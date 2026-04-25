@@ -70,7 +70,7 @@ function deriveStatus(outcome: ChallengePayload['outcome']): GameStatus {
 function apiAttemptsToGuesses(
   attempts: ChallengePayload['attempts']
 ): GuessEntry[] {
-  return attempts.map((a) => ({
+  return attempts.map((a: { guess: string; correct: boolean }): GuessEntry => ({
     value: a.guess,
     status: a.correct ? 'correct' : 'wrong',
     timestamp: Date.now(),
@@ -158,7 +158,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // ── submitGuess ───────────────────────────────────────────────────────────
 
   submitGuess: async (guess: string) => {
-    const { challenge, guesses, ui, stats } = get()
+    const { challenge, guesses, stats } = get()
     if (!challenge || !guess.trim()) return
 
     // Optimistic UI: append guess immediately

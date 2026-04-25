@@ -81,7 +81,7 @@ function getTodayUTC(): string {
 export function getTodayChallenge(): ChallengeRow {
   const today = getTodayUTC();
   const row = db
-    .prepare<[], ChallengeRow>(
+    .prepare<[string], ChallengeRow>(
       `SELECT dc.* FROM daily_challenges dc
        WHERE dc.challenge_date = ?`
     )

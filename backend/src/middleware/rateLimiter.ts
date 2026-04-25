@@ -15,13 +15,14 @@ import rateLimit, { Options } from 'express-rate-limit';
 export function createRateLimiter(
   opts: Partial<Options> & { max: number; windowMs: number }
 ) {
+  const { max, windowMs, ...rest } = opts;
   return rateLimit({
-    windowMs: opts.windowMs,
-    max: opts.max,
+    windowMs,
+    max,
     standardHeaders: true,  // Return `RateLimit-*` headers
     legacyHeaders: false,
     message: { error: 'Too many requests, please slow down.' },
-    ...opts,
+    ...rest,
   });
 }
 
