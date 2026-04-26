@@ -1,73 +1,128 @@
-# React + TypeScript + Vite
+# FrameQuest 🎬
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Jeu quotidien : devine le film à partir d'une image et d'indices progressifs. Un nouveau film chaque jour.
 
-Currently, two official plugins are available:
+## Prérequis
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- [Node.js](https://nodejs.org) v18+
+- npm v9+
 
-## React Compiler
+## Lancement en local
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Le projet est composé de deux parties : un **frontend** React/Vite et un **backend** Express/SQLite. Il faut lancer les deux en parallèle.
 
-## Expanding the ESLint configuration
+### 1. Backend
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+```bash
+cd backend
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+# Installer les dépendances
+npm install
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+# Configurer l'environnement
+cp .env.example .env
+# Le fichier .env fonctionne tel quel pour le dev local.
+# Optionnel : changer COOKIE_SECRET pour plus de sécurité.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Créer la base de données et appliquer le schéma
+npm run db:migrate
+
+# Remplir la base avec les films et planifier les défis
+npm run db:seed
+
+# Démarrer le serveur API (port 3001, hot-reload)
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+L'API est disponible sur `http://localhost:3001`.  
+Vérification : `curl http://localhost:3001/health` doit retourner `{"status":"ok"}`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+---
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 2. Frontend
+
+Dans un second terminal, depuis la **racine du projet** :
+
+```bash
+npm install
+npm run dev
 ```
+
+Le frontend est disponible sur `http://localhost:5173`.
+
+---
+
+## Structure du projet
+
+```
+/
+├── src/                        # Frontend React + TypeScript
+│   ├── api/client.ts           # Appels API typés
+│   ├── components/
+│   │   ├── game/               # Composants du jeu (image, input, indices...)
+│   │   ├── modals/             # Victoire, défaite, règles, stats
+│   │   ├── layout/             # Header
+│   │   └── ui/                 # Composants réutilisables (Button, Badge...)
+│   ├── hooks/                  # useAutocomplete, useKeyboard
+│   ├── store/gameStore.ts      # État global Zustand
+│   └── types/index.ts          # Types TypeScript partagés
+│
+└── backend/
+    ├── src/
+    │   ├── routes/             # challenge.ts, films.ts, stats.ts
+    │   ├── services/           # challenge.service.ts (logique métier)
+    │   ├── middleware/         # session, rateLimiter, errorHandler
+    │   └── db/                 # schema.sql, migrate.ts, database.ts
+    └── scripts/
+        ├── seed.ts             # Peuplement initial (films + planning)
+        └── reset.ts            # Remise à zéro (dev uniquement)
+```
+
+## Scripts utiles
+
+### Backend
+
+| Commande | Description |
+|----------|-------------|
+| `npm run dev` | Serveur avec hot-reload |
+| `npm run build` | Compile TypeScript → `dist/` |
+| `npm run db:migrate` | Applique le schéma SQL (idempotent) |
+| `npm run db:seed` | Insère les films et planifie 60 jours |
+| `npm run db:reset` | Supprime et recrée la base (dev uniquement) |
+
+### Frontend
+
+| Commande | Description |
+|----------|-------------|
+| `npm run dev` | Serveur Vite avec hot-reload |
+| `npm run build` | Build de production dans `dist/` |
+
+## Variables d'environnement
+
+Voir `backend/.env.example` pour la liste complète. Les valeurs par défaut fonctionnent en local sans modification.
+
+| Variable | Valeur locale | Description |
+|----------|--------------|-------------|
+| `PORT` | `3001` | Port du serveur API |
+| `DATABASE_PATH` | `./data/moviegame.db` | Chemin du fichier SQLite |
+| `COOKIE_SECRET` | *(voir .env.example)* | Secret pour signer les cookies de session |
+| `CORS_ORIGIN` | `http://localhost:5173` | Origine autorisée (frontend) |
+| `IMAGE_SOURCE` | `tmdb` | Source des images (`tmdb` ou `local`) |
+
+## API
+
+| Méthode | Route | Description |
+|---------|-------|-------------|
+| `GET` | `/api/challenge/today` | Défi du jour (sans le titre) |
+| `POST` | `/api/challenge/guess` | Soumettre une tentative `{ guess: string }` |
+| `GET` | `/api/challenge/result` | Révéler le film (fin de partie uniquement) |
+| `GET` | `/api/films/search?q=` | Autocomplétion des titres |
+| `GET` | `/api/stats` | Statistiques globales anonymes |
+| `GET` | `/health` | Vérification de santé du serveur |
+
+## Déploiement
+
+- **Frontend** → [Vercel](https://vercel.com) (détection Vite automatique, `vercel.json` inclus)
+- **Backend** → [Railway](https://railway.app) (`backend/railway.toml` inclus)
+
+Voir la section déploiement dans la doc du projet pour les étapes complètes.
