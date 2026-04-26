@@ -1,0 +1,10 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+# db:migrate is idempotent (IF NOT EXISTS) — safe on every deploy.
+# Run db:seed manually once from the Railway console after first deploy:
+#   npm run db:seed
+startCommand = "npm run build && npm run db:migrate && node dist/server.js"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
