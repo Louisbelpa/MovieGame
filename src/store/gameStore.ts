@@ -329,8 +329,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 export const selectAttemptsLeft = (s: GameStore) =>
   (s.challenge?.maxAttempts ?? 6) - s.guesses.length
 
+const EMPTY_HINTS: ChallengePayload['hints'] = []
+
 export const selectCurrentHints = (s: GameStore) =>
-  s.challenge?.hints.slice(0, s.hintsRevealed) ?? []
+  s.challenge ? s.challenge.hints.slice(0, s.hintsRevealed) : EMPTY_HINTS
 
 export const selectIsGameOver = (s: GameStore) =>
   s.status === 'won' || s.status === 'lost'

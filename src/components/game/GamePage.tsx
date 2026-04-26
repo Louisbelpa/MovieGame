@@ -6,6 +6,7 @@
 
 import { useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { useShallow } from 'zustand/react/shallow'
 import { MovieImage } from './MovieImage'
 import { GuessInput } from './GuessInput'
 import { GuessList } from './GuessList'
@@ -26,7 +27,7 @@ export function GamePage() {
   const hintsRevealed = useGameStore((s) => s.hintsRevealed)
 
   const attemptsLeft = useGameStore(selectAttemptsLeft)
-  const currentHints = useGameStore(selectCurrentHints)
+  const currentHints = useGameStore(useShallow(selectCurrentHints))
   const isGameOver = useGameStore(selectIsGameOver)
 
   // Bootstrap on mount
