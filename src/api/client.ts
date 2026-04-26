@@ -4,7 +4,7 @@
  * All requests include credentials (cookie-based session).
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
 // ─── Generic fetch wrapper ────────────────────────────────────────────────────
 
@@ -96,35 +96,35 @@ export interface GlobalStatsPayload {
 
 // ─── Endpoints ────────────────────────────────────────────────────────────────
 
-/** GET /api/challenge – today's challenge + current session state */
+/** GET /api/challenge/today – today's challenge + current session state */
 export function fetchChallenge(): Promise<ChallengePayload> {
-  return request<ChallengePayload>('/api/challenge')
+  return request<ChallengePayload>('/api/challenge/today')
 }
 
 /**
- * POST /api/challenge/:challengeId/guess
+ * POST /api/challenge/guess
  * Body: { guess: string }
  */
 export function postGuess(
-  challengeId: number,
+  _challengeId: number,
   guess: string
 ): Promise<GuessResultPayload> {
   return request<GuessResultPayload>(
-    `/api/challenge/${challengeId}/guess`,
+    '/api/challenge/guess',
     { method: 'POST', body: JSON.stringify({ guess }) }
   )
 }
 
 /**
- * GET /api/challenge/:challengeId/result
+ * GET /api/challenge/result
  * Only succeeds when outcome !== null
  */
-export function fetchResult(challengeId: number): Promise<ResultPayload> {
-  return request<ResultPayload>(`/api/challenge/${challengeId}/result`)
+export function fetchResult(_challengeId: number): Promise<ResultPayload> {
+  return request<ResultPayload>('/api/challenge/result')
 }
 
 /**
- * GET /api/search?q=<query>
+ * GET /api/films/search?q=<query>
  * Autocomplete – excludes today's answer server-side
  */
 export function searchMovies(
@@ -132,10 +132,10 @@ export function searchMovies(
   limit = 8
 ): Promise<SearchResultPayload[]> {
   const params = new URLSearchParams({ q: query, limit: String(limit) })
-  return request<SearchResultPayload[]>(`/api/search?${params}`)
+  return request<SearchResultPayload[]>(`/api/films/search?${params}`)
 }
 
-/** GET /api/stats/global */
+/** GET /api/stats */
 export function fetchGlobalStats(): Promise<GlobalStatsPayload> {
-  return request<GlobalStatsPayload>('/api/stats/global')
+  return request<GlobalStatsPayload>('/api/stats')
 }
