@@ -46,7 +46,8 @@ export interface ChallengePayload {
   challengeId: number
   challengeNumber: number
   date: string
-  imageUrl: string | null           // null until game over
+  imageUrl: string                  // always present; frontend applies CSS blur
+  isGameOver: boolean
   hintsAvailable: number
   hintsRevealed: number
   hints: HintPayload[]

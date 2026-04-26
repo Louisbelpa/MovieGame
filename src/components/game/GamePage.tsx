@@ -23,7 +23,6 @@ export function GamePage() {
   const challenge = useGameStore((s) => s.challenge)
   const guesses = useGameStore((s) => s.guesses)
   const status = useGameStore((s) => s.status)
-  const currentBlurPx = useGameStore((s) => s.currentBlurPx)
   const hintsRevealed = useGameStore((s) => s.hintsRevealed)
 
   const attemptsLeft = useGameStore(selectAttemptsLeft)
@@ -58,12 +57,7 @@ export function GamePage() {
 
   // ── Game view ──────────────────────────────────────────────────────────────
 
-  // The image URL is only provided after game over. Before that, we use a
-  // blurred placeholder image if a blurred_url hint was unlocked.
-  const blurredHint = currentHints.find((h) => h.type === 'image_blurred')
-  const displayImageUrl =
-    challenge.imageUrl ??                        // game over: full image
-    (blurredHint ? String(blurredHint.value) : null) // blurred stub from hints
+  const displayImageUrl = challenge.imageUrl
 
   return (
     <motion.main
@@ -76,7 +70,7 @@ export function GamePage() {
       <section>
         <MovieImage
           imageUrl={displayImageUrl}
-          blurPx={isGameOver ? 0 : currentBlurPx}
+          blurPx={0}
           attempt={guesses.length + 1}
         />
       </section>

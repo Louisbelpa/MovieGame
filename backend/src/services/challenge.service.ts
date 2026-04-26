@@ -163,15 +163,17 @@ export function buildChallengePayload(
     }
   });
 
-  // The main image (full resolution) is only revealed after game ends
   const isGameOver = session.outcome !== null;
-  const imageUrl = isGameOver ? resolveImageUrl(film.image_url) : null;
+  // Always send the image URL — the frontend applies CSS blur that decreases
+  // with each wrong guess. Full unblurred reveal only happens on game over.
+  const imageUrl = resolveImageUrl(film.image_url);
 
   return {
     challengeId: challenge.id,
     challengeNumber: challenge.challenge_number,
     date: challenge.challenge_date,
-    imageUrl,                    // null until game over
+    imageUrl,
+    isGameOver,
     hintsAvailable: schedule.length,
     hintsRevealed: hintsRevealed,
     hints,
