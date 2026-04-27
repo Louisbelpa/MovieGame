@@ -121,6 +121,13 @@ interface ChallengeWithFilm extends ChallengeRow {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const TMDB_BASE_ADMIN = process.env.TMDB_IMAGE_BASE_URL ?? 'https://image.tmdb.org/t/p/w1280';
+
+function resolveAdminImageUrl(url: string): string {
+  if (!url) return url;
+  return url.startsWith('http') ? url : `${TMDB_BASE_ADMIN}${url}`;
+}
+
 function parseDateParam(raw: unknown): string | null {
   if (typeof raw !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
   return raw;
@@ -137,13 +144,9 @@ function formatFilm(row: FilmRow) {
     cast_members: JSON.parse(row.cast_members) as string[],
     tagline: row.tagline,
     synopsis: row.synopsis,
-    image_url: row.image_url,
-    image_blurred_url: row.image_blurred_url,
+    image_url: resolveAdminImageUrl(row.image_url),
     tmdb_id: row.tmdb_id,
-    imdb_id: row.imdb_id,
     is_active: row.is_active === 1,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
   };
 }
 
