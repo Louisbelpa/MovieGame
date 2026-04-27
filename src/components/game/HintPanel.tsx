@@ -5,7 +5,7 @@
  */
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { Calendar, Clapperboard, User, Users, FileText, Globe, Tag, Eye } from 'lucide-react'
+import { Calendar, Clapperboard, User, Users, FileText, Tag } from 'lucide-react'
 import type { HintPayload } from '@/api/client'
 
 interface HintPanelProps {
@@ -81,14 +81,12 @@ const HINT_META: Record<
   string,
   { icon: typeof Calendar; label: string }
 > = {
-  year:         { icon: Calendar,    label: 'Année' },
-  director:     { icon: Clapperboard, label: 'Réalisateur' },
-  genres:       { icon: Tag,         label: 'Genres' },
-  cast:         { icon: Users,       label: 'Acteurs' },
-  tagline:      { icon: FileText,    label: 'Accroche' },
-  synopsis:     { icon: FileText,    label: 'Synopsis' },
-  country:      { icon: Globe,       label: 'Pays' },
-  image_blurred:{ icon: Eye,         label: 'Image floue' },
+  year:     { icon: Calendar,     label: 'Année' },
+  director: { icon: Clapperboard, label: 'Réalisateur' },
+  genres:   { icon: Tag,          label: 'Genres' },
+  cast:     { icon: Users,        label: 'Acteurs' },
+  tagline:  { icon: FileText,     label: 'Accroche' },
+  synopsis: { icon: FileText,     label: 'Synopsis' },
 }
 
 function resolveHint(hint: HintPayload): {
@@ -98,15 +96,6 @@ function resolveHint(hint: HintPayload): {
 } {
   const meta = HINT_META[hint.type] ?? { icon: User, label: hint.type }
   const val = hint.value
-
-  let formatted: string
-  if (Array.isArray(val)) {
-    formatted = val.join(', ')
-  } else if (hint.type === 'image_blurred') {
-    formatted = '(voir ci-dessus)'
-  } else {
-    formatted = String(val)
-  }
-
+  const formatted = Array.isArray(val) ? val.join(', ') : String(val)
   return { ...meta, formatted }
 }

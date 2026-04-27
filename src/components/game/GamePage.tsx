@@ -70,7 +70,6 @@ export function GamePage() {
       <section>
         <MovieImage
           imageUrl={displayImageUrl}
-          blurPx={0}
           attempt={guesses.length + 1}
         />
       </section>

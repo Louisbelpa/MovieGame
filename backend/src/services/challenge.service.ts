@@ -140,33 +140,17 @@ export function buildChallengePayload(
   // Build revealed hints array – one object per unlocked hint
   const hints = schedule.slice(0, hintsRevealed).map((type) => {
     switch (type) {
-      case 'image_blurred':
-        return {
-          type,
-          value: film.image_blurred_url
-            ? resolveImageUrl(film.image_blurred_url)
-            : resolveImageUrl(film.image_url),
-        };
-      case 'year':
-        return { type, value: film.year };
-      case 'director':
-        return { type, value: film.director };
-      case 'genres':
-        return { type, value: JSON.parse(film.genres) as string[] };
-      case 'cast':
-        return { type, value: JSON.parse(film.cast_members) as string[] };
-      case 'tagline':
-        return { type, value: film.tagline ?? '' };
-      case 'synopsis':
-        return { type, value: film.synopsis ?? '' };
-      default:
-        return { type, value: null };
+      case 'year':     return { type, value: film.year };
+      case 'director': return { type, value: film.director };
+      case 'genres':   return { type, value: JSON.parse(film.genres) as string[] };
+      case 'cast':     return { type, value: JSON.parse(film.cast_members) as string[] };
+      case 'tagline':  return { type, value: film.tagline ?? '' };
+      case 'synopsis': return { type, value: film.synopsis ?? '' };
+      default:         return { type, value: null };
     }
   });
 
   const isGameOver = session.outcome !== null;
-  // Always send the image URL — the frontend applies CSS blur that decreases
-  // with each wrong guess. Full unblurred reveal only happens on game over.
   const imageUrl = resolveImageUrl(film.image_url);
 
   return {

@@ -33,7 +33,6 @@ interface GameStore {
   guesses: GuessEntry[]
   hintsRevealed: number
   status: GameStatus
-  currentBlurPx: number
 
   // Personal stats (localStorage only)
   stats: GameStats
@@ -49,14 +48,6 @@ interface GameStore {
   closeModal: () => void
   setInputValue: (value: string) => void
   shareResult: () => void
-}
-
-// ─── Blur levels (index = hintsRevealed, value = blur px) ───────────────────
-
-const BLUR_TABLE = [28, 20, 14, 8, 3, 0] as const
-
-function blurForHints(hintsRevealed: number): number {
-  return BLUR_TABLE[Math.min(hintsRevealed, BLUR_TABLE.length - 1)]
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -114,7 +105,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
   guesses: [],
   hintsRevealed: 0,
   status: 'idle',
-  currentBlurPx: BLUR_TABLE[0],
   stats: loadStats(),
   ui: defaultUI(),
 
@@ -133,7 +123,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         guesses,
         hintsRevealed,
         status,
-        currentBlurPx: blurForHints(hintsRevealed),
       })
 
       // If game already over (user returns same day), fetch result & open modal
@@ -188,8 +177,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         guesses: updatedGuesses,
         hintsRevealed: newHintsRevealed,
         status: newStatus,
-        currentBlurPx: blurForHints(newHintsRevealed),
-        // Sync hints from server so newly-unlocked hints appear immediately
         challenge: { ...challenge, hints: res.challenge.hints, hintsRevealed: newHintsRevealed },
       })
 
@@ -258,7 +245,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         guesses: updatedGuesses,
         hintsRevealed: newHintsRevealed,
         status: newStatus,
-        currentBlurPx: blurForHints(newHintsRevealed),
         challenge: { ...challenge, hints: res.challenge.hints, hintsRevealed: newHintsRevealed },
       })
 

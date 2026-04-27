@@ -1,23 +1,18 @@
 /**
  * game/MovieImage.tsx
- * The central movie still with animated blur reveal.
- * Blur is driven by `blurPx` prop; Framer Motion animates transitions.
+ * The central movie still.
  */
 
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
 interface MovieImageProps {
-  /** CDN URL of the full-resolution still (null until game over) */
   imageUrl: string | null
-  /** Active blur in px (0 = clear) */
-  blurPx: number
-  /** Current attempt number for aria label */
   attempt: number
   className?: string
 }
 
-export function MovieImage({ imageUrl, blurPx, attempt, className }: MovieImageProps) {
+export function MovieImage({ imageUrl, attempt, className }: MovieImageProps) {
   return (
     <div
       className={cn(
@@ -28,27 +23,19 @@ export function MovieImage({ imageUrl, blurPx, attempt, className }: MovieImageP
     >
       {imageUrl ? (
         <motion.img
-          key={blurPx} // re-mount triggers entry animation
+          key={imageUrl}
           src={imageUrl}
           alt="Extrait du film à deviner"
           className="w-full h-full object-cover"
-          initial={{ filter: `blur(${blurPx + 8}px)`, opacity: 0.7 }}
-          animate={{ filter: `blur(${blurPx}px)`, opacity: 1 }}
-          transition={{ duration: 0.7, ease: 'easeOut' }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
           draggable={false}
         />
       ) : (
-        /* Placeholder while image URL is not yet known */
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
           <FilmStripIcon />
           <p className="text-film-text-dim text-sm">Image révélée à la fin</p>
-        </div>
-      )}
-
-      {/* Blur level indicator – subtle pill bottom-right */}
-      {blurPx > 0 && imageUrl && (
-        <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-full bg-black/60 text-film-text-dim text-xs backdrop-blur-sm">
-          flou {blurPx}px
         </div>
       )}
     </div>
@@ -77,3 +64,4 @@ function FilmStripIcon() {
     </svg>
   )
 }
+

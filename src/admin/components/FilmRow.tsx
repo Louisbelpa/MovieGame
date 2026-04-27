@@ -27,19 +27,19 @@ export function FilmRow({ film, onEdit, onDelete, onBackdrops, onUpload }: FilmR
   return (
     <tr className="hover:bg-gray-50 transition-colors">
       {/* Thumbnail */}
-      <td className="px-4 py-3 w-14">
+      <td className="px-4 py-3 w-24">
         {film.image_url ? (
           <img
             src={film.image_url}
             alt={film.title}
-            className="w-10 h-7 object-cover rounded border border-gray-200"
+            className="w-20 h-12 object-cover rounded-md border border-gray-200"
             onError={(e) => {
               e.currentTarget.style.display = 'none'
             }}
           />
         ) : (
-          <div className="w-10 h-7 bg-gray-100 rounded flex items-center justify-center">
-            <Clapperboard size={13} className="text-gray-400" />
+          <div className="w-20 h-12 bg-gray-100 rounded-md flex items-center justify-center">
+            <Clapperboard size={16} className="text-gray-400" />
           </div>
         )}
       </td>

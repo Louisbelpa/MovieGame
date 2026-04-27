@@ -821,7 +821,7 @@ adminRouter.get(
         .slice(0, 12)
         .map((b) => ({
           path: b.file_path,
-          url: `https://image.tmdb.org/t/p/w780${b.file_path}`,
+          url: `https://image.tmdb.org/t/p/w1280${b.file_path}`,
           width: b.width,
           height: b.height,
           vote_average: b.vote_average,
