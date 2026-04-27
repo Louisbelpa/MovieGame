@@ -3,16 +3,17 @@
  * A single row in the films table.
  */
 
-import { Pencil, Trash2, Clapperboard } from 'lucide-react'
+import { Pencil, Trash2, Clapperboard, Images } from 'lucide-react'
 import type { AdminFilm } from '../api'
 
 interface FilmRowProps {
   film: AdminFilm
   onEdit: (film: AdminFilm) => void
   onDelete: (film: AdminFilm) => void
+  onBackdrops: (film: AdminFilm) => void
 }
 
-export function FilmRow({ film, onEdit, onDelete }: FilmRowProps) {
+export function FilmRow({ film, onEdit, onDelete, onBackdrops }: FilmRowProps) {
   return (
     <tr className="hover:bg-gray-50 transition-colors">
       {/* Thumbnail */}
@@ -63,6 +64,13 @@ export function FilmRow({ film, onEdit, onDelete }: FilmRowProps) {
       {/* Actions */}
       <td className="px-4 py-3 text-right">
         <div className="flex items-center justify-end gap-1.5">
+          <button
+            onClick={() => onBackdrops(film)}
+            title="Backdrops TMDB"
+            className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+          >
+            <Images size={15} />
+          </button>
           <button
             onClick={() => onEdit(film)}
             title="Modifier"

@@ -158,3 +158,20 @@ export async function updateChallenge(
 export async function deleteChallenge(id: number): Promise<void> {
   return request<void>(`/api/admin/challenges/${id}`, { method: 'DELETE' })
 }
+
+// ─── TMDB Backdrops ───────────────────────────────────────────────────────────
+
+export interface TmdbBackdrop {
+  path: string
+  url: string
+  width: number
+  height: number
+  vote_average: number
+}
+
+export async function getFilmBackdrops(filmId: number): Promise<TmdbBackdrop[]> {
+  const res = await request<{ backdrops: TmdbBackdrop[] }>(
+    `/api/admin/films/${filmId}/backdrops`
+  )
+  return res.backdrops
+}

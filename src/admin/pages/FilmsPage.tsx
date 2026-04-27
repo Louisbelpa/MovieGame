@@ -16,6 +16,7 @@ import {
 import { AdminLayout } from '../components/AdminLayout'
 import { FilmForm } from '../components/FilmForm'
 import { FilmRow } from '../components/FilmRow'
+import { BackdropPicker } from '../components/BackdropPicker'
 
 // ─── Simple modal wrapper ─────────────────────────────────────────────────────
 
@@ -98,6 +99,7 @@ type ModalState =
   | { type: 'create' }
   | { type: 'edit'; film: AdminFilm }
   | { type: 'delete'; film: AdminFilm }
+  | { type: 'backdrops'; film: AdminFilm }
   | null
 
 export function FilmsPage() {
@@ -129,6 +131,13 @@ export function FilmsPage() {
   async function handleEdit(payload: FilmPayload) {
     if (modal?.type !== 'edit') return
     await updateFilm(modal.film.id, payload)
+    setModal(null)
+    load()
+  }
+
+  async function handleBackdropSelect(imageUrl: string) {
+    if (modal?.type !== 'backdrops') return
+    await updateFilm(modal.film.id, { ...modal.film, image_url: imageUrl })
     setModal(null)
     load()
   }
@@ -217,6 +226,7 @@ export function FilmsPage() {
                   film={film}
                   onEdit={(f) => setModal({ type: 'edit', film: f })}
                   onDelete={(f) => setModal({ type: 'delete', film: f })}
+                  onBackdrops={(f) => setModal({ type: 'backdrops', film: f })}
                 />
               ))}
             </tbody>
@@ -252,6 +262,14 @@ export function FilmsPage() {
           onConfirm={handleDelete}
           onCancel={() => setModal(null)}
           loading={deleteLoading}
+        />
+      )}
+
+      {modal?.type === 'backdrops' && (
+        <BackdropPicker
+          filmId={modal.film.id}
+          onSelect={handleBackdropSelect}
+          onClose={() => setModal(null)}
         />
       )}
     </AdminLayout>

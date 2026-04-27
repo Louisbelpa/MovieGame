@@ -607,6 +607,80 @@ adminRouter.delete(
   }
 );
 
+// ─── TMDB Backdrops ───────────────────────────────────────────────────────────
+
+interface TmdbImageEntry {
+  file_path: string;
+  width: number;
+  height: number;
+  vote_average: number;
+}
+
+interface TmdbImagesResponse {
+  backdrops: TmdbImageEntry[];
+}
+
+// GET /api/admin/films/:id/backdrops
+adminRouter.get(
+  '/films/:id/backdrops',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        res.status(400).json({ error: 'Invalid film id.' });
+        return;
+      }
+
+      const film = db
+        .prepare<[number], Pick<FilmRow, 'tmdb_id'>>(`SELECT tmdb_id FROM films WHERE id = ?`)
+        .get(id);
+
+      if (!film) {
+        res.status(404).json({ error: 'Film not found.' });
+        return;
+      }
+
+      if (!film.tmdb_id) {
+        res.status(400).json({ error: 'No TMDB ID for this film' });
+        return;
+      }
+
+      const apiKey = process.env.TMDB_API_KEY;
+      if (!apiKey) {
+        res.status(400).json({ error: 'TMDB_API_KEY not configured' });
+        return;
+      }
+
+      const url =
+        `https://api.themoviedb.org/3/movie/${film.tmdb_id}/images` +
+        `?api_key=${apiKey}&include_image_language=null`;
+
+      const tmdbRes = await fetch(url);
+      if (!tmdbRes.ok) {
+        res.status(502).json({ error: `TMDB error: ${tmdbRes.status}` });
+        return;
+      }
+
+      const data = (await tmdbRes.json()) as TmdbImagesResponse;
+
+      const backdrops = (data.backdrops ?? [])
+        .sort((a, b) => b.vote_average - a.vote_average)
+        .slice(0, 12)
+        .map((b) => ({
+          path: b.file_path,
+          url: `https://image.tmdb.org/t/p/w780${b.file_path}`,
+          width: b.width,
+          height: b.height,
+          vote_average: b.vote_average,
+        }));
+
+      res.json({ backdrops });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
 // GET /api/admin/stats
