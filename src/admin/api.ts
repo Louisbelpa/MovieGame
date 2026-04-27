@@ -176,6 +176,10 @@ export async function getFilmBackdrops(filmId: number): Promise<TmdbBackdrop[]> 
   return res.backdrops
 }
 
+export async function getRandomTmdbFilm(): Promise<FilmPayload> {
+  return request<FilmPayload>('/api/admin/tmdb/random')
+}
+
 export async function uploadFilmImage(
   filmId: number,
   file: File

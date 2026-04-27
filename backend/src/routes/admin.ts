@@ -907,3 +907,96 @@ adminRouter.get(
     }
   }
 );
+
+// ─── TMDB Random Film ─────────────────────────────────────────────────────────
+
+// GET /api/admin/tmdb/random
+// Fetches a random well-known film from TMDB and returns it as a FilmPayload.
+adminRouter.get(
+  '/tmdb/random',
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const apiKey = process.env.TMDB_API_KEY;
+      if (!apiKey) {
+        res.status(400).json({ error: 'TMDB_API_KEY not configured' });
+        return;
+      }
+
+      // Random page across popular films (vote_count ≥ 500 keeps results well-known)
+      const page = Math.floor(Math.random() * 50) + 1;
+      const discoverUrl =
+        `https://api.themoviedb.org/3/discover/movie` +
+        `?api_key=${apiKey}&language=fr-FR&sort_by=vote_count.desc` +
+        `&vote_count.gte=500&page=${page}`;
+
+      const discoverRes = await fetch(discoverUrl);
+      if (!discoverRes.ok) {
+        res.status(502).json({ error: `TMDB discover error: ${discoverRes.status}` });
+        return;
+      }
+      const discoverData = (await discoverRes.json()) as { results: { id: number }[] };
+      const results = discoverData.results ?? [];
+      if (results.length === 0) {
+        res.status(502).json({ error: 'No results from TMDB' });
+        return;
+      }
+
+      const picked = results[Math.floor(Math.random() * results.length)];
+
+      // Fetch details, credits and images in parallel
+      const [detailsRes, creditsRes, imagesRes] = await Promise.all([
+        fetch(`https://api.themoviedb.org/3/movie/${picked.id}?api_key=${apiKey}&language=fr-FR`),
+        fetch(`https://api.themoviedb.org/3/movie/${picked.id}/credits?api_key=${apiKey}`),
+        fetch(`https://api.themoviedb.org/3/movie/${picked.id}/images?api_key=${apiKey}&include_image_language=null`),
+      ]);
+
+      const details = (await detailsRes.json()) as {
+        id: number; title: string; original_title: string;
+        release_date: string; tagline: string; overview: string;
+        backdrop_path: string | null;
+        genres: { name: string }[];
+      };
+      const credits = (await creditsRes.json()) as {
+        crew: { job: string; name: string }[];
+        cast: { name: string }[];
+      };
+      const images = (await imagesRes.json()) as {
+        backdrops: { file_path: string; vote_average: number }[];
+      };
+
+      const director = credits.crew?.find((c) => c.job === 'Director')?.name ?? '';
+      const cast = (credits.cast ?? []).slice(0, 5).map((c) => c.name);
+      const genres = (details.genres ?? []).map((g) => g.name);
+
+      // Best backdrop or fallback to TMDB backdrop_path
+      const bestBackdrop = (images.backdrops ?? [])
+        .sort((a, b) => b.vote_average - a.vote_average)[0];
+      const imageUrl = bestBackdrop
+        ? `https://image.tmdb.org/t/p/w1280${bestBackdrop.file_path}`
+        : details.backdrop_path
+        ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}`
+        : '';
+
+      const titleAliases: string[] = [];
+      if (details.original_title && details.original_title !== details.title) {
+        titleAliases.push(details.original_title);
+      }
+
+      res.json({
+        title: details.title,
+        title_aliases: titleAliases,
+        year: details.release_date ? parseInt(details.release_date.slice(0, 4), 10) : 0,
+        director,
+        genres,
+        cast_members: cast,
+        tagline: details.tagline ?? '',
+        synopsis: details.overview ?? '',
+        image_url: imageUrl,
+        tmdb_id: details.id,
+        is_active: true,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);

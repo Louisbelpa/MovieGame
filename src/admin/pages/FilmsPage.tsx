@@ -4,13 +4,14 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, Search, X } from 'lucide-react'
+import { Plus, Search, X, Shuffle } from 'lucide-react'
 import {
   getFilms,
   createFilm,
   updateFilm,
   deleteFilm,
   uploadFilmImage,
+  getRandomTmdbFilm,
   type AdminFilm,
   type FilmPayload,
 } from '../api'
@@ -97,7 +98,7 @@ function ConfirmDeleteModal({
 // ─── FilmsPage ────────────────────────────────────────────────────────────────
 
 type ModalState =
-  | { type: 'create' }
+  | { type: 'create'; initial?: Partial<AdminFilm> }
   | { type: 'edit'; film: AdminFilm }
   | { type: 'delete'; film: AdminFilm }
   | { type: 'backdrops'; film: AdminFilm }
@@ -110,11 +111,25 @@ export function FilmsPage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [modal, setModal] = useState<ModalState>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [randomLoading, setRandomLoading] = useState(false)
   const [search, setSearch] = useState('')
 
   function showSuccess(msg: string) {
     setSuccess(msg)
     setTimeout(() => setSuccess(null), 3000)
+  }
+
+  async function handleRandomFilm() {
+    setRandomLoading(true)
+    setError(null)
+    try {
+      const film = await getRandomTmdbFilm()
+      setModal({ type: 'create', initial: film as Partial<AdminFilm> })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur TMDB')
+    } finally {
+      setRandomLoading(false)
+    }
   }
 
   const load = useCallback(() => {
@@ -205,13 +220,26 @@ export function FilmsPage() {
           />
         </div>
 
-        <button
-          onClick={() => setModal({ type: 'create' })}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
-        >
-          <Plus size={16} />
-          Ajouter un film
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRandomFilm}
+            disabled={randomLoading}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors disabled:opacity-50"
+          >
+            {randomLoading
+              ? <span className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+              : <Shuffle size={16} />
+            }
+            Film aléatoire
+          </button>
+          <button
+            onClick={() => setModal({ type: 'create' })}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            <Plus size={16} />
+            Ajouter un film
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -272,7 +300,11 @@ export function FilmsPage() {
       {/* Modals */}
       {modal?.type === 'create' && (
         <Modal title="Ajouter un film" onClose={() => setModal(null)}>
-          <FilmForm onSubmit={handleCreate} onCancel={() => setModal(null)} />
+          <FilmForm
+            initial={modal.initial}
+            onSubmit={handleCreate}
+            onCancel={() => setModal(null)}
+          />
         </Modal>
       )}
 
