@@ -23,6 +23,10 @@ dist-ssr
 *.db-wal
 backend/data/
 
+# Build outputs
+backend/public/
+backend/dist/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
