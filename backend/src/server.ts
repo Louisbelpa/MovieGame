@@ -25,6 +25,17 @@ import { createRateLimiter } from './middleware/rateLimiter.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// ─── Production safety checks ─────────────────────────────────────────────────
+if (process.env.NODE_ENV === 'production') {
+  const missing = ['COOKIE_SECRET', 'ADMIN_PASSWORD', 'CORS_ORIGIN'].filter(
+    (v) => !process.env[v]
+  );
+  if (missing.length) {
+    console.error(`Missing required env vars: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+}
+
 const app = express();
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:5173';

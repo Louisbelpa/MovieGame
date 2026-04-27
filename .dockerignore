@@ -1,0 +1,12 @@
+node_modules
+backend/node_modules
+backend/dist
+backend/public
+backend/data
+dist
+.env
+.env.local
+.env.*.local
+*.db
+*.db-shm
+*.db-wal

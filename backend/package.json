@@ -5,8 +5,8 @@
   "description": "Backend API for the MovieGame daily cinema challenge",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js",
+    "build": "tsc && node -e \"require('fs').copyFileSync('src/db/schema.sql','dist/db/schema.sql')\"",
+    "start": "node dist/db/migrate.js && node dist/server.js",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "db:reset": "node --input-type=module -e \"import{rmSync}from'fs';rmSync(process.env.DATABASE_PATH??'data/moviegame.db',{force:true})\" && npm run db:migrate && npm run db:seed",
