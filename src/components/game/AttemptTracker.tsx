@@ -25,7 +25,7 @@ export function AttemptTracker({ guesses, maxAttempts }: AttemptTrackerProps) {
             key={i}
             aria-hidden
             className={cn(
-              'w-2.5 h-2.5 rounded-full transition-all duration-300',
+              'w-3 h-3 sm:w-2.5 sm:h-2.5 rounded-full transition-all duration-300',
               !guess
                 ? 'bg-film-border'
                 : guess.status === 'correct'

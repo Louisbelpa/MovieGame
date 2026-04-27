@@ -43,7 +43,7 @@ function GuessSlot({ index, guess }: GuessSlotProps) {
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.25, delay: 0.05 }}
       className={cn(
-        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
+        'flex items-center gap-3 px-3 py-3 sm:py-2.5 rounded-lg text-sm transition-colors',
         isEmpty
           ? 'border border-dashed border-film-border/50 text-film-text-dim/40'
           : guess.status === 'correct'

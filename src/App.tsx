@@ -19,18 +19,16 @@ const RULES_SEEN_KEY = 'cineguess:rules_seen'
 
 function useFirstVisit() {
   const openModal = useGameStore((s) => s.openModal)
+  // Wait for the game to finish loading before showing the tutorial so no
+  // concurrent state updates (initGame, win/lose modals) can override it.
+  const status = useGameStore((s) => s.status)
 
   useEffect(() => {
-    const seen = localStorage.getItem(RULES_SEEN_KEY)
-    if (!seen) {
-      // Delay slightly so the game loads first
-      const t = setTimeout(() => {
-        openModal('rules')
-        localStorage.setItem(RULES_SEEN_KEY, '1')
-      }, 400)
-      return () => clearTimeout(t)
-    }
-  }, [openModal])
+    if (status === 'idle') return
+    if (localStorage.getItem(RULES_SEEN_KEY)) return
+    localStorage.setItem(RULES_SEEN_KEY, '1')
+    openModal('rules')
+  }, [status, openModal])
 }
 
 // ─── App ──────────────────────────────────────────────────────────────────────

@@ -76,7 +76,7 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
         key={shakeTrigger}
         className={cn(
           'flex items-center gap-2 p-1 pl-3 rounded-xl film-border',
-          'focus-within:border-film-gold/60 transition-colors',
+          'focus-within:border-film-gold/60 transition-colors min-h-[52px]',
           disabled && 'opacity-50'
         )}
         animate={shakeTrigger > 0 ? { x: [-8, 8, -5, 5, 0] } : {}}
@@ -115,7 +115,7 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
           onClick={onSkip}
           disabled={disabled}
           title="Passer cette tentative"
-          className="shrink-0 text-film-text-dim"
+          className="shrink-0 text-film-text-dim min-h-[44px] min-w-[44px]"
         >
           <SkipForward size={14} />
           <span className="hidden sm:inline">Passer</span>
@@ -126,7 +126,7 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
           size="sm"
           onClick={() => inputValue.trim() && handleSelect(inputValue.trim())}
           disabled={disabled || !inputValue.trim()}
-          className="shrink-0"
+          className="shrink-0 min-h-[44px] px-4"
         >
           Deviner
         </Button>

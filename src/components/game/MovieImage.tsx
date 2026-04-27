@@ -17,6 +17,7 @@ export function MovieImage({ imageUrl, attempt, className }: MovieImageProps) {
     <div
       className={cn(
         'relative w-full overflow-hidden rounded-xl film-border aspect-video bg-film-gray',
+        'max-h-[42vh] sm:max-h-none',
         className
       )}
       aria-label={`Image du film, tentative ${attempt}`}

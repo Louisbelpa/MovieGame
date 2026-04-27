@@ -61,7 +61,7 @@ export function GamePage() {
 
   return (
     <motion.main
-      className="max-w-2xl mx-auto px-4 py-6 flex flex-col gap-6"
+      className="max-w-2xl mx-auto px-3 sm:px-4 py-3 sm:py-6 flex flex-col gap-3 sm:gap-5"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
@@ -121,7 +121,7 @@ export function GamePage() {
 
       {/* Guess history */}
       <section>
-        <h3 className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-3">
+        <h3 className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-2">
           Tentatives
         </h3>
         <GuessList guesses={guesses} maxAttempts={challenge.maxAttempts} />

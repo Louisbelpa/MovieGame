@@ -19,11 +19,11 @@ export function HintPanel({ hints, hintsAvailable, hintsRevealed }: HintPanelPro
 
   return (
     <section aria-label="Indices" className="w-full">
-      <h3 className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-3">
+      <h3 className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-2">
         Indices ({hintsRevealed}/{hintsAvailable})
       </h3>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
         <AnimatePresence initial={false}>
           {hints.map((hint, i) => (
             <HintCard key={hint.type} hint={hint} index={i} />
@@ -49,7 +49,7 @@ function HintCard({ hint, index }: { hint: HintPayload; index: number }) {
       initial={{ opacity: 0, scale: 0.92, y: 8 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
-      className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg film-border"
+      className="flex items-start gap-2 sm:gap-2.5 px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-lg film-border"
     >
       <span className="mt-0.5 text-film-gold shrink-0" aria-hidden>
         <Icon size={14} />
