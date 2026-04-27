@@ -6,7 +6,7 @@
 
 import db from '../db/database.js';
 
-const MAX_ATTEMPTS = parseInt(process.env.MAX_ATTEMPTS ?? '6', 10);
+const MAX_ATTEMPTS = parseInt(process.env.MAX_ATTEMPTS ?? '3', 10);
 const MAX_HINTS = 3;
 const IMAGE_SOURCE = process.env.IMAGE_SOURCE ?? 'tmdb';
 const TMDB_BASE = process.env.TMDB_IMAGE_BASE_URL ?? 'https://image.tmdb.org/t/p/w500';

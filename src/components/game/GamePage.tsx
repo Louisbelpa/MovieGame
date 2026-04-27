@@ -105,7 +105,7 @@ export function GamePage() {
           {status === 'won'
             ? `Bravo ! Trouvé en ${guesses.filter(g => g.status === 'correct').length > 0
                 ? guesses.findIndex(g => g.status === 'correct') + 1
-                : '?'}/6`
+                : '?'}/${challenge.maxAttempts}`
             : "Pas cette fois… Revenez demain !"}
         </div>
       )}

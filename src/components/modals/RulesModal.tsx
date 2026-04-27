@@ -17,8 +17,8 @@ export function RulesModal() {
       <div className="flex flex-col gap-4 text-sm text-film-text">
         <p className="text-film-text-dim leading-relaxed">
           Devinez le film du jour en{' '}
-          <strong className="text-film-gold">6 tentatives maximum</strong>.
-          Chaque mauvaise réponse débloque un nouvel indice et améliore la netteté de l'image.
+          <strong className="text-film-gold">3 tentatives maximum</strong>.
+          Chaque mauvaise réponse débloque un nouvel indice.
         </p>
 
         <ul className="flex flex-col gap-3">
@@ -30,7 +30,7 @@ export function RulesModal() {
           <RuleItem
             icon={<XCircle size={16} className="text-film-red" />}
             title="Mauvaise réponse"
-            description="Un indice supplémentaire est révélé. L'image devient plus nette."
+            description="Un indice supplémentaire est révélé."
           />
           <RuleItem
             icon={<SkipForward size={16} className="text-film-text-dim" />}
@@ -42,12 +42,9 @@ export function RulesModal() {
         <div className="film-border rounded-lg p-3 text-xs text-film-text-dim">
           <p className="font-semibold text-film-text mb-1">Ordre des indices</p>
           <ol className="list-decimal list-inside space-y-0.5">
-            <li>Image très floue</li>
             <li>Année de sortie</li>
             <li>Réalisateur</li>
-            <li>Genres</li>
             <li>Acteurs principaux</li>
-            <li>Accroche / Synopsis</li>
           </ol>
         </div>
 
