@@ -10,6 +10,7 @@ import {
   createFilm,
   updateFilm,
   deleteFilm,
+  uploadFilmImage,
   type AdminFilm,
   type FilmPayload,
 } from '../api'
@@ -142,6 +143,15 @@ export function FilmsPage() {
     load()
   }
 
+  async function handleUpload(film: AdminFilm, file: File) {
+    try {
+      await uploadFilmImage(film.id, file)
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur upload')
+    }
+  }
+
   async function handleDelete() {
     if (modal?.type !== 'delete') return
     setDeleteLoading(true)
@@ -227,6 +237,7 @@ export function FilmsPage() {
                   onEdit={(f) => setModal({ type: 'edit', film: f })}
                   onDelete={(f) => setModal({ type: 'delete', film: f })}
                   onBackdrops={(f) => setModal({ type: 'backdrops', film: f })}
+                  onUpload={handleUpload}
                 />
               ))}
             </tbody>

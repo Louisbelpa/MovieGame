@@ -26,8 +26,37 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import crypto from 'crypto';
+import fs from 'fs';
+import multer from 'multer';
 import db from '../db/database.js';
 import { adminAuth, computeAdminToken, ADMIN_COOKIE } from '../middleware/adminAuth.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// ─── Multer upload setup ──────────────────────────────────────────────────────
+
+const uploadsDir = path.join(__dirname, '../../public/uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadsDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    cb(null, `${crypto.randomUUID()}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only image files are allowed'));
+  },
+});
 
 export const adminRouter = Router();
 
@@ -420,6 +449,92 @@ adminRouter.delete(
   }
 );
 
+// PATCH /api/admin/films/:id  (alias for PUT – same behaviour)
+adminRouter.patch(
+  '/films/:id',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) { res.status(400).json({ error: 'Invalid film id.' }); return; }
+
+      const existing = db
+        .prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`)
+        .get(id);
+      if (!existing) { res.status(404).json({ error: 'Film not found.' }); return; }
+
+      const body = req.body as Partial<FilmBody>;
+
+      db.prepare(
+        `UPDATE films
+         SET title        = ?,
+             title_aliases = ?,
+             year         = ?,
+             director     = ?,
+             genres       = ?,
+             cast_members = ?,
+             tagline      = ?,
+             synopsis     = ?,
+             image_url    = ?,
+             tmdb_id      = ?,
+             updated_at   = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+         WHERE id = ?`
+      ).run(
+        (body.title ?? existing.title).trim(),
+        JSON.stringify(body.title_aliases ?? JSON.parse(existing.title_aliases)),
+        body.year ?? existing.year,
+        (body.director ?? existing.director).trim(),
+        JSON.stringify(body.genres ?? JSON.parse(existing.genres)),
+        JSON.stringify(body.cast_members ?? JSON.parse(existing.cast_members)),
+        body.tagline !== undefined ? body.tagline : existing.tagline,
+        body.synopsis !== undefined ? body.synopsis : existing.synopsis,
+        (body.image_url ?? existing.image_url).trim(),
+        body.tmdb_id !== undefined ? body.tmdb_id : existing.tmdb_id,
+        id
+      );
+
+      const updated = db.prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`).get(id)!;
+      res.json(formatFilm(updated));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /api/admin/films/:id/image  – upload a local image file
+adminRouter.post(
+  '/films/:id/image',
+  upload.single('image'),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) { res.status(400).json({ error: 'Invalid film id.' }); return; }
+
+      if (!req.file) { res.status(400).json({ error: 'No image file received.' }); return; }
+
+      const existing = db
+        .prepare<[number], Pick<FilmRow, 'id'>>(`SELECT id FROM films WHERE id = ?`)
+        .get(id);
+      if (!existing) {
+        fs.unlinkSync(req.file.path);
+        res.status(404).json({ error: 'Film not found.' });
+        return;
+      }
+
+      const backendUrl = (process.env.BACKEND_URL ?? 'http://localhost:3001').replace(/\/$/, '');
+      const imageUrl = `${backendUrl}/uploads/${req.file.filename}`;
+
+      db.prepare(
+        `UPDATE films SET image_url = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?`
+      ).run(imageUrl, id);
+
+      const updated = db.prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`).get(id)!;
+      res.json({ url: imageUrl, film: formatFilm(updated) });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // ─── Challenge planning ───────────────────────────────────────────────────────
 
 // GET /api/admin/challenges?from=YYYY-MM-DD&to=YYYY-MM-DD
@@ -560,6 +675,44 @@ adminRouter.put(
         res.status(404).json({ error: 'Film not found or inactive.' });
         return;
       }
+
+      db.prepare(`UPDATE daily_challenges SET film_id = ? WHERE id = ?`).run(film_id, id);
+
+      const updated = db
+        .prepare<[number], ChallengeWithFilm>(
+          `SELECT dc.*, f.title AS film_title, f.image_url AS film_image_url
+           FROM daily_challenges dc
+           JOIN films f ON f.id = dc.film_id
+           WHERE dc.id = ?`
+        )
+        .get(id)!;
+
+      res.json(formatChallenge(updated));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// PATCH /api/admin/challenges/:id  (alias for PUT)
+adminRouter.patch(
+  '/challenges/:id',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) { res.status(400).json({ error: 'Invalid challenge id.' }); return; }
+
+      const { film_id } = req.body as { film_id?: number };
+      if (!film_id || typeof film_id !== 'number') {
+        res.status(400).json({ error: 'Field "film_id" must be a number.' });
+        return;
+      }
+
+      const existing = db.prepare(`SELECT id FROM daily_challenges WHERE id = ?`).get(id);
+      if (!existing) { res.status(404).json({ error: 'Challenge not found.' }); return; }
+
+      const film = db.prepare(`SELECT id FROM films WHERE id = ? AND is_active = 1`).get(film_id);
+      if (!film) { res.status(404).json({ error: 'Film not found or inactive.' }); return; }
 
       db.prepare(`UPDATE daily_challenges SET film_id = ? WHERE id = ?`).run(film_id, id);
 

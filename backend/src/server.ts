@@ -12,6 +12,8 @@
 import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { challengeRouter } from './routes/challenge.js';
 import { filmsRouter } from './routes/films.js';
 import { statsRouter } from './routes/stats.js';
@@ -19,6 +21,8 @@ import { adminRouter } from './routes/admin.js';
 import { sessionMiddleware } from './middleware/session.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { createRateLimiter } from './middleware/rateLimiter.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
@@ -48,6 +52,10 @@ app.use(sessionMiddleware);
 // ─── Global rate limiter (generous) ──────────────────────────────────────────
 // Tighter per-route limits are applied in the route files themselves.
 app.use('/api', createRateLimiter({ max: 300, windowMs: 60_000 }));
+
+// ─── Static files (uploaded images) ──────────────────────────────────────────
+
+app.use(express.static(path.join(__dirname, '../public')));
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 

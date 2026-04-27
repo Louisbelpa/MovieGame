@@ -3,7 +3,8 @@
  * A single row in the films table.
  */
 
-import { Pencil, Trash2, Clapperboard, Images } from 'lucide-react'
+import { useRef } from 'react'
+import { Pencil, Trash2, Clapperboard, Images, Upload } from 'lucide-react'
 import type { AdminFilm } from '../api'
 
 interface FilmRowProps {
@@ -11,9 +12,18 @@ interface FilmRowProps {
   onEdit: (film: AdminFilm) => void
   onDelete: (film: AdminFilm) => void
   onBackdrops: (film: AdminFilm) => void
+  onUpload: (film: AdminFilm, file: File) => void
 }
 
-export function FilmRow({ film, onEdit, onDelete, onBackdrops }: FilmRowProps) {
+export function FilmRow({ film, onEdit, onDelete, onBackdrops, onUpload }: FilmRowProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) onUpload(film, file)
+    e.target.value = ''
+  }
+
   return (
     <tr className="hover:bg-gray-50 transition-colors">
       {/* Thumbnail */}
@@ -64,6 +74,20 @@ export function FilmRow({ film, onEdit, onDelete, onBackdrops }: FilmRowProps) {
       {/* Actions */}
       <td className="px-4 py-3 text-right">
         <div className="flex items-center justify-end gap-1.5">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            title="Uploader une image"
+            className="p-1.5 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+          >
+            <Upload size={15} />
+          </button>
           <button
             onClick={() => onBackdrops(film)}
             title="Backdrops TMDB"

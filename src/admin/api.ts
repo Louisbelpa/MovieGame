@@ -175,3 +175,29 @@ export async function getFilmBackdrops(filmId: number): Promise<TmdbBackdrop[]> 
   )
   return res.backdrops
 }
+
+export async function uploadFilmImage(
+  filmId: number,
+  file: File
+): Promise<{ url: string; film: AdminFilm }> {
+  const form = new FormData()
+  form.append('image', file)
+
+  const res = await fetch(`${BASE_URL}/api/admin/films/${filmId}/image`, {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+
+  if (res.status === 401) {
+    window.location.href = '/admin/login'
+    throw new Error('Unauthorized')
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`)
+  }
+
+  return res.json() as Promise<{ url: string; film: AdminFilm }>
+}
