@@ -180,6 +180,60 @@ adminRouter.post(
 
 adminRouter.use(adminAuth);
 
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+adminRouter.get(
+  '/dashboard',
+  (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const today = getTodayUTC();
+
+      const todayRow = db
+        .prepare<[string], ChallengeWithFilm>(
+          `SELECT dc.*, f.title AS film_title, f.image_url AS film_image_url,
+                  f.year AS film_year, f.director AS film_director
+           FROM daily_challenges dc
+           JOIN films f ON f.id = dc.film_id
+           WHERE dc.challenge_date = ?`
+        )
+        .get(today);
+
+      const upcomingRows = db
+        .prepare<[string], ChallengeWithFilm>(
+          `SELECT dc.*, f.title AS film_title, f.image_url AS film_image_url,
+                  f.year AS film_year, f.director AS film_director
+           FROM daily_challenges dc
+           JOIN films f ON f.id = dc.film_id
+           WHERE dc.challenge_date > ?
+           ORDER BY dc.challenge_date ASC
+           LIMIT 7`
+        )
+        .all(today);
+
+      const totalFilms = (
+        db.prepare(`SELECT COUNT(*) as c FROM films WHERE is_active = 1`).get() as { c: number }
+      ).c;
+      const totalChallenges = (
+        db.prepare(`SELECT COUNT(*) as c FROM daily_challenges`).get() as { c: number }
+      ).c;
+      const globalRow = db.prepare(`SELECT * FROM global_stats WHERE id = 1`).get() as {
+        total_games: number; total_wins: number;
+      };
+      const successRate = globalRow.total_games > 0
+        ? Math.round((globalRow.total_wins / globalRow.total_games) * 100)
+        : 0;
+
+      res.json({
+        today_challenge: todayRow ? formatChallenge(todayRow) : null,
+        upcoming_challenges: upcomingRows.map(formatChallenge),
+        stats: { total_films: totalFilms, total_challenges: totalChallenges, success_rate: successRate },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // ─── Films CRUD ───────────────────────────────────────────────────────────────
 
 // GET /api/admin/films?page=1&limit=20
