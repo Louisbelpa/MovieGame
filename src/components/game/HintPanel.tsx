@@ -5,7 +5,7 @@
  */
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { Calendar, Clapperboard, User, Users, FileText, Tag } from 'lucide-react'
+import { Calendar, Clapperboard, User, Users, FileText, Tag, Lock } from 'lucide-react'
 import type { HintPayload } from '@/api/client'
 
 interface HintPanelProps {
@@ -69,7 +69,7 @@ function HintCard({ hint, index }: { hint: HintPayload; index: number }) {
 function LockedSlot() {
   return (
     <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-dashed border-film-border/40 opacity-40">
-      <Eye size={14} className="text-film-text-dim shrink-0" aria-hidden />
+      <Lock size={14} className="text-film-text-dim shrink-0" aria-hidden />
       <span className="text-xs text-film-text-dim">Indice verrouillé</span>
     </div>
   )
