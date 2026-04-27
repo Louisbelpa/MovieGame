@@ -5,7 +5,7 @@
  * 401 responses redirect to /admin/login.
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
+const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

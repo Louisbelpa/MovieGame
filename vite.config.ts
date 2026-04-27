@@ -10,8 +10,13 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    outDir: 'backend/public',
+    emptyOutDir: true,
+  },
   server: {
     proxy: {
+      '/api': 'http://localhost:3001',
       '/uploads': 'http://localhost:3001',
     },
   },

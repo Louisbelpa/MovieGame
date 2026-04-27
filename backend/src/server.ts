@@ -13,6 +13,7 @@ import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { challengeRouter } from './routes/challenge.js';
 import { filmsRouter } from './routes/films.js';
@@ -69,9 +70,15 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', ts: new Date().toISOString() });
 });
 
-// 404 catch-all
-app.use((_req, res) => {
-  res.status(404).json({ error: 'Not found' });
+// SPA fallback – serve built index.html for all non-API routes (production)
+// In development the Vite dev server handles this at localhost:5173
+const spaIndex = path.join(__dirname, '../public/index.html');
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/api') && fs.existsSync(spaIndex)) {
+    res.sendFile(spaIndex);
+  } else {
+    res.status(404).json({ error: 'Not found' });
+  }
 });
 
 // Centralised error handler
