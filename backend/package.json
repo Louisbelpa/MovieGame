@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
+    "db:reset": "node --input-type=module -e \"import{rmSync}from'fs';rmSync(process.env.DATABASE_PATH??'data/moviegame.db',{force:true})\" && npm run db:migrate && npm run db:seed",
     "fetch-backdrops": "tsx scripts/fetch-backdrops.ts"
   },
   "dependencies": {
