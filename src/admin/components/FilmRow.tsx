@@ -7,6 +7,12 @@ import { useRef } from 'react'
 import { Pencil, Trash2, Clapperboard, Images, Upload } from 'lucide-react'
 import type { AdminFilm } from '../api'
 
+function resolveThumb(url: string): string {
+  if (!url) return ''
+  if (url.startsWith('http')) return url
+  return `https://image.tmdb.org/t/p/w300${url}`
+}
+
 interface FilmRowProps {
   film: AdminFilm
   onEdit: (film: AdminFilm) => void
@@ -30,7 +36,7 @@ export function FilmRow({ film, onEdit, onDelete, onBackdrops, onUpload }: FilmR
       <td className="px-4 py-3 w-24">
         {film.image_url ? (
           <img
-            src={film.image_url}
+            src={resolveThumb(film.image_url)}
             alt={film.title}
             className="w-20 h-12 object-cover rounded-md border border-gray-200"
             onError={(e) => {

@@ -107,9 +107,15 @@ export function FilmsPage() {
   const [films, setFilms] = useState<AdminFilm[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [modal, setModal] = useState<ModalState>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [search, setSearch] = useState('')
+
+  function showSuccess(msg: string) {
+    setSuccess(msg)
+    setTimeout(() => setSuccess(null), 3000)
+  }
 
   const load = useCallback(() => {
     setLoading(true)
@@ -138,15 +144,22 @@ export function FilmsPage() {
 
   async function handleBackdropSelect(imageUrl: string) {
     if (modal?.type !== 'backdrops') return
-    await updateFilm(modal.film.id, { ...modal.film, image_url: imageUrl })
-    setModal(null)
-    load()
+    const filmId = modal.film.id
+    try {
+      await updateFilm(filmId, { image_url: imageUrl })
+      setModal(null)
+      load()
+      showSuccess('Image mise à jour')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la mise à jour')
+    }
   }
 
   async function handleUpload(film: AdminFilm, file: File) {
     try {
       await uploadFilmImage(film.id, file)
       load()
+      showSuccess('Image uploadée')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur upload')
     }
@@ -204,6 +217,12 @@ export function FilmsPage() {
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
           {error}
+        </div>
+      )}
+
+      {success && (
+        <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-4 py-3 text-sm">
+          {success}
         </div>
       )}
 

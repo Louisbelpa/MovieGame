@@ -8,6 +8,12 @@ import { useState, useRef, type KeyboardEvent } from 'react'
 import { X } from 'lucide-react'
 import type { AdminFilm, FilmPayload } from '../api'
 
+function resolvePreviewUrl(url: string): string {
+  if (!url) return ''
+  if (url.startsWith('http')) return url
+  return `https://image.tmdb.org/t/p/w300${url}`
+}
+
 interface FilmFormProps {
   initial?: Partial<AdminFilm>
   onSubmit: (payload: FilmPayload) => Promise<void>
@@ -273,7 +279,7 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
         {form.image_url && (
           <div className="mt-2">
             <img
-              src={form.image_url}
+              src={resolvePreviewUrl(form.image_url)}
               alt="Aperçu"
               className="h-32 w-auto rounded-lg object-cover border border-gray-200"
               onError={(e) => {
