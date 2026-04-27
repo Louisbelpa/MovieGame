@@ -147,16 +147,14 @@ function formatFilm(row: FilmRow) {
   };
 }
 
-function formatChallenge(row: ChallengeWithFilm) {
+function formatChallenge(row: ChallengeRow) {
+  const film = db
+    .prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`)
+    .get(row.film_id)!;
   return {
     id: row.id,
-    challenge_date: row.challenge_date,
-    film_id: row.film_id,
-    challenge_number: row.challenge_number,
-    hint_schedule: JSON.parse(row.hint_schedule) as string[],
-    film_title: row.film_title,
-    film_image_url: row.film_image_url,
-    created_at: row.created_at,
+    date: row.challenge_date,
+    film: formatFilm(film),
   };
 }
 
