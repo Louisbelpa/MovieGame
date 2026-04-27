@@ -998,3 +998,48 @@ adminRouter.get(
     }
   }
 );
+
+// GET /api/admin/tmdb/:tmdbId/backdrops
+// Fetches backdrops directly by TMDB ID — used when creating a film (no DB id yet).
+adminRouter.get(
+  '/tmdb/:tmdbId/backdrops',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const tmdbId = parseInt(req.params.tmdbId, 10);
+      if (isNaN(tmdbId)) {
+        res.status(400).json({ error: 'Invalid TMDB id.' });
+        return;
+      }
+
+      const apiKey = process.env.TMDB_API_KEY;
+      if (!apiKey) {
+        res.status(400).json({ error: 'TMDB_API_KEY not configured' });
+        return;
+      }
+
+      const tmdbRes = await fetch(
+        `https://api.themoviedb.org/3/movie/${tmdbId}/images?api_key=${apiKey}&include_image_language=null`
+      );
+      if (!tmdbRes.ok) {
+        res.status(502).json({ error: `TMDB error: ${tmdbRes.status}` });
+        return;
+      }
+
+      const data = (await tmdbRes.json()) as TmdbImagesResponse;
+      const backdrops = (data.backdrops ?? [])
+        .sort((a, b) => b.vote_average - a.vote_average)
+        .slice(0, 12)
+        .map((b) => ({
+          path: b.file_path,
+          url: `https://image.tmdb.org/t/p/w1280${b.file_path}`,
+          width: b.width,
+          height: b.height,
+          vote_average: b.vote_average,
+        }));
+
+      res.json({ backdrops });
+    } catch (err) {
+      next(err);
+    }
+  }
+);

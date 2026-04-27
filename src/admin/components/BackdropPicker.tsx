@@ -1,19 +1,18 @@
 /**
  * admin/components/BackdropPicker.tsx
  * Modal gallery for picking a TMDB backdrop as the film's image_url.
+ * Accepts either a filmId (existing DB film) or a tmdbId (pre-creation flow).
  */
 
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
-import { getFilmBackdrops, type TmdbBackdrop } from '../api'
+import { getFilmBackdrops, getBackdropsByTmdbId, type TmdbBackdrop } from '../api'
 
-interface BackdropPickerProps {
-  filmId: number
-  onSelect: (imageUrl: string) => void
-  onClose: () => void
-}
+type BackdropPickerProps =
+  | { filmId: number; tmdbId?: never; onSelect: (imageUrl: string) => void; onClose: () => void }
+  | { tmdbId: number; filmId?: never; onSelect: (imageUrl: string) => void; onClose: () => void }
 
-export function BackdropPicker({ filmId, onSelect, onClose }: BackdropPickerProps) {
+export function BackdropPicker({ filmId, tmdbId, onSelect, onClose }: BackdropPickerProps) {
   const [backdrops, setBackdrops] = useState<TmdbBackdrop[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -21,13 +20,16 @@ export function BackdropPicker({ filmId, onSelect, onClose }: BackdropPickerProp
   useEffect(() => {
     setLoading(true)
     setError(null)
-    getFilmBackdrops(filmId)
+    const fetch = filmId !== undefined
+      ? getFilmBackdrops(filmId)
+      : getBackdropsByTmdbId(tmdbId!)
+    fetch
       .then(setBackdrops)
       .catch((err: unknown) =>
         setError(err instanceof Error ? err.message : 'Erreur lors du chargement des backdrops.')
       )
       .finally(() => setLoading(false))
-  }, [filmId])
+  }, [filmId, tmdbId])
 
   function handleSelect(backdrop: TmdbBackdrop) {
     onSelect(backdrop.url)
@@ -35,13 +37,11 @@ export function BackdropPicker({ filmId, onSelect, onClose }: BackdropPickerProp
   }
 
   return (
-    /* Backdrop overlay */
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl my-8 flex flex-col max-h-[90vh]">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
           <h2 className="text-base font-semibold text-gray-900">
             Choisir un backdrop TMDB
@@ -54,7 +54,6 @@ export function BackdropPicker({ filmId, onSelect, onClose }: BackdropPickerProp
           </button>
         </div>
 
-        {/* Body */}
         <div className="px-6 py-5 overflow-y-auto">
           {loading && (
             <div className="flex items-center justify-center h-40">

@@ -5,8 +5,9 @@
  */
 
 import { useState, useRef, type KeyboardEvent } from 'react'
-import { X } from 'lucide-react'
+import { X, Images } from 'lucide-react'
 import type { AdminFilm, FilmPayload } from '../api'
+import { BackdropPicker } from './BackdropPicker'
 
 function resolvePreviewUrl(url: string): string {
   if (!url) return ''
@@ -177,6 +178,7 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
   })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showBackdrops, setShowBackdrops] = useState(false)
 
   function set<K extends keyof FilmPayload>(key: K, value: FilmPayload[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -268,14 +270,28 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
 
       {/* Image URL + preview */}
       <div>
-        <Field
-          label="URL de l'image"
-          id="image_url"
-          required
-          value={form.image_url}
-          onChange={(v) => set('image_url', v)}
-          placeholder="https://..."
-        />
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <Field
+              label="URL de l'image"
+              id="image_url"
+              required
+              value={form.image_url}
+              onChange={(v) => set('image_url', v)}
+              placeholder="https://..."
+            />
+          </div>
+          {form.tmdb_id && (
+            <button
+              type="button"
+              onClick={() => setShowBackdrops(true)}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors whitespace-nowrap"
+            >
+              <Images size={15} />
+              Backdrops TMDB
+            </button>
+          )}
+        </div>
         {form.image_url && (
           <div className="mt-2">
             <img
@@ -289,6 +305,14 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
           </div>
         )}
       </div>
+
+      {showBackdrops && form.tmdb_id && (
+        <BackdropPicker
+          tmdbId={form.tmdb_id}
+          onSelect={(url) => set('image_url', url)}
+          onClose={() => setShowBackdrops(false)}
+        />
+      )}
 
       <Field
         label="TMDB ID"
