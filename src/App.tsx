@@ -1,11 +1,11 @@
 /**
  * App.tsx
- * Root layout: header + game page + all modals.
- * No router needed – the app is single-page.
+ * Root layout: header + game page + footer + all modals.
  */
 
 import { useEffect } from 'react'
 import { Header } from '@/components/layout/Header'
+import { Footer } from '@/components/layout/Footer'
 import { GamePage } from '@/components/game/GamePage'
 import { WinModal } from '@/components/modals/WinModal'
 import { LoseModal } from '@/components/modals/LoseModal'
@@ -13,14 +13,10 @@ import { StatsModal } from '@/components/modals/StatsModal'
 import { RulesModal } from '@/components/modals/RulesModal'
 import { useGameStore } from '@/store/gameStore'
 
-// ── First-visit rules modal ───────────────────────────────────────────────────
-
 const RULES_SEEN_KEY = 'cineguess:rules_seen'
 
 function useFirstVisit() {
   const openModal = useGameStore((s) => s.openModal)
-  // Wait for the game to finish loading before showing the tutorial so no
-  // concurrent state updates (initGame, win/lose modals) can override it.
   const status = useGameStore((s) => s.status)
 
   useEffect(() => {
@@ -31,22 +27,19 @@ function useFirstVisit() {
   }, [status, openModal])
 }
 
-// ─── App ──────────────────────────────────────────────────────────────────────
-
 export default function App() {
   useFirstVisit()
 
   return (
     <div className="min-h-dvh flex flex-col bg-film-black text-film-text">
-      {/* ── Navigation ── */}
       <Header />
 
-      {/* ── Main content ── */}
       <div className="flex-1">
         <GamePage />
       </div>
 
-      {/* ── Modals (rendered in a portal-like fashion via AnimatePresence) ── */}
+      <Footer />
+
       <WinModal />
       <LoseModal />
       <StatsModal />

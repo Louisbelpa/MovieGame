@@ -7,6 +7,7 @@
 import { create } from 'zustand'
 import {
   fetchChallenge,
+  fetchChallengeByDate,
   fetchResult,
   postGuess,
   type ChallengePayload,
@@ -34,6 +35,9 @@ interface GameStore {
   hintsRevealed: number
   status: GameStatus
 
+  // Date navigation
+  viewingDate: string | null  // null = today
+
   // Personal stats (localStorage only)
   stats: GameStats
 
@@ -42,6 +46,7 @@ interface GameStore {
 
   // Actions
   initGame: () => Promise<void>
+  loadDate: (date: string) => Promise<void>
   submitGuess: (guess: string) => Promise<void>
   skipAttempt: () => Promise<void>
   openModal: (type: UIState['modalType']) => void
@@ -66,6 +71,11 @@ function apiAttemptsToGuesses(
     status: a.correct ? 'correct' : 'wrong',
     timestamp: Date.now(),
   }))
+}
+
+/** Returns current date in Europe/Paris timezone as YYYY-MM-DD */
+export function getTodayParis(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
 }
 
 // ─── Default UI state ─────────────────────────────────────────────────────────
@@ -105,6 +115,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   guesses: [],
   hintsRevealed: 0,
   status: 'idle',
+  viewingDate: null,
   stats: loadStats(),
   ui: defaultUI(),
 
@@ -123,9 +134,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         guesses,
         hintsRevealed,
         status,
+        viewingDate: null,
       })
 
-      // If game already over (user returns same day), fetch result & open modal
       if (status === 'won' || status === 'lost') {
         try {
           const result = await fetchResult(challenge.challengeId)
@@ -133,14 +144,49 @@ export const useGameStore = create<GameStore>((set, get) => ({
         } catch {
           // result not critical for re-display
         }
-        // Small delay so the page mounts before the modal appears
         setTimeout(() => {
           get().openModal(status === 'won' ? 'win' : 'lose')
         }, 800)
       }
     } catch (err) {
       console.error('[initGame]', err)
-      // stay idle – GamePage will show an error boundary
+    }
+  },
+
+  // ── loadDate ──────────────────────────────────────────────────────────────
+
+  loadDate: async (date: string) => {
+    const todayParis = getTodayParis()
+    // If requesting today, just reload normally
+    if (date === todayParis) {
+      set({ viewingDate: null, status: 'idle', challenge: null, result: null, guesses: [], hintsRevealed: 0, ui: defaultUI() })
+      await get().initGame()
+      return
+    }
+
+    set({ status: 'idle', challenge: null, result: null, guesses: [], hintsRevealed: 0, viewingDate: date, ui: defaultUI() })
+    try {
+      const challenge = await fetchChallengeByDate(date)
+      const guesses = apiAttemptsToGuesses(challenge.attempts)
+      const status = deriveStatus(challenge.outcome)
+      const hintsRevealed = challenge.hintsRevealed
+
+      set({ challenge, guesses, hintsRevealed, status, viewingDate: date })
+
+      if (status === 'won' || status === 'lost') {
+        try {
+          const result = await fetchResult(challenge.challengeId)
+          set({ result })
+        } catch {
+          // result not critical
+        }
+        setTimeout(() => {
+          get().openModal(status === 'won' ? 'win' : 'lose')
+        }, 800)
+      }
+    } catch (err) {
+      console.error('[loadDate]', err)
+      set({ status: 'idle' })
     }
   },
 
@@ -150,10 +196,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { challenge, guesses, stats } = get()
     if (!challenge || !guess.trim()) return
 
-    // Optimistic UI: append guess immediately
     const optimisticGuess: GuessEntry = {
       value: guess,
-      status: 'wrong', // will be corrected on response
+      status: 'wrong',
       timestamp: Date.now(),
     }
     set((s) => ({
@@ -188,17 +233,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
         completedAt: res.outcome ? Date.now() : undefined,
       })
 
-      // Wrong guess: shake animation
       if (!res.correct) {
         set((s) => ({ ui: { ...s.ui, shakeTrigger: s.ui.shakeTrigger + 1 } }))
       }
 
-      // Game over
       if (res.outcome !== null) {
         const result = await fetchResult(challenge.challengeId)
         set({ result })
 
-        // Update local stats
         const today = getTodayId()
         const newStats = updateStats(stats, {
           challengeId: String(challenge.challengeId),
@@ -216,7 +258,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }, res.correct ? 1200 : 600)
       }
     } catch (err) {
-      // Revert optimistic update
       set({ guesses })
       console.error('[submitGuess]', err)
     }
@@ -235,7 +276,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
     const updatedGuesses = [...guesses, skippedGuess]
 
-    // A skip counts as a wrong attempt server-side: send empty string
     try {
       const res = await postGuess(challenge.challengeId, '')
 
@@ -321,5 +361,4 @@ export const selectCurrentHints = (s: GameStore) =>
 export const selectIsGameOver = (s: GameStore) =>
   s.status === 'won' || s.status === 'lost'
 
-// Fix missing type import used in submitGuess
 type GuessStatus = 'correct' | 'wrong' | 'skipped'

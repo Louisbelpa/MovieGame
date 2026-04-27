@@ -133,7 +133,7 @@ function parseDateParam(raw: unknown): string | null {
   return raw;
 }
 
-function formatFilm(row: FilmRow) {
+function formatFilm(row: FilmRow, usedDates?: string[]) {
   return {
     id: row.id,
     title: row.title,
@@ -147,7 +147,17 @@ function formatFilm(row: FilmRow) {
     image_url: resolveAdminImageUrl(row.image_url),
     tmdb_id: row.tmdb_id,
     is_active: row.is_active === 1,
+    used_dates: usedDates ?? [],
   };
+}
+
+function getFilmUsedDates(filmId: number): string[] {
+  const rows = db
+    .prepare<[number], { challenge_date: string }>(
+      `SELECT challenge_date FROM daily_challenges WHERE film_id = ? ORDER BY challenge_date DESC`
+    )
+    .all(filmId);
+  return rows.map((r) => r.challenge_date);
 }
 
 function formatChallenge(row: ChallengeRow) {
@@ -167,11 +177,19 @@ function getTodayUTC(): string {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
+// GET /api/admin/config – public endpoint, returns whether username is required
+adminRouter.get(
+  '/config',
+  (_req: Request, res: Response) => {
+    res.json({ requiresUsername: !!(process.env.ADMIN_USERNAME ?? '') });
+  }
+);
+
 adminRouter.post(
   '/login',
   (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { password } = req.body as { password?: string };
+      const { username, password } = req.body as { username?: string; password?: string };
 
       if (!password || typeof password !== 'string') {
         res.status(400).json({ error: 'Field "password" is required.' });
@@ -184,14 +202,29 @@ adminRouter.post(
         return;
       }
 
-      if (password !== adminPassword) {
-        res.status(401).json({ error: 'Invalid password.' });
-        return;
+      const adminUsername = process.env.ADMIN_USERNAME ?? '';
+
+      // If ADMIN_USERNAME is configured, both fields are required
+      if (adminUsername) {
+        if (!username || typeof username !== 'string') {
+          res.status(400).json({ error: 'Field "username" is required.' });
+          return;
+        }
+        if (username !== adminUsername || password !== adminPassword) {
+          res.status(401).json({ error: 'Identifiants invalides.' });
+          return;
+        }
+      } else {
+        // Backward compatibility: password only
+        if (password !== adminPassword) {
+          res.status(401).json({ error: 'Mot de passe incorrect.' });
+          return;
+        }
       }
 
       const token = computeAdminToken();
       res.cookie(ADMIN_COOKIE, token, COOKIE_OPTIONS);
-      res.json({ ok: true });
+      res.json({ ok: true, requiresUsername: !!adminUsername });
     } catch (err) {
       next(err);
     }
@@ -289,7 +322,7 @@ adminRouter.get(
         .all(limit, offset);
 
       res.json({
-        data: rows.map(formatFilm),
+        data: rows.map((r) => formatFilm(r, getFilmUsedDates(r.id))),
         pagination: {
           page,
           limit,
@@ -351,7 +384,7 @@ adminRouter.post(
         .prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`)
         .get(result.lastInsertRowid as number)!;
 
-      res.status(201).json(formatFilm(created));
+      res.status(201).json(formatFilm(created, []));
     } catch (err) {
       next(err);
     }
@@ -412,7 +445,7 @@ adminRouter.put(
         .prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`)
         .get(id)!;
 
-      res.json(formatFilm(updated));
+      res.json(formatFilm(updated, getFilmUsedDates(id)));
     } catch (err) {
       next(err);
     }
@@ -494,7 +527,7 @@ adminRouter.patch(
       );
 
       const updated = db.prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`).get(id)!;
-      res.json(formatFilm(updated));
+      res.json(formatFilm(updated, getFilmUsedDates(id)));
     } catch (err) {
       next(err);
     }
@@ -903,6 +936,138 @@ adminRouter.get(
       }
 
       res.json({ global, today: todayStats });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── TMDB Search by title ─────────────────────────────────────────────────────
+
+// GET /api/admin/tmdb/search?q=title
+// Returns a list of matching films from TMDB (title, year, tmdb_id, poster_path)
+adminRouter.get(
+  '/tmdb/search',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const q = (req.query.q as string | undefined)?.trim();
+      if (!q || q.length < 2) {
+        res.json({ results: [] });
+        return;
+      }
+
+      const apiKey = process.env.TMDB_API_KEY;
+      if (!apiKey) {
+        res.status(400).json({ error: 'TMDB_API_KEY not configured' });
+        return;
+      }
+
+      const searchUrl =
+        `https://api.themoviedb.org/3/search/movie` +
+        `?api_key=${apiKey}&language=fr-FR&query=${encodeURIComponent(q)}&page=1`;
+
+      const tmdbRes = await fetch(searchUrl);
+      if (!tmdbRes.ok) {
+        res.status(502).json({ error: `TMDB error: ${tmdbRes.status}` });
+        return;
+      }
+
+      const data = (await tmdbRes.json()) as {
+        results: {
+          id: number;
+          title: string;
+          original_title: string;
+          release_date: string;
+          poster_path: string | null;
+          backdrop_path: string | null;
+        }[];
+      };
+
+      const results = (data.results ?? []).slice(0, 8).map((m) => ({
+        tmdb_id: m.id,
+        title: m.title,
+        original_title: m.original_title,
+        year: m.release_date ? parseInt(m.release_date.slice(0, 4), 10) : 0,
+        poster_url: m.poster_path
+          ? `https://image.tmdb.org/t/p/w185${m.poster_path}`
+          : null,
+      }));
+
+      res.json({ results });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/tmdb/:tmdbId/details
+// Fetches full details for a specific TMDB ID (same format as /random)
+adminRouter.get(
+  '/tmdb/:tmdbId/details',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const tmdbId = parseInt(req.params.tmdbId, 10);
+      if (isNaN(tmdbId)) {
+        res.status(400).json({ error: 'Invalid TMDB id.' });
+        return;
+      }
+
+      const apiKey = process.env.TMDB_API_KEY;
+      if (!apiKey) {
+        res.status(400).json({ error: 'TMDB_API_KEY not configured' });
+        return;
+      }
+
+      const [detailsRes, creditsRes, imagesRes] = await Promise.all([
+        fetch(`https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${apiKey}&language=fr-FR`),
+        fetch(`https://api.themoviedb.org/3/movie/${tmdbId}/credits?api_key=${apiKey}`),
+        fetch(`https://api.themoviedb.org/3/movie/${tmdbId}/images?api_key=${apiKey}&include_image_language=null`),
+      ]);
+
+      const details = (await detailsRes.json()) as {
+        id: number; title: string; original_title: string;
+        release_date: string; tagline: string; overview: string;
+        backdrop_path: string | null;
+        genres: { name: string }[];
+      };
+      const credits = (await creditsRes.json()) as {
+        crew: { job: string; name: string }[];
+        cast: { name: string }[];
+      };
+      const images = (await imagesRes.json()) as {
+        backdrops: { file_path: string; vote_average: number }[];
+      };
+
+      const director = credits.crew?.find((c) => c.job === 'Director')?.name ?? '';
+      const cast = (credits.cast ?? []).slice(0, 5).map((c) => c.name);
+      const genres = (details.genres ?? []).map((g) => g.name);
+
+      const bestBackdrop = (images.backdrops ?? [])
+        .sort((a, b) => b.vote_average - a.vote_average)[0];
+      const imageUrl = bestBackdrop
+        ? `https://image.tmdb.org/t/p/w1280${bestBackdrop.file_path}`
+        : details.backdrop_path
+        ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}`
+        : '';
+
+      const titleAliases: string[] = [];
+      if (details.original_title && details.original_title !== details.title) {
+        titleAliases.push(details.original_title);
+      }
+
+      res.json({
+        title: details.title,
+        title_aliases: titleAliases,
+        year: details.release_date ? parseInt(details.release_date.slice(0, 4), 10) : 0,
+        director,
+        genres,
+        cast_members: cast,
+        tagline: details.tagline ?? '',
+        synopsis: details.overview ?? '',
+        image_url: imageUrl,
+        tmdb_id: details.id,
+        is_active: true,
+      });
     } catch (err) {
       next(err);
     }

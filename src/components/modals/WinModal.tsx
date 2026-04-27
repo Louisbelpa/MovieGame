@@ -1,11 +1,10 @@
 /**
  * modals/WinModal.tsx
  * Shown when the player guesses correctly.
- * Displays movie reveal, attempt count, and share button.
  */
 
 import { motion } from 'framer-motion'
-import { Share2, Trophy, BarChart2 } from 'lucide-react'
+import { Share2, Trophy, BarChart2, ExternalLink } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -22,6 +21,9 @@ export function WinModal() {
   if (!result) return null
 
   const correctAttempt = guesses.findIndex((g) => g.status === 'correct') + 1
+  const tmdbUrl = result.tmdbId
+    ? `https://www.themoviedb.org/movie/${result.tmdbId}`
+    : null
 
   return (
     <Modal isOpen={isOpen} onClose={closeModal}>
@@ -39,7 +41,7 @@ export function WinModal() {
         <div>
           <p className="text-film-text-dim text-sm mb-1">Bravo ! Vous avez trouvé en</p>
           <p className="text-4xl font-title font-bold text-gradient-gold">
-            {correctAttempt}<span className="text-2xl">/6</span>
+            {correctAttempt}<span className="text-2xl">/3</span>
           </p>
         </div>
 
@@ -89,6 +91,19 @@ export function WinModal() {
           </Button>
         </div>
 
+        {/* Learn more */}
+        {tmdbUrl && (
+          <a
+            href={tmdbUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs text-film-text-dim hover:text-film-text transition-colors"
+          >
+            <ExternalLink size={12} />
+            En savoir plus sur TMDB
+          </a>
+        )}
+
         <p className="text-xs text-film-text-dim">
           Prochain film dans <NextGameCountdown />
         </p>
@@ -97,12 +112,27 @@ export function WinModal() {
   )
 }
 
+/** Counts down to midnight in Europe/Paris timezone */
 function NextGameCountdown() {
   const now = new Date()
-  const tomorrow = new Date(now)
-  tomorrow.setUTCHours(24, 0, 0, 0)
-  const diff = tomorrow.getTime() - now.getTime()
-  const h = Math.floor(diff / 3600000)
-  const m = Math.floor((diff % 3600000) / 60000)
-  return <strong className="text-film-text">{h}h {m}min</strong>
+
+  // Get current hour/minute/second in Paris
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Paris',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    hour12: false,
+  })
+  const parts = formatter.formatToParts(now)
+  const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value ?? '0', 10)
+
+  const h = get('hour')
+  const m = get('minute')
+  const s = get('second')
+  const secondsUntilMidnight = (24 * 3600) - (h * 3600 + m * 60 + s)
+  const hoursLeft = Math.floor(secondsUntilMidnight / 3600)
+  const minsLeft = Math.floor((secondsUntilMidnight % 3600) / 60)
+
+  return <strong className="text-film-text">{hoursLeft}h {minsLeft}min</strong>
 }

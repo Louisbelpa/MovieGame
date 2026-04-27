@@ -1,11 +1,10 @@
 /**
  * modals/LoseModal.tsx
  * Shown when the player exhausts all attempts.
- * Reveals the correct answer with full film details.
  */
 
 import { motion } from 'framer-motion'
-import { Share2, BarChart2, Film } from 'lucide-react'
+import { Share2, BarChart2, Film, ExternalLink } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -19,6 +18,10 @@ export function LoseModal() {
   const result = useGameStore((s) => s.result)
 
   if (!result) return null
+
+  const tmdbUrl = result.tmdbId
+    ? `https://www.themoviedb.org/movie/${result.tmdbId}`
+    : null
 
   return (
     <Modal isOpen={isOpen} onClose={closeModal}>
@@ -85,6 +88,19 @@ export function LoseModal() {
             Partager
           </Button>
         </div>
+
+        {/* Learn more */}
+        {tmdbUrl && (
+          <a
+            href={tmdbUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs text-film-text-dim hover:text-film-text transition-colors"
+          >
+            <ExternalLink size={12} />
+            En savoir plus sur TMDB
+          </a>
+        )}
       </div>
     </Modal>
   )

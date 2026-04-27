@@ -84,7 +84,7 @@ const HINT_META: Record<
   year:     { icon: Calendar,     label: 'Année' },
   director: { icon: Clapperboard, label: 'Réalisateur' },
   genres:   { icon: Tag,          label: 'Genres' },
-  cast:     { icon: Users,        label: 'Acteurs' },
+  cast:     { icon: User,         label: 'Acteur principal' },
   tagline:  { icon: FileText,     label: 'Accroche' },
   synopsis: { icon: FileText,     label: 'Synopsis' },
 }
@@ -94,8 +94,11 @@ function resolveHint(hint: HintPayload): {
   label: string
   formatted: string
 } {
-  const meta = HINT_META[hint.type] ?? { icon: User, label: hint.type }
+  const meta = HINT_META[hint.type] ?? { icon: Users, label: hint.type }
   const val = hint.value
-  const formatted = Array.isArray(val) ? val.join(', ') : String(val)
+  // For cast, show only the first actor (main actor)
+  const formatted = Array.isArray(val)
+    ? (hint.type === 'cast' ? val[0] ?? '' : val.join(', '))
+    : String(val)
   return { ...meta, formatted }
 }
