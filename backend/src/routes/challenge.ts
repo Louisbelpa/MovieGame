@@ -98,8 +98,8 @@ challengeRouter.post(
       const sessionToken = res.locals.sessionToken as string;
       const { guess } = req.body as { guess?: string };
 
-      if (!guess || typeof guess !== 'string' || guess.trim().length === 0) {
-        res.status(422).json({ error: 'Field "guess" is required and must be a non-empty string.' });
+      if (typeof guess !== 'string') {
+        res.status(422).json({ error: 'Field "guess" must be a string (use empty string to skip).' });
         return;
       }
 

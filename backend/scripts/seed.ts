@@ -269,15 +269,7 @@ const scheduleMany = db.transaction(
     for (const entry of entries) {
       insertChallenge.run({
         ...entry,
-        hint_schedule: JSON.stringify([
-          'image_blurred',
-          'year',
-          'director',
-          'genres',
-          'cast',
-          'tagline',
-          'synopsis',
-        ]),
+        hint_schedule: JSON.stringify(['year', 'director', 'cast']),
       });
     }
   }

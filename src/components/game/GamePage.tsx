@@ -114,7 +114,7 @@ export function GamePage() {
       {/* Hints */}
       {(currentHints.length > 0 || challenge.hintsAvailable > 0) && (
         <HintPanel
-          hints={currentHints.filter((h) => h.type !== 'image_blurred')}
+          hints={currentHints}
           hintsAvailable={challenge.hintsAvailable}
           hintsRevealed={hintsRevealed}
         />

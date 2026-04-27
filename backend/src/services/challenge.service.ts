@@ -7,6 +7,7 @@
 import db from '../db/database.js';
 
 const MAX_ATTEMPTS = parseInt(process.env.MAX_ATTEMPTS ?? '6', 10);
+const MAX_HINTS = 3;
 const IMAGE_SOURCE = process.env.IMAGE_SOURCE ?? 'tmdb';
 const TMDB_BASE = process.env.TMDB_IMAGE_BASE_URL ?? 'https://image.tmdb.org/t/p/w500';
 
@@ -132,8 +133,8 @@ export function buildChallengePayload(
     .prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`)
     .get(challenge.film_id)!;
 
-  const schedule: string[] = JSON.parse(challenge.hint_schedule);
-  const hintsRevealed = session.hints_revealed;
+  const schedule: string[] = (JSON.parse(challenge.hint_schedule) as string[]).slice(0, MAX_HINTS);
+  const hintsRevealed = Math.min(session.hints_revealed, MAX_HINTS);
   const attempts: AttemptEntry[] = JSON.parse(session.attempts);
 
   // Build revealed hints array – one object per unlocked hint
@@ -235,9 +236,9 @@ export function processGuess(
   attempts.push(newAttempt);
 
   // Determine new outcome
-  const schedule: string[] = JSON.parse(challenge.hint_schedule);
+  const schedule: string[] = (JSON.parse(challenge.hint_schedule) as string[]).slice(0, MAX_HINTS);
   let newOutcome: 'won' | 'lost' | null = null;
-  let newHintsRevealed = session.hints_revealed;
+  let newHintsRevealed = Math.min(session.hints_revealed, MAX_HINTS);
   let nextHintUnlocked = false;
 
   if (correct) {

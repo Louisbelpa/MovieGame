@@ -620,10 +620,10 @@ adminRouter.post(
 
       const result = db
         .prepare(
-          `INSERT INTO daily_challenges (challenge_date, film_id, challenge_number)
-           VALUES (?, ?, ?)`
+          `INSERT INTO daily_challenges (challenge_date, film_id, challenge_number, hint_schedule)
+           VALUES (?, ?, ?, ?)`
         )
-        .run(date, film_id, maxNum + 1);
+        .run(date, film_id, maxNum + 1, JSON.stringify(['year', 'director', 'cast']));
 
       const created = db
         .prepare<[number], ChallengeWithFilm>(

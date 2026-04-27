@@ -182,15 +182,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
       ]
 
       const newStatus = deriveStatus(res.outcome)
-      const newHintsRevealed = res.nextHintUnlocked
-        ? get().hintsRevealed + 1
-        : get().hintsRevealed
+      const newHintsRevealed = res.challenge.hintsRevealed
 
       set({
         guesses: updatedGuesses,
         hintsRevealed: newHintsRevealed,
         status: newStatus,
         currentBlurPx: blurForHints(newHintsRevealed),
+        // Sync hints from server so newly-unlocked hints appear immediately
+        challenge: { ...challenge, hints: res.challenge.hints, hintsRevealed: newHintsRevealed },
       })
 
       persistGame(challenge.challengeId, {
@@ -247,21 +247,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
       timestamp: Date.now(),
     }
     const updatedGuesses = [...guesses, skippedGuess]
-    const newHintsRevealed = Math.min(
-      get().hintsRevealed + 1,
-      challenge.hintsAvailable
-    )
 
     // A skip counts as a wrong attempt server-side: send empty string
     try {
       const res = await postGuess(challenge.challengeId, '')
 
       const newStatus = deriveStatus(res.outcome)
+      const newHintsRevealed = res.challenge.hintsRevealed
       set({
         guesses: updatedGuesses,
         hintsRevealed: newHintsRevealed,
         status: newStatus,
         currentBlurPx: blurForHints(newHintsRevealed),
+        challenge: { ...challenge, hints: res.challenge.hints, hintsRevealed: newHintsRevealed },
       })
 
       persistGame(challenge.challengeId, {

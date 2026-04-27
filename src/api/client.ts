@@ -62,6 +62,7 @@ export interface GuessResultPayload {
   outcome: 'won' | 'lost' | null
   attemptsLeft: number
   nextHintUnlocked: boolean
+  challenge: ChallengePayload
 }
 
 export interface ResultPayload {
