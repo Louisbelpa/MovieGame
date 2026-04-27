@@ -15,6 +15,7 @@ import cookieParser from 'cookie-parser';
 import { challengeRouter } from './routes/challenge.js';
 import { filmsRouter } from './routes/films.js';
 import { statsRouter } from './routes/stats.js';
+import { adminRouter } from './routes/admin.js';
 import { sessionMiddleware } from './middleware/session.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { createRateLimiter } from './middleware/rateLimiter.js';
@@ -32,7 +33,7 @@ app.use(cookieParser(process.env.COOKIE_SECRET ?? 'dev_secret'));
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', CORS_ORIGIN);
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') {
     res.sendStatus(204);
@@ -53,6 +54,7 @@ app.use('/api', createRateLimiter({ max: 300, windowMs: 60_000 }));
 app.use('/api/challenge', challengeRouter);
 app.use('/api/films', filmsRouter);
 app.use('/api/stats', statsRouter);
+app.use('/api/admin', adminRouter);
 
 // Health-check (used by Railway/Render)
 app.get('/health', (_req, res) => {
