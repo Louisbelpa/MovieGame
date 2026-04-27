@@ -103,7 +103,8 @@ export async function getDashboard(): Promise<AdminDashboard> {
 // ─── Films ────────────────────────────────────────────────────────────────────
 
 export async function getFilms(): Promise<AdminFilm[]> {
-  return request<AdminFilm[]>('/api/admin/films')
+  const res = await request<{ data: AdminFilm[] }>('/api/admin/films')
+  return res.data
 }
 
 export async function createFilm(payload: FilmPayload): Promise<AdminFilm> {
@@ -130,7 +131,8 @@ export async function deleteFilm(id: number): Promise<void> {
 // ─── Calendar / Challenges ────────────────────────────────────────────────────
 
 export async function getChallenges(days = 30): Promise<AdminChallenge[]> {
-  return request<AdminChallenge[]>(`/api/admin/challenges?days=${days}`)
+  const res = await request<{ data: AdminChallenge[] }>(`/api/admin/challenges?days=${days}`)
+  return res.data
 }
 
 export async function scheduleChallenge(
