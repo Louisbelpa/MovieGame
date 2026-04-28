@@ -148,3 +148,8 @@ export function searchMovies(
 export function fetchGlobalStats(): Promise<GlobalStatsPayload> {
   return request<GlobalStatsPayload>('/api/stats')
 }
+
+/** GET /api/challenge/adjacent – nearest scheduled challenge before or after a date */
+export function fetchAdjacentDate(date: string, direction: 'prev' | 'next'): Promise<{ date: string }> {
+  return request<{ date: string }>(`/api/challenge/adjacent?date=${date}&direction=${direction}`)
+}

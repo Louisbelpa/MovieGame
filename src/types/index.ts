@@ -2,7 +2,7 @@
 
 export type GuessStatus = 'correct' | 'wrong' | 'skipped'
 
-export type GameStatus = 'idle' | 'playing' | 'won' | 'lost'
+export type GameStatus = 'idle' | 'playing' | 'won' | 'lost' | 'not_found'
 
 export type HintType =
   | 'year'

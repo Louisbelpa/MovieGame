@@ -46,7 +46,7 @@ export function LoginPage() {
           <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-4">
             <Lock size={22} className="text-indigo-600" />
           </div>
-          <h1 className="text-xl font-bold text-gray-900">MovieGuessr Admin</h1>
+          <h1 className="text-xl font-bold text-gray-900">CinéGuessr Admin</h1>
           <p className="text-sm text-gray-500 mt-1">Accès réservé aux administrateurs</p>
         </div>
 

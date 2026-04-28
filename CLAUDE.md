@@ -1,4 +1,4 @@
-# MovieGuessr — Guide pour Claude Code
+# CinéGuessr — Guide pour Claude Code
 
 ## Architecture
 

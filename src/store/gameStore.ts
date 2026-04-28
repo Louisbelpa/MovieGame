@@ -8,6 +8,7 @@ import { create } from 'zustand'
 import {
   fetchChallenge,
   fetchChallengeByDate,
+  fetchAdjacentDate,
   fetchResult,
   postGuess,
   type ChallengePayload,
@@ -37,6 +38,8 @@ interface GameStore {
 
   // Date navigation
   viewingDate: string | null  // null = today
+  hasPrev: boolean  // false when no earlier challenge exists
+  hasNext: boolean  // false when no later challenge exists (besides today)
 
   // Personal stats (localStorage only)
   stats: GameStats
@@ -47,6 +50,7 @@ interface GameStore {
   // Actions
   initGame: () => Promise<void>
   loadDate: (date: string) => Promise<void>
+  navigateDate: (direction: 'prev' | 'next') => Promise<void>
   submitGuess: (guess: string) => Promise<void>
   skipAttempt: () => Promise<void>
   openModal: (type: UIState['modalType']) => void
@@ -76,6 +80,12 @@ function apiAttemptsToGuesses(
 /** Returns current date in Europe/Paris timezone as YYYY-MM-DD */
 export function getTodayParis(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
+}
+
+function addDaysStr(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
 }
 
 // ─── Default UI state ─────────────────────────────────────────────────────────
@@ -116,6 +126,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   hintsRevealed: 0,
   status: 'idle',
   viewingDate: null,
+  hasPrev: true,
+  hasNext: false,
   stats: loadStats(),
   ui: defaultUI(),
 
@@ -188,8 +200,63 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }, 800)
       }
     } catch (err) {
-      console.error('[loadDate]', err)
-      set({ status: 'idle' })
+      const is404 = (err as { status?: number }).status === 404
+      set({ status: is404 ? 'not_found' : 'idle' })
+      if (!is404) console.error('[loadDate]', err)
+    }
+  },
+
+  // ── navigateDate ─────────────────────────────────────────────────────────
+  // Finds the nearest valid challenge in the given direction (single SQL query),
+  // then loads it. Pre-checks if another adjacent exists to set boundary flags.
+  // On boundary (404), silently restores previous state.
+
+  navigateDate: async (direction: 'prev' | 'next') => {
+    const todayParis = getTodayParis()
+    const snapshot = get()
+    const currentDate = snapshot.viewingDate ?? todayParis
+
+    set({ status: 'idle', challenge: null, result: null, guesses: [], hintsRevealed: 0, ui: defaultUI() })
+
+    try {
+      const { date: targetDate } = await fetchAdjacentDate(currentDate, direction)
+
+      if (targetDate >= todayParis) {
+        set({ viewingDate: null, hasPrev: true, hasNext: false })
+        await get().initGame()
+        return
+      }
+
+      // We know the opposite direction is valid (we just came from there).
+      // Pre-check the same direction to avoid the "ghost click" on the boundary.
+      const sameDirectionExists = await fetchAdjacentDate(targetDate, direction)
+        .then(() => true)
+        .catch((err) => (err as { status?: number }).status === 404 ? false : true)
+
+      set({
+        hasPrev: direction === 'prev' ? sameDirectionExists : true,
+        hasNext: direction === 'next' ? sameDirectionExists : true,
+      })
+      await get().loadDate(targetDate)
+    } catch (err) {
+      const is404 = (err as { status?: number }).status === 404
+      if (is404) {
+        // Boundary reached – restore previous state and mark this direction as exhausted
+        set({
+          status: snapshot.status,
+          challenge: snapshot.challenge,
+          result: snapshot.result,
+          guesses: snapshot.guesses,
+          hintsRevealed: snapshot.hintsRevealed,
+          viewingDate: snapshot.viewingDate,
+          ui: snapshot.ui,
+          hasPrev: direction === 'prev' ? false : snapshot.hasPrev,
+          hasNext: direction === 'next' ? false : snapshot.hasNext,
+        })
+      } else {
+        set({ status: 'idle', viewingDate: currentDate })
+        console.error('[navigateDate]', err)
+      }
     }
   },
 
@@ -341,7 +408,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const text = buildShareText(
       challenge.date,
       guesses,
-      status === 'won'
+      status === 'won',
+      challenge.maxAttempts
     )
     if (navigator.share) {
       navigator.share({ text }).catch(() => {})

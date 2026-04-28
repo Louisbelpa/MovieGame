@@ -1,4 +1,4 @@
-# MovieGuessr 🎬
+# CinéGuessr 🎬
 
 Jeu quotidien de cinéma : devine le film à partir d'une image et d'indices progressifs.
 Un nouveau défi chaque jour à minuit (heure de Paris). Les anciens défis restent accessibles.

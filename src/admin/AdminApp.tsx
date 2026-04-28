@@ -9,6 +9,7 @@ import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { FilmsPage } from './pages/FilmsPage'
 import { CalendarPage } from './pages/CalendarPage'
+import { ChangelogPage } from './pages/ChangelogPage'
 
 export function AdminApp() {
   return (
@@ -18,6 +19,7 @@ export function AdminApp() {
         <Route path="/admin" element={<DashboardPage />} />
         <Route path="/admin/films" element={<FilmsPage />} />
         <Route path="/admin/calendar" element={<CalendarPage />} />
+        <Route path="/admin/changelog" element={<ChangelogPage />} />
         {/* Fallback: redirect unknown /admin/* to dashboard */}
         <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
       </Routes>

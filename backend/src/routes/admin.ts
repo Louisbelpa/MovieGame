@@ -239,6 +239,35 @@ adminRouter.post(
   }
 );
 
+// ─── Changelog (public read) ──────────────────────────────────────────────────
+
+// GET /api/admin/changelog – public, no auth (footer fetches this)
+adminRouter.get(
+  '/changelog',
+  (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const rows = db
+        .prepare<[], { id: number; version: string; release_date: string; changes: string; created_at: string }>(
+          `SELECT id, version, release_date, changes, created_at
+           FROM changelog
+           ORDER BY created_at DESC`
+        )
+        .all();
+
+      res.json(
+        rows.map((r) => ({
+          id: r.id,
+          version: r.version,
+          release_date: r.release_date,
+          changes: JSON.parse(r.changes) as string[],
+        }))
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // ─── All routes below require admin authentication ────────────────────────────
 
 adminRouter.use(adminAuth);
@@ -563,6 +592,22 @@ adminRouter.post(
 
       const updated = db.prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`).get(id)!;
       res.json({ url: imageUrl, film: formatFilm(updated) });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /api/admin/upload  – upload an image without requiring a film ID (for new films)
+adminRouter.post(
+  '/upload',
+  upload.single('image'),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.file) { res.status(400).json({ error: 'No image file received.' }); return; }
+      const backendUrl = (process.env.BACKEND_URL ?? 'http://localhost:3001').replace(/\/$/, '');
+      const url = `${backendUrl}/uploads/${req.file.filename}`;
+      res.json({ url });
     } catch (err) {
       next(err);
     }
@@ -1209,5 +1254,87 @@ adminRouter.get(
     } catch (err) {
       next(err);
     }
+  }
+);
+
+// ─── Changelog CRUD (protected) ───────────────────────────────────────────────
+
+interface ChangelogBody {
+  version: string;
+  release_date: string;
+  changes: string[];
+}
+
+// POST /api/admin/changelog
+adminRouter.post(
+  '/changelog',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { version, release_date, changes } = req.body as ChangelogBody;
+
+      if (!version?.trim()) { res.status(400).json({ error: 'Field "version" is required.' }); return; }
+      if (!release_date?.trim()) { res.status(400).json({ error: 'Field "release_date" is required.' }); return; }
+      if (!Array.isArray(changes)) { res.status(400).json({ error: 'Field "changes" must be an array.' }); return; }
+
+      const result = db
+        .prepare(`INSERT INTO changelog (version, release_date, changes) VALUES (?, ?, ?)`)
+        .run(version.trim(), release_date.trim(), JSON.stringify(changes));
+
+      const created = db
+        .prepare<[number], { id: number; version: string; release_date: string; changes: string }>(
+          `SELECT id, version, release_date, changes FROM changelog WHERE id = ?`
+        )
+        .get(result.lastInsertRowid as number)!;
+
+      res.status(201).json({ id: created.id, version: created.version, release_date: created.release_date, changes: JSON.parse(created.changes) as string[] });
+    } catch (err) { next(err); }
+  }
+);
+
+// PUT /api/admin/changelog/:id
+adminRouter.put(
+  '/changelog/:id',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) { res.status(400).json({ error: 'Invalid changelog id.' }); return; }
+
+      const existing = db.prepare(`SELECT id FROM changelog WHERE id = ?`).get(id);
+      if (!existing) { res.status(404).json({ error: 'Changelog entry not found.' }); return; }
+
+      const { version, release_date, changes } = req.body as ChangelogBody;
+
+      if (!version?.trim()) { res.status(400).json({ error: 'Field "version" is required.' }); return; }
+      if (!release_date?.trim()) { res.status(400).json({ error: 'Field "release_date" is required.' }); return; }
+      if (!Array.isArray(changes)) { res.status(400).json({ error: 'Field "changes" must be an array.' }); return; }
+
+      db.prepare(`UPDATE changelog SET version = ?, release_date = ?, changes = ? WHERE id = ?`)
+        .run(version.trim(), release_date.trim(), JSON.stringify(changes), id);
+
+      const updated = db
+        .prepare<[number], { id: number; version: string; release_date: string; changes: string }>(
+          `SELECT id, version, release_date, changes FROM changelog WHERE id = ?`
+        )
+        .get(id)!;
+
+      res.json({ id: updated.id, version: updated.version, release_date: updated.release_date, changes: JSON.parse(updated.changes) as string[] });
+    } catch (err) { next(err); }
+  }
+);
+
+// DELETE /api/admin/changelog/:id
+adminRouter.delete(
+  '/changelog/:id',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) { res.status(400).json({ error: 'Invalid changelog id.' }); return; }
+
+      const existing = db.prepare(`SELECT id FROM changelog WHERE id = ?`).get(id);
+      if (!existing) { res.status(404).json({ error: 'Changelog entry not found.' }); return; }
+
+      db.prepare(`DELETE FROM changelog WHERE id = ?`).run(id);
+      res.json({ ok: true, id });
+    } catch (err) { next(err); }
   }
 );

@@ -146,10 +146,35 @@ export async function deleteFilm(id: number): Promise<void> {
   return request<void>(`/api/admin/films/${id}`, { method: 'DELETE' })
 }
 
+/** Upload a local image file and return the hosted URL */
+export async function uploadImage(file: File): Promise<string> {
+  const formData = new FormData()
+  formData.append('image', file)
+  const res = await fetch(`${BASE_URL}/api/admin/upload`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  })
+  if (res.status === 401) {
+    window.location.href = '/admin/login'
+    throw new Error('Unauthorized')
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`)
+  }
+  const data = await res.json() as { url: string }
+  return data.url
+}
+
 // ─── Calendar / Challenges ────────────────────────────────────────────────────
 
-export async function getChallenges(days = 30): Promise<AdminChallenge[]> {
-  const res = await request<{ data: AdminChallenge[] }>(`/api/admin/challenges?days=${days}`)
+export async function getChallenges(opts: { from?: string; to?: string } = {}): Promise<AdminChallenge[]> {
+  const params = new URLSearchParams()
+  if (opts.from) params.set('from', opts.from)
+  if (opts.to) params.set('to', opts.to)
+  const qs = params.toString()
+  const res = await request<{ data: AdminChallenge[] }>(`/api/admin/challenges${qs ? `?${qs}` : ''}`)
   return res.data
 }
 
@@ -208,6 +233,39 @@ export async function searchTmdb(query: string): Promise<TmdbSearchResult[]> {
 export async function getTmdbFilmDetails(tmdbId: number): Promise<FilmPayload> {
   return request<FilmPayload>(`/api/admin/tmdb/${tmdbId}/details`)
 }
+
+// ─── Changelog ───────────────────────────────────────────────────────────────
+
+export interface AdminChangelog {
+  id: number
+  version: string
+  release_date: string
+  changes: string[]
+}
+
+export async function getChangelog(): Promise<AdminChangelog[]> {
+  return request<AdminChangelog[]>('/api/admin/changelog')
+}
+
+export async function createChangelogEntry(payload: Omit<AdminChangelog, 'id'>): Promise<AdminChangelog> {
+  return request<AdminChangelog>('/api/admin/changelog', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateChangelogEntry(id: number, payload: Omit<AdminChangelog, 'id'>): Promise<AdminChangelog> {
+  return request<AdminChangelog>(`/api/admin/changelog/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteChangelogEntry(id: number): Promise<void> {
+  return request<void>(`/api/admin/changelog/${id}`, { method: 'DELETE' })
+}
+
+// ─── Image upload ─────────────────────────────────────────────────────────────
 
 export async function uploadFilmImage(filmId: number, file: File): Promise<{ url: string; film: AdminFilm }> {
   const form = new FormData()

@@ -27,7 +27,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ─── Production safety checks ─────────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
-  const missing = ['COOKIE_SECRET', 'ADMIN_PASSWORD', 'CORS_ORIGIN'].filter(
+  const missing = ['COOKIE_SECRET', 'ADMIN_PASSWORD', 'CORS_ORIGIN', 'BACKEND_URL'].filter(
     (v) => !process.env[v]
   );
   if (missing.length) {
@@ -55,6 +55,26 @@ app.use((req, res, next) => {
     res.sendStatus(204);
     return;
   }
+  next();
+});
+
+// ─── Security headers ────────────────────────────────────────────────────────
+app.use((_req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",  // needed for Tailwind inline styles
+      "img-src 'self' data: https://image.tmdb.org",
+      "connect-src 'self'",
+      "font-src 'self'",
+      "frame-ancestors 'none'",
+    ].join('; ')
+  );
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   next();
 });
 
