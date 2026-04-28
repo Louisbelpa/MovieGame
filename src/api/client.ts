@@ -46,6 +46,7 @@ export interface ChallengePayload {
   challengeId: number
   challengeNumber: number
   date: string
+  isPastChallenge: boolean
   imageUrl: string                  // always present; frontend applies CSS blur
   isGameOver: boolean
   hintsAvailable: number
@@ -75,6 +76,7 @@ export interface ResultPayload {
   tagline: string | null
   synopsis: string | null
   imageUrl: string
+  tmdbId: number | null
   attemptsUsed: number
   maxAttempts: number
   attempts: AttemptPayload[]
@@ -103,26 +105,31 @@ export function fetchChallenge(): Promise<ChallengePayload> {
   return request<ChallengePayload>('/api/challenge/today')
 }
 
+/** GET /api/challenge/date/:date – a specific past challenge */
+export function fetchChallengeByDate(date: string): Promise<ChallengePayload> {
+  return request<ChallengePayload>(`/api/challenge/date/${date}`)
+}
+
 /**
  * POST /api/challenge/guess
- * Body: { guess: string }
+ * Body: { guess: string, challengeId?: number }
  */
 export function postGuess(
-  _challengeId: number,
+  challengeId: number,
   guess: string
 ): Promise<GuessResultPayload> {
   return request<GuessResultPayload>(
     '/api/challenge/guess',
-    { method: 'POST', body: JSON.stringify({ guess }) }
+    { method: 'POST', body: JSON.stringify({ guess, challengeId }) }
   )
 }
 
 /**
- * GET /api/challenge/result
+ * GET /api/challenge/result?challengeId=N
  * Only succeeds when outcome !== null
  */
-export function fetchResult(_challengeId: number): Promise<ResultPayload> {
-  return request<ResultPayload>('/api/challenge/result')
+export function fetchResult(challengeId: number): Promise<ResultPayload> {
+  return request<ResultPayload>(`/api/challenge/result?challengeId=${challengeId}`)
 }
 
 /**

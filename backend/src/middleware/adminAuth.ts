@@ -18,9 +18,10 @@ export const ADMIN_COOKIE = 'admin_token';
 
 /** Compute the expected admin token from env vars. */
 export function computeAdminToken(): string {
+  const username = process.env.ADMIN_USERNAME ?? '';
   const password = process.env.ADMIN_PASSWORD ?? '';
   const secret = process.env.COOKIE_SECRET ?? 'dev_secret';
-  return createHash('sha256').update(password + secret).digest('hex');
+  return createHash('sha256').update(username + password + secret).digest('hex');
 }
 
 export function adminAuth(req: Request, res: Response, next: NextFunction): void {

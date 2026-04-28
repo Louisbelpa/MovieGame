@@ -1,8 +1,6 @@
 /**
  * admin/api.ts
  * Typed fetch helpers for all /api/admin/* routes.
- * All requests include credentials (cookie-based session).
- * 401 responses redirect to /admin/login.
  */
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? ''
@@ -22,11 +20,12 @@ export interface AdminFilm {
   image_url: string
   tmdb_id: number | null
   is_active: boolean
+  used_dates: string[]  // ISO dates this film has been scheduled
 }
 
 export interface AdminChallenge {
   id: number
-  date: string // ISO date "YYYY-MM-DD"
+  date: string
   film: AdminFilm
 }
 
@@ -36,7 +35,7 @@ export interface AdminDashboard {
   stats: {
     total_films: number
     total_challenges: number
-    success_rate: number // 0-100
+    success_rate: number
   }
 }
 
@@ -52,6 +51,14 @@ export interface FilmPayload {
   image_url: string
   tmdb_id: number | null
   is_active: boolean
+}
+
+export interface TmdbSearchResult {
+  tmdb_id: number
+  title: string
+  original_title: string
+  year: number
+  poster_url: string | null
 }
 
 // ─── HTTP client ──────────────────────────────────────────────────────────────
@@ -71,23 +78,37 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error(
-      (body as { message?: string }).message ?? `HTTP ${res.status}`
+      (body as { error?: string; message?: string }).error ??
+      (body as { message?: string }).message ??
+      `HTTP ${res.status}`
     )
   }
 
-  // 204 No Content
   if (res.status === 204) return undefined as unknown as T
-
   return res.json() as Promise<T>
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-export async function adminLogin(password: string): Promise<void> {
-  await request<void>('/api/admin/login', {
+export async function adminLogin(username: string | undefined, password: string): Promise<void> {
+  await request<{ ok: boolean; requiresUsername: boolean }>('/api/admin/login', {
     method: 'POST',
-    body: JSON.stringify({ password }),
+    body: JSON.stringify(username !== undefined ? { username, password } : { password }),
   })
+}
+
+/** Check whether the server requires a username in addition to a password. */
+export async function checkAdminConfig(): Promise<{ requiresUsername: boolean }> {
+  // POST with dummy password to trigger a 401 that tells us whether username is required
+  // A simpler approach: try to hit a public-safe config endpoint, or just check login response
+  // We use a dedicated endpoint: GET /api/admin/config (unauthenticated)
+  try {
+    const res = await fetch(`${BASE_URL}/api/admin/config`, { credentials: 'include' })
+    if (res.ok) return res.json() as Promise<{ requiresUsername: boolean }>
+  } catch {
+    // ignore
+  }
+  return { requiresUsername: false }
 }
 
 export async function adminLogout(): Promise<void> {
@@ -114,10 +135,7 @@ export async function createFilm(payload: FilmPayload): Promise<AdminFilm> {
   })
 }
 
-export async function updateFilm(
-  id: number,
-  payload: Partial<FilmPayload>
-): Promise<AdminFilm> {
+export async function updateFilm(id: number, payload: Partial<FilmPayload>): Promise<AdminFilm> {
   return request<AdminFilm>(`/api/admin/films/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
@@ -135,20 +153,14 @@ export async function getChallenges(days = 30): Promise<AdminChallenge[]> {
   return res.data
 }
 
-export async function scheduleChallenge(
-  date: string,
-  filmId: number
-): Promise<AdminChallenge> {
+export async function scheduleChallenge(date: string, filmId: number): Promise<AdminChallenge> {
   return request<AdminChallenge>('/api/admin/challenges', {
     method: 'POST',
     body: JSON.stringify({ date, film_id: filmId }),
   })
 }
 
-export async function updateChallenge(
-  id: number,
-  filmId: number
-): Promise<AdminChallenge> {
+export async function updateChallenge(id: number, filmId: number): Promise<AdminChallenge> {
   return request<AdminChallenge>(`/api/admin/challenges/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ film_id: filmId }),
@@ -159,7 +171,7 @@ export async function deleteChallenge(id: number): Promise<void> {
   return request<void>(`/api/admin/challenges/${id}`, { method: 'DELETE' })
 }
 
-// ─── TMDB Backdrops ───────────────────────────────────────────────────────────
+// ─── TMDB ─────────────────────────────────────────────────────────────────────
 
 export interface TmdbBackdrop {
   path: string
@@ -170,16 +182,12 @@ export interface TmdbBackdrop {
 }
 
 export async function getFilmBackdrops(filmId: number): Promise<TmdbBackdrop[]> {
-  const res = await request<{ backdrops: TmdbBackdrop[] }>(
-    `/api/admin/films/${filmId}/backdrops`
-  )
+  const res = await request<{ backdrops: TmdbBackdrop[] }>(`/api/admin/films/${filmId}/backdrops`)
   return res.backdrops
 }
 
 export async function getBackdropsByTmdbId(tmdbId: number): Promise<TmdbBackdrop[]> {
-  const res = await request<{ backdrops: TmdbBackdrop[] }>(
-    `/api/admin/tmdb/${tmdbId}/backdrops`
-  )
+  const res = await request<{ backdrops: TmdbBackdrop[] }>(`/api/admin/tmdb/${tmdbId}/backdrops`)
   return res.backdrops
 }
 
@@ -187,10 +195,21 @@ export async function getRandomTmdbFilm(): Promise<FilmPayload> {
   return request<FilmPayload>('/api/admin/tmdb/random')
 }
 
-export async function uploadFilmImage(
-  filmId: number,
-  file: File
-): Promise<{ url: string; film: AdminFilm }> {
+/** Search TMDB by movie title – returns lightweight suggestions */
+export async function searchTmdb(query: string): Promise<TmdbSearchResult[]> {
+  if (!query.trim()) return []
+  const res = await request<{ results: TmdbSearchResult[] }>(
+    `/api/admin/tmdb/search?q=${encodeURIComponent(query)}`
+  )
+  return res.results
+}
+
+/** Fetch full film details from TMDB by tmdb_id */
+export async function getTmdbFilmDetails(tmdbId: number): Promise<FilmPayload> {
+  return request<FilmPayload>(`/api/admin/tmdb/${tmdbId}/details`)
+}
+
+export async function uploadFilmImage(filmId: number, file: File): Promise<{ url: string; film: AdminFilm }> {
   const form = new FormData()
   form.append('image', file)
 

@@ -204,40 +204,37 @@ export function FilmsPage() {
   return (
     <AdminLayout>
       {/* Top bar */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
         {/* Search */}
-        <div className="relative">
-          <Search
-            size={15}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
+        <div className="relative flex-1 sm:max-w-xs">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher un film..."
-            className="pl-9 pr-3 py-2 text-sm rounded-lg border border-gray-300 bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none w-64"
+            className="pl-9 pr-3 py-2 text-sm rounded-lg border border-gray-300 bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none w-full"
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 sm:ml-auto">
           <button
             onClick={handleRandomFilm}
             disabled={randomLoading}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors disabled:opacity-50"
           >
             {randomLoading
               ? <span className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-              : <Shuffle size={16} />
+              : <Shuffle size={15} />
             }
-            Film aléatoire
+            <span className="hidden sm:inline">Film aléatoire</span>
           </button>
           <button
             onClick={() => setModal({ type: 'create' })}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
           >
-            <Plus size={16} />
-            Ajouter un film
+            <Plus size={15} />
+            Ajouter
           </button>
         </div>
       </div>
@@ -265,15 +262,15 @@ export function FilmsPage() {
             {search ? 'Aucun film trouvé pour cette recherche.' : 'Aucun film enregistré.'}
           </div>
         ) : (
-          <table className="w-full">
+          <table className="w-full min-w-[400px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                <th className="px-4 py-3 w-14"></th>
-                <th className="px-4 py-3">Titre</th>
-                <th className="px-4 py-3">Année</th>
-                <th className="px-4 py-3">Réalisateur</th>
-                <th className="px-4 py-3">Statut</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-3 py-3 w-20"></th>
+                <th className="px-3 py-3">Titre</th>
+                <th className="px-3 py-3 hidden sm:table-cell">Année</th>
+                <th className="px-3 py-3 hidden md:table-cell">Réalisateur</th>
+                <th className="px-3 py-3 hidden lg:table-cell">Statut</th>
+                <th className="px-3 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">

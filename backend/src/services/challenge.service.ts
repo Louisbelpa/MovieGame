@@ -26,6 +26,7 @@ interface FilmRow {
   synopsis: string | null;
   image_url: string;
   image_blurred_url: string | null;
+  tmdb_id: number | null;
 }
 
 interface ChallengeRow {
@@ -73,15 +74,16 @@ function normalise(str: string): string {
     .trim();
 }
 
-function getTodayUTC(): string {
-  return new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD'
+/** Returns current date in Europe/Paris timezone as YYYY-MM-DD */
+function getTodayParis(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
 }
 
 // ─── Public service methods ───────────────────────────────────────────────────
 
 /** Return today's challenge row (throws if not found) */
 export function getTodayChallenge(): ChallengeRow {
-  const today = getTodayUTC();
+  const today = getTodayParis();
   const row = db
     .prepare<[string], ChallengeRow>(
       `SELECT dc.* FROM daily_challenges dc
@@ -90,6 +92,28 @@ export function getTodayChallenge(): ChallengeRow {
     .get(today);
 
   if (!row) throw new Error(`No challenge scheduled for ${today}`);
+  return row;
+}
+
+/** Return a challenge row by its ID */
+export function getChallengeById(id: number): ChallengeRow {
+  const row = db
+    .prepare<[number], ChallengeRow>(`SELECT * FROM daily_challenges WHERE id = ?`)
+    .get(id);
+  if (!row) throw Object.assign(new Error(`No challenge found with id ${id}`), { status: 404 });
+  return row;
+}
+
+/** Return a challenge by a specific date (throws if not found) */
+export function getChallengeByDate(date: string): ChallengeRow {
+  const row = db
+    .prepare<[string], ChallengeRow>(
+      `SELECT dc.* FROM daily_challenges dc
+       WHERE dc.challenge_date = ?`
+    )
+    .get(date);
+
+  if (!row) throw new Error(`No challenge scheduled for ${date}`);
   return row;
 }
 
@@ -144,7 +168,11 @@ export function buildChallengePayload(
       case 'year':     return { type, value: film.year };
       case 'director': return { type, value: film.director };
       case 'genres':   return { type, value: JSON.parse(film.genres) as string[] };
-      case 'cast':     return { type, value: JSON.parse(film.cast_members) as string[] };
+      case 'cast': {
+        // Return only the first (main) actor
+        const cast = JSON.parse(film.cast_members) as string[];
+        return { type, value: cast.slice(0, 1) };
+      }
       case 'tagline':  return { type, value: film.tagline ?? '' };
       case 'synopsis': return { type, value: film.synopsis ?? '' };
       default:         return { type, value: null };
@@ -153,11 +181,14 @@ export function buildChallengePayload(
 
   const isGameOver = session.outcome !== null;
   const imageUrl = resolveImageUrl(film.image_url);
+  const today = getTodayParis();
+  const isPastChallenge = challenge.challenge_date < today;
 
   return {
     challengeId: challenge.id,
     challengeNumber: challenge.challenge_number,
     date: challenge.challenge_date,
+    isPastChallenge,
     imageUrl,
     isGameOver,
     hintsAvailable: schedule.length,
@@ -297,6 +328,7 @@ export function getResult(sessionToken: string, challengeId: number) {
     tagline: film.tagline,
     synopsis: film.synopsis,
     imageUrl: resolveImageUrl(film.image_url),
+    tmdbId: film.tmdb_id,
     attemptsUsed: attempts.length,
     maxAttempts: MAX_ATTEMPTS,
     attempts: attempts.map((a) => ({ guess: a.guess, correct: a.correct })),
@@ -333,7 +365,7 @@ export function getGlobalStats() {
 }
 
 /** Autocomplete search – returns titles only, never exposes today's answer */
-export function searchFilms(query: string, limit = 10) {
+export function searchFilms(query: string, limit = 10, excludeChallengeId?: number) {
   if (!query || query.trim().length < 2) return [];
 
   const todayChallenge = (() => {
@@ -353,10 +385,15 @@ export function searchFilms(query: string, limit = 10) {
     )
     .all(`%${normalise(query)}%`, limit + 1); // fetch one extra to exclude today if needed
 
-  // Filter out today's challenge film from autocomplete to avoid leaking the answer
-  const filtered = todayChallenge
-    ? rows.filter((r) => r.id !== todayChallenge.film_id)
-    : rows;
+  // Filter out today's challenge film and any override challenge from autocomplete
+  const excludeIds = new Set<number>();
+  if (todayChallenge) excludeIds.add(todayChallenge.film_id);
+  if (excludeChallengeId) {
+    const ch = db.prepare<[number], ChallengeRow>(`SELECT * FROM daily_challenges WHERE id = ?`).get(excludeChallengeId);
+    if (ch) excludeIds.add(ch.film_id);
+  }
+
+  const filtered = rows.filter((r) => !excludeIds.has(r.id));
 
   return filtered.slice(0, limit).map((r) => ({ title: r.title, year: r.year }));
 }

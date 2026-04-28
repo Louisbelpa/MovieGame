@@ -1,0 +1,23 @@
+# Build outputs
+backend/dist/
+backend/public/
+dist/
+
+# Dependencies
+node_modules/
+backend/node_modules/
+
+# Database
+backend/data/
+
+# Logs
+*.log
+backend/logs/
+
+# Environment (secrets)
+.env
+backend/.env
+
+# Lock files (too verbose)
+package-lock.json
+backend/package-lock.json
