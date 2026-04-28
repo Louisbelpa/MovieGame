@@ -1,36 +1,27 @@
 name: Security Audit
 
 on:
-  push:
-    branches: [main, master]
-  pull_request:
+  # Permet le lancement manuel depuis l'onglet Actions
+  workflow_dispatch:
+
+  # Conserve le scan automatique du lundi matin (optionnel, tu peux le supprimer)
   schedule:
-    # Every Monday at 08:00 UTC — catches new CVEs between deploys
     - cron: '0 8 * * 1'
+
+permissions:
+  contents: read
 
 jobs:
   audit:
     name: npm audit
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-
-      - name: Install frontend dependencies
-        run: npm ci
-
       - name: Audit frontend
         run: npm audit --audit-level=moderate
-
-      - name: Install backend dependencies
-        working-directory: backend
-        run: npm ci
-
       - name: Audit backend
         working-directory: backend
         run: npm audit --audit-level=moderate
