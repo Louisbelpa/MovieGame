@@ -1572,3 +1572,52 @@ adminRouter.delete(
     } catch (err) { next(err); }
   }
 );
+
+// ─── Audit Logs ───────────────────────────────────────────────────────────────
+
+// GET /api/admin/audit-logs?page=1&limit=50&action=film.create
+adminRouter.get(
+  '/audit-logs',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const page   = Math.max(1, parseInt(req.query.page as string ?? '1', 10) || 1);
+      const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit as string ?? '50', 10) || 50));
+      const action = typeof req.query.action === 'string' && req.query.action ? req.query.action : null;
+      const offset = (page - 1) * limit;
+
+      const where  = action ? 'WHERE action = ?' : '';
+      const params = action ? [action] : [];
+
+      const total = (
+        db.prepare<unknown[], { count: number }>(`SELECT COUNT(*) as count FROM audit_logs ${where}`)
+          .get(...params) as { count: number }
+      ).count;
+
+      interface AuditRow { id: number; action: string; details: string; created_at: string }
+      const rows = db.prepare<unknown[], AuditRow>(
+        `SELECT id, action, details, created_at FROM audit_logs ${where} ORDER BY id DESC LIMIT ? OFFSET ?`
+      ).all(...params, limit, offset);
+
+      res.json({
+        data: rows.map((r) => ({ ...r, details: JSON.parse(r.details) as Record<string, unknown> })),
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      });
+    } catch (err) { next(err); }
+  }
+);
+
+// GET /api/admin/audit-logs/actions  – distinct action types for filter dropdown
+adminRouter.get(
+  '/audit-logs/actions',
+  (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const rows = db
+        .prepare<[], { action: string }>(`SELECT DISTINCT action FROM audit_logs ORDER BY action`)
+        .all();
+      res.json({ data: rows.map((r) => r.action) });
+    } catch (err) { next(err); }
+  }
+);
