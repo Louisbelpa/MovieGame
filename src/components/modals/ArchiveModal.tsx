@@ -75,14 +75,15 @@ export function ArchiveModal() {
         setChallengeDates(new Set(dates))
         // Historique local
         let hist = loadHistory()
-        // Si l'historique est vide ou partiel, on tente de compléter à partir des stats globaux
-        if (Object.keys(hist).length === 0 || hist[loadStats().lastPlayedDate ?? ''] === undefined) {
-          const stats = loadStats()
-          // Si on a lastPlayedDate, on marque ce jour comme gagné/perdu selon lastWonDate
-          if (stats.lastPlayedDate) {
-            const d = stats.lastPlayedDate
-            hist[d] = (stats.lastWonDate === d) ? 'won' : 'lost'
-          }
+        // Toujours compléter le jour courant si lastPlayedDate correspond à aujourd'hui
+        const stats = loadStats()
+        if (stats.lastPlayedDate === today) {
+          hist[today] = (stats.lastWonDate === today) ? 'won' : 'lost'
+        }
+        // Si l'historique est vide ou partiel, on tente de compléter à partir des stats globaux (pour le dernier jour joué)
+        if ((Object.keys(hist).length === 0 || hist[stats.lastPlayedDate ?? ''] === undefined) && stats.lastPlayedDate) {
+          const d = stats.lastPlayedDate
+          hist[d] = (stats.lastWonDate === d) ? 'won' : 'lost'
         }
         setHistory(hist)
       })
