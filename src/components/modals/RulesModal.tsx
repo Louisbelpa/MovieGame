@@ -3,17 +3,30 @@
  * How-to-play explanation shown on first visit.
  */
 
-import { CheckCircle2, XCircle, SkipForward, Calendar, Clapperboard, User, Image } from 'lucide-react'
+import { CheckCircle2, XCircle, SkipForward, Calendar, Clapperboard, User } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { useGameStore } from '@/store/gameStore'
 
+const RULES_SEEN_KEY = 'cineguess:rules_seen'
+
 export function RulesModal() {
   const isOpen = useGameStore((s) => s.ui.isModalOpen && s.ui.modalType === 'rules')
   const closeModal = useGameStore((s) => s.closeModal)
+  const status = useGameStore((s) => s.status)
+  const openModal = useGameStore((s) => s.openModal)
+
+  function handleClose() {
+    // Mark as seen only when the user explicitly closes the tutorial
+    localStorage.setItem(RULES_SEEN_KEY, '1')
+    closeModal()
+    // If the game was already finished while the tutorial was open, show the result modal now
+    if (status === 'won') setTimeout(() => openModal('win'), 300)
+    else if (status === 'lost') setTimeout(() => openModal('lose'), 300)
+  }
 
   return (
-    <Modal isOpen={isOpen} onClose={closeModal} title="Comment jouer ?">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Comment jouer ?">
       <div className="flex flex-col gap-5 text-sm text-film-text">
 
         {/* Principle */}
@@ -27,22 +40,19 @@ export function RulesModal() {
 
         {/* Image blur progression */}
         <div className="film-border rounded-lg p-3">
-          <p className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <Image size={12} />
-            Progression de l'image
+          <p className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-2.5">
+            L'image se révèle à chaque essai
           </p>
-          <div className="flex items-center gap-1.5">
-            {[24, 14, 4, 0].map((blur, i) => (
-              <div key={blur} className="flex flex-col items-center gap-1 flex-1">
-                <div
-                  className="w-full h-10 rounded bg-film-surface border border-film-border flex items-center justify-center text-[9px] text-film-text-dim font-mono"
-                  style={{ filter: blur > 0 ? `blur(${Math.min(blur / 3, 4)}px)` : 'none' }}
-                >
-                  🎬
-                </div>
-                <span className="text-[9px] text-film-text-dim text-center">
-                  {i === 0 ? 'Départ' : i === 3 ? 'Fin' : `Essai ${i}`}
-                </span>
+          <div className="flex items-end gap-1.5">
+            {[
+              { label: 'Départ', opacity: 'opacity-20', size: 'h-5' },
+              { label: 'Essai 1', opacity: 'opacity-40', size: 'h-7' },
+              { label: 'Essai 2', opacity: 'opacity-70', size: 'h-9' },
+              { label: 'Fin', opacity: 'opacity-100', size: 'h-11' },
+            ].map(({ label, opacity, size }) => (
+              <div key={label} className="flex flex-col items-center gap-1 flex-1">
+                <div className={`w-full rounded bg-film-gold ${opacity} ${size} transition-all`} />
+                <span className="text-[9px] text-film-text-dim">{label}</span>
               </div>
             ))}
           </div>
@@ -84,7 +94,7 @@ export function RulesModal() {
           Vous pouvez aussi rejouer les anciens défis avec les flèches ◀ ▶.
         </p>
 
-        <Button variant="primary" size="lg" onClick={closeModal} className="w-full">
+        <Button variant="primary" size="lg" onClick={handleClose} className="w-full">
           C'est parti !
         </Button>
       </div>

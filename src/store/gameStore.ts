@@ -145,7 +145,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
           // result not critical for re-display
         }
         setTimeout(() => {
-          get().openModal(status === 'won' ? 'win' : 'lose')
+          // Don't override the tutorial modal if it's currently showing
+          if (get().ui.modalType !== 'rules') {
+            get().openModal(status === 'won' ? 'win' : 'lose')
+          }
         }, 800)
       }
     } catch (err) {

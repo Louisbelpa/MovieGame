@@ -17,14 +17,14 @@ const RULES_SEEN_KEY = 'cineguess:rules_seen'
 
 function useFirstVisit() {
   const openModal = useGameStore((s) => s.openModal)
-  const status = useGameStore((s) => s.status)
 
   useEffect(() => {
-    if (status === 'idle') return
+    // Show tutorial immediately on mount – before the game loads.
+    // This avoids the race condition where the win/lose modal (shown 800ms
+    // after initGame) would override the rules modal for returning users.
     if (localStorage.getItem(RULES_SEEN_KEY)) return
-    localStorage.setItem(RULES_SEEN_KEY, '1')
     openModal('rules')
-  }, [status, openModal])
+  }, [openModal]) // no `status` dependency – runs once on mount
 }
 
 export default function App() {
