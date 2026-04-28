@@ -53,8 +53,9 @@ const upload = multer({
   storage,
   limits: { fileSize: 8 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) cb(null, true);
-    else cb(new Error('Only image files are allowed'));
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only JPEG, PNG and WebP images are allowed'));
   },
 });
 
@@ -66,7 +67,7 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 const COOKIE_OPTIONS = {
   signed: true,
   httpOnly: true,
-  sameSite: 'lax' as const,
+  sameSite: 'strict' as const,
   secure: process.env.NODE_ENV === 'production',
   maxAge: SEVEN_DAYS_MS,
 };
@@ -85,6 +86,7 @@ interface FilmBody {
   image_url: string;
   tmdb_id?: number;
   fame_level?: number;
+  is_active?: boolean;
 }
 
 interface FilmRow {
@@ -223,19 +225,30 @@ adminRouter.post(
 
       const adminUsername = process.env.ADMIN_USERNAME ?? '';
 
+      const timingSafeEqual = (a: string, b: string): boolean => {
+        const bufA = Buffer.from(a);
+        const bufB = Buffer.from(b);
+        if (bufA.length !== bufB.length) {
+          // Still run timingSafeEqual on same-length buffers to avoid leaking length
+          crypto.timingSafeEqual(bufA, bufA);
+          return false;
+        }
+        return crypto.timingSafeEqual(bufA, bufB);
+      };
+
       // If ADMIN_USERNAME is configured, both fields are required
       if (adminUsername) {
         if (!username || typeof username !== 'string') {
           res.status(400).json({ error: 'Field "username" is required.' });
           return;
         }
-        if (username !== adminUsername || password !== adminPassword) {
+        if (!timingSafeEqual(username, adminUsername) || !timingSafeEqual(password, adminPassword)) {
           res.status(401).json({ error: 'Identifiants invalides.' });
           return;
         }
       } else {
         // Backward compatibility: password only
-        if (password !== adminPassword) {
+        if (!timingSafeEqual(password, adminPassword)) {
           res.status(401).json({ error: 'Mot de passe incorrect.' });
           return;
         }
@@ -253,7 +266,7 @@ adminRouter.post(
 adminRouter.post(
   '/logout',
   (_req: Request, res: Response) => {
-    res.clearCookie(ADMIN_COOKIE, { httpOnly: true, sameSite: 'lax' });
+    res.clearCookie(ADMIN_COOKIE, { httpOnly: true, sameSite: 'strict' });
     res.json({ ok: true });
   }
 );
@@ -429,16 +442,33 @@ adminRouter.post(
         res.status(400).json({ error: 'Field "title" is required.' });
         return;
       }
+      if (body.title.length > 500) {
+        res.status(400).json({ error: 'Field "title" must be 500 characters or fewer.' });
+        return;
+      }
       if (!body.year || typeof body.year !== 'number') {
         res.status(400).json({ error: 'Field "year" must be a number.' });
+        return;
+      }
+      const maxYear = new Date().getFullYear() + 5;
+      if (!Number.isInteger(body.year) || body.year < 1888 || body.year > maxYear) {
+        res.status(400).json({ error: `Field "year" must be between 1888 and ${maxYear}.` });
         return;
       }
       if (!body.director || typeof body.director !== 'string' || !body.director.trim()) {
         res.status(400).json({ error: 'Field "director" is required.' });
         return;
       }
+      if (body.director.length > 200) {
+        res.status(400).json({ error: 'Field "director" must be 200 characters or fewer.' });
+        return;
+      }
       if (!body.image_url || typeof body.image_url !== 'string' || !body.image_url.trim()) {
         res.status(400).json({ error: 'Field "image_url" is required.' });
+        return;
+      }
+      if (body.fame_level !== undefined && (typeof body.fame_level !== 'number' || body.fame_level < 1 || body.fame_level > 5)) {
+        res.status(400).json({ error: 'Field "fame_level" must be between 1 and 5.' });
         return;
       }
 
@@ -597,6 +627,22 @@ adminRouter.patch(
       if (!existing) { res.status(404).json({ error: 'Film not found.' }); return; }
 
       const body = req.body as Partial<FilmBody>;
+
+      if (body.title !== undefined && body.title.length > 500) {
+        res.status(400).json({ error: 'Field "title" must be 500 characters or fewer.' }); return;
+      }
+      if (body.director !== undefined && body.director.length > 200) {
+        res.status(400).json({ error: 'Field "director" must be 200 characters or fewer.' }); return;
+      }
+      if (body.year !== undefined) {
+        const maxYear = new Date().getFullYear() + 5;
+        if (!Number.isInteger(body.year) || body.year < 1888 || body.year > maxYear) {
+          res.status(400).json({ error: `Field "year" must be between 1888 and ${maxYear}.` }); return;
+        }
+      }
+      if (body.fame_level !== undefined && (body.fame_level < 1 || body.fame_level > 5)) {
+        res.status(400).json({ error: 'Field "fame_level" must be between 1 and 5.' }); return;
+      }
 
       db.prepare(
         `UPDATE films
@@ -833,7 +879,7 @@ adminRouter.post(
     try {
       const { date, film_id } = req.body as { date?: string; film_id?: number };
 
-      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || new Date(date).toISOString().slice(0, 10) !== date) {
         res.status(400).json({ error: 'Field "date" must be a valid YYYY-MM-DD string.' });
         return;
       }

@@ -22,6 +22,7 @@ import { adminRouter } from './routes/admin.js';
 import { sessionMiddleware } from './middleware/session.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { createRateLimiter } from './middleware/rateLimiter.js';
+import db from './db/database.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -79,6 +80,9 @@ app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
   next();
 });
 
@@ -102,7 +106,12 @@ app.use('/api/admin', adminRouter);
 
 // Health-check (used by Railway/Render)
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', ts: new Date().toISOString() });
+  try {
+    db.prepare('SELECT 1').get();
+    res.json({ status: 'ok', ts: new Date().toISOString() });
+  } catch {
+    res.status(503).json({ status: 'error', message: 'Database unavailable' });
+  }
 });
 
 // SPA fallback – serve built index.html for all non-API routes (production)
