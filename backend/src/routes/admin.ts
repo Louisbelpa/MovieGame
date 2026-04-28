@@ -85,6 +85,7 @@ interface FilmBody {
   image_url: string;
   tmdb_id?: number;
   fame_level?: number;
+  is_active?: boolean;
 }
 
 interface FilmRow {
