@@ -82,12 +82,6 @@ export function getTodayParis(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
 }
 
-function addDaysStr(dateStr: string, days: number): string {
-  const d = new Date(dateStr + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() + days)
-  return d.toISOString().slice(0, 10)
-}
-
 // ─── Default UI state ─────────────────────────────────────────────────────────
 
 function defaultUI(): UIState {
