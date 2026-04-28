@@ -5,9 +5,9 @@
  */
 
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react'
-import { X, Images, Search, Loader2 } from 'lucide-react'
+import { X, Images, Search, Loader2, Upload } from 'lucide-react'
 import type { AdminFilm, FilmPayload, TmdbSearchResult } from '../api'
-import { searchTmdb, getTmdbFilmDetails } from '../api'
+import { searchTmdb, getTmdbFilmDetails, uploadImage } from '../api'
 import { BackdropPicker } from './BackdropPicker'
 
 function resolvePreviewUrl(url: string): string {
@@ -248,6 +248,23 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showBackdrops, setShowBackdrops] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const url = await uploadImage(file)
+      setField('image_url', url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Échec de l\'upload')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   function setField<K extends keyof FilmPayload>(key: K, value: FilmPayload[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -306,6 +323,22 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
           <div className="flex-1">
             <Field label="URL de l'image" id="image_url" required value={form.image_url} onChange={(v) => setField('image_url', v)} placeholder="https://..." />
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors whitespace-nowrap disabled:opacity-50"
+          >
+            {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+            {uploading ? 'Upload…' : 'Importer'}
+          </button>
           {form.tmdb_id && (
             <button
               type="button"

@@ -21,6 +21,7 @@ export function WinModal() {
   if (!result) return null
 
   const correctAttempt = guesses.findIndex((g) => g.status === 'correct') + 1
+  const maxAttempts = result.maxAttempts
   const tmdbUrl = result.tmdbId
     ? `https://www.themoviedb.org/movie/${result.tmdbId}`
     : null
@@ -41,7 +42,7 @@ export function WinModal() {
         <div>
           <p className="text-film-text-dim text-sm mb-1">Bravo ! Vous avez trouvé en</p>
           <p className="text-4xl font-title font-bold text-gradient-gold">
-            {correctAttempt}<span className="text-2xl">/3</span>
+            {correctAttempt}<span className="text-2xl">/{maxAttempts}</span>
           </p>
         </div>
 
@@ -134,5 +135,5 @@ function NextGameCountdown() {
   const hoursLeft = Math.floor(secondsUntilMidnight / 3600)
   const minsLeft = Math.floor((secondsUntilMidnight % 3600) / 60)
 
-  return <strong className="text-film-text">{hoursLeft}h {minsLeft}min</strong>
+  return <strong className="text-film-text">{hoursLeft}h{minsLeft}</strong>
 }

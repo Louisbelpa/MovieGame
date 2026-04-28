@@ -598,6 +598,22 @@ adminRouter.post(
   }
 );
 
+// POST /api/admin/upload  – upload an image without requiring a film ID (for new films)
+adminRouter.post(
+  '/upload',
+  upload.single('image'),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.file) { res.status(400).json({ error: 'No image file received.' }); return; }
+      const backendUrl = (process.env.BACKEND_URL ?? 'http://localhost:3001').replace(/\/$/, '');
+      const url = `${backendUrl}/uploads/${req.file.filename}`;
+      res.json({ url });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // ─── Challenge planning ───────────────────────────────────────────────────────
 
 // GET /api/admin/challenges?from=YYYY-MM-DD&to=YYYY-MM-DD

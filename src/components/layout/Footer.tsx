@@ -109,7 +109,7 @@ function PrivacyModal({ onClose }: { onClose: () => void }) {
     <Modal isOpen onClose={onClose} title="Politique de confidentialité">
       <div className="flex flex-col gap-4 text-sm text-film-text-dim leading-relaxed">
         <p>
-          <strong className="text-film-text">MovieGuessr</strong> respecte votre vie privée.
+          <strong className="text-film-text">CinéGuessr</strong> respecte votre vie privée.
           Cette page explique quelles données sont collectées et comment elles sont utilisées.
         </p>
 
@@ -150,7 +150,7 @@ function PrivacyModal({ onClose }: { onClose: () => void }) {
             >
               The Movie Database (TMDB)
             </a>
-            . Votre utilisation de MovieGuessr est soumise aux conditions d'utilisation de TMDB.
+            . Votre utilisation de CinéGuessr est soumise aux conditions d'utilisation de TMDB.
           </p>
         </section>
 
@@ -177,18 +177,18 @@ export function Footer() {
           <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-film-text-dim mb-4">
             <button
               onClick={() => setModal('faq')}
-              className="hover:text-film-text transition-colors"
+              className="hover:text-film-text transition-colors cursor-pointer"
             >
               FAQ
             </button>
             <button
               onClick={() => setModal('privacy')}
-              className="hover:text-film-text transition-colors"
+              className="hover:text-film-text transition-colors cursor-pointer"
             >
               Politique de confidentialité
             </button>
             <a
-              href="https://www.linkedin.com/in/louisbelpa"
+              href="https://www.linkedin.com/in/louisbelpalme/"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 hover:text-film-text transition-colors"
@@ -217,10 +217,10 @@ export function Footer() {
 
           {/* Copyright + version */}
           <div className="flex items-center justify-center gap-3 text-[10px] text-film-text-dim/50">
-            <p>© {new Date().getFullYear()} MovieGuessr. Tous droits réservés.</p>
+            <p>© {new Date().getFullYear()} CinéGuessr. Tous droits réservés.</p>
             <button
               onClick={() => setModal('changelog')}
-              className="hover:text-film-text-dim transition-colors"
+              className="hover:text-film-text-dim transition-colors cursor-pointer"
             >
               v{__APP_VERSION__}
             </button>

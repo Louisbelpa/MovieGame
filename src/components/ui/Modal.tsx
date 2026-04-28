@@ -50,7 +50,7 @@ export function Modal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Backdrop */}
           <motion.div
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
@@ -89,7 +89,7 @@ export function Modal({
                   <button
                     onClick={onClose}
                     aria-label="Fermer"
-                    className="ml-auto p-1.5 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors"
+                    className="ml-auto p-1.5 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer"
                   >
                     <X size={18} />
                   </button>

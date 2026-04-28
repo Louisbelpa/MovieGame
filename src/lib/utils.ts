@@ -43,12 +43,17 @@ export function buildShareGrid(guesses: GuessEntry[]): string {
 export function buildShareText(
   challengeId: string,
   guesses: GuessEntry[],
-  won: boolean
+  won: boolean,
+  maxAttempts?: number
 ): string {
   const grid = buildShareGrid(guesses)
-  const score = won ? `${guesses.length}/6` : 'X/6'
-  const url = 'https://cineguess.app'
-  return `CineGuess ${challengeId}\n${score}\n\n${grid}\n\n${url}`
+  const max = maxAttempts ?? guesses.length
+  const score = won ? `${guesses.length}/${max}` : `X/${max}`
+  const url = 'https://cineguessr.fr'
+  const dateFr = new Date(challengeId + 'T12:00:00Z').toLocaleDateString('fr-FR', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+  })
+  return `CinéGuessr – ${dateFr}\n${score}\n\n${grid}\n\n${url}`
 }
 
 /** Default empty stats */

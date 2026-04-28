@@ -29,7 +29,8 @@ export function RulesModal() {
 
         {/* Principle */}
         <p className="text-film-text-dim leading-relaxed">
-          Une image tirée d'un film s'affiche. Devinez le film en{' '}
+          Une image tirée d'un film s'affiche.
+          <br/>Devinez le film en{' '}
           <strong className="text-film-gold">3 tentatives maximum</strong>.
           À chaque mauvaise réponse, un nouvel indice se débloque.
         </p>
@@ -66,7 +67,7 @@ export function RulesModal() {
         </ul>
 
         <p className="text-xs text-film-text-dim text-center">
-          Un nouveau film chaque jour à minuit (heure de Paris).
+          Un nouveau film chaque jour à minuit (heure de Paris).<br/>
           Rejoue les anciens défis avec les flèches ◀ ▶.
         </p>
 

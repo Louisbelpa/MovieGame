@@ -6,6 +6,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { guessLimiter } from '../middleware/rateLimiter.js';
+import db from '../db/database.js';
 import {
   getTodayChallenge,
   getChallengeByDate,
@@ -130,6 +131,56 @@ challengeRouter.get(
 
       const result = getResult(sessionToken, challengeId);
       res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── GET /api/challenge/adjacent ─────────────────────────────────────────────
+//
+// Returns the date of the nearest scheduled past challenge before or after a
+// given date. Used by the frontend for single-request date navigation.
+//
+// Query params:
+//   date      – reference date YYYY-MM-DD
+//   direction – "prev" | "next"
+
+challengeRouter.get(
+  '/adjacent',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { date, direction } = req.query as { date?: string; direction?: string };
+
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        res.status(400).json({ error: 'date must be YYYY-MM-DD' });
+        return;
+      }
+      if (direction !== 'prev' && direction !== 'next') {
+        res.status(400).json({ error: 'direction must be "prev" or "next"' });
+        return;
+      }
+
+      const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+
+      const row = direction === 'prev'
+        ? db.prepare<[string, string], { challenge_date: string }>(
+            `SELECT challenge_date FROM daily_challenges
+             WHERE challenge_date < ? AND challenge_date <= ?
+             ORDER BY challenge_date DESC LIMIT 1`
+          ).get(date, todayParis)
+        : db.prepare<[string, string], { challenge_date: string }>(
+            `SELECT challenge_date FROM daily_challenges
+             WHERE challenge_date > ? AND challenge_date <= ?
+             ORDER BY challenge_date ASC LIMIT 1`
+          ).get(date, todayParis);
+
+      if (!row) {
+        res.status(404).json({ error: 'No adjacent challenge found.' });
+        return;
+      }
+
+      res.json({ date: row.challenge_date });
     } catch (err) {
       next(err);
     }

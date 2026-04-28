@@ -146,10 +146,35 @@ export async function deleteFilm(id: number): Promise<void> {
   return request<void>(`/api/admin/films/${id}`, { method: 'DELETE' })
 }
 
+/** Upload a local image file and return the hosted URL */
+export async function uploadImage(file: File): Promise<string> {
+  const formData = new FormData()
+  formData.append('image', file)
+  const res = await fetch(`${BASE_URL}/api/admin/upload`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  })
+  if (res.status === 401) {
+    window.location.href = '/admin/login'
+    throw new Error('Unauthorized')
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`)
+  }
+  const data = await res.json() as { url: string }
+  return data.url
+}
+
 // ─── Calendar / Challenges ────────────────────────────────────────────────────
 
-export async function getChallenges(days = 30): Promise<AdminChallenge[]> {
-  const res = await request<{ data: AdminChallenge[] }>(`/api/admin/challenges?days=${days}`)
+export async function getChallenges(opts: { from?: string; to?: string } = {}): Promise<AdminChallenge[]> {
+  const params = new URLSearchParams()
+  if (opts.from) params.set('from', opts.from)
+  if (opts.to) params.set('to', opts.to)
+  const qs = params.toString()
+  const res = await request<{ data: AdminChallenge[] }>(`/api/admin/challenges${qs ? `?${qs}` : ''}`)
   return res.data
 }
 

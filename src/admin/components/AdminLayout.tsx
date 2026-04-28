@@ -41,7 +41,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     return (
       <>
         <div className="px-6 py-5 border-b border-gray-700">
-          <span className="font-bold text-lg tracking-tight">MovieGuessr</span>
+          <span className="font-bold text-lg tracking-tight">CinéGuessr</span>
           <span className="ml-2 text-xs text-gray-400 uppercase tracking-widest">Admin</span>
         </div>
 
@@ -104,7 +104,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         ].join(' ')}
       >
         <div className="flex items-center justify-between px-4 py-4 border-b border-gray-700">
-          <span className="font-bold text-base">MovieGuessr Admin</span>
+          <span className="font-bold text-base">CinéGuessr Admin</span>
           <button
             onClick={() => setSidebarOpen(false)}
             className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700 transition-colors"

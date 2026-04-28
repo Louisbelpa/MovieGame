@@ -15,6 +15,21 @@ import { useGameStore } from '@/store/gameStore'
 
 const RULES_SEEN_KEY = 'cineguess:rules_seen'
 
+function useDynamicTitle() {
+  const challengeNumber = useGameStore((s) => s.challenge?.challengeNumber ?? null)
+  const viewingDate = useGameStore((s) => s.viewingDate)
+
+  useEffect(() => {
+    if (challengeNumber) {
+      document.title = viewingDate
+        ? `CinéGuessr #${challengeNumber} — Ancien défi`
+        : `CinéGuessr #${challengeNumber} — Devine le film du jour`
+    } else {
+      document.title = 'CinéGuessr — Devine le film du jour'
+    }
+  }, [challengeNumber, viewingDate])
+}
+
 function useFirstVisit() {
   const openModal = useGameStore((s) => s.openModal)
 
@@ -29,6 +44,7 @@ function useFirstVisit() {
 
 export default function App() {
   useFirstVisit()
+  useDynamicTitle()
 
   return (
     <div className="min-h-dvh flex flex-col bg-film-black text-film-text">

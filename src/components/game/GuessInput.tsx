@@ -115,10 +115,10 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
           onClick={onSkip}
           disabled={disabled}
           title="Passer cette tentative"
-          className="shrink-0 text-film-text-dim min-h-[44px] min-w-[44px]"
+          className="shrink-0 text-film-text-dim min-h-[44px] min-w-[44px] gap-1"
         >
           <SkipForward size={14} />
-          <span className="hidden sm:inline">Passer</span>
+          <span className="text-xs">Passer</span>
         </Button>
 
         <Button
