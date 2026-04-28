@@ -15,7 +15,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 
 const COOKIE_NAME = 'mg_session';
 const MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000; // 1 year
@@ -29,7 +29,7 @@ export function sessionMiddleware(
   let token = req.signedCookies?.[COOKIE_NAME] as string | undefined;
 
   if (!token || typeof token !== 'string' || token.length < 8) {
-    token = uuidv4();
+    token = randomUUID();
     res.cookie(COOKIE_NAME, token, {
       signed: true,
       httpOnly: true,           // not accessible from document.cookie

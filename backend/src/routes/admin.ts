@@ -33,6 +33,8 @@ import fs from 'fs';
 import multer from 'multer';
 import db from '../db/database.js';
 import { adminAuth, computeAdminToken, ADMIN_COOKIE } from '../middleware/adminAuth.js';
+import { adminLimiter, loginLimiter } from '../middleware/rateLimiter.js';
+import { logAuditEvent } from '../middleware/auditLog.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -53,8 +55,9 @@ const upload = multer({
   storage,
   limits: { fileSize: 8 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) cb(null, true);
-    else cb(new Error('Only image files are allowed'));
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only JPEG, PNG and WebP images are allowed'));
   },
 });
 
@@ -66,7 +69,7 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 const COOKIE_OPTIONS = {
   signed: true,
   httpOnly: true,
-  sameSite: 'lax' as const,
+  sameSite: 'strict' as const,
   secure: process.env.NODE_ENV === 'production',
   maxAge: SEVEN_DAYS_MS,
 };
@@ -207,6 +210,7 @@ adminRouter.get(
 
 adminRouter.post(
   '/login',
+  loginLimiter,
   (req: Request, res: Response, next: NextFunction) => {
     try {
       const { username, password } = req.body as { username?: string; password?: string };
@@ -224,24 +228,36 @@ adminRouter.post(
 
       const adminUsername = process.env.ADMIN_USERNAME ?? '';
 
+      const timingSafeEqual = (a: string, b: string): boolean => {
+        const bufA = Buffer.from(a);
+        const bufB = Buffer.from(b);
+        if (bufA.length !== bufB.length) {
+          // Still run timingSafeEqual on same-length buffers to avoid leaking length
+          crypto.timingSafeEqual(bufA, bufA);
+          return false;
+        }
+        return crypto.timingSafeEqual(bufA, bufB);
+      };
+
       // If ADMIN_USERNAME is configured, both fields are required
       if (adminUsername) {
         if (!username || typeof username !== 'string') {
           res.status(400).json({ error: 'Field "username" is required.' });
           return;
         }
-        if (username !== adminUsername || password !== adminPassword) {
+        if (!timingSafeEqual(username, adminUsername) || !timingSafeEqual(password, adminPassword)) {
           res.status(401).json({ error: 'Identifiants invalides.' });
           return;
         }
       } else {
         // Backward compatibility: password only
-        if (password !== adminPassword) {
+        if (!timingSafeEqual(password, adminPassword)) {
           res.status(401).json({ error: 'Mot de passe incorrect.' });
           return;
         }
       }
 
+      logAuditEvent('admin.login', { username: adminUsername || '(password-only)' });
       const token = computeAdminToken();
       res.cookie(ADMIN_COOKIE, token, COOKIE_OPTIONS);
       res.json({ ok: true, requiresUsername: !!adminUsername });
@@ -254,7 +270,7 @@ adminRouter.post(
 adminRouter.post(
   '/logout',
   (_req: Request, res: Response) => {
-    res.clearCookie(ADMIN_COOKIE, { httpOnly: true, sameSite: 'lax' });
+    res.clearCookie(ADMIN_COOKIE, { httpOnly: true, sameSite: 'strict' });
     res.json({ ok: true });
   }
 );
@@ -291,6 +307,7 @@ adminRouter.get(
 // ─── All routes below require admin authentication ────────────────────────────
 
 adminRouter.use(adminAuth);
+adminRouter.use(adminLimiter);
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
@@ -430,16 +447,33 @@ adminRouter.post(
         res.status(400).json({ error: 'Field "title" is required.' });
         return;
       }
+      if (body.title.length > 500) {
+        res.status(400).json({ error: 'Field "title" must be 500 characters or fewer.' });
+        return;
+      }
       if (!body.year || typeof body.year !== 'number') {
         res.status(400).json({ error: 'Field "year" must be a number.' });
+        return;
+      }
+      const maxYear = new Date().getFullYear() + 5;
+      if (!Number.isInteger(body.year) || body.year < 1888 || body.year > maxYear) {
+        res.status(400).json({ error: `Field "year" must be between 1888 and ${maxYear}.` });
         return;
       }
       if (!body.director || typeof body.director !== 'string' || !body.director.trim()) {
         res.status(400).json({ error: 'Field "director" is required.' });
         return;
       }
+      if (body.director.length > 200) {
+        res.status(400).json({ error: 'Field "director" must be 200 characters or fewer.' });
+        return;
+      }
       if (!body.image_url || typeof body.image_url !== 'string' || !body.image_url.trim()) {
         res.status(400).json({ error: 'Field "image_url" is required.' });
+        return;
+      }
+      if (body.fame_level !== undefined && (typeof body.fame_level !== 'number' || body.fame_level < 1 || body.fame_level > 5)) {
+        res.status(400).json({ error: 'Field "fame_level" must be between 1 and 5.' });
         return;
       }
 
@@ -469,6 +503,7 @@ adminRouter.post(
         .prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`)
         .get(result.lastInsertRowid as number)!;
 
+      logAuditEvent('film.create', { id: result.lastInsertRowid, title: body.title.trim() });
       res.status(201).json(formatFilm(created, []));
     } catch (err) {
       next(err);
@@ -534,6 +569,7 @@ adminRouter.put(
         .prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`)
         .get(id)!;
 
+      logAuditEvent('film.update', { id, fields: Object.keys(body) });
       res.json(formatFilm(updated, getFilmUsedDates(id)));
     } catch (err) {
       next(err);
@@ -577,6 +613,7 @@ adminRouter.delete(
 
       db.prepare(`DELETE FROM films WHERE id = ?`).run(id);
 
+      logAuditEvent('film.delete', { id });
       res.json({ ok: true, id });
     } catch (err) {
       next(err);
@@ -598,6 +635,22 @@ adminRouter.patch(
       if (!existing) { res.status(404).json({ error: 'Film not found.' }); return; }
 
       const body = req.body as Partial<FilmBody>;
+
+      if (body.title !== undefined && body.title.length > 500) {
+        res.status(400).json({ error: 'Field "title" must be 500 characters or fewer.' }); return;
+      }
+      if (body.director !== undefined && body.director.length > 200) {
+        res.status(400).json({ error: 'Field "director" must be 200 characters or fewer.' }); return;
+      }
+      if (body.year !== undefined) {
+        const maxYear = new Date().getFullYear() + 5;
+        if (!Number.isInteger(body.year) || body.year < 1888 || body.year > maxYear) {
+          res.status(400).json({ error: `Field "year" must be between 1888 and ${maxYear}.` }); return;
+        }
+      }
+      if (body.fame_level !== undefined && (body.fame_level < 1 || body.fame_level > 5)) {
+        res.status(400).json({ error: 'Field "fame_level" must be between 1 and 5.' }); return;
+      }
 
       db.prepare(
         `UPDATE films
@@ -632,6 +685,7 @@ adminRouter.patch(
       );
 
       const updated = db.prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`).get(id)!;
+      logAuditEvent('film.update', { id, fields: Object.keys(body) });
       res.json(formatFilm(updated, getFilmUsedDates(id)));
     } catch (err) {
       next(err);
@@ -834,7 +888,7 @@ adminRouter.post(
     try {
       const { date, film_id } = req.body as { date?: string; film_id?: number };
 
-      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || new Date(date).toISOString().slice(0, 10) !== date) {
         res.status(400).json({ error: 'Field "date" must be a valid YYYY-MM-DD string.' });
         return;
       }
@@ -885,6 +939,7 @@ adminRouter.post(
         )
         .get(result.lastInsertRowid as number)!;
 
+      logAuditEvent('challenge.create', { id: result.lastInsertRowid, date, film_id });
       res.status(201).json(formatChallenge(created));
     } catch (err) {
       next(err);
@@ -938,6 +993,7 @@ adminRouter.put(
         )
         .get(id)!;
 
+      logAuditEvent('challenge.update', { id, film_id });
       res.json(formatChallenge(updated));
     } catch (err) {
       next(err);
@@ -976,6 +1032,7 @@ adminRouter.patch(
         )
         .get(id)!;
 
+      logAuditEvent('challenge.update', { id, film_id });
       res.json(formatChallenge(updated));
     } catch (err) {
       next(err);
@@ -1004,6 +1061,7 @@ adminRouter.delete(
       }
 
       db.prepare(`DELETE FROM daily_challenges WHERE id = ?`).run(id);
+      logAuditEvent('challenge.delete', { id });
       res.json({ ok: true, id });
     } catch (err) {
       next(err);
@@ -1511,6 +1569,55 @@ adminRouter.delete(
 
       db.prepare(`DELETE FROM changelog WHERE id = ?`).run(id);
       res.json({ ok: true, id });
+    } catch (err) { next(err); }
+  }
+);
+
+// ─── Audit Logs ───────────────────────────────────────────────────────────────
+
+// GET /api/admin/audit-logs?page=1&limit=50&action=film.create
+adminRouter.get(
+  '/audit-logs',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const page   = Math.max(1, parseInt(req.query.page as string ?? '1', 10) || 1);
+      const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit as string ?? '50', 10) || 50));
+      const action = typeof req.query.action === 'string' && req.query.action ? req.query.action : null;
+      const offset = (page - 1) * limit;
+
+      const where  = action ? 'WHERE action = ?' : '';
+      const params = action ? [action] : [];
+
+      const total = (
+        db.prepare<unknown[], { count: number }>(`SELECT COUNT(*) as count FROM audit_logs ${where}`)
+          .get(...params) as { count: number }
+      ).count;
+
+      interface AuditRow { id: number; action: string; details: string; created_at: string }
+      const rows = db.prepare<unknown[], AuditRow>(
+        `SELECT id, action, details, created_at FROM audit_logs ${where} ORDER BY id DESC LIMIT ? OFFSET ?`
+      ).all(...params, limit, offset);
+
+      res.json({
+        data: rows.map((r) => ({ ...r, details: JSON.parse(r.details) as Record<string, unknown> })),
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      });
+    } catch (err) { next(err); }
+  }
+);
+
+// GET /api/admin/audit-logs/actions  – distinct action types for filter dropdown
+adminRouter.get(
+  '/audit-logs/actions',
+  (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const rows = db
+        .prepare<[], { action: string }>(`SELECT DISTINCT action FROM audit_logs ORDER BY action`)
+        .all();
+      res.json({ data: rows.map((r) => r.action) });
     } catch (err) { next(err); }
   }
 );

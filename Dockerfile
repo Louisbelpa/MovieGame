@@ -1,33 +1,56 @@
 # syntax=docker/dockerfile:1
-# Single-stage build — keeps the setup simple and avoids native-addon
-# cross-compilation issues between Alpine build and runtime stages.
-FROM node:20-alpine
+#
+# Multi-stage build:
+#   stage 1 (frontend-builder) – Vite builds the React SPA → backend/public/
+#   stage 2 (backend-builder)  – tsc compiles backend, then devDeps are pruned
+#   stage 3 (runtime)          – only compiled artifacts + prod node_modules
+
+# ── Stage 1: Build frontend ────────────────────────────────────────────────────
+FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 
-# Build tools required by better-sqlite3 native addon
-RUN apk add --no-cache python3 make g++
-
-# ── Frontend dependencies ──────────────────────────────────────────────────────
 COPY package*.json ./
 RUN npm ci
 
-# ── Backend dependencies ───────────────────────────────────────────────────────
-COPY backend/package*.json ./backend/
-RUN cd backend && npm ci
+COPY index.html vite.config.ts tsconfig*.json eslint.config.js ./
+COPY public ./public
+COPY src ./src
 
-# ── Source ─────────────────────────────────────────────────────────────────────
-COPY . .
-
-# ── Build ──────────────────────────────────────────────────────────────────────
-# 1. Vite builds the React SPA → backend/public/  (Express will serve it)
+# Vite outputs to backend/public/ — create the directory first
+RUN mkdir -p backend
 RUN npm run build
-# 2. TypeScript compiles the backend → backend/dist/
-RUN cd backend && npm run build
 
-# ── Runtime ────────────────────────────────────────────────────────────────────
-# Mount a Railway/Render persistent volume at /data so the SQLite file
-# survives container restarts and redeployments.
+# ── Stage 2: Build + prune backend ────────────────────────────────────────────
+FROM node:20-alpine AS backend-builder
+
+# Build tools required by better-sqlite3 native addon (only at build time)
+RUN apk add --no-cache python3 make g++
+
+WORKDIR /app
+
+COPY backend/package*.json ./
+RUN npm ci
+
+COPY backend/src ./src
+COPY backend/tsconfig.json ./
+RUN npm run build
+
+# Remove devDependencies — keeps node_modules lean for the runtime stage
+RUN npm prune --omit=dev
+
+# ── Stage 3: Runtime ──────────────────────────────────────────────────────────
+FROM node:20-alpine
+WORKDIR /app
+
+# Persistent volume for SQLite database (mount at /data on Railway)
 RUN mkdir -p /data
+
+# Compiled backend (JS + schema.sql copied by the build script)
+COPY --from=backend-builder /app/dist           ./backend/dist
+# Production node_modules (includes compiled better-sqlite3 .node binary)
+COPY --from=backend-builder /app/node_modules   ./backend/node_modules
+# Built React SPA
+COPY --from=frontend-builder /app/backend/public ./backend/public
 
 ENV NODE_ENV=production
 ENV DATABASE_PATH=/data/moviegame.db
@@ -35,5 +58,5 @@ ENV PORT=3001
 
 EXPOSE 3001
 
-# Run migrations (idempotent — safe to re-run on every start), then serve.
+# Run migrations (idempotent — safe to re-run on every deploy), then serve.
 CMD ["sh", "-c", "node backend/dist/db/migrate.js && node backend/dist/server.js"]

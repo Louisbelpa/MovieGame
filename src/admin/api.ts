@@ -67,6 +67,21 @@ export interface TmdbSearchResult {
   poster_url: string | null
 }
 
+export interface AuditLog {
+  id: number
+  action: string
+  details: Record<string, unknown>
+  created_at: string
+}
+
+export interface AuditLogsResponse {
+  data: AuditLog[]
+  total: number
+  page: number
+  limit: number
+  pages: number
+}
+
 // ─── HTTP client ──────────────────────────────────────────────────────────────
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -310,4 +325,21 @@ export async function uploadFilmImage(filmId: number, file: File): Promise<{ url
   }
 
   return res.json() as Promise<{ url: string; film: AdminFilm }>
+}
+
+// ─── Audit logs ───────────────────────────────────────────────────────────────
+
+export async function getAuditLogs(
+  page = 1,
+  limit = 50,
+  action?: string
+): Promise<AuditLogsResponse> {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+  if (action) params.set('action', action)
+  return request<AuditLogsResponse>(`/api/admin/audit-logs?${params}`)
+}
+
+export async function getAuditLogActions(): Promise<string[]> {
+  const res = await request<{ data: string[] }>('/api/admin/audit-logs/actions')
+  return res.data
 }

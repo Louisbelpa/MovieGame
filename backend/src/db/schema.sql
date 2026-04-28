@@ -165,6 +165,19 @@ INSERT OR IGNORE INTO changelog (id, version, release_date, changes) VALUES
   (3, '1.0.0', 'Janvier 2026', '["Lancement de CinéGuessr","Défi quotidien avec une image tirée d''un film","Autocomplétion des titres","Back office pour gérer les films et le planning"]');
 
 -- ---------------------------------------------------------------------------
+-- audit_logs  (trail of admin actions for security and debugging)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    action     TEXT NOT NULL,
+    details    TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action     ON audit_logs (action);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs (created_at);
+
+-- ---------------------------------------------------------------------------
 -- Trigger: update global_stats when a session is finished.
 -- wins_by_attempt JSON key is the number of attempts used (1-6).
 -- We use json_set to update only the matching bucket atomically.

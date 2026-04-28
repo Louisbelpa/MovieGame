@@ -15,7 +15,7 @@ Un nouveau défi chaque jour à minuit (heure de Paris). Les anciens défis rest
 
 ## Prérequis
 
-- Node.js v18+
+- Node.js v20+
 - npm v9+
 - Clé API TMDB gratuite (pour le back office) : [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)
 
@@ -53,7 +53,7 @@ npm install
 npm run dev
 ```
 
-Frontend disponible sur `http://localhost:5173`.  
+Frontend disponible sur `http://localhost:5173`.
 Back office sur `http://localhost:5173/admin`.
 
 ## Structure du projet
@@ -79,7 +79,7 @@ Back office sur `http://localhost:5173/admin`.
     │   └── db/                   # schema.sql, migrate.ts, database.ts
     └── scripts/
         ├── seed.ts               # Peuplement initial
-        └── reset.ts              # Remise à zéro (dev)
+        └── reset.ts              # Remise à zéro (dev uniquement)
 ```
 
 ## Scripts
@@ -109,13 +109,14 @@ Voir `backend/.env.example` pour la liste complète.
 |----------|-----|-------------|
 | `PORT` | `3001` | Port du serveur API |
 | `DATABASE_PATH` | `./data/moviegame.db` | Chemin du fichier SQLite |
-| `COOKIE_SECRET` | *(voir .env.example)* | Secret de signature des cookies |
-| `ADMIN_PASSWORD` | *(voir .env.example)* | Mot de passe du back office |
+| `COOKIE_SECRET` | *(voir .env.example)* | Secret de signature des cookies — générer avec `openssl rand -hex 32` |
+| `ADMIN_PASSWORD` | *(voir .env.example)* | Mot de passe du back office (min. 12 caractères recommandé) |
 | `ADMIN_USERNAME` | *(optionnel)* | Identifiant du back office (si défini, requis à la connexion) |
-| `CORS_ORIGIN` | `http://localhost:5173` | Origine autorisée |
+| `CORS_ORIGIN` | `http://localhost:5173` | Origine autorisée — domaine exact, sans slash final |
 | `TMDB_API_KEY` | — | Clé API TMDB (back office uniquement) |
 | `IMAGE_SOURCE` | `tmdb` | `tmdb` ou `local` |
 | `MAX_ATTEMPTS` | `3` | Nombre de tentatives par défi |
+| `BACKEND_URL` | — | URL publique du backend (pour les URLs d'images uploadées) |
 
 ## API publique
 
@@ -137,13 +138,42 @@ Accessible sur `/admin`. Protégé par mot de passe (et identifiant si `ADMIN_US
 - **Films** — CRUD complet, recherche TMDB par titre avec auto-remplissage, sélection de backdrop, badge "Joué / Planifié"
 - **Planning** — calendrier des 30 prochains jours, association film ↔ date
 
-## Déploiement
+## Déploiement (Railway)
 
-Tout est hébergé sur [Railway](https://railway.app). Le frontend est buildé dans `backend/public/` et servi directement par Express — pas de déploiement séparé.
+Le frontend est buildé dans `backend/public/` et servi directement par Express — un seul service à déployer.
 
-- `npm run build` (racine) → génère `backend/public/`
-- Railway détecte le `Dockerfile` et déploie le tout en un seul service
-- Le volume persistant Railway est monté sur `/data` pour la base SQLite
+### Première mise en production
+
+1. Créer le service Railway et lier le repo
+2. Ajouter un **volume persistant** monté sur `/data` (pour la base SQLite)
+3. Configurer toutes les variables d'environnement (voir tableau ci-dessus + `.env.example`)
+4. Déployer — Railway détecte le `Dockerfile` automatiquement
+5. Après le premier déploiement réussi, peupler la base depuis la console Railway :
+   ```bash
+   cd backend && npm run db:seed
+   ```
+
+### Variables obligatoires en production
+
+```
+COOKIE_SECRET=<openssl rand -hex 32>
+ADMIN_PASSWORD=<mot de passe fort, 12+ caractères>
+CORS_ORIGIN=https://votre-app.up.railway.app
+BACKEND_URL=https://votre-app.up.railway.app
+TMDB_API_KEY=<votre clé TMDB>
+```
+
+### Checklist avant mise en ligne
+
+- [ ] `COOKIE_SECRET` généré aléatoirement (`openssl rand -hex 32`)
+- [ ] `ADMIN_PASSWORD` fort et unique (≥ 12 caractères)
+- [ ] `ADMIN_USERNAME` défini (recommandé pour le double facteur identifiant + mot de passe)
+- [ ] `CORS_ORIGIN` pointe vers le bon domaine (sans slash final)
+- [ ] `BACKEND_URL` configuré pour les URLs d'images uploadées
+- [ ] Volume persistant Railway monté sur `/data`
+- [ ] HTTPS activé (Railway le fait automatiquement)
+- [ ] Au moins 2 semaines de défis planifiés dans le back office
+- [ ] `npm audit` sans vulnérabilité critique côté frontend et backend
 
 ## Attribution
 
