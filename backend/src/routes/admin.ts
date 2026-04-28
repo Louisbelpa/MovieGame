@@ -446,8 +446,8 @@ adminRouter.post(
         .prepare(
           `INSERT INTO films
              (title, title_aliases, year, director, genres, cast_members,
-              tagline, synopsis, image_url, tmdb_id, fame_level)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+              tagline, synopsis, image_url, tmdb_id, fame_level, is_active)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
           body.title.trim(),
@@ -460,7 +460,8 @@ adminRouter.post(
           body.synopsis ?? null,
           body.image_url.trim(),
           body.tmdb_id ?? null,
-          body.fame_level ?? 3
+          body.fame_level ?? 3,
+          body.is_active !== undefined ? (body.is_active ? 1 : 0) : 1
         );
 
       const created = db
@@ -509,6 +510,7 @@ adminRouter.put(
              image_url    = ?,
              tmdb_id      = ?,
              fame_level   = ?,
+             is_active    = ?,
              updated_at   = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
          WHERE id = ?`
       ).run(
@@ -523,6 +525,7 @@ adminRouter.put(
         (body.image_url ?? existing.image_url).trim(),
         body.tmdb_id !== undefined ? body.tmdb_id : existing.tmdb_id,
         body.fame_level !== undefined ? body.fame_level : (existing.fame_level ?? 3),
+        body.is_active !== undefined ? (body.is_active ? 1 : 0) : existing.is_active,
         id
       );
 
@@ -608,6 +611,7 @@ adminRouter.patch(
              image_url    = ?,
              tmdb_id      = ?,
              fame_level   = ?,
+             is_active    = ?,
              updated_at   = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
          WHERE id = ?`
       ).run(
@@ -622,6 +626,7 @@ adminRouter.patch(
         (body.image_url ?? existing.image_url).trim(),
         body.tmdb_id !== undefined ? body.tmdb_id : existing.tmdb_id,
         body.fame_level !== undefined ? body.fame_level : (existing.fame_level ?? 3),
+        body.is_active !== undefined ? (body.is_active ? 1 : 0) : existing.is_active,
         id
       );
 
@@ -766,8 +771,8 @@ adminRouter.post(
 
         try {
           const result = db.prepare(
-            `INSERT INTO films (title, title_aliases, year, director, genres, cast_members, tagline, synopsis, image_url, tmdb_id)
-             VALUES (?, '[]', ?, ?, '[]', '[]', NULL, NULL, ?, NULL)`
+            `INSERT INTO films (title, title_aliases, year, director, genres, cast_members, tagline, synopsis, image_url, tmdb_id, fame_level, is_active)
+             VALUES (?, '[]', ?, ?, '[]', '[]', NULL, NULL, ?, NULL, 3, 1)`
           ).run(title, year, director, image_url);
           created.push(result.lastInsertRowid as number);
         } catch {
