@@ -188,8 +188,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }, 800)
       }
     } catch (err) {
-      console.error('[loadDate]', err)
-      set({ status: 'idle' })
+      const is404 = (err as { status?: number }).status === 404
+      set({ status: is404 ? 'not_found' : 'idle' })
+      if (!is404) console.error('[loadDate]', err)
     }
   },
 

@@ -41,6 +41,7 @@ function DateNavBar() {
   const currentDate = viewingDate ?? todayParis
   const isToday = currentDate === todayParis
   const isLoading = status === 'idle'
+  const isAtBoundary = status === 'not_found'
 
   const goBack = useCallback(() => {
     const prev = addDays(currentDate, -1)
@@ -64,9 +65,9 @@ function DateNavBar() {
     <div className="flex items-center justify-between gap-2 py-1.5 px-1">
       <button
         onClick={goBack}
-        disabled={isLoading}
-        className="p-1.5 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-40"
-        title="Défi précédent"
+        disabled={isLoading || isAtBoundary}
+        className="p-1.5 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        title={isAtBoundary ? 'Pas de défi avant cette date' : 'Défi précédent'}
       >
         <ChevronLeft size={18} />
       </button>
@@ -134,11 +135,22 @@ export function GamePage() {
     )
   }
 
+  if (status === 'not_found') {
+    return (
+      <div className="max-w-2xl mx-auto px-3 sm:px-4 py-3 sm:py-6 flex flex-col gap-3">
+        <DateNavBar />
+        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-2 text-center">
+          <p className="text-film-text font-semibold">Aucun défi pour cette date.</p>
+          <p className="text-film-text-dim text-sm">Utilisez les flèches pour naviguer vers une date avec un défi.</p>
+        </div>
+      </div>
+    )
+  }
+
   if (!challenge) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <p className="text-film-red font-semibold">Aucun défi disponible pour cette date.</p>
-        <p className="text-film-text-dim text-sm">Essayez une autre date.</p>
+        <p className="text-film-red font-semibold">Aucun défi disponible.</p>
       </div>
     )
   }

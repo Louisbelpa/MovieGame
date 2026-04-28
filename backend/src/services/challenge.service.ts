@@ -113,7 +113,7 @@ export function getChallengeByDate(date: string): ChallengeRow {
     )
     .get(date);
 
-  if (!row) throw new Error(`No challenge scheduled for ${date}`);
+  if (!row) throw Object.assign(new Error(`No challenge scheduled for ${date}`), { status: 404 });
   return row;
 }
 
