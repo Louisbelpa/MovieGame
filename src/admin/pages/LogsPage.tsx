@@ -6,17 +6,17 @@ import { getAuditLogs, getAuditLogActions, type AuditLog } from '../api'
 // ─── Action badge ─────────────────────────────────────────────────────────────
 
 const ACTION_STYLES: Record<string, string> = {
-  'admin.login':       'bg-blue-900/60 text-blue-300 border-blue-700',
-  'film.create':       'bg-green-900/60 text-green-300 border-green-700',
-  'film.update':       'bg-amber-900/60 text-amber-300 border-amber-700',
-  'film.delete':       'bg-red-900/60 text-red-300 border-red-700',
-  'challenge.create':  'bg-green-900/60 text-green-300 border-green-700',
-  'challenge.update':  'bg-amber-900/60 text-amber-300 border-amber-700',
-  'challenge.delete':  'bg-red-900/60 text-red-300 border-red-700',
+  'admin.login':       'bg-blue-50 text-blue-700 border-blue-200',
+  'film.create':       'bg-green-50 text-green-700 border-green-200',
+  'film.update':       'bg-amber-50 text-amber-700 border-amber-200',
+  'film.delete':       'bg-red-50 text-red-700 border-red-200',
+  'challenge.create':  'bg-green-50 text-green-700 border-green-200',
+  'challenge.update':  'bg-amber-50 text-amber-700 border-amber-200',
+  'challenge.delete':  'bg-red-50 text-red-700 border-red-200',
 }
 
 function ActionBadge({ action }: { action: string }) {
-  const style = ACTION_STYLES[action] ?? 'bg-gray-700 text-gray-300 border-gray-600'
+  const style = ACTION_STYLES[action] ?? 'bg-gray-100 text-gray-600 border-gray-300'
   return (
     <span className={`inline-block border rounded-md px-2 py-0.5 text-xs font-mono font-medium ${style}`}>
       {action}
@@ -50,7 +50,7 @@ function Details({ action, details }: { action: string; details: Record<string, 
   }
 
   return (
-    <span className="text-sm text-gray-300 font-mono">
+    <span className="text-sm text-gray-700 font-mono">
       {parts.join(' · ')}
     </span>
   )
@@ -63,8 +63,8 @@ function Timestamp({ iso }: { iso: string }) {
   const date = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
   const time = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   return (
-    <span className="text-xs text-gray-400 whitespace-nowrap">
-      {date} <span className="text-gray-500">{time}</span>
+    <span className="text-xs text-gray-500 whitespace-nowrap">
+      {date} <span className="text-gray-400">{time}</span>
     </span>
   )
 }
@@ -127,14 +127,14 @@ export function LogsPage() {
           <div className="flex items-center gap-3">
             <ShieldAlert className="w-6 h-6 text-indigo-400" />
             <div>
-              <h1 className="text-xl font-bold text-white">Journal d'activité</h1>
-              <p className="text-sm text-gray-400">{total} événement{total !== 1 ? 's' : ''} enregistré{total !== 1 ? 's' : ''}</p>
+              <h1 className="text-xl font-bold text-gray-900">Journal d'activité</h1>
+              <p className="text-sm text-gray-500">{total} événement{total !== 1 ? 's' : ''} enregistré{total !== 1 ? 's' : ''}</p>
             </div>
           </div>
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm text-gray-200 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-sm text-gray-700 transition-colors disabled:opacity-50 shadow-sm"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             Actualiser
@@ -143,11 +143,11 @@ export function LogsPage() {
 
         {/* Filter */}
         <div className="flex items-center gap-3">
-          <label className="text-sm text-gray-400 shrink-0">Filtrer par action :</label>
+          <label className="text-sm text-gray-600 shrink-0">Filtrer par action :</label>
           <select
             value={filter}
             onChange={(e) => handleFilter(e.target.value)}
-            className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+            className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-indigo-500 shadow-sm"
           >
             <option value="">Toutes les actions</option>
             {actions.map((a) => (
@@ -158,36 +158,36 @@ export function LogsPage() {
 
         {/* Error */}
         {error && (
-          <div className="bg-red-900/40 border border-red-700 rounded-lg px-4 py-3 text-sm text-red-300">
+          <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
             {error}
           </div>
         )}
 
         {/* Table */}
-        <div className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700">
+        <div className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm">
           {loading ? (
             <div className="flex items-center justify-center h-40">
               <span className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : logs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-gray-500 gap-2">
+            <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
               <ShieldAlert className="w-8 h-8 opacity-40" />
               <p className="text-sm">Aucun événement{filter ? ` pour « ${filter} »` : ''}</p>
             </div>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-700 text-xs text-gray-400 uppercase tracking-wider">
+                <tr className="border-b border-gray-200 bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
                   <th className="text-left px-4 py-3 font-medium w-8">#</th>
                   <th className="text-left px-4 py-3 font-medium">Date</th>
                   <th className="text-left px-4 py-3 font-medium">Action</th>
                   <th className="text-left px-4 py-3 font-medium">Détails</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700/50">
+              <tbody className="divide-y divide-gray-100">
                 {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-700/30 transition-colors">
-                    <td className="px-4 py-3 text-gray-600 text-xs">{log.id}</td>
+                  <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 text-gray-400 text-xs">{log.id}</td>
                     <td className="px-4 py-3"><Timestamp iso={log.created_at} /></td>
                     <td className="px-4 py-3"><ActionBadge action={log.action} /></td>
                     <td className="px-4 py-3"><Details action={log.action} details={log.details} /></td>
@@ -201,19 +201,19 @@ export function LogsPage() {
         {/* Pagination */}
         {pages > 1 && (
           <div className="flex items-center justify-between text-sm text-gray-400">
-            <span>Page {page} / {pages}</span>
+            <span className="text-gray-500">Page {page} / {pages}</span>
             <div className="flex gap-2">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-white"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-gray-700 shadow-sm"
               >
                 <ChevronLeft className="w-4 h-4" /> Précédent
               </button>
               <button
                 onClick={() => setPage((p) => Math.min(pages, p + 1))}
                 disabled={page === pages}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-white"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-gray-700 shadow-sm"
               >
                 Suivant <ChevronRight className="w-4 h-4" />
               </button>
