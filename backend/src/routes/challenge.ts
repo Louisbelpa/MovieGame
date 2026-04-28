@@ -137,6 +137,36 @@ challengeRouter.get(
   }
 );
 
+// ─── GET /api/challenge/dates ─────────────────────────────────────────────────
+//
+// Returns all challenge dates from the past N days (default 90, max 365).
+// Used by the archive calendar on the frontend.
+
+challengeRouter.get(
+  '/dates',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const days = Math.min(Math.max(1, parseInt((req.query.days as string) ?? '90', 10)), 365)
+      const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
+      const from = new Date(todayParis + 'T12:00:00Z')
+      from.setUTCDate(from.getUTCDate() - days)
+      const fromStr = from.toISOString().slice(0, 10)
+
+      const rows = db
+        .prepare<[string, string], { challenge_date: string }>(
+          `SELECT challenge_date FROM daily_challenges
+           WHERE challenge_date >= ? AND challenge_date <= ?
+           ORDER BY challenge_date DESC`
+        )
+        .all(fromStr, todayParis)
+
+      res.json({ dates: rows.map((r) => r.challenge_date) })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
 // ─── GET /api/challenge/adjacent ─────────────────────────────────────────────
 //
 // Returns the date of the nearest scheduled past challenge before or after a

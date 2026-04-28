@@ -51,6 +51,9 @@ CREATE TABLE IF NOT EXISTS films (
     tmdb_id         INTEGER UNIQUE,
     imdb_id         TEXT,
 
+    -- Celebrity level 1–5 (1 = niche, 5 = blockbuster). Used to gauge difficulty.
+    fame_level      INTEGER NOT NULL DEFAULT 3 CHECK (fame_level BETWEEN 1 AND 5),
+
     -- Soft-delete / visibility flag
     is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
 

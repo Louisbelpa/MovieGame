@@ -18,6 +18,24 @@ const schema = fs.readFileSync(schemaPath, 'utf-8');
 
 console.log('Running migrations…');
 db.exec(schema);
+
+// Incremental migrations — safe to re-run (guarded by try/catch)
+const incremental: { name: string; sql: string }[] = [
+  {
+    name: 'add_fame_level',
+    sql: `ALTER TABLE films ADD COLUMN fame_level INTEGER NOT NULL DEFAULT 3 CHECK (fame_level BETWEEN 1 AND 5)`,
+  },
+]
+
+for (const { name, sql } of incremental) {
+  try {
+    db.prepare(sql).run()
+    console.log(`  ✓ ${name}`)
+  } catch {
+    // column already exists — ignore
+  }
+}
+
 console.log('Migrations complete.');
 
 db.close();

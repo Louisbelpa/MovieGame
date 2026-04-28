@@ -10,7 +10,8 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "db:reset": "node --input-type=module -e \"import{rmSync}from'fs';rmSync(process.env.DATABASE_PATH??'data/moviegame.db',{force:true})\" && npm run db:migrate && npm run db:seed",
-    "fetch-backdrops": "tsx scripts/fetch-backdrops.ts"
+    "fetch-backdrops": "tsx scripts/fetch-backdrops.ts",
+    "db:backfill-fame": "tsx scripts/backfill-fame.ts"
   },
   "dependencies": {
     "@types/multer": "^2.1.0",

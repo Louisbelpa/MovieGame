@@ -84,6 +84,7 @@ interface FilmBody {
   synopsis?: string;
   image_url: string;
   tmdb_id?: number;
+  fame_level?: number;
 }
 
 interface FilmRow {
@@ -101,6 +102,7 @@ interface FilmRow {
   tmdb_id: number | null;
   imdb_id: string | null;
   is_active: number;
+  fame_level: number;
   created_at: string;
   updated_at: string;
 }
@@ -122,6 +124,22 @@ interface ChallengeWithFilm extends ChallengeRow {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const TMDB_BASE_ADMIN = process.env.TMDB_IMAGE_BASE_URL ?? 'https://image.tmdb.org/t/p/w1280';
+
+/**
+ * Maps a TMDB vote_count to a 1-5 fame level.
+ *   1 = niche       (<500 votes)
+ *   2 = confidentiel (500–2 000)
+ *   3 = connu        (2 000–8 000)
+ *   4 = populaire    (8 000–25 000)
+ *   5 = blockbuster  (>25 000)
+ */
+function fameFromVoteCount(voteCount: number): number {
+  if (voteCount >= 25_000) return 5;
+  if (voteCount >= 8_000)  return 4;
+  if (voteCount >= 2_000)  return 3;
+  if (voteCount >= 500)    return 2;
+  return 1;
+}
 
 function resolveAdminImageUrl(url: string): string {
   if (!url) return url;
@@ -147,6 +165,7 @@ function formatFilm(row: FilmRow, usedDates?: string[]) {
     image_url: resolveAdminImageUrl(row.image_url),
     tmdb_id: row.tmdb_id,
     is_active: row.is_active === 1,
+    fame_level: row.fame_level ?? 3,
     used_dates: usedDates ?? [],
   };
 }
@@ -305,9 +324,24 @@ adminRouter.get(
       const totalFilms = (
         db.prepare(`SELECT COUNT(*) as c FROM films WHERE is_active = 1`).get() as { c: number }
       ).c;
+      const unusedFilms = (
+        db.prepare(`SELECT COUNT(*) as c FROM films f WHERE is_active = 1 AND NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.film_id = f.id)`).get() as { c: number }
+      ).c;
       const totalChallenges = (
         db.prepare(`SELECT COUNT(*) as c FROM daily_challenges`).get() as { c: number }
       ).c;
+      // Unscheduled days in the next 30 days
+      const next30 = Array.from({ length: 30 }, (_, i) => {
+        const d = new Date(); d.setUTCDate(d.getUTCDate() + i + 1);
+        return d.toISOString().slice(0, 10);
+      });
+      const scheduledDates = new Set(
+        (db.prepare(`SELECT challenge_date FROM daily_challenges WHERE challenge_date > ? AND challenge_date <= ?`)
+          .all(today, next30[next30.length - 1]) as { challenge_date: string }[])
+          .map((r) => r.challenge_date)
+      );
+      const unscheduledNext30 = next30.filter((d) => !scheduledDates.has(d)).length;
+
       const globalRow = db.prepare(`SELECT * FROM global_stats WHERE id = 1`).get() as {
         total_games: number; total_wins: number;
       };
@@ -315,10 +349,29 @@ adminRouter.get(
         ? Math.round((globalRow.total_wins / globalRow.total_games) * 100)
         : 0;
 
+      // Today's game activity
+      let todayGames = 0; let todayWins = 0;
+      if (todayRow) {
+        const todayStats = db.prepare<[number], { total: number; wins: number }>(
+          `SELECT COUNT(*) as total, SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) as wins
+           FROM game_sessions WHERE challenge_id = ?`
+        ).get(todayRow.id) as { total: number; wins: number } | undefined;
+        todayGames = todayStats?.total ?? 0;
+        todayWins = todayStats?.wins ?? 0;
+      }
+
       res.json({
         today_challenge: todayRow ? formatChallenge(todayRow) : null,
         upcoming_challenges: upcomingRows.map(formatChallenge),
-        stats: { total_films: totalFilms, total_challenges: totalChallenges, success_rate: successRate },
+        stats: {
+          total_films: totalFilms,
+          unused_films: unusedFilms,
+          total_challenges: totalChallenges,
+          success_rate: successRate,
+          today_games: todayGames,
+          today_wins: todayWins,
+          unscheduled_next_30: unscheduledNext30,
+        },
       });
     } catch (err) {
       next(err);
@@ -393,8 +446,8 @@ adminRouter.post(
         .prepare(
           `INSERT INTO films
              (title, title_aliases, year, director, genres, cast_members,
-              tagline, synopsis, image_url, tmdb_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+              tagline, synopsis, image_url, tmdb_id, fame_level)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
           body.title.trim(),
@@ -406,7 +459,8 @@ adminRouter.post(
           body.tagline ?? null,
           body.synopsis ?? null,
           body.image_url.trim(),
-          body.tmdb_id ?? null
+          body.tmdb_id ?? null,
+          body.fame_level ?? 3
         );
 
       const created = db
@@ -454,6 +508,7 @@ adminRouter.put(
              synopsis     = ?,
              image_url    = ?,
              tmdb_id      = ?,
+             fame_level   = ?,
              updated_at   = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
          WHERE id = ?`
       ).run(
@@ -467,6 +522,7 @@ adminRouter.put(
         body.synopsis !== undefined ? body.synopsis : existing.synopsis,
         (body.image_url ?? existing.image_url).trim(),
         body.tmdb_id !== undefined ? body.tmdb_id : existing.tmdb_id,
+        body.fame_level !== undefined ? body.fame_level : (existing.fame_level ?? 3),
         id
       );
 
@@ -481,7 +537,7 @@ adminRouter.put(
   }
 );
 
-// DELETE /api/admin/films/:id  (soft delete)
+// DELETE /api/admin/films/:id  (hard delete — blocked if film is scheduled)
 adminRouter.delete(
   '/films/:id',
   (req: Request, res: Response, next: NextFunction) => {
@@ -501,9 +557,21 @@ adminRouter.delete(
         return;
       }
 
-      db.prepare(
-        `UPDATE films SET is_active = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?`
-      ).run(id);
+      // Block deletion if film is referenced in any scheduled challenge
+      const scheduled = db
+        .prepare<[number], { count: number }>(
+          `SELECT COUNT(*) as count FROM daily_challenges WHERE film_id = ?`
+        )
+        .get(id);
+
+      if (scheduled && scheduled.count > 0) {
+        res.status(409).json({
+          error: `Ce film est planifié sur ${scheduled.count} date(s). Retirez-le du planning avant de le supprimer.`,
+        });
+        return;
+      }
+
+      db.prepare(`DELETE FROM films WHERE id = ?`).run(id);
 
       res.json({ ok: true, id });
     } catch (err) {
@@ -539,6 +607,7 @@ adminRouter.patch(
              synopsis     = ?,
              image_url    = ?,
              tmdb_id      = ?,
+             fame_level   = ?,
              updated_at   = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
          WHERE id = ?`
       ).run(
@@ -552,6 +621,7 @@ adminRouter.patch(
         body.synopsis !== undefined ? body.synopsis : existing.synopsis,
         (body.image_url ?? existing.image_url).trim(),
         body.tmdb_id !== undefined ? body.tmdb_id : existing.tmdb_id,
+        body.fame_level !== undefined ? body.fame_level : (existing.fame_level ?? 3),
         id
       );
 
@@ -614,9 +684,105 @@ adminRouter.post(
   }
 );
 
-// ─── Challenge planning ───────────────────────────────────────────────────────
+// ─── Film stats & CSV import ──────────────────────────────────────────────────
 
-// GET /api/admin/challenges?from=YYYY-MM-DD&to=YYYY-MM-DD
+// GET /api/admin/films/:id/stats
+adminRouter.get(
+  '/films/:id/stats',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) { res.status(400).json({ error: 'Invalid film id.' }); return; }
+
+      const challenge = db
+        .prepare<[number], { id: number; challenge_date: string }>(
+          `SELECT id, challenge_date FROM daily_challenges WHERE film_id = ? ORDER BY challenge_date DESC LIMIT 1`
+        )
+        .get(id);
+
+      if (!challenge) {
+        res.json({ played: false });
+        return;
+      }
+
+      const stats = db
+        .prepare<[number], { total: number; wins: number; total_attempts: number }>(
+          `SELECT COUNT(*) as total,
+                  SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) as wins,
+                  SUM(json_array_length(attempts)) as total_attempts
+           FROM game_sessions WHERE challenge_id = ? AND outcome IS NOT NULL`
+        )
+        .get(challenge.id) as { total: number; wins: number; total_attempts: number };
+
+      const winsByAttempt = db
+        .prepare<[number], { attempt_count: number; count: number }>(
+          `SELECT json_array_length(attempts) as attempt_count, COUNT(*) as count
+           FROM game_sessions
+           WHERE challenge_id = ? AND outcome = 'won'
+           GROUP BY attempt_count ORDER BY attempt_count`
+        )
+        .all(challenge.id);
+
+      res.json({
+        played: true,
+        challenge_date: challenge.challenge_date,
+        total_games: stats.total ?? 0,
+        win_rate: stats.total > 0 ? Math.round(((stats.wins ?? 0) / stats.total) * 100) : 0,
+        avg_attempts: stats.total > 0 && stats.total_attempts
+          ? Math.round((stats.total_attempts / stats.total) * 10) / 10
+          : null,
+        wins_by_attempt: Object.fromEntries(winsByAttempt.map((r) => [r.attempt_count, r.count])),
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /api/admin/films/import-csv — bulk import films from CSV rows
+adminRouter.post(
+  '/films/import-csv',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { rows } = req.body as { rows: Record<string, string>[] };
+      if (!Array.isArray(rows) || rows.length === 0) {
+        res.status(400).json({ error: 'No rows provided.' });
+        return;
+      }
+
+      const created: number[] = [];
+      const errors: { line: number; error: string }[] = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const title = row.title?.trim();
+        const year = parseInt(row.year, 10);
+        const director = row.director?.trim();
+        const image_url = row.image_url?.trim() ?? '';
+
+        if (!title) { errors.push({ line: i + 2, error: 'Titre manquant' }); continue; }
+        if (!year || isNaN(year)) { errors.push({ line: i + 2, error: 'Année invalide' }); continue; }
+        if (!director) { errors.push({ line: i + 2, error: 'Réalisateur manquant' }); continue; }
+
+        try {
+          const result = db.prepare(
+            `INSERT INTO films (title, title_aliases, year, director, genres, cast_members, tagline, synopsis, image_url, tmdb_id)
+             VALUES (?, '[]', ?, ?, '[]', '[]', NULL, NULL, ?, NULL)`
+          ).run(title, year, director, image_url);
+          created.push(result.lastInsertRowid as number);
+        } catch {
+          errors.push({ line: i + 2, error: 'Erreur insertion (doublon ?)' });
+        }
+      }
+
+      res.json({ created: created.length, errors });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── Challenge planning ───────────────────────────────────────────────────────
 adminRouter.get(
   '/challenges',
   (req: Request, res: Response, next: NextFunction) => {
@@ -1074,6 +1240,7 @@ adminRouter.get(
         release_date: string; tagline: string; overview: string;
         backdrop_path: string | null;
         genres: { name: string }[];
+        vote_count: number;
       };
       const credits = (await creditsRes.json()) as {
         crew: { job: string; name: string }[];
@@ -1112,6 +1279,7 @@ adminRouter.get(
         image_url: imageUrl,
         tmdb_id: details.id,
         is_active: true,
+        fame_level: fameFromVoteCount(details.vote_count ?? 0),
       });
     } catch (err) {
       next(err);
@@ -1166,6 +1334,7 @@ adminRouter.get(
         release_date: string; tagline: string; overview: string;
         backdrop_path: string | null;
         genres: { name: string }[];
+        vote_count: number;
       };
       const credits = (await creditsRes.json()) as {
         crew: { job: string; name: string }[];
@@ -1205,6 +1374,7 @@ adminRouter.get(
         image_url: imageUrl,
         tmdb_id: details.id,
         is_active: true,
+        fame_level: fameFromVoteCount(details.vote_count ?? 0),
       });
     } catch (err) {
       next(err);
