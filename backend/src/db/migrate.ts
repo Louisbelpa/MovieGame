@@ -25,6 +25,23 @@ const incremental: { name: string; sql: string }[] = [
     name: 'add_fame_level',
     sql: `ALTER TABLE films ADD COLUMN fame_level INTEGER NOT NULL DEFAULT 3 CHECK (fame_level BETWEEN 1 AND 5)`,
   },
+  {
+    name: 'create_audit_logs',
+    sql: `CREATE TABLE IF NOT EXISTS audit_logs (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      action     TEXT NOT NULL,
+      details    TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    )`,
+  },
+  {
+    name: 'create_audit_logs_idx_action',
+    sql: `CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs (action)`,
+  },
+  {
+    name: 'create_audit_logs_idx_created_at',
+    sql: `CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs (created_at)`,
+  },
 ]
 
 for (const { name, sql } of incremental) {
