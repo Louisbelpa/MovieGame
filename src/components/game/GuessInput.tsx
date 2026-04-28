@@ -101,7 +101,8 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
           spellCheck={false}
           className={cn(
             'flex-1 bg-transparent text-film-text placeholder:text-film-text-dim',
-            'text-sm outline-none min-w-0 py-2'
+            'text-sm outline-none min-w-0 py-2',
+            'sm:text-sm text-base' // text-base (16px) sur mobile, text-sm sur sm+
           )}
         />
 

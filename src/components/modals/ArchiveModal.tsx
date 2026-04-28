@@ -8,7 +8,7 @@ import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { useGameStore, getTodayParis } from '@/store/gameStore'
 import { fetchChallengeDates } from '@/api/client'
-import { loadHistory } from '@/lib/storage'
+import { loadHistory, loadStats } from '@/lib/storage'
 
 type DayStatus = 'won' | 'lost' | 'available' | 'none'
 
@@ -73,7 +73,18 @@ export function ArchiveModal() {
     fetchChallengeDates(365)
       .then(({ dates }) => {
         setChallengeDates(new Set(dates))
-        setHistory(loadHistory())
+        // Historique local
+        let hist = loadHistory()
+        // Si l'historique est vide ou partiel, on tente de compléter à partir des stats globaux
+        if (Object.keys(hist).length === 0 || hist[loadStats().lastPlayedDate ?? ''] === undefined) {
+          const stats = loadStats()
+          // Si on a lastPlayedDate, on marque ce jour comme gagné/perdu selon lastWonDate
+          if (stats.lastPlayedDate) {
+            const d = stats.lastPlayedDate
+            hist[d] = (stats.lastWonDate === d) ? 'won' : 'lost'
+          }
+        }
+        setHistory(hist)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
