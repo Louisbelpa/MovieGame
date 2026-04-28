@@ -7,7 +7,77 @@ import { useState } from 'react'
 import { ExternalLink, Film } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 
-// ─── Inline modals for FAQ and Privacy ───────────────────────────────────────
+// ─── Changelog data ───────────────────────────────────────────────────────────
+
+interface ChangelogEntry {
+  version: string
+  date: string
+  changes: string[]
+}
+
+const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.2.0',
+    date: 'Avril 2026',
+    changes: [
+      'Navigation dans les défis passés avec les flèches ◀ ▶',
+      'Bouton « En savoir plus » vers la page TMDB du film en fin de partie',
+      'Réinitialisation du jeu à minuit heure de Paris (corrigé)',
+      'Back office : recherche TMDB avec auto-remplissage des fiches film',
+      'Back office : connexion par identifiant + mot de passe',
+      'Back office : badge « Joué / Planifié » sur les films',
+      'Back office : responsive mobile',
+      'Footer : FAQ, politique de confidentialité, contact',
+    ],
+  },
+  {
+    version: '1.1.0',
+    date: 'Mars 2026',
+    changes: [
+      'Tutoriel affiché à la première visite',
+      'Indices progressifs : année → réalisateur → acteur principal',
+      'Statistiques personnelles (victoires, séries, distribution)',
+      'Partage du résultat en grille emoji',
+    ],
+  },
+  {
+    version: '1.0.0',
+    date: 'Janvier 2026',
+    changes: [
+      "Lancement de MovieGuessr",
+      "Défi quotidien avec une image tirée d'un film",
+      'Autocomplétion des titres',
+      'Back office pour gérer les films et le planning',
+    ],
+  },
+]
+
+// ─── Inline modals ────────────────────────────────────────────────────────────
+
+function ChangelogModal({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal isOpen onClose={onClose} title="Notes de version">
+      <div className="flex flex-col gap-5 text-sm text-film-text">
+        {CHANGELOG.map((entry) => (
+          <div key={entry.version}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="font-bold text-film-gold">v{entry.version}</span>
+              <span className="text-xs text-film-text-dim">{entry.date}</span>
+            </div>
+            <ul className="flex flex-col gap-1">
+              {entry.changes.map((change, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-film-text-dim">
+                  <span className="text-film-gold mt-0.5 shrink-0">·</span>
+                  {change}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </Modal>
+  )
+}
 
 function FaqModal({ onClose }: { onClose: () => void }) {
   return (
@@ -111,7 +181,7 @@ function PrivacyModal({ onClose }: { onClose: () => void }) {
 
 // ─── Footer ───────────────────────────────────────────────────────────────────
 
-type ModalType = 'faq' | 'privacy' | null
+type ModalType = 'faq' | 'privacy' | 'changelog' | null
 
 export function Footer() {
   const [modal, setModal] = useState<ModalType>(null)
@@ -162,15 +232,22 @@ export function Footer() {
             </span>
           </div>
 
-          {/* Copyright */}
-          <p className="text-center text-[10px] text-film-text-dim/50">
-            © {new Date().getFullYear()} MovieGuessr. Tous droits réservés.
-          </p>
+          {/* Copyright + version */}
+          <div className="flex items-center justify-center gap-3 text-[10px] text-film-text-dim/50">
+            <p>© {new Date().getFullYear()} MovieGuessr. Tous droits réservés.</p>
+            <button
+              onClick={() => setModal('changelog')}
+              className="hover:text-film-text-dim transition-colors"
+            >
+              v{__APP_VERSION__}
+            </button>
+          </div>
         </div>
       </footer>
 
       {modal === 'faq' && <FaqModal onClose={() => setModal(null)} />}
       {modal === 'privacy' && <PrivacyModal onClose={() => setModal(null)} />}
+      {modal === 'changelog' && <ChangelogModal onClose={() => setModal(null)} />}
     </>
   )
 }
