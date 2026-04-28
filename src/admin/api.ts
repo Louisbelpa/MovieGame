@@ -209,6 +209,39 @@ export async function getTmdbFilmDetails(tmdbId: number): Promise<FilmPayload> {
   return request<FilmPayload>(`/api/admin/tmdb/${tmdbId}/details`)
 }
 
+// ─── Changelog ───────────────────────────────────────────────────────────────
+
+export interface AdminChangelog {
+  id: number
+  version: string
+  release_date: string
+  changes: string[]
+}
+
+export async function getChangelog(): Promise<AdminChangelog[]> {
+  return request<AdminChangelog[]>('/api/admin/changelog')
+}
+
+export async function createChangelogEntry(payload: Omit<AdminChangelog, 'id'>): Promise<AdminChangelog> {
+  return request<AdminChangelog>('/api/admin/changelog', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateChangelogEntry(id: number, payload: Omit<AdminChangelog, 'id'>): Promise<AdminChangelog> {
+  return request<AdminChangelog>(`/api/admin/changelog/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteChangelogEntry(id: number): Promise<void> {
+  return request<void>(`/api/admin/changelog/${id}`, { method: 'DELETE' })
+}
+
+// ─── Image upload ─────────────────────────────────────────────────────────────
+
 export async function uploadFilmImage(filmId: number, file: File): Promise<{ url: string; film: AdminFilm }> {
   const form = new FormData()
   form.append('image', file)

@@ -3,66 +3,49 @@
  * Site footer with legal links, contact and TMDB attribution.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ExternalLink, Film } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 
-// ─── Changelog data ───────────────────────────────────────────────────────────
+// ─── Changelog (fetched from API) ─────────────────────────────────────────────
 
 interface ChangelogEntry {
+  id: number
   version: string
-  date: string
+  release_date: string
   changes: string[]
 }
 
-const CHANGELOG: ChangelogEntry[] = [
-  {
-    version: '1.2.0',
-    date: 'Avril 2026',
-    changes: [
-      'Navigation dans les défis passés avec les flèches ◀ ▶',
-      'Bouton « En savoir plus » vers la page TMDB du film en fin de partie',
-      'Réinitialisation du jeu à minuit heure de Paris (corrigé)',
-      'Back office : recherche TMDB avec auto-remplissage des fiches film',
-      'Back office : connexion par identifiant + mot de passe',
-      'Back office : badge « Joué / Planifié » sur les films',
-      'Back office : responsive mobile',
-      'Footer : FAQ, politique de confidentialité, contact',
-    ],
-  },
-  {
-    version: '1.1.0',
-    date: 'Mars 2026',
-    changes: [
-      'Tutoriel affiché à la première visite',
-      'Indices progressifs : année → réalisateur → acteur principal',
-      'Statistiques personnelles (victoires, séries, distribution)',
-      'Partage du résultat en grille emoji',
-    ],
-  },
-  {
-    version: '1.0.0',
-    date: 'Janvier 2026',
-    changes: [
-      "Lancement de MovieGuessr",
-      "Défi quotidien avec une image tirée d'un film",
-      'Autocomplétion des titres',
-      'Back office pour gérer les films et le planning',
-    ],
-  },
-]
+async function fetchChangelog(): Promise<ChangelogEntry[]> {
+  try {
+    const res = await fetch('/api/admin/changelog')
+    if (!res.ok) return []
+    return res.json() as Promise<ChangelogEntry[]>
+  } catch {
+    return []
+  }
+}
 
 // ─── Inline modals ────────────────────────────────────────────────────────────
 
 function ChangelogModal({ onClose }: { onClose: () => void }) {
+  const [entries, setEntries] = useState<ChangelogEntry[]>([])
+
+  useEffect(() => {
+    fetchChangelog().then(setEntries)
+  }, [])
+
   return (
     <Modal isOpen onClose={onClose} title="Notes de version">
       <div className="flex flex-col gap-5 text-sm text-film-text">
-        {CHANGELOG.map((entry) => (
-          <div key={entry.version}>
+        {entries.length === 0 && (
+          <p className="text-film-text-dim text-xs text-center">Chargement…</p>
+        )}
+        {entries.map((entry) => (
+          <div key={entry.id}>
             <div className="flex items-center gap-2 mb-2">
               <span className="font-bold text-film-gold">v{entry.version}</span>
-              <span className="text-xs text-film-text-dim">{entry.date}</span>
+              <span className="text-xs text-film-text-dim">{entry.release_date}</span>
             </div>
             <ul className="flex flex-col gap-1">
               {entry.changes.map((change, i) => (

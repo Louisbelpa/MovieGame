@@ -6,13 +6,14 @@
 
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Film, Calendar, LayoutDashboard, LogOut, Menu, X } from 'lucide-react'
+import { Film, Calendar, LayoutDashboard, LogOut, Menu, X, ScrollText } from 'lucide-react'
 import { adminLogout } from '../api'
 
 const navItems = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { to: '/admin/films', label: 'Films', icon: Film, exact: false },
   { to: '/admin/calendar', label: 'Planning', icon: Calendar, exact: false },
+  { to: '/admin/changelog', label: 'Changelog', icon: ScrollText, exact: false },
 ]
 
 interface AdminLayoutProps {

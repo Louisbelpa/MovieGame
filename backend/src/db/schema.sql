@@ -143,6 +143,25 @@ CREATE TABLE IF NOT EXISTS global_stats (
 INSERT OR IGNORE INTO global_stats (id) VALUES (1);
 
 -- ---------------------------------------------------------------------------
+-- changelog  (managed via admin back office)
+--   Each row is one release entry shown in the public changelog modal.
+--   Ordered by created_at DESC (newest first).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS changelog (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    version      TEXT NOT NULL,
+    release_date TEXT NOT NULL,
+    changes      TEXT NOT NULL DEFAULT '[]',
+    created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+-- Seed initial entries (idempotent – only runs if the table was just created)
+INSERT OR IGNORE INTO changelog (id, version, release_date, changes) VALUES
+  (1, '1.2.0', 'Avril 2026',   '["Navigation dans les défis passés avec les flèches ◀ ▶","Bouton « En savoir plus » vers la page TMDB du film en fin de partie","Réinitialisation du jeu à minuit heure de Paris (corrigé)","Back office : recherche TMDB avec auto-remplissage des fiches film","Back office : connexion par identifiant + mot de passe","Back office : badge « Joué / Planifié » sur les films","Back office : responsive mobile","Footer : FAQ, politique de confidentialité, contact, changelog"]'),
+  (2, '1.1.0', 'Mars 2026',    '["Tutoriel affiché à la première visite","Indices progressifs : année → réalisateur → acteur principal","Statistiques personnelles (victoires, séries, distribution)","Partage du résultat en grille emoji"]'),
+  (3, '1.0.0', 'Janvier 2026', '["Lancement de MovieGuessr","Défi quotidien avec une image tirée d''un film","Autocomplétion des titres","Back office pour gérer les films et le planning"]');
+
+-- ---------------------------------------------------------------------------
 -- Trigger: update global_stats when a session is finished.
 -- wins_by_attempt JSON key is the number of attempts used (1-6).
 -- We use json_set to update only the matching bucket atomically.
