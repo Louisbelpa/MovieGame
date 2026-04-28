@@ -139,8 +139,11 @@ Accessible sur `/admin`. Protégé par mot de passe (et identifiant si `ADMIN_US
 
 ## Déploiement
 
-- **Frontend** → [Vercel](https://vercel.com) (détection Vite automatique, `vercel.json` inclus)
-- **Backend** → [Railway](https://railway.app) (`backend/railway.toml` inclus) avec volume persistant sur `/data`
+Tout est hébergé sur [Railway](https://railway.app). Le frontend est buildé dans `backend/public/` et servi directement par Express — pas de déploiement séparé.
+
+- `npm run build` (racine) → génère `backend/public/`
+- Railway détecte le `Dockerfile` et déploie le tout en un seul service
+- Le volume persistant Railway est monté sur `/data` pour la base SQLite
 
 ## Attribution
 
