@@ -40,6 +40,10 @@ const app = express();
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:5173';
 
+// Trust the first proxy (Railway, Render, etc.) so express-rate-limit can
+// read X-Forwarded-For correctly instead of throwing a ValidationError.
+app.set('trust proxy', 1);
+
 // ─── Core middleware ──────────────────────────────────────────────────────────
 
 app.use(express.json());
