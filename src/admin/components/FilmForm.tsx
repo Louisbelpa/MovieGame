@@ -244,6 +244,7 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
     image_url: initial?.image_url ?? '',
     tmdb_id: initial?.tmdb_id ?? null,
     is_active: initial?.is_active ?? true,
+    fame_level: initial?.fame_level ?? 3,
   })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -371,6 +372,28 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
       )}
 
       <Field label="TMDB ID" id="tmdb_id" type="number" value={form.tmdb_id ?? ''} onChange={(v) => setField('tmdb_id', v ? parseInt(v, 10) : null)} placeholder="Optionnel" />
+
+      {/* Fame level */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Niveau de célébrité <span className="font-normal text-gray-400">(1 = film de niche · 5 = blockbuster)</span>
+        </label>
+        <div className="flex gap-1">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => setField('fame_level', n)}
+              className={`text-xl transition-colors ${
+                n <= form.fame_level ? 'text-amber-400 hover:text-amber-500' : 'text-gray-300 hover:text-amber-300'
+              }`}
+              title={`${n} étoile${n > 1 ? 's' : ''}`}
+            >
+              ★
+            </button>
+          ))}
+        </div>
+      </div>
 
       <label className="flex items-center gap-3 cursor-pointer">
         <input

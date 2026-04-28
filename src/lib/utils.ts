@@ -36,7 +36,7 @@ export function buildShareGrid(guesses: GuessEntry[]): string {
       if (g.status === 'skipped') return '⏭️'
       return '❌'
     })
-    .join('')
+    .join(' ')
 }
 
 /** Format a share text */
@@ -44,7 +44,8 @@ export function buildShareText(
   challengeId: string,
   guesses: GuessEntry[],
   won: boolean,
-  maxAttempts?: number
+  maxAttempts?: number,
+  challengeNumber?: number
 ): string {
   const grid = buildShareGrid(guesses)
   const max = maxAttempts ?? guesses.length
@@ -53,7 +54,8 @@ export function buildShareText(
   const dateFr = new Date(challengeId + 'T12:00:00Z').toLocaleDateString('fr-FR', {
     day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
   })
-  return `CinéGuessr – ${dateFr}\n${score}\n\n${grid}\n\n${url}`
+  const header = challengeNumber ? `CinéGuessr #${challengeNumber} – ${dateFr}` : `CinéGuessr – ${dateFr}`
+  return `${header}\n${score} ${grid}\n\n${url}`
 }
 
 /** Default empty stats */

@@ -21,6 +21,7 @@ export interface AdminFilm {
   tmdb_id: number | null
   is_active: boolean
   used_dates: string[]  // ISO dates this film has been scheduled
+  fame_level: number    // 1–5, auto-filled from TMDB vote_count
 }
 
 export interface AdminChallenge {
@@ -34,8 +35,12 @@ export interface AdminDashboard {
   upcoming_challenges: AdminChallenge[]
   stats: {
     total_films: number
+    unused_films: number
     total_challenges: number
     success_rate: number
+    today_games: number
+    today_wins: number
+    unscheduled_next_30: number
   }
 }
 
@@ -51,6 +56,7 @@ export interface FilmPayload {
   image_url: string
   tmdb_id: number | null
   is_active: boolean
+  fame_level: number
 }
 
 export interface TmdbSearchResult {
@@ -263,6 +269,22 @@ export async function updateChangelogEntry(id: number, payload: Omit<AdminChange
 
 export async function deleteChangelogEntry(id: number): Promise<void> {
   return request<void>(`/api/admin/changelog/${id}`, { method: 'DELETE' })
+}
+
+// ─── CSV Import ───────────────────────────────────────────────────────────────
+
+export interface CsvImportResult {
+  created: number
+  errors: { line: number; error: string }[]
+}
+
+export async function importCsvFilms(
+  rows: Record<string, string>[]
+): Promise<CsvImportResult> {
+  return request<CsvImportResult>('/api/admin/films/import-csv', {
+    method: 'POST',
+    body: JSON.stringify({ rows }),
+  })
 }
 
 // ─── Image upload ─────────────────────────────────────────────────────────────

@@ -14,7 +14,7 @@ import {
   type ChallengePayload,
   type ResultPayload,
 } from '@/api/client'
-import { loadStats, saveStats } from '@/lib/storage'
+import { loadStats, saveStats, addToHistory } from '@/lib/storage'
 import { buildShareText, getTodayId, updateStats } from '@/lib/utils'
 import type {
   GameStats,
@@ -175,12 +175,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     set({ status: 'idle', challenge: null, result: null, guesses: [], hintsRevealed: 0, viewingDate: date, ui: defaultUI() })
     try {
-      const challenge = await fetchChallengeByDate(date)
+      const [challengeRes, prevCheck, nextCheck] = await Promise.all([
+        fetchChallengeByDate(date),
+        fetchAdjacentDate(date, 'prev').then(() => true).catch((err) => (err as { status?: number }).status === 404 ? false : true),
+        fetchAdjacentDate(date, 'next').then(() => true).catch((err) => (err as { status?: number }).status === 404 ? false : true),
+      ])
+
+      const challenge = challengeRes
       const guesses = apiAttemptsToGuesses(challenge.attempts)
       const status = deriveStatus(challenge.outcome)
       const hintsRevealed = challenge.hintsRevealed
 
-      set({ challenge, guesses, hintsRevealed, status, viewingDate: date })
+      set({ challenge, guesses, hintsRevealed, status, viewingDate: date, hasPrev: prevCheck, hasNext: nextCheck })
 
       if (status === 'won' || status === 'lost') {
         try {
@@ -210,19 +216,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const snapshot = get()
     const currentDate = snapshot.viewingDate ?? todayParis
 
-    set({ status: 'idle', challenge: null, result: null, guesses: [], hintsRevealed: 0, ui: defaultUI() })
-
     try {
       const { date: targetDate } = await fetchAdjacentDate(currentDate, direction)
 
-      if (targetDate >= todayParis) {
-        set({ viewingDate: null, hasPrev: true, hasNext: false })
+      // Fetch target first — then clear with the correct viewingDate in one atomic
+      // set() so the loading key is stable (no double-spinner animation).
+      const isToday = targetDate >= todayParis
+      set({
+        status: 'idle',
+        challenge: null,
+        result: null,
+        guesses: [],
+        hintsRevealed: 0,
+        ui: defaultUI(),
+        viewingDate: isToday ? null : targetDate,
+      })
+
+      if (isToday) {
+        set({ hasPrev: true, hasNext: false })
         await get().initGame()
         return
       }
 
-      // We know the opposite direction is valid (we just came from there).
-      // Pre-check the same direction to avoid the "ghost click" on the boundary.
       const sameDirectionExists = await fetchAdjacentDate(targetDate, direction)
         .then(() => true)
         .catch((err) => (err as { status?: number }).status === 404 ? false : true)
@@ -235,7 +250,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     } catch (err) {
       const is404 = (err as { status?: number }).status === 404
       if (is404) {
-        // Boundary reached – restore previous state and mark this direction as exhausted
         set({
           status: snapshot.status,
           challenge: snapshot.challenge,
@@ -305,6 +319,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const result = await fetchResult(challenge.challengeId)
         set({ result })
 
+        addToHistory(challenge.date, res.outcome)
+
         const today = getTodayId()
         const newStats = updateStats(stats, {
           challengeId: String(challenge.challengeId),
@@ -364,6 +380,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const result = await fetchResult(challenge.challengeId)
         set({ result })
 
+        addToHistory(challenge.date, res.outcome)
+
         const today = getTodayId()
         const newStats = updateStats(stats, {
           challengeId: String(challenge.challengeId),
@@ -403,7 +421,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       challenge.date,
       guesses,
       status === 'won',
-      challenge.maxAttempts
+      challenge.maxAttempts,
+      challenge.challengeNumber
     )
     if (navigator.share) {
       navigator.share({ text }).catch(() => {})

@@ -91,7 +91,7 @@ export interface GameStats {
 
 export interface UIState {
   isModalOpen: boolean
-  modalType: 'win' | 'lose' | 'stats' | 'rules' | null
+  modalType: 'win' | 'lose' | 'stats' | 'rules' | 'archive' | null
   isSearchOpen: boolean
   inputValue: string
   shakeTrigger: number  // increment to re-trigger shake animation

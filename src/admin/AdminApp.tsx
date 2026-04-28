@@ -10,6 +10,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { FilmsPage } from './pages/FilmsPage'
 import { CalendarPage } from './pages/CalendarPage'
 import { ChangelogPage } from './pages/ChangelogPage'
+import { ImportPage } from './pages/ImportPage'
 
 export function AdminApp() {
   return (
@@ -20,6 +21,7 @@ export function AdminApp() {
         <Route path="/admin/films" element={<FilmsPage />} />
         <Route path="/admin/calendar" element={<CalendarPage />} />
         <Route path="/admin/changelog" element={<ChangelogPage />} />
+        <Route path="/admin/import" element={<ImportPage />} />
         {/* Fallback: redirect unknown /admin/* to dashboard */}
         <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
       </Routes>

@@ -11,6 +11,7 @@ import { WinModal } from '@/components/modals/WinModal'
 import { LoseModal } from '@/components/modals/LoseModal'
 import { StatsModal } from '@/components/modals/StatsModal'
 import { RulesModal } from '@/components/modals/RulesModal'
+import { ArchiveModal } from '@/components/modals/ArchiveModal'
 import { useGameStore } from '@/store/gameStore'
 
 const RULES_SEEN_KEY = 'cineguess:rules_seen'
@@ -60,6 +61,7 @@ export default function App() {
       <LoseModal />
       <StatsModal />
       <RulesModal />
+      <ArchiveModal />
     </div>
   )
 }

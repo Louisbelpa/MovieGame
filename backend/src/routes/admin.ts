@@ -186,7 +186,7 @@ function formatChallenge(row: ChallengeRow) {
   return {
     id: row.id,
     date: row.challenge_date,
-    film: formatFilm(film),
+    film: formatFilm(film, getFilmUsedDates(film.id)),
   };
 }
 

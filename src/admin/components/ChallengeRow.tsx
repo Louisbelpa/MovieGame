@@ -4,7 +4,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { RefreshCw, Trash2, Plus, Clapperboard, ChevronDown } from 'lucide-react'
+import { RefreshCw, Trash2, Plus, Clapperboard, ChevronDown, AlertTriangle, History } from 'lucide-react'
 import type { AdminChallenge, AdminFilm } from '../api'
 
 interface ChallengeRowProps {
@@ -46,6 +46,7 @@ function FilmPicker({ films, onSelect, onCancel, loading }: FilmPickerProps) {
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const todayStr = new Date().toISOString().slice(0, 10)
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -72,33 +73,46 @@ function FilmPicker({ films, onSelect, onCancel, loading }: FilmPickerProps) {
         {filtered.length === 0 ? (
           <p className="text-xs text-gray-400 py-2 text-center">Aucun résultat</p>
         ) : (
-          filtered.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setSelectedId(f.id)}
-              className={[
-                'w-full flex items-center gap-2 px-2 py-1.5 text-left text-sm rounded-lg transition-colors',
-                selectedId === f.id
-                  ? 'bg-indigo-50 text-indigo-700'
-                  : 'hover:bg-gray-50 text-gray-800',
-              ].join(' ')}
-            >
-              {f.image_url ? (
-                <img
-                  src={f.image_url}
-                  alt=""
-                  className="w-8 h-5 object-cover rounded border border-gray-100 flex-shrink-0"
-                />
-              ) : (
-                <div className="w-8 h-5 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
-                  <Clapperboard size={10} className="text-gray-400" />
-                </div>
-              )}
-              <span className="truncate">{f.title}</span>
-              <span className="text-xs text-gray-400 ml-auto flex-shrink-0">{f.year}</span>
-            </button>
-          ))
+          filtered.map((f) => {
+            const upcomingDates = (f.used_dates ?? []).filter((d) => d >= todayStr)
+            const isDuplicate = upcomingDates.length > 0
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setSelectedId(f.id)}
+                className={[
+                  'w-full flex items-center gap-2 px-2 py-1.5 text-left text-sm rounded-lg transition-colors',
+                  selectedId === f.id
+                    ? 'bg-indigo-50 text-indigo-700'
+                    : 'hover:bg-gray-50 text-gray-800',
+                ].join(' ')}
+              >
+                {f.image_url ? (
+                  <img
+                    src={f.image_url}
+                    alt=""
+                    className="w-8 h-5 object-cover rounded border border-gray-100 flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-8 h-5 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
+                    <Clapperboard size={10} className="text-gray-400" />
+                  </div>
+                )}
+                <span className="truncate flex-1">{f.title}</span>
+                {isDuplicate && (
+                  <span
+                    title={`Déjà planifié le ${upcomingDates[0]}`}
+                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-amber-100 text-amber-700 flex-shrink-0"
+                  >
+                    <AlertTriangle size={9} />
+                    Doublon
+                  </span>
+                )}
+                <span className="text-xs text-gray-400 flex-shrink-0">{f.year}</span>
+              </button>
+            )
+          })
         )}
       </div>
 
@@ -207,6 +221,37 @@ export function ChallengeRow({
                 {challenge.film.year}
               </span>
             </span>
+
+            {/* Doublon badge */}
+            {(() => {
+              const todayStr = new Date().toISOString().slice(0, 10)
+              const pastPlays = (challenge.film.used_dates ?? []).filter((d) => d < todayStr)
+              const otherDates = (challenge.film.used_dates ?? []).filter(
+                (d) => d >= todayStr && d !== date
+              )
+              return (
+                <>
+                  {pastPlays.length > 0 && (
+                    <span
+                      title={`Joué le ${pastPlays[0]}`}
+                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-emerald-100 text-emerald-700 flex-shrink-0"
+                    >
+                      <History size={9} />
+                      Joué {pastPlays.length}×
+                    </span>
+                  )}
+                  {otherDates.length > 0 && (
+                    <span
+                      title={`Aussi planifié le ${otherDates[0]}`}
+                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-amber-100 text-amber-700 flex-shrink-0"
+                    >
+                      <AlertTriangle size={9} />
+                      Doublon
+                    </span>
+                  )}
+                </>
+              )
+            })()}
 
             {/* Actions */}
             {!past && (

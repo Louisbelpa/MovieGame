@@ -188,13 +188,11 @@ export function Footer() {
               Politique de confidentialité
             </button>
             <a
-              href="https://www.linkedin.com/in/louisbelpalme/"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="mailto:contact@cineguessr.fr"
               className="flex items-center gap-1.5 hover:text-film-text transition-colors"
             >
               <ExternalLink size={12} />
-              Contact (LinkedIn)
+              Contact
             </a>
           </div>
 

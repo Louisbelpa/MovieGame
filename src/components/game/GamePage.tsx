@@ -4,7 +4,7 @@
  * Supports navigating past challenges with date arrows.
  */
 
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Calendar, Share2 } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
@@ -25,7 +25,7 @@ function formatDateFr(dateStr: string): string {
 
 // ─── DateNavBar ───────────────────────────────────────────────────────────────
 
-function DateNavBar() {
+function DateNavBar({ directionRef }: { directionRef: React.MutableRefObject<'prev' | 'next'> }) {
   const viewingDate = useGameStore((s) => s.viewingDate)
   const challenge = useGameStore((s) => s.challenge)
   const loadDate = useGameStore((s) => s.loadDate)
@@ -40,13 +40,15 @@ function DateNavBar() {
   const isLoading = status === 'idle'
 
   const goBack = useCallback(() => {
+    directionRef.current = 'prev'
     navigateDate('prev')
-  }, [navigateDate])
+  }, [navigateDate, directionRef])
 
   const goForward = useCallback(() => {
     if (isToday) return
+    directionRef.current = 'next'
     navigateDate('next')
-  }, [isToday, navigateDate])
+  }, [isToday, navigateDate, directionRef])
 
   const goToday = useCallback(() => {
     if (isToday) return
@@ -116,21 +118,26 @@ export function GamePage() {
   const isGameOver = useGameStore(selectIsGameOver)
   const openModal = useGameStore((s) => s.openModal)
 
+  const directionRef = useRef<'prev' | 'next'>('prev')
+
   useEffect(() => {
     initGame()
   }, [initGame])
 
   const dateKey = viewingDate ?? 'today'
+  // positive x = arrive from right (prev = older = appears from left side)
+  // negative x = arrive from left (next = newer = appears from right side)
+  const slideX = directionRef.current === 'prev' ? 32 : -32
 
   return (
-    <AnimatePresence mode="wait">
+    <AnimatePresence mode="sync">
       {status === 'idle' && (
         <motion.div
           key={`loading-${dateKey}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
+          transition={{ duration: 0.12 }}
           className="flex flex-col items-center justify-center min-h-[60vh] gap-4"
         >
           <Spinner size="lg" />
@@ -146,10 +153,10 @@ export function GamePage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
+          transition={{ duration: 0.12 }}
           className="max-w-2xl mx-auto px-3 sm:px-4 py-3 sm:py-6 flex flex-col gap-3"
         >
-          <DateNavBar />
+          <DateNavBar directionRef={directionRef} />
           <div className="flex flex-col items-center justify-center min-h-[50vh] gap-2 text-center">
             <p className="text-film-text font-semibold">Aucun défi pour cette date.</p>
             <p className="text-film-text-dim text-sm">Utilisez les flèches pour naviguer vers une date avec un défi.</p>
@@ -163,7 +170,7 @@ export function GamePage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
+          transition={{ duration: 0.12 }}
           className="flex flex-col items-center justify-center min-h-[60vh] gap-3"
         >
           <p className="text-film-red font-semibold">Aucun défi disponible.</p>
@@ -174,13 +181,13 @@ export function GamePage() {
         <motion.main
           key={challenge.date}
           className="max-w-2xl mx-auto px-3 sm:px-4 py-3 sm:py-6 flex flex-col gap-3 sm:gap-5"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.2 }}
+          initial={{ opacity: 0, x: slideX }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -slideX }}
+          transition={{ duration: 0.2, ease: 'easeInOut' }}
         >
           {/* Date navigation */}
-          <DateNavBar />
+          <DateNavBar directionRef={directionRef} />
 
           {/* Movie image */}
           <section>

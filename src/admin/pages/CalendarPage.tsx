@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { ChevronUp, ChevronDown } from 'lucide-react'
+import { ChevronUp, ChevronDown, Sparkles } from 'lucide-react'
 import {
   getChallenges,
   getFilms,
@@ -18,7 +18,7 @@ import { AdminLayout } from '../components/AdminLayout'
 import { ChallengeRow } from '../components/ChallengeRow'
 
 const FUTURE_DAYS = 30
-const PAST_DAYS = 30
+const PAST_DAYS = 7
 
 function getISODate(offsetDays: number): string {
   const d = new Date()
@@ -38,6 +38,8 @@ export function CalendarPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showPast, setShowPast] = useState(false)
+  const [autoLoading, setAutoLoading] = useState(false)
+  const [autoSuccess, setAutoSuccess] = useState<string | null>(null)
 
   const from = showPast ? getISODate(-PAST_DAYS) : getISODate(0)
   const to = getISODate(FUTURE_DAYS - 1)
@@ -83,6 +85,48 @@ export function CalendarPage() {
     load(from, to)
   }
 
+  async function handleAutoSchedule() {
+    setAutoLoading(true)
+    setError(null)
+    setAutoSuccess(null)
+    let scheduled = 0
+    try {
+      const emptyDates = todayAndFuture.filter((d) => !byDate[d])
+      if (emptyDates.length === 0) {
+        setAutoSuccess('Tous les jours sont déjà planifiés !')
+        return
+      }
+      const usedIds = new Set(challenges.map((c) => c.film.id))
+      const available = films.filter((f) => !usedIds.has(f.id))
+      if (available.length === 0) {
+        setError('Aucun film disponible non encore planifié.')
+        return
+      }
+      const shuffled = [...available].sort(() => Math.random() - 0.5)
+      const toSchedule = emptyDates.slice(0, shuffled.length)
+
+      // allSettled: partial failures don't abort the whole batch
+      const results = await Promise.allSettled(
+        toSchedule.map((date, i) => scheduleChallenge(date, shuffled[i].id))
+      )
+      scheduled = results.filter((r) => r.status === 'fulfilled').length
+      const failed = results.filter((r) => r.status === 'rejected').length
+      if (failed > 0) {
+        setError(`${failed} défi${failed > 1 ? 's' : ''} n'ont pas pu être planifiés (conflit de date ?).`)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur auto-planification')
+    } finally {
+      // Always reload so newly scheduled challenges appear
+      load(from, to)
+      if (scheduled > 0) {
+        setAutoSuccess(`${scheduled} défi${scheduled > 1 ? 's' : ''} planifié${scheduled > 1 ? 's' : ''} automatiquement.`)
+        setTimeout(() => setAutoSuccess(null), 4000)
+      }
+      setAutoLoading(false)
+    }
+  }
+
   return (
     <AdminLayout>
       <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
@@ -97,6 +141,18 @@ export function CalendarPage() {
           </span>
           <button
             type="button"
+            onClick={handleAutoSchedule}
+            disabled={autoLoading || loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
+          >
+            {autoLoading
+              ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              : <Sparkles size={13} />
+            }
+            Auto-planifier
+          </button>
+          <button
+            type="button"
             onClick={() => setShowPast((v) => !v)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
           >
@@ -109,6 +165,12 @@ export function CalendarPage() {
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
           {error}
+        </div>
+      )}
+
+      {autoSuccess && (
+        <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-4 py-3 text-sm">
+          {autoSuccess}
         </div>
       )}
 

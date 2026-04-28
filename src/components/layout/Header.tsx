@@ -4,7 +4,7 @@
  */
 
 import { useRef } from 'react'
-import { HelpCircle, BarChart2, Film } from 'lucide-react'
+import { HelpCircle, BarChart2, Film, CalendarDays } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useGameStore } from '@/store/gameStore'
 
@@ -53,14 +53,23 @@ export function Header() {
           )}
         </div>
 
-        {/* Right: stats button */}
-        <button
-          onClick={() => openModal('stats')}
-          aria-label="Mes statistiques"
-          className="p-2 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer"
-        >
-          <BarChart2 size={20} />
-        </button>
+        {/* Right: archive + stats buttons */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => openModal('archive')}
+            aria-label="Archives"
+            className="p-2 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer"
+          >
+            <CalendarDays size={20} />
+          </button>
+          <button
+            onClick={() => openModal('stats')}
+            aria-label="Mes statistiques"
+            className="p-2 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer"
+          >
+            <BarChart2 size={20} />
+          </button>
+        </div>
       </div>
     </header>
   )

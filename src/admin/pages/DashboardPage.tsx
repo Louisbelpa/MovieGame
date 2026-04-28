@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Film, Calendar, TrendingUp, Clapperboard } from 'lucide-react'
+import { Film, Calendar, TrendingUp, Clapperboard, Users, AlertCircle } from 'lucide-react'
 import { getDashboard, type AdminDashboard } from '../api'
 import { AdminLayout } from '../components/AdminLayout'
 
@@ -48,11 +48,16 @@ export function DashboardPage() {
       {data && (
         <div className="space-y-6">
           {/* Quick stats */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <StatCard
               icon={<Film size={20} className="text-indigo-500" />}
-              label="Films"
+              label="Films actifs"
               value={data.stats.total_films}
+            />
+            <StatCard
+              icon={<AlertCircle size={20} className="text-amber-500" />}
+              label="Films non planifiés"
+              value={data.stats.unused_films}
             />
             <StatCard
               icon={<Calendar size={20} className="text-emerald-500" />}
@@ -60,9 +65,19 @@ export function DashboardPage() {
               value={data.stats.total_challenges}
             />
             <StatCard
-              icon={<TrendingUp size={20} className="text-amber-500" />}
-              label="Taux de réussite"
-              value={`${data.stats.success_rate.toFixed(1)} %`}
+              icon={<AlertCircle size={20} className="text-red-400" />}
+              label="Jours vides (30j)"
+              value={data.stats.unscheduled_next_30}
+            />
+            <StatCard
+              icon={<Users size={20} className="text-blue-500" />}
+              label="Parties aujourd'hui"
+              value={data.stats.today_games}
+            />
+            <StatCard
+              icon={<TrendingUp size={20} className="text-teal-500" />}
+              label="Taux de réussite global"
+              value={`${data.stats.success_rate} %`}
             />
           </div>
 
