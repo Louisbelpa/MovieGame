@@ -1,14 +1,3 @@
-/**
- * server.ts
- * Express application entry point for MovieGame backend.
- *
- * Stack rationale:
- *  - Node.js + Express  → mature ecosystem, synchronous better-sqlite3 fits perfectly
- *  - better-sqlite3     → single-file SQLite, zero infrastructure, trivially portable
- *  - TMDB CDN           → free, global, no storage costs for the MVP
- *  - Railway/Render     → one-command deploy, free tier sufficient for MVP traffic
- */
-
 import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';
@@ -21,7 +10,9 @@ import { statsRouter } from './routes/stats.js';
 import { adminRouter } from './routes/admin.js';
 import { sessionMiddleware } from './middleware/session.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { requestIdMiddleware } from './middleware/requestId.js';
 import { createRateLimiter } from './middleware/rateLimiter.js';
+import { logger } from './lib/logger.js';
 import db from './db/database.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -32,8 +23,14 @@ if (process.env.NODE_ENV === 'production') {
     (v) => !process.env[v]
   );
   if (missing.length) {
-    console.error(`Missing required env vars: ${missing.join(', ')}`);
+    logger.fatal({ missing }, 'Missing required environment variables — aborting');
     process.exit(1);
+  }
+  if (!process.env.ADMIN_USERNAME) {
+    logger.warn(
+      'ADMIN_USERNAME is not set — admin login is password-only (single factor). ' +
+      'Set ADMIN_USERNAME for better security.'
+    );
   }
 }
 
@@ -47,11 +44,12 @@ app.set('trust proxy', 1);
 
 // ─── Core middleware ──────────────────────────────────────────────────────────
 
+app.use(requestIdMiddleware);
 app.use(express.json());
 app.use(cookieParser(process.env.COOKIE_SECRET ?? 'dev_secret'));
 
 // Manual CORS (avoids adding the `cors` package for a single origin)
-app.use((req, res, next) => {
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
   res.setHeader('Access-Control-Allow-Origin', CORS_ORIGIN);
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
@@ -63,14 +61,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// ─── Security headers ────────────────────────────────────────────────────────
-app.use((_req, res, next) => {
+// ─── Security headers ─────────────────────────────────────────────────────────
+app.use((_req: express.Request, res: express.Response, next: express.NextFunction) => {
   res.setHeader(
     'Content-Security-Policy',
     [
       "default-src 'self'",
       "script-src 'self'",
-      "style-src 'self' 'unsafe-inline'",  // needed for Tailwind inline styles
+      "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https://image.tmdb.org",
       "connect-src 'self'",
       "font-src 'self'",
@@ -105,7 +103,7 @@ app.use('/api/stats', statsRouter);
 app.use('/api/admin', adminRouter);
 
 // Health-check (used by Railway/Render)
-app.get('/health', (_req, res) => {
+app.get('/health', (_req: express.Request, res: express.Response) => {
   try {
     db.prepare('SELECT 1').get();
     res.json({ status: 'ok', ts: new Date().toISOString() });
@@ -115,9 +113,8 @@ app.get('/health', (_req, res) => {
 });
 
 // SPA fallback – serve built index.html for all non-API routes (production)
-// In development the Vite dev server handles this at localhost:5173
 const spaIndex = path.join(__dirname, '../public/index.html');
-app.get('*', (req, res) => {
+app.get('*', (req: express.Request, res: express.Response) => {
   if (!req.path.startsWith('/api') && fs.existsSync(spaIndex)) {
     res.sendFile(spaIndex);
   } else {
@@ -128,13 +125,11 @@ app.get('*', (req, res) => {
 // Centralised error handler
 app.use(errorHandler);
 
-// ─── Start ───────────────────────────────────────────────────────────────────
+// ─── Start ────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
-  console.log(`MovieGame API running on http://localhost:${PORT}`);
-  console.log(`  NODE_ENV   : ${process.env.NODE_ENV ?? 'development'}`);
-  console.log(`  CORS origin: ${CORS_ORIGIN}`);
-  console.log(`  IMAGE_SOURCE: ${process.env.IMAGE_SOURCE ?? 'tmdb'}`);
+  logger.info(`MovieGame API running on http://localhost:${PORT}`);
+  logger.info({ nodeEnv: process.env.NODE_ENV ?? 'development', corsOrigin: CORS_ORIGIN, imageSource: process.env.IMAGE_SOURCE ?? 'tmdb' }, 'Server config');
 });
 
 export default app;

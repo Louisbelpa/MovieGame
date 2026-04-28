@@ -1,10 +1,5 @@
-/**
- * errorHandler.ts
- * Centralised Express error handler.
- * Errors can carry a `.status` property (set in service layer) for HTTP code.
- */
-
 import { Request, Response, NextFunction } from 'express';
+import { logger } from '../lib/logger.js';
 
 interface AppError extends Error {
   status?: number;
@@ -12,7 +7,7 @@ interface AppError extends Error {
 
 export function errorHandler(
   err: AppError,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ): void {
@@ -20,8 +15,14 @@ export function errorHandler(
   const message = err.message ?? 'Internal server error';
 
   if (status >= 500) {
-    console.error('[ERROR]', err);
+    logger.error(
+      { err, requestId: res.locals.requestId as string | undefined, path: req.path },
+      'Unhandled error'
+    );
   }
 
-  res.status(status).json({ error: message });
+  res.status(status).json({
+    error: message,
+    ...(res.locals.requestId ? { requestId: res.locals.requestId as string } : {}),
+  });
 }

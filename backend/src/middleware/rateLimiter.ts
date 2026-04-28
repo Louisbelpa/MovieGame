@@ -37,3 +37,15 @@ export const searchLimiter = createRateLimiter({
   max: 60,
   windowMs: 60_000,
 });
+
+/** Limiter for authenticated admin operations (30 req/min) */
+export const adminLimiter = createRateLimiter({
+  max: 30,
+  windowMs: 60_000,
+});
+
+/** Very strict limiter for the login endpoint — stops brute-force (10 req/min) */
+export const loginLimiter = createRateLimiter({
+  max: 10,
+  windowMs: 60_000,
+});

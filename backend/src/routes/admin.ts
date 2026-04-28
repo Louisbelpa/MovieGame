@@ -33,6 +33,8 @@ import fs from 'fs';
 import multer from 'multer';
 import db from '../db/database.js';
 import { adminAuth, computeAdminToken, ADMIN_COOKIE } from '../middleware/adminAuth.js';
+import { adminLimiter, loginLimiter } from '../middleware/rateLimiter.js';
+import { logAuditEvent } from '../middleware/auditLog.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -208,6 +210,7 @@ adminRouter.get(
 
 adminRouter.post(
   '/login',
+  loginLimiter,
   (req: Request, res: Response, next: NextFunction) => {
     try {
       const { username, password } = req.body as { username?: string; password?: string };
@@ -254,6 +257,7 @@ adminRouter.post(
         }
       }
 
+      logAuditEvent('admin.login', { username: adminUsername || '(password-only)' });
       const token = computeAdminToken();
       res.cookie(ADMIN_COOKIE, token, COOKIE_OPTIONS);
       res.json({ ok: true, requiresUsername: !!adminUsername });
@@ -303,6 +307,7 @@ adminRouter.get(
 // ─── All routes below require admin authentication ────────────────────────────
 
 adminRouter.use(adminAuth);
+adminRouter.use(adminLimiter);
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
@@ -498,6 +503,7 @@ adminRouter.post(
         .prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`)
         .get(result.lastInsertRowid as number)!;
 
+      logAuditEvent('film.create', { id: result.lastInsertRowid, title: body.title.trim() });
       res.status(201).json(formatFilm(created, []));
     } catch (err) {
       next(err);
@@ -563,6 +569,7 @@ adminRouter.put(
         .prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`)
         .get(id)!;
 
+      logAuditEvent('film.update', { id, fields: Object.keys(body) });
       res.json(formatFilm(updated, getFilmUsedDates(id)));
     } catch (err) {
       next(err);
@@ -606,6 +613,7 @@ adminRouter.delete(
 
       db.prepare(`DELETE FROM films WHERE id = ?`).run(id);
 
+      logAuditEvent('film.delete', { id });
       res.json({ ok: true, id });
     } catch (err) {
       next(err);
@@ -677,6 +685,7 @@ adminRouter.patch(
       );
 
       const updated = db.prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`).get(id)!;
+      logAuditEvent('film.update', { id, fields: Object.keys(body) });
       res.json(formatFilm(updated, getFilmUsedDates(id)));
     } catch (err) {
       next(err);
@@ -930,6 +939,7 @@ adminRouter.post(
         )
         .get(result.lastInsertRowid as number)!;
 
+      logAuditEvent('challenge.create', { id: result.lastInsertRowid, date, film_id });
       res.status(201).json(formatChallenge(created));
     } catch (err) {
       next(err);
@@ -983,6 +993,7 @@ adminRouter.put(
         )
         .get(id)!;
 
+      logAuditEvent('challenge.update', { id, film_id });
       res.json(formatChallenge(updated));
     } catch (err) {
       next(err);
@@ -1021,6 +1032,7 @@ adminRouter.patch(
         )
         .get(id)!;
 
+      logAuditEvent('challenge.update', { id, film_id });
       res.json(formatChallenge(updated));
     } catch (err) {
       next(err);
@@ -1049,6 +1061,7 @@ adminRouter.delete(
       }
 
       db.prepare(`DELETE FROM daily_challenges WHERE id = ?`).run(id);
+      logAuditEvent('challenge.delete', { id });
       res.json({ ok: true, id });
     } catch (err) {
       next(err);
