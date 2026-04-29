@@ -1621,3 +1621,299 @@ adminRouter.get(
     } catch (err) { next(err); }
   }
 );
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
+
+// GET /api/admin/analytics/overview
+adminRouter.get(
+  '/analytics/overview',
+  (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const overview = db.prepare(`
+        SELECT
+          COUNT(*) AS total_sessions,
+          COUNT(DISTINCT session_token) AS total_unique_players,
+          ROUND(100.0 * SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN outcome IS NOT NULL THEN 1 ELSE 0 END), 0)) AS overall_win_rate,
+          ROUND(AVG(CASE WHEN outcome = 'won' THEN json_array_length(attempts) ELSE NULL END), 1) AS avg_attempts_on_win,
+          ROUND(AVG(hints_revealed), 1) AS avg_hints_per_session,
+          ROUND(100.0 * SUM(CASE WHEN outcome IS NOT NULL THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0)) AS completion_rate,
+          ROUND(AVG(CASE WHEN outcome IS NOT NULL THEN strftime('%s', finished_at) - strftime('%s', started_at) ELSE NULL END)) AS avg_session_duration_seconds
+        FROM game_sessions
+      `).get() as {
+        total_sessions: number;
+        total_unique_players: number;
+        overall_win_rate: number | null;
+        avg_attempts_on_win: number | null;
+        avg_hints_per_session: number | null;
+        completion_rate: number | null;
+        avg_session_duration_seconds: number | null;
+      };
+
+      res.json({
+        total_sessions: overview.total_sessions ?? 0,
+        total_unique_players: overview.total_unique_players ?? 0,
+        overall_win_rate: overview.overall_win_rate ?? 0,
+        avg_attempts_on_win: overview.avg_attempts_on_win ?? 0,
+        avg_hints_per_session: overview.avg_hints_per_session ?? 0,
+        completion_rate: overview.completion_rate ?? 0,
+        avg_session_duration_seconds: overview.avg_session_duration_seconds ?? 0,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/daily?from=YYYY-MM-DD&to=YYYY-MM-DD
+adminRouter.get(
+  '/analytics/daily',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const defaultTo = new Date().toISOString().slice(0, 10);
+      const defaultFrom = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+      const from = parseDateParam(req.query.from) ?? defaultFrom;
+      const to = parseDateParam(req.query.to) ?? defaultTo;
+
+      const rows = db.prepare(`
+        SELECT
+          date(started_at) AS date,
+          COUNT(*) AS sessions_started,
+          SUM(CASE WHEN outcome IS NOT NULL THEN 1 ELSE 0 END) AS sessions_completed,
+          COUNT(DISTINCT session_token) AS unique_players,
+          ROUND(100.0 * SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN outcome IS NOT NULL THEN 1 ELSE 0 END), 0)) AS win_rate,
+          ROUND(AVG(CASE WHEN outcome IS NOT NULL THEN json_array_length(attempts) ELSE NULL END), 1) AS avg_attempts,
+          ROUND(AVG(hints_revealed), 1) AS avg_hints,
+          ROUND(100.0 * SUM(CASE WHEN outcome IS NULL THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0)) AS abandonment_rate
+        FROM game_sessions
+        WHERE date(started_at) BETWEEN ? AND ?
+        GROUP BY date(started_at)
+        ORDER BY date(started_at) ASC
+      `).all(from, to) as {
+        date: string;
+        sessions_started: number;
+        sessions_completed: number;
+        unique_players: number;
+        win_rate: number | null;
+        avg_attempts: number | null;
+        avg_hints: number | null;
+        abandonment_rate: number | null;
+      }[];
+
+      res.json(rows.map((r) => ({
+        date: r.date,
+        sessions_started: r.sessions_started,
+        sessions_completed: r.sessions_completed,
+        unique_players: r.unique_players,
+        win_rate: r.win_rate ?? 0,
+        avg_attempts: r.avg_attempts ?? 0,
+        avg_hints: r.avg_hints ?? 0,
+        abandonment_rate: r.abandonment_rate ?? 0,
+      })));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/attempts-distribution
+adminRouter.get(
+  '/analytics/attempts-distribution',
+  (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const rows = db.prepare(`
+        SELECT json_array_length(attempts) AS attempt_count, COUNT(*) AS cnt
+        FROM game_sessions
+        WHERE outcome = 'won'
+        GROUP BY attempt_count
+        ORDER BY attempt_count ASC
+      `).all() as { attempt_count: number; cnt: number }[];
+
+      const result: Record<string, number> = {};
+      for (const row of rows) {
+        result[String(row.attempt_count)] = row.cnt;
+      }
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/hints-distribution
+adminRouter.get(
+  '/analytics/hints-distribution',
+  (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const rows = db.prepare(`
+        SELECT hints_revealed, COUNT(*) AS cnt
+        FROM game_sessions
+        GROUP BY hints_revealed
+        ORDER BY hints_revealed ASC
+      `).all() as { hints_revealed: number; cnt: number }[];
+
+      const result: Record<string, number> = {};
+      for (const row of rows) {
+        result[String(row.hints_revealed)] = row.cnt;
+      }
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/hourly
+adminRouter.get(
+  '/analytics/hourly',
+  (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const rows = db.prepare(`
+        SELECT CAST(strftime('%H', started_at, '+1 hour') AS INTEGER) AS hour,
+               COUNT(*) AS sessions
+        FROM game_sessions
+        GROUP BY hour
+        ORDER BY hour ASC
+      `).all() as { hour: number; sessions: number }[];
+
+      res.json(rows);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/films?sort=win_rate|sessions|avg_hints
+adminRouter.get(
+  '/analytics/films',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sortParam = req.query.sort as string | undefined;
+      const validSorts = ['win_rate', 'sessions', 'avg_hints'] as const;
+      type SortOption = typeof validSorts[number];
+      const sort: SortOption = validSorts.includes(sortParam as SortOption)
+        ? (sortParam as SortOption)
+        : 'win_rate';
+
+      const orderClause =
+        sort === 'win_rate'
+          ? 'ORDER BY win_rate ASC'
+          : sort === 'sessions'
+          ? 'ORDER BY sessions DESC'
+          : 'ORDER BY avg_hints DESC';
+
+      const rows = db.prepare(`
+        SELECT
+          dc.challenge_date,
+          f.title AS film_title,
+          f.year AS film_year,
+          f.fame_level,
+          COUNT(gs.rowid) AS sessions,
+          ROUND(100.0 * SUM(CASE WHEN gs.outcome = 'won' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN gs.outcome IS NOT NULL THEN 1 ELSE 0 END), 0)) AS win_rate,
+          ROUND(AVG(CASE WHEN gs.outcome IS NOT NULL THEN json_array_length(gs.attempts) ELSE NULL END), 1) AS avg_attempts,
+          ROUND(AVG(gs.hints_revealed), 1) AS avg_hints,
+          (
+            SELECT j.value->>'$.guess'
+            FROM game_sessions gs2, json_each(gs2.attempts) j
+            WHERE gs2.challenge_id = dc.id AND j.value->>'$.correct' = 'false'
+            GROUP BY j.value->>'$.guess'
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+          ) AS most_common_wrong_guess
+        FROM daily_challenges dc
+        JOIN films f ON f.id = dc.film_id
+        LEFT JOIN game_sessions gs ON gs.challenge_id = dc.id
+        GROUP BY dc.id
+        ${orderClause}
+      `).all() as {
+        challenge_date: string;
+        film_title: string;
+        film_year: number;
+        fame_level: number;
+        sessions: number;
+        win_rate: number | null;
+        avg_attempts: number | null;
+        avg_hints: number | null;
+        most_common_wrong_guess: string | null;
+      }[];
+
+      res.json(rows.map((r) => ({
+        challenge_date: r.challenge_date,
+        film_title: r.film_title,
+        film_year: r.film_year,
+        fame_level: r.fame_level,
+        sessions: r.sessions,
+        win_rate: r.win_rate ?? 0,
+        avg_attempts: r.avg_attempts ?? 0,
+        avg_hints: r.avg_hints ?? 0,
+        most_common_wrong_guess: r.most_common_wrong_guess ?? null,
+      })));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/wrong-guesses?challenge_id=X&limit=10
+adminRouter.get(
+  '/analytics/wrong-guesses',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const challengeId = parseInt(req.query.challenge_id as string, 10);
+      if (isNaN(challengeId)) {
+        res.status(400).json({ error: 'Query param "challenge_id" must be a valid integer.' });
+        return;
+      }
+
+      const limit = Math.min(
+        100,
+        Math.max(1, parseInt((req.query.limit as string | undefined) ?? '10', 10) || 10)
+      );
+
+      const rows = db.prepare(`
+        SELECT j.value->>'$.guess' AS guess, COUNT(*) AS count
+        FROM game_sessions gs, json_each(gs.attempts) j
+        WHERE gs.challenge_id = ? AND j.value->>'$.correct' = 'false'
+        GROUP BY guess
+        ORDER BY count DESC
+        LIMIT ?
+      `).all(challengeId, limit) as { guess: string; count: number }[];
+
+      res.json(rows);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/returning-players?days=30
+adminRouter.get(
+  '/analytics/returning-players',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const daysParam = parseInt((req.query.days as string | undefined) ?? '0', 10);
+      const useDaysFilter = !isNaN(daysParam) && daysParam > 0;
+
+      const whereClause = useDaysFilter
+        ? `WHERE started_at >= date('now', '-' || ${daysParam} || ' days')`
+        : '';
+
+      const rows = db.prepare(`
+        SELECT days_played, COUNT(*) AS player_count
+        FROM (
+          SELECT session_token, COUNT(DISTINCT date(started_at)) AS days_played
+          FROM game_sessions
+          ${whereClause}
+          GROUP BY session_token
+          HAVING days_played >= 1
+        )
+        GROUP BY days_played
+        ORDER BY days_played ASC
+      `).all() as { days_played: number; player_count: number }[];
+
+      res.json(rows);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
