@@ -13,6 +13,7 @@ import { GuessInput } from './GuessInput'
 import { GuessList } from './GuessList'
 import { HintPanel } from './HintPanel'
 import { AttemptTracker } from './AttemptTracker'
+import { ModeTabs } from './ModeTabs'
 import { Spinner } from '@/components/ui/Spinner'
 import { useGameStore, selectAttemptsLeft, selectCurrentHints, selectIsGameOver, getTodayParis } from '@/store/gameStore'
 
@@ -186,8 +187,11 @@ export function GamePage() {
           exit={{ opacity: 0, x: -slideX }}
           transition={{ duration: 0.2, ease: 'easeInOut' }}
         >
+
           {/* Date navigation */}
           <DateNavBar directionRef={directionRef} />
+          {/* Mode selector */}
+          <ModeTabs />
 
           {/* Movie image */}
           <section>

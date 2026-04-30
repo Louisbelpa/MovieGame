@@ -1,11 +1,5 @@
-/**
- * hooks/useAutocomplete.ts
- * Debounced autocomplete hook that calls /api/search.
- * Abstracts the async search lifecycle away from the input component.
- */
-
 import { useEffect, useRef, useState } from 'react'
-import { searchMovies, type SearchResultPayload } from '@/api/client'
+import type { SearchResultPayload } from '@/api/client'
 
 interface UseAutocompleteOptions {
   debounceMs?: number
@@ -22,6 +16,7 @@ interface UseAutocompleteReturn {
 
 export function useAutocomplete(
   query: string,
+  searchFn: (q: string, limit?: number) => Promise<SearchResultPayload[]>,
   options: UseAutocompleteOptions = {}
 ): UseAutocompleteReturn {
   const { debounceMs = 220, minLength = 2, limit = 8 } = options
@@ -33,9 +28,7 @@ export function useAutocomplete(
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    // Clear previous timer
     if (timerRef.current) clearTimeout(timerRef.current)
-    // Cancel in-flight request
     abortRef.current?.abort()
 
     if (query.length < minLength) {
@@ -53,19 +46,15 @@ export function useAutocomplete(
       abortRef.current = controller
 
       try {
-        const results = await searchMovies(query, limit)
-        if (!controller.signal.aborted) {
-          setSuggestions(results)
-        }
-      } catch (err) {
+        const results = await searchFn(query, limit)
+        if (!controller.signal.aborted) setSuggestions(results)
+      } catch {
         if (!controller.signal.aborted) {
           setError('Recherche indisponible')
           setSuggestions([])
         }
       } finally {
-        if (!controller.signal.aborted) {
-          setIsLoading(false)
-        }
+        if (!controller.signal.aborted) setIsLoading(false)
       }
     }, debounceMs)
 
@@ -73,13 +62,7 @@ export function useAutocomplete(
       if (timerRef.current) clearTimeout(timerRef.current)
       abortRef.current?.abort()
     }
-  }, [query, minLength, limit, debounceMs])
+  }, [query, minLength, limit, debounceMs, searchFn])
 
-  const clear = () => {
-    setSuggestions([])
-    setError(null)
-    setIsLoading(false)
-  }
-
-  return { suggestions, isLoading, error, clear }
+  return { suggestions, isLoading, error, clear: () => { setSuggestions([]); setError(null); setIsLoading(false) } }
 }

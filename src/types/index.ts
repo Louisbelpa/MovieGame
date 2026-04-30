@@ -8,9 +8,12 @@ export type HintType =
   | 'year'
   | 'genre'
   | 'director'
+  | 'creator'
   | 'actor'
   | 'synopsis'
   | 'country'
+
+export type MediaType = 'film' | 'series'
 
 // ─── API response shapes ─────────────────────────────────────────────────────
 
@@ -25,7 +28,8 @@ export interface Hint {
 export interface DailyChallenge {
   id: string            // "2026-04-25"
   date: string          // ISO date
-  imageUrl: string      // CDN URL of the movie still
+  mediaType: MediaType  // 'film' | 'series'
+  imageUrl: string      // CDN URL of the movie/series still
   /** Blur levels keyed by attempt index 0-5. 0 = max blur, 5 = clear */
   blurLevels: number[]  // e.g. [24, 18, 12, 8, 4, 0]
   hints: Hint[]         // max 5 hints (one unlocked per wrong attempt 1-5)
@@ -48,9 +52,11 @@ export interface SearchResponse {
 
 /** Result revealed after game ends */
 export interface GameResult {
+  mediaType: MediaType
   movieTitle: string
   movieYear: number
-  director: string
+  director: string | null    // null for series
+  creator: string | null     // null for films
   posterUrl: string
   synopsis: string
   trailerUrl?: string

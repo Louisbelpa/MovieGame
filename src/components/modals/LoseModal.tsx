@@ -20,7 +20,7 @@ export function LoseModal() {
   if (!result) return null
 
   const tmdbUrl = result.tmdbId
-    ? `https://www.themoviedb.org/movie/${result.tmdbId}`
+    ? `https://www.themoviedb.org/${result.mediaType === 'series' ? 'tv' : 'movie'}/${result.tmdbId}`
     : null
 
   return (

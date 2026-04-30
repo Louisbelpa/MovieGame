@@ -47,29 +47,29 @@ function EntryForm({ initial, onSave, onCancel }: EntryFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-gray-800 rounded-xl p-5 flex flex-col gap-4">
+    <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col gap-4 shadow-sm">
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Version</label>
+          <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Version</label>
           <input
             value={version}
             onChange={(e) => setVersion(e.target.value)}
             placeholder="1.3.0"
-            className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+            className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-500"
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Date</label>
+          <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Date</label>
           <input
             value={releaseDate}
             onChange={(e) => setReleaseDate(e.target.value)}
             placeholder="Mai 2026"
-            className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+            className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-500"
           />
         </div>
       </div>
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+        <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">
           Changements <span className="normal-case font-normal">(un par ligne)</span>
         </label>
         <textarea
@@ -77,17 +77,17 @@ function EntryForm({ initial, onSave, onCancel }: EntryFormProps) {
           onChange={(e) => setChangesText(e.target.value)}
           rows={6}
           placeholder="Nouvelle fonctionnalité&#10;Correction de bug&#10;..."
-          className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 resize-none font-mono"
+          className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-500 resize-none font-mono"
         />
       </div>
 
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {error && <p className="text-red-600 text-sm">{error}</p>}
 
       <div className="flex gap-2 justify-end">
         <button
           type="button"
           onClick={onCancel}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-700 transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
         >
           <X size={15} /> Annuler
         </button>
@@ -115,16 +115,16 @@ function EntryRow({ entry, onEdit, onDelete }: EntryRowProps) {
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   return (
-    <div className="bg-gray-800 rounded-xl p-5">
+    <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
       <div className="flex items-start justify-between gap-4 mb-3">
         <div className="flex items-center gap-3">
-          <span className="font-bold text-indigo-400 text-lg">v{entry.version}</span>
-          <span className="text-sm text-gray-400">{entry.release_date}</span>
+          <span className="font-bold text-indigo-600 text-lg">v{entry.version}</span>
+          <span className="text-sm text-gray-500">{entry.release_date}</span>
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={onEdit}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
             title="Modifier"
           >
             <Pencil size={15} />
@@ -139,7 +139,7 @@ function EntryRow({ entry, onEdit, onDelete }: EntryRowProps) {
               </button>
               <button
                 onClick={() => setConfirmDelete(false)}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
               >
                 <X size={15} />
               </button>
@@ -147,7 +147,7 @@ function EntryRow({ entry, onEdit, onDelete }: EntryRowProps) {
           ) : (
             <button
               onClick={() => setConfirmDelete(true)}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-gray-700 transition-colors"
+              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
               title="Supprimer"
             >
               <Trash2 size={15} />
@@ -157,8 +157,8 @@ function EntryRow({ entry, onEdit, onDelete }: EntryRowProps) {
       </div>
       <ul className="flex flex-col gap-1">
         {entry.changes.map((change, i) => (
-          <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
-            <span className="text-indigo-400 mt-0.5 shrink-0">·</span>
+          <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+            <span className="text-indigo-500 mt-0.5 shrink-0">·</span>
             {change}
           </li>
         ))}
@@ -206,7 +206,7 @@ export function ChangelogPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-xl font-bold text-gray-900">Changelog</h1>
-            <p className="text-sm text-gray-400 mt-0.5">Notes de version affichées dans le footer.</p>
+            <p className="text-sm text-gray-500 mt-0.5">Notes de version affichées dans le footer.</p>
           </div>
           {!creating && (
             <button
@@ -220,7 +220,7 @@ export function ChangelogPage() {
         </div>
 
         {error && (
-          <div className="bg-red-900/40 border border-red-700 rounded-lg p-3 mb-4 text-sm text-red-300">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm text-red-700">
             {error}
           </div>
         )}

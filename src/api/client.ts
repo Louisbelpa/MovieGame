@@ -77,6 +77,7 @@ export interface ResultPayload {
   synopsis: string | null
   imageUrl: string
   tmdbId: number | null
+  mediaType?: 'movie' | 'series'
   attemptsUsed: number
   maxAttempts: number
   attempts: AttemptPayload[]
@@ -101,13 +102,13 @@ export interface GlobalStatsPayload {
 // ─── Endpoints ────────────────────────────────────────────────────────────────
 
 /** GET /api/challenge/today – today's challenge + current session state */
-export function fetchChallenge(): Promise<ChallengePayload> {
-  return request<ChallengePayload>('/api/challenge/today')
+export function fetchChallenge(type: 'film' | 'series' = 'film'): Promise<ChallengePayload> {
+  return request<ChallengePayload>(`/api/challenge/today?type=${type}`)
 }
 
 /** GET /api/challenge/date/:date – a specific past challenge */
-export function fetchChallengeByDate(date: string): Promise<ChallengePayload> {
-  return request<ChallengePayload>(`/api/challenge/date/${date}`)
+export function fetchChallengeByDate(date: string, type: 'film' | 'series' = 'film'): Promise<ChallengePayload> {
+  return request<ChallengePayload>(`/api/challenge/date/${date}?type=${type}`)
 }
 
 /**
@@ -149,7 +150,21 @@ export function searchMovies(
   limit = 8
 ): Promise<SearchResultPayload[]> {
   const params = new URLSearchParams({ q: query, limit: String(limit) })
-  return request<SearchResultPayload[]>(`/api/films/search?${params}`)
+  return request<{ results: SearchResultPayload[] }>(`/api/films/search?${params}`)
+    .then(r => r.results)
+}
+
+/**
+ * GET /api/series/search?q=<query>
+ * Autocomplete for series – excludes today's answer server-side
+ */
+export function searchSeries(
+  query: string,
+  limit = 8
+): Promise<SearchResultPayload[]> {
+  const params = new URLSearchParams({ q: query, limit: String(limit) })
+  return request<{ results: SearchResultPayload[] }>(`/api/series/search?${params}`)
+    .then(r => r.results)
 }
 
 /** GET /api/stats */
@@ -158,6 +173,6 @@ export function fetchGlobalStats(): Promise<GlobalStatsPayload> {
 }
 
 /** GET /api/challenge/adjacent – nearest scheduled challenge before or after a date */
-export function fetchAdjacentDate(date: string, direction: 'prev' | 'next'): Promise<{ date: string }> {
-  return request<{ date: string }>(`/api/challenge/adjacent?date=${date}&direction=${direction}`)
+export function fetchAdjacentDate(date: string, direction: 'prev' | 'next', type: 'film' | 'series' = 'film'): Promise<{ date: string }> {
+  return request<{ date: string }>(`/api/challenge/adjacent?date=${date}&direction=${direction}&type=${type}`)
 }

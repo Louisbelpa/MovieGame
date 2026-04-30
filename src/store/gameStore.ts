@@ -44,6 +44,10 @@ interface GameStore {
   // Personal stats (localStorage only)
   stats: GameStats
 
+  // Game type
+  gameType: 'film' | 'series'
+  setGameType: (type: 'film' | 'series') => void
+
   // UI
   ui: UIState
 
@@ -97,6 +101,7 @@ function defaultUI(): UIState {
 // ─── Persist a snapshot to localStorage ──────────────────────────────────────
 
 function persistGame(
+  type: 'film' | 'series',
   challengeId: number,
   state: Omit<PersistedGameState, 'challengeId'>
 ) {
@@ -105,13 +110,16 @@ function persistGame(
     ...state,
   }
   try {
-    localStorage.setItem('cineguess:game', JSON.stringify(snap))
-  } catch {
-    // quota exceeded – fail silently
-  }
+    localStorage.setItem(`cineguess:game:${type}`, JSON.stringify(snap))
+  } catch {}
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
+
+const initialGameType = ((): 'film' | 'series' => {
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/series')) return 'series'
+  return 'film'
+})()
 
 export const useGameStore = create<GameStore>((set, get) => ({
   challenge: null,
@@ -122,14 +130,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   viewingDate: null,
   hasPrev: true,
   hasNext: false,
-  stats: loadStats(),
+  gameType: initialGameType,
+  stats: loadStats(initialGameType),
   ui: defaultUI(),
 
   // ── initGame ──────────────────────────────────────────────────────────────
 
   initGame: async () => {
     try {
-      const challenge = await fetchChallenge()
+      const challenge = await fetchChallenge(get().gameType)
 
       const guesses = apiAttemptsToGuesses(challenge.attempts)
       const status = deriveStatus(challenge.outcome)
@@ -176,9 +185,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ status: 'idle', challenge: null, result: null, guesses: [], hintsRevealed: 0, viewingDate: date, ui: defaultUI() })
     try {
       const [challengeRes, prevCheck, nextCheck] = await Promise.all([
-        fetchChallengeByDate(date),
-        fetchAdjacentDate(date, 'prev').then(() => true).catch((err) => (err as { status?: number }).status === 404 ? false : true),
-        fetchAdjacentDate(date, 'next').then(() => true).catch((err) => (err as { status?: number }).status === 404 ? false : true),
+        fetchChallengeByDate(date, get().gameType),
+        fetchAdjacentDate(date, 'prev', get().gameType).then(() => true).catch((err) => (err as { status?: number }).status === 404 ? false : true),
+        fetchAdjacentDate(date, 'next', get().gameType).then(() => true).catch((err) => (err as { status?: number }).status === 404 ? false : true),
       ])
 
       const challenge = challengeRes
@@ -217,7 +226,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const currentDate = snapshot.viewingDate ?? todayParis
 
     try {
-      const { date: targetDate } = await fetchAdjacentDate(currentDate, direction)
+      const { date: targetDate } = await fetchAdjacentDate(currentDate, direction, get().gameType)
 
       // Fetch target first — then clear with the correct viewingDate in one atomic
       // set() so the loading key is stable (no double-spinner animation).
@@ -238,7 +247,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         return
       }
 
-      const sameDirectionExists = await fetchAdjacentDate(targetDate, direction)
+      const sameDirectionExists = await fetchAdjacentDate(targetDate, direction, get().gameType)
         .then(() => true)
         .catch((err) => (err as { status?: number }).status === 404 ? false : true)
 
@@ -303,7 +312,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         challenge: { ...challenge, hints: res.challenge.hints, hintsRevealed: newHintsRevealed },
       })
 
-      persistGame(challenge.challengeId, {
+      persistGame(get().gameType, challenge.challengeId, {
         guesses: updatedGuesses,
         hintsUnlocked: newHintsRevealed,
         status: newStatus,
@@ -319,7 +328,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const result = await fetchResult(challenge.challengeId)
         set({ result })
 
-        addToHistory(challenge.date, res.outcome)
+        addToHistory(challenge.date, res.outcome, get().gameType)
 
         const today = getTodayId()
         const newStats = updateStats(stats, {
@@ -331,7 +340,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           completedAt: Date.now(),
         }, today)
         set({ stats: newStats })
-        saveStats(newStats)
+        saveStats(newStats, get().gameType)
 
         setTimeout(() => {
           get().openModal(res.outcome === 'won' ? 'win' : 'lose')
@@ -368,7 +377,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         challenge: { ...challenge, hints: res.challenge.hints, hintsRevealed: newHintsRevealed },
       })
 
-      persistGame(challenge.challengeId, {
+      persistGame(get().gameType, challenge.challengeId, {
         guesses: updatedGuesses,
         hintsUnlocked: newHintsRevealed,
         status: newStatus,
@@ -380,7 +389,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const result = await fetchResult(challenge.challengeId)
         set({ result })
 
-        addToHistory(challenge.date, res.outcome)
+        addToHistory(challenge.date, res.outcome, get().gameType)
 
         const today = getTodayId()
         const newStats = updateStats(stats, {
@@ -392,7 +401,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           completedAt: Date.now(),
         }, today)
         set({ stats: newStats })
-        saveStats(newStats)
+        saveStats(newStats, get().gameType)
 
         setTimeout(() => get().openModal('lose'), 600)
       }
@@ -413,6 +422,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set((s) => ({
       ui: { ...s.ui, inputValue: value, isSearchOpen: value.length >= 2 },
     })),
+
+  setGameType: (type) => {
+    const stats = loadStats(type)
+    set({ gameType: type, stats })
+  },
 
   shareResult: () => {
     const { challenge, guesses, status } = get()
