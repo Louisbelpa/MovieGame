@@ -1,0 +1,9 @@
+## Cursor rule: low-token execution
+
+- Keep replies concise and action-first.
+- Ask at most one clarifying question when strictly required.
+- Prefer direct edits over long planning.
+- Read the minimum set of files needed.
+- Avoid repeating command output; summarize only essentials.
+- Batch independent checks in parallel when possible.
+- For code changes: short changelog + verification status.

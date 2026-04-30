@@ -137,8 +137,8 @@ export function fetchResult(challengeId: number): Promise<ResultPayload> {
  * GET /api/challenge/dates?days=N
  * Returns ISO dates of the last N challenges (default 365)
  */
-export function fetchChallengeDates(days = 365): Promise<{ dates: string[] }> {
-  return request<{ dates: string[] }>(`/api/challenge/dates?days=${days}`)
+export function fetchChallengeDates(days = 365, type: 'film' | 'series' = 'film'): Promise<{ dates: string[] }> {
+  return request<{ dates: string[] }>(`/api/challenge/dates?days=${days}&type=${type}`)
 }
 
 /**

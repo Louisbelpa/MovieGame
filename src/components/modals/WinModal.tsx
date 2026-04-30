@@ -8,7 +8,9 @@ import { Share2, Trophy, BarChart2, ExternalLink } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { useGameStore } from '@/store/gameStore'
+import { getTodayParis, useGameStore } from '@/store/gameStore'
+import { loadStats } from '@/lib/storage'
+import { FEATURES } from '@/config/features'
 
 export function WinModal() {
   const isOpen = useGameStore((s) => s.ui.isModalOpen && s.ui.modalType === 'win')
@@ -17,6 +19,8 @@ export function WinModal() {
   const shareResult = useGameStore((s) => s.shareResult)
   const result = useGameStore((s) => s.result)
   const guesses = useGameStore((s) => s.guesses)
+  const gameType = useGameStore((s) => s.gameType)
+  const viewingDate = useGameStore((s) => s.viewingDate)
 
   if (!result) return null
 
@@ -25,6 +29,14 @@ export function WinModal() {
   const tmdbUrl = result.tmdbId
     ? `https://www.themoviedb.org/${result.mediaType === 'series' ? 'tv' : 'movie'}/${result.tmdbId}`
     : null
+  const otherType = gameType === 'film' ? 'series' : 'film'
+  const otherPlayedToday = loadStats(otherType).lastPlayedDate === getTodayParis()
+  const showOtherModeCta = FEATURES.enableSeries && !viewingDate && !otherPlayedToday
+
+  function goToOtherMode() {
+    closeModal()
+    window.location.href = otherType === 'series' ? '/series' : '/films'
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={closeModal}>
@@ -91,6 +103,18 @@ export function WinModal() {
             Partager
           </Button>
         </div>
+
+        {showOtherModeCta && (
+          <Button
+            variant="primary"
+            size="md"
+            onClick={goToOtherMode}
+            className="w-full !text-white hover:brightness-110 transition-[filter]"
+            style={{ backgroundColor: otherType === 'series' ? 'var(--sg-series)' : 'var(--sg-films)' }}
+          >
+            {otherType === 'series' ? 'Jouer la série du jour' : 'Jouer le film du jour'}
+          </Button>
+        )}
 
         {/* Learn more */}
         {tmdbUrl && (

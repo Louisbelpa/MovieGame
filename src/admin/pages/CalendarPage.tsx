@@ -3,8 +3,8 @@
  * Planning des défis : liste des 30 prochains jours + option pour voir le passé.
  */
 
-import { useEffect, useState, useCallback } from 'react'
-import { ChevronUp, ChevronDown, Sparkles, Film, Tv, X } from 'lucide-react'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { ChevronDown, Sparkles, Film, Tv, X } from 'lucide-react'
 import {
   getChallenges,
   getFilms,
@@ -22,6 +22,7 @@ import {
   type SeriesPayload,
 } from '../api'
 import { AdminLayout } from '../components/AdminLayout'
+import { SegmentedToggle } from '../components/SegmentedToggle'
 import { ChallengeRow } from '../components/ChallengeRow'
 import { FilmForm } from '../components/FilmForm'
 import { SeriesForm } from '../components/SeriesForm'
@@ -67,12 +68,15 @@ export function CalendarPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showPast, setShowPast] = useState(false)
+  const [renderPast, setRenderPast] = useState(false)
+  const [pastHeight, setPastHeight] = useState(0)
   const [autoLoading, setAutoLoading] = useState(false)
   const [autoSuccess, setAutoSuccess] = useState<string | null>(null)
   const [editingFilm, setEditingFilm] = useState<AdminFilm | null>(null)
   const [editingSeries, setEditingSeries] = useState<AdminSeries | null>(null)
+  const pastContentRef = useRef<HTMLDivElement>(null)
 
-  const from = showPast ? getISODate(-PAST_DAYS) : getISODate(0)
+  const from = getISODate(-PAST_DAYS)
   const to = getISODate(FUTURE_DAYS - 1)
 
   const load = useCallback((rangeFrom: string, rangeTo: string, mt: 'film' | 'series') => {
@@ -93,14 +97,25 @@ export function CalendarPage() {
 
   const byDate = Object.fromEntries(challenges.map((ch) => [ch.date, ch]))
 
-  const dateRange = showPast
-    ? buildDateRange(-PAST_DAYS, FUTURE_DAYS - 1)
-    : buildDateRange(0, FUTURE_DAYS - 1)
-
   const todayStr = getISODate(0)
-  const pastDates = dateRange.filter((d) => d < todayStr)
-  const todayAndFuture = dateRange.filter((d) => d >= todayStr)
+  const pastDates = buildDateRange(-PAST_DAYS, -1).filter((d) => d < todayStr)
+  const todayAndFuture = buildDateRange(0, FUTURE_DAYS - 1)
   const plannedCount = todayAndFuture.filter((d) => byDate[d]).length
+
+  useEffect(() => {
+    if (showPast) setRenderPast(true)
+  }, [showPast])
+
+  useEffect(() => {
+    if (!renderPast) return
+    const el = pastContentRef.current
+    if (!el) return
+    setPastHeight(el.scrollHeight)
+  }, [renderPast, pastDates, mediaType, challenges.length, showPast])
+
+  function handlePastTransitionEnd() {
+    if (!showPast) setRenderPast(false)
+  }
 
   async function handleSchedule(date: string, ref: MediaRef) {
     await scheduleChallenge(date, ref)
@@ -184,26 +199,15 @@ export function CalendarPage() {
   return (
     <AdminLayout>
       {/* Media type tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4 w-full sm:w-fit">
-        <button
-          onClick={() => setMediaType('film')}
-          className={[
-            'flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-lg transition-colors',
-            mediaType === 'film' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700',
-          ].join(' ')}
-        >
-          <Film size={14} /> Films
-        </button>
-        <button
-          onClick={() => setMediaType('series')}
-          className={[
-            'flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-lg transition-colors',
-            mediaType === 'series' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700',
-          ].join(' ')}
-        >
-          <Tv size={14} /> Séries
-        </button>
-      </div>
+      <SegmentedToggle
+        value={mediaType}
+        onChange={setMediaType}
+        className="mb-4 w-full sm:w-fit"
+        options={[
+          { id: 'film', label: 'Films', icon: <Film size={14} /> },
+          { id: 'series', label: 'Séries', icon: <Tv size={14} /> },
+        ]}
+      />
 
       <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <p className="text-sm text-gray-500">
@@ -230,10 +234,15 @@ export function CalendarPage() {
           <button
             type="button"
             onClick={() => setShowPast((v) => !v)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
+            className="group flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
           >
-            {showPast ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-            {showPast ? 'Masquer le passé' : `${PAST_DAYS} j. passés`}
+            <ChevronDown
+              size={13}
+              className={`transition-transform duration-200 ${showPast ? 'rotate-180' : ''}`}
+            />
+            <span className="inline-block min-w-[110px] text-left">
+              {showPast ? 'Masquer le passé' : `${PAST_DAYS} j. passés`}
+            </span>
           </button>
         </div>
       </div>
@@ -257,28 +266,39 @@ export function CalendarPage() {
           </div>
         ) : (
           <ul className="divide-y divide-gray-100">
-            {showPast && pastDates.length > 0 && (
-              <>
-                {pastDates.map((date) => (
-                  <ChallengeRow
-                    key={date}
-                    date={date}
-                    challenge={byDate[date] ?? null}
-                    films={films}
-                    seriesList={seriesList}
-                    mediaType={mediaType}
-                    onSchedule={handleSchedule}
-                    onUpdate={handleUpdate}
-                    onDelete={handleDelete}
-                    onEditMedia={handleEditMedia}
-                  />
-                ))}
-                <li className="flex items-center gap-3 px-4 py-2 bg-indigo-50">
-                  <span className="flex-1 border-t border-indigo-200" />
-                  <span className="text-xs font-semibold text-indigo-500 uppercase tracking-wider">Aujourd'hui</span>
-                  <span className="flex-1 border-t border-indigo-200" />
-                </li>
-              </>
+            {renderPast && (
+              <li className="p-0 list-none">
+                <div
+                  className="overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out"
+                  style={{ maxHeight: showPast ? `${pastHeight}px` : '0px', opacity: showPast ? 1 : 0 }}
+                  onTransitionEnd={handlePastTransitionEnd}
+                >
+                  <div ref={pastContentRef}>
+                    <ul className="divide-y divide-gray-100">
+                      {pastDates.map((date) => (
+                        <ChallengeRow
+                          key={date}
+                          date={date}
+                          challenge={byDate[date] ?? null}
+                          films={films}
+                          seriesList={seriesList}
+                          mediaType={mediaType}
+                          onSchedule={handleSchedule}
+                          onUpdate={handleUpdate}
+                          onDelete={handleDelete}
+                          onEditMedia={handleEditMedia}
+                          rowClassName="animate-slide-up"
+                        />
+                      ))}
+                      <li className="flex items-center gap-3 px-4 py-2 bg-indigo-50 animate-slide-up">
+                        <span className="flex-1 border-t border-indigo-200" />
+                        <span className="text-xs font-semibold text-indigo-500 uppercase tracking-wider">Aujourd'hui</span>
+                        <span className="flex-1 border-t border-indigo-200" />
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </li>
             )}
             {todayAndFuture.map((date) => (
               <ChallengeRow

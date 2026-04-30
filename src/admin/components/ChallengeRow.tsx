@@ -18,6 +18,7 @@ interface ChallengeRowProps {
   onUpdate: (challengeId: number, ref: MediaRef) => Promise<void>
   onDelete: (challengeId: number) => Promise<void>
   onEditMedia?: (media: AdminFilm | AdminSeries, type: 'film' | 'series') => void
+  rowClassName?: string
 }
 
 function formatDateShort(iso: string) {
@@ -229,6 +230,7 @@ export function ChallengeRow({
   onUpdate,
   onDelete,
   onEditMedia,
+  rowClassName,
 }: ChallengeRowProps) {
   const [picking, setPicking] = useState(false)
   const [mutating, setMutating] = useState(false)
@@ -269,6 +271,7 @@ export function ChallengeRow({
         'px-4 py-3 flex flex-col gap-2',
         today ? 'bg-indigo-50' : '',
         past ? 'opacity-60' : '',
+        rowClassName ?? '',
       ].join(' ')}
     >
       <div className="flex items-center gap-3">

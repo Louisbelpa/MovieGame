@@ -1,18 +1,19 @@
 import { useEffect, useState, useCallback } from 'react'
 import { ChevronUp, ChevronDown, X } from 'lucide-react'
 import { AdminLayout } from '../components/AdminLayout'
+import { SegmentedToggle } from '../components/SegmentedToggle'
 import {
-  getAnalyticsOverview,
+  getAnalyticsOverviewByMedia,
   getAnalyticsDaily,
-  getAnalyticsFilms,
+  getAnalyticsChallenges,
   getWrongGuesses,
-  getReturningPlayers,
+  getReturningPlayersByMedia,
   getHourlyDistribution,
   getAttemptsDistribution,
   getHintsDistribution,
   type AnalyticsOverview,
   type DailyAnalytics,
-  type FilmAnalytics,
+  type ChallengeAnalytics,
   type WrongGuess,
   type ReturningPlayer,
   type HourlyData,
@@ -85,11 +86,10 @@ function TimelineChart({ data }: { data: DailyAnalytics[] }) {
   if (data.length === 0) return <p className="text-sm text-gray-400 py-4">Aucune donnée.</p>
 
   const H = 120
-  const labelH = 20
-  const totalH = H + labelH
   const maxSessions = Math.max(...data.map((d) => d.sessions_started), 1)
   const maxWinRate = 100
   const barW = 100 / data.length
+  const showEvery = Math.max(1, Math.floor(data.length / 6))
 
   return (
     <div>
@@ -97,7 +97,7 @@ function TimelineChart({ data }: { data: DailyAnalytics[] }) {
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-indigo-500" />Parties</span>
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-emerald-500" />Taux victoire %</span>
       </div>
-      <svg width="100%" viewBox={`0 0 100 ${totalH}`} preserveAspectRatio="none" className="w-full" style={{ height: 160 }}>
+      <svg width="100%" viewBox={`0 0 100 ${H}`} preserveAspectRatio="none" className="w-full" style={{ height: 140 }}>
         {data.map((d, i) => {
           const sessH = (d.sessions_started / maxSessions) * H
           const winH = (d.win_rate / maxWinRate) * H
@@ -114,15 +114,14 @@ function TimelineChart({ data }: { data: DailyAnalytics[] }) {
             </g>
           )
         })}
-        {data.map((d, i) => {
-          if (i % Math.max(1, Math.floor(data.length / 6)) !== 0) return null
-          return (
-            <text key={d.date} x={i * barW + barW / 2} y={totalH - 2} fontSize="3.5" fill="#9ca3af" textAnchor="middle">
-              {d.date.slice(5)}
-            </text>
-          )
-        })}
       </svg>
+      <div className="mt-1 grid text-[11px] text-gray-400" style={{ gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))` }}>
+        {data.map((d, i) => (
+          <span key={d.date} className="text-center leading-none min-h-[14px]">
+            {i % showEvery === 0 ? d.date.slice(5) : ''}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
@@ -181,20 +180,20 @@ function HourlyChart({ data }: { data: HourlyData[] }) {
 
 // Section 7 — Wrong guesses mini modal
 function WrongGuessesPanel({
-  film,
+  item,
   onClose,
 }: {
-  film: FilmAnalytics
+  item: ChallengeAnalytics
   onClose: () => void
 }) {
   const [guesses, setGuesses] = useState<WrongGuess[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    getWrongGuesses(film.challenge_id, 5)
+    getWrongGuesses(item.challenge_id, 5)
       .then(setGuesses)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Erreur'))
-  }, [film.challenge_id])
+  }, [item.challenge_id])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
@@ -203,7 +202,7 @@ function WrongGuessesPanel({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-800 text-sm">{film.film_title}</h3>
+          <h3 className="font-semibold text-gray-800 text-sm">{item.title}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
         <p className="text-xs text-gray-500 mb-3">Top 5 mauvaises réponses</p>
@@ -229,7 +228,8 @@ function WrongGuessesPanel({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 type Period = '7' | '30' | '90' | 'all'
-type FilmsSort = 'win_rate' | 'sessions' | 'avg_hints'
+type AnalyticsSort = 'win_rate' | 'sessions' | 'avg_hints'
+type MediaTab = 'film' | 'series'
 
 export function AnalyticsPage() {
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
@@ -246,24 +246,24 @@ export function AnalyticsPage() {
   const [returning, setReturning] = useState<ReturningPlayer[]>([])
   const [distErr, setDistErr] = useState<string | null>(null)
 
-  const [films, setFilms] = useState<FilmAnalytics[]>([])
-  const [filmsSort, setFilmsSort] = useState<FilmsSort>('win_rate')
-  const [filmsErr, setFilmsErr] = useState<string | null>(null)
-  const [filmsLoading, setFilmsLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<MediaTab>('film')
+  const [sort, setSort] = useState<AnalyticsSort>('win_rate')
+  const [challenges, setChallenges] = useState<ChallengeAnalytics[]>([])
+  const [challengesErr, setChallengesErr] = useState<string | null>(null)
+  const [challengesLoading, setChallengesLoading] = useState(false)
+  const [selectedChallenge, setSelectedChallenge] = useState<ChallengeAnalytics | null>(null)
 
-  const [selectedFilm, setSelectedFilm] = useState<FilmAnalytics | null>(null)
-
-  // Load overview + distributions once
+  // Load overview + distributions when media tab changes
   useEffect(() => {
-    getAnalyticsOverview()
+    getAnalyticsOverviewByMedia(activeTab)
       .then(setOverview)
       .catch((e: unknown) => setOverviewErr(e instanceof Error ? e.message : 'Erreur'))
 
     Promise.all([
-      getAttemptsDistribution(),
-      getHintsDistribution(),
-      getHourlyDistribution(),
-      getReturningPlayers(),
+      getAttemptsDistribution(activeTab),
+      getHintsDistribution(activeTab),
+      getHourlyDistribution(activeTab),
+      getReturningPlayersByMedia(undefined, activeTab),
     ])
       .then(([att, hin, hou, ret]) => {
         setAttempts(att)
@@ -272,7 +272,7 @@ export function AnalyticsPage() {
         setReturning(ret)
       })
       .catch((e: unknown) => setDistErr(e instanceof Error ? e.message : 'Erreur distributions'))
-  }, [])
+  }, [activeTab])
 
   // Load daily data when period changes
   const loadDaily = useCallback((p: Period) => {
@@ -280,36 +280,36 @@ export function AnalyticsPage() {
     setDailyErr(null)
     const to = todayISO()
     const from = p === 'all' ? '2000-01-01' : subtractDays(Number(p))
-    getAnalyticsDaily(from, to)
+    getAnalyticsDaily(from, to, activeTab)
       .then(setDaily)
       .catch((e: unknown) => setDailyErr(e instanceof Error ? e.message : 'Erreur'))
       .finally(() => setDailyLoading(false))
-  }, [])
+  }, [activeTab])
 
   useEffect(() => { loadDaily(period) }, [period, loadDaily])
 
-  // Load films when sort changes
-  const loadFilms = useCallback((sort: FilmsSort) => {
-    setFilmsLoading(true)
-    setFilmsErr(null)
-    getAnalyticsFilms(sort)
-      .then(setFilms)
-      .catch((e: unknown) => setFilmsErr(e instanceof Error ? e.message : 'Erreur'))
-      .finally(() => setFilmsLoading(false))
+  // Load challenge analytics for active media tab
+  const loadChallenges = useCallback((mediaType: MediaTab, sortBy: AnalyticsSort) => {
+    setChallengesLoading(true)
+    setChallengesErr(null)
+    getAnalyticsChallenges(mediaType, sortBy)
+      .then(setChallenges)
+      .catch((e: unknown) => setChallengesErr(e instanceof Error ? e.message : 'Erreur'))
+      .finally(() => setChallengesLoading(false))
   }, [])
 
-  useEffect(() => { loadFilms(filmsSort) }, [filmsSort, loadFilms])
+  useEffect(() => { loadChallenges(activeTab, sort) }, [activeTab, sort, loadChallenges])
 
-  function handleFilmsSort(col: FilmsSort) {
-    if (col === filmsSort) return
-    setFilmsSort(col)
+  function handleSort(col: AnalyticsSort) {
+    if (col === sort) return
+    setSort(col)
   }
 
   const attMax = Math.max(...Object.values(attempts), 1)
   const hinMax = Math.max(...Object.values(hints), 1)
 
-  const SortIcon = ({ col }: { col: FilmsSort }) =>
-    filmsSort === col
+  const SortIcon = ({ col }: { col: AnalyticsSort }) =>
+    sort === col
       ? <ChevronUp size={13} className="inline ml-0.5 text-indigo-600" />
       : <ChevronDown size={13} className="inline ml-0.5 text-gray-400" />
 
@@ -317,7 +317,20 @@ export function AnalyticsPage() {
     <AdminLayout>
       <div className="space-y-6">
 
-        {/* ── Section 1 : KPIs ─────────────────────────────────────────────── */}
+        {/* ── Section 1 : Type de jeu ──────────────────────────────────────── */}
+        <section>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Type de jeu</h2>
+          <SegmentedToggle
+            value={activeTab}
+            onChange={setActiveTab}
+            options={[
+              { id: 'film', label: 'Films' },
+              { id: 'series', label: 'Séries' },
+            ]}
+          />
+        </section>
+
+        {/* ── Section 2 : KPIs ─────────────────────────────────────────────── */}
         <section>
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Vue d'ensemble</h2>
           {overviewErr && <ErrorMsg msg={overviewErr} />}
@@ -334,7 +347,7 @@ export function AnalyticsPage() {
           )}
         </section>
 
-        {/* ── Section 2 : Sélecteur de période ────────────────────────────── */}
+        {/* ── Section 3 : Sélecteur de période ────────────────────────────── */}
         <section>
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Période</h2>
           <div className="flex gap-2 flex-wrap">
@@ -355,7 +368,7 @@ export function AnalyticsPage() {
           </div>
         </section>
 
-        {/* ── Section 3 : Timeline ─────────────────────────────────────────── */}
+        {/* ── Section 4 : Timeline ─────────────────────────────────────────── */}
         <section className="bg-white rounded-xl border border-gray-200 p-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Activité quotidienne</h2>
           {dailyErr && <ErrorMsg msg={dailyErr} />}
@@ -411,68 +424,70 @@ export function AnalyticsPage() {
           <div className="px-4 py-3 border-b border-gray-100">
             <h2 className="text-sm font-semibold text-gray-700">Classement des défis par difficulté</h2>
           </div>
-          {filmsErr && <div className="p-4"><ErrorMsg msg={filmsErr} /></div>}
-          {filmsLoading && <Spinner />}
-          {!filmsLoading && !filmsErr && (
+          {challengesErr && <div className="p-4"><ErrorMsg msg={challengesErr} /></div>}
+          {challengesLoading && <Spinner />}
+          {!challengesLoading && !challengesErr && (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs text-gray-500 border-b border-gray-100 bg-gray-50">
                     <th className="px-4 py-2.5 font-medium">Date</th>
-                    <th className="px-4 py-2.5 font-medium">Film</th>
+                    <th className="px-4 py-2.5 font-medium">{activeTab === 'film' ? 'Film' : 'Série'}</th>
                     <th className="px-4 py-2.5 font-medium">Fame</th>
                     <th
                       className="px-4 py-2.5 font-medium cursor-pointer hover:text-indigo-600 select-none"
-                      onClick={() => handleFilmsSort('sessions')}
+                      onClick={() => handleSort('sessions')}
                     >
                       Parties<SortIcon col="sessions" />
                     </th>
                     <th
                       className="px-4 py-2.5 font-medium cursor-pointer hover:text-indigo-600 select-none"
-                      onClick={() => handleFilmsSort('win_rate')}
+                      onClick={() => handleSort('win_rate')}
                     >
                       Victoires %<SortIcon col="win_rate" />
                     </th>
                     <th className="px-4 py-2.5 font-medium">Moy. tent.</th>
                     <th
                       className="px-4 py-2.5 font-medium cursor-pointer hover:text-indigo-600 select-none"
-                      onClick={() => handleFilmsSort('avg_hints')}
+                      onClick={() => handleSort('avg_hints')}
                     >
                       Moy. indices<SortIcon col="avg_hints" />
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {films.map((f) => (
+                  {challenges.map((item) => (
                     <tr
-                      key={f.challenge_id}
+                      key={item.challenge_id}
                       className="hover:bg-indigo-50 cursor-pointer transition-colors"
-                      onClick={() => setSelectedFilm(f)}
+                      onClick={() => setSelectedChallenge(item)}
                     >
-                      <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">{formatDate(f.challenge_date)}</td>
+                      <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">{formatDate(item.challenge_date)}</td>
                       <td className="px-4 py-2.5 font-medium text-gray-800 max-w-[160px] truncate">
-                        {f.film_title}
-                        <span className="ml-1 text-xs text-gray-400">{f.film_year}</span>
+                        {item.title}
+                        <span className="ml-1 text-xs text-gray-400">{item.year}</span>
                       </td>
-                      <td className="px-4 py-2.5"><Stars level={f.fame_level} /></td>
-                      <td className="px-4 py-2.5 text-gray-700">{f.sessions}</td>
+                      <td className="px-4 py-2.5"><Stars level={item.fame_level} /></td>
+                      <td className="px-4 py-2.5 text-gray-700">{item.sessions}</td>
                       <td className="px-4 py-2.5">
                         <span className={[
                           'text-xs font-semibold px-1.5 py-0.5 rounded',
-                          f.win_rate >= 60 ? 'bg-emerald-50 text-emerald-700' :
-                          f.win_rate >= 40 ? 'bg-amber-50 text-amber-700' :
+                          item.win_rate >= 60 ? 'bg-emerald-50 text-emerald-700' :
+                          item.win_rate >= 40 ? 'bg-amber-50 text-amber-700' :
                           'bg-red-50 text-red-700',
                         ].join(' ')}>
-                          {f.win_rate} %
+                          {item.win_rate} %
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-gray-600">{f.avg_attempts.toFixed(1)}</td>
-                      <td className="px-4 py-2.5 text-gray-600">{f.avg_hints.toFixed(1)}</td>
+                      <td className="px-4 py-2.5 text-gray-600">{item.avg_attempts.toFixed(1)}</td>
+                      <td className="px-4 py-2.5 text-gray-600">{item.avg_hints.toFixed(1)}</td>
                     </tr>
                   ))}
-                  {films.length === 0 && (
+                  {challenges.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-400">Aucun défi trouvé.</td>
+                      <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-400">
+                        {activeTab === 'film' ? 'Aucun film trouvé.' : 'Aucune série trouvée.'}
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -480,7 +495,6 @@ export function AnalyticsPage() {
             </div>
           )}
         </section>
-
         {/* ── Section 8 : Fidélité joueurs ──────────────────────────────────── */}
         <section className="bg-white rounded-xl border border-gray-200 p-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Fidélité des joueurs</h2>
@@ -513,8 +527,8 @@ export function AnalyticsPage() {
       </div>
 
       {/* Wrong guesses modal */}
-      {selectedFilm && (
-        <WrongGuessesPanel film={selectedFilm} onClose={() => setSelectedFilm(null)} />
+      {selectedChallenge && (
+        <WrongGuessesPanel item={selectedChallenge} onClose={() => setSelectedChallenge(null)} />
       )}
     </AdminLayout>
   )

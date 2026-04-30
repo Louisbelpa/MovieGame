@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { getDashboard, type AdminDashboard, type AdminChallenge } from '../api'
 import { AdminLayout } from '../components/AdminLayout'
+import { SegmentedToggle } from '../components/SegmentedToggle'
 
 function formatDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', {
@@ -91,26 +92,16 @@ export function DashboardPage() {
           </div>
 
           {/* ── Sélecteur d'onglets (mobile uniquement) ── */}
-          <div className="lg:hidden flex gap-1 bg-gray-100 rounded-xl p-1">
-            <button
-              onClick={() => setActiveTab('films')}
-              className={[
-                'flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-colors',
-                activeTab === 'films' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700',
-              ].join(' ')}
-            >
-              <Film size={15} /> Films
-            </button>
-            <button
-              onClick={() => setActiveTab('series')}
-              className={[
-                'flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-colors',
-                activeTab === 'series' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-700',
-              ].join(' ')}
-            >
-              <Tv size={15} /> Séries
-            </button>
-          </div>
+          <SegmentedToggle
+            value={activeTab}
+            onChange={setActiveTab}
+            className="lg:hidden w-full"
+            buttonClassName="flex-1"
+            options={[
+              { id: 'films', label: 'Films', icon: <Film size={15} /> },
+              { id: 'series', label: 'Séries', icon: <Tv size={15} /> },
+            ]}
+          />
 
           {/* ── Contenu : colonnes desktop / onglet mobile ── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

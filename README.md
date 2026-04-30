@@ -1,17 +1,17 @@
-# CinéGuessr 🎬
+# CinéGuessr / GuessToday 🎬
 
-Jeu quotidien de cinéma : devine le film à partir d'une image et d'indices progressifs.
+Jeu quotidien : devine le film (et la série si activé) à partir d'une image et d'indices progressifs.
 Un nouveau défi chaque jour à minuit (heure de Paris). Les anciens défis restent accessibles.
 
 ## Fonctionnalités
 
-- **Défi quotidien** — un film différent chaque jour, planifié via le back office
-- **3 tentatives** — chaque mauvaise réponse débloque un indice (année → réalisateur → acteur principal)
+- **Défi quotidien** — un film (et éventuellement une série) différent(e) chaque jour, planifié via le back office
+- **5 tentatives** — chaque mauvaise réponse débloque un indice (année → réalisateur/créateur → acteur principal)
 - **Anciens défis** — navigation ◀ ▶ pour rejouer les jours précédents
 - **Statistiques** — suivi local des victoires, séries et distribution des scores
 - **Partage** — résultat exportable en grille emoji
-- **Back office** — interface d'administration pour gérer les films et le planning
-- **TMDB** — auto-remplissage des fiches films via l'API The Movie Database
+- **Back office** — interface d'administration pour gérer films, séries, planning et analytics
+- **TMDB** — auto-remplissage des fiches films/séries via l'API The Movie Database
 
 ## Prérequis
 
@@ -105,6 +105,16 @@ Back office sur `http://localhost:5173/admin`.
 
 Voir `backend/.env.example` pour la liste complète.
 
+### Frontend (Vite)
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `VITE_ENABLE_SERIES` | `true` | Active/désactive le mode Séries côté interface publique (home, tabs, route `/series`) |
+
+Effets du flag:
+- `VITE_ENABLE_SERIES=false` → mode films uniquement, branding public `CinéGuessr`
+- `VITE_ENABLE_SERIES=true` → films + séries, branding public `GuessToday`
+
 | Variable | Dev | Description |
 |----------|-----|-------------|
 | `PORT` | `3001` | Port du serveur API |
@@ -115,7 +125,7 @@ Voir `backend/.env.example` pour la liste complète.
 | `CORS_ORIGIN` | `http://localhost:5173` | Origine autorisée — domaine exact, sans slash final |
 | `TMDB_API_KEY` | — | Clé API TMDB (back office uniquement) |
 | `IMAGE_SOURCE` | `tmdb` | `tmdb` ou `local` |
-| `MAX_ATTEMPTS` | `3` | Nombre de tentatives par défi |
+| `MAX_ATTEMPTS` | `5` | Nombre de tentatives par défi |
 | `BACKEND_URL` | — | URL publique du backend (pour les URLs d'images uploadées) |
 
 ## API publique

@@ -7,6 +7,7 @@ import { useRef } from 'react'
 import { HelpCircle, BarChart2, Film, CalendarDays, Tv, Home } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useGameStore } from '@/store/gameStore'
+import { BRAND_NAME } from '@/config/features'
 
 export function Header() {
   const openModal = useGameStore((s) => s.openModal)
@@ -43,7 +44,7 @@ export function Header() {
         <div className="flex items-center gap-2">
           {gameType === 'series' ? <Tv size={22} className="text-film-gold" aria-hidden /> : <Film size={22} className="text-film-gold" aria-hidden />}
           <span className="font-title text-xl font-bold text-gradient-gold tracking-tight">
-            CinéGuessr
+            {BRAND_NAME}
           </span>
           {displayNumber && (
             <div className="overflow-hidden h-5 flex items-center">

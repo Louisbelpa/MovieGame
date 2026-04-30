@@ -510,6 +510,33 @@ export interface FilmAnalytics {
   most_common_wrong_guess: string | null
 }
 
+export interface SeriesAnalytics {
+  challenge_id: number
+  challenge_date: string
+  series_title: string
+  series_year: number
+  fame_level: number
+  sessions: number
+  win_rate: number
+  avg_attempts: number
+  avg_hints: number
+  most_common_wrong_guess: string | null
+}
+
+export interface ChallengeAnalytics {
+  challenge_id: number
+  challenge_date: string
+  media_type: 'film' | 'series'
+  title: string
+  year: number
+  fame_level: number
+  sessions: number
+  win_rate: number
+  avg_attempts: number
+  avg_hints: number
+  most_common_wrong_guess: string | null
+}
+
 export interface WrongGuess {
   guess: string
   count: number
@@ -529,8 +556,16 @@ export async function getAnalyticsOverview(): Promise<AnalyticsOverview> {
   return request<AnalyticsOverview>('/api/admin/analytics/overview')
 }
 
-export async function getAnalyticsDaily(from: string, to: string): Promise<DailyAnalytics[]> {
+export async function getAnalyticsOverviewByMedia(mediaType?: 'film' | 'series'): Promise<AnalyticsOverview> {
+  const params = new URLSearchParams()
+  if (mediaType) params.set('mediaType', mediaType)
+  const qs = params.toString()
+  return request<AnalyticsOverview>(`/api/admin/analytics/overview${qs ? `?${qs}` : ''}`)
+}
+
+export async function getAnalyticsDaily(from: string, to: string, mediaType?: 'film' | 'series'): Promise<DailyAnalytics[]> {
   const params = new URLSearchParams({ from, to })
+  if (mediaType) params.set('mediaType', mediaType)
   return request<DailyAnalytics[]>(`/api/admin/analytics/daily?${params}`)
 }
 
@@ -541,6 +576,24 @@ export async function getAnalyticsFilms(
   if (sort) params.set('sort', sort)
   const qs = params.toString()
   return request<FilmAnalytics[]>(`/api/admin/analytics/films${qs ? `?${qs}` : ''}`)
+}
+
+export async function getAnalyticsSeries(
+  sort?: 'win_rate' | 'sessions' | 'avg_hints'
+): Promise<SeriesAnalytics[]> {
+  const params = new URLSearchParams()
+  if (sort) params.set('sort', sort)
+  const qs = params.toString()
+  return request<SeriesAnalytics[]>(`/api/admin/analytics/series${qs ? `?${qs}` : ''}`)
+}
+
+export async function getAnalyticsChallenges(
+  mediaType: 'film' | 'series',
+  sort?: 'win_rate' | 'sessions' | 'avg_hints'
+): Promise<ChallengeAnalytics[]> {
+  const params = new URLSearchParams({ mediaType })
+  if (sort) params.set('sort', sort)
+  return request<ChallengeAnalytics[]>(`/api/admin/analytics/challenges?${params}`)
 }
 
 export async function getWrongGuesses(challengeId: number, limit?: number): Promise<WrongGuess[]> {
@@ -556,16 +609,33 @@ export async function getReturningPlayers(days?: number): Promise<ReturningPlaye
   return request<ReturningPlayer[]>(`/api/admin/analytics/returning-players${qs ? `?${qs}` : ''}`)
 }
 
-export async function getHourlyDistribution(): Promise<HourlyData[]> {
-  return request<HourlyData[]>('/api/admin/analytics/hourly')
+export async function getReturningPlayersByMedia(days?: number, mediaType?: 'film' | 'series'): Promise<ReturningPlayer[]> {
+  const params = new URLSearchParams()
+  if (days !== undefined) params.set('days', String(days))
+  if (mediaType) params.set('mediaType', mediaType)
+  const qs = params.toString()
+  return request<ReturningPlayer[]>(`/api/admin/analytics/returning-players${qs ? `?${qs}` : ''}`)
 }
 
-export async function getAttemptsDistribution(): Promise<Record<string, number>> {
-  return request<Record<string, number>>('/api/admin/analytics/attempts-distribution')
+export async function getHourlyDistribution(mediaType?: 'film' | 'series'): Promise<HourlyData[]> {
+  const params = new URLSearchParams()
+  if (mediaType) params.set('mediaType', mediaType)
+  const qs = params.toString()
+  return request<HourlyData[]>(`/api/admin/analytics/hourly${qs ? `?${qs}` : ''}`)
 }
 
-export async function getHintsDistribution(): Promise<Record<string, number>> {
-  return request<Record<string, number>>('/api/admin/analytics/hints-distribution')
+export async function getAttemptsDistribution(mediaType?: 'film' | 'series'): Promise<Record<string, number>> {
+  const params = new URLSearchParams()
+  if (mediaType) params.set('mediaType', mediaType)
+  const qs = params.toString()
+  return request<Record<string, number>>(`/api/admin/analytics/attempts-distribution${qs ? `?${qs}` : ''}`)
+}
+
+export async function getHintsDistribution(mediaType?: 'film' | 'series'): Promise<Record<string, number>> {
+  const params = new URLSearchParams()
+  if (mediaType) params.set('mediaType', mediaType)
+  const qs = params.toString()
+  return request<Record<string, number>>(`/api/admin/analytics/hints-distribution${qs ? `?${qs}` : ''}`)
 }
 
 // ─── Audit logs ───────────────────────────────────────────────────────────────

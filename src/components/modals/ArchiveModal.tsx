@@ -57,6 +57,7 @@ export function ArchiveModal() {
   const closeModal = useGameStore((s) => s.closeModal)
   const loadDate = useGameStore((s) => s.loadDate)
   const viewingDate = useGameStore((s) => s.viewingDate)
+  const gameType = useGameStore((s) => s.gameType)
 
   const [challengeDates, setChallengeDates] = useState<Set<string>>(new Set())
   const [history, setHistory] = useState<Record<string, 'won' | 'lost'>>({})
@@ -70,7 +71,7 @@ export function ArchiveModal() {
     if (!isOpen) return
     setDisplayYM(todayYM)
     setLoading(true)
-    fetchChallengeDates(365)
+    fetchChallengeDates(365, gameType)
       .then(({ dates }) => {
         setChallengeDates(new Set(dates))
         // Historique local
@@ -89,7 +90,7 @@ export function ArchiveModal() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [isOpen, todayYM])
+  }, [isOpen, todayYM, gameType])
 
   const activeDate = viewingDate ?? today
   const days = daysForMonth(displayYM, today)

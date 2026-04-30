@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react'
 import { ExternalLink, Film } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
+import { BRAND_NAME, FEATURES } from '@/config/features'
 
 // ─── Changelog (fetched from API) ─────────────────────────────────────────────
 
@@ -63,16 +64,24 @@ function ChangelogModal({ onClose }: { onClose: () => void }) {
 }
 
 function FaqModal({ onClose }: { onClose: () => void }) {
+  const modeLabel = FEATURES.enableSeries ? 'film ou série' : 'film'
+  const dailyLabel = FEATURES.enableSeries
+    ? 'Un nouveau défi est disponible chaque jour à minuit, heure de Paris (Europe/Paris).'
+    : 'Un nouveau film est disponible chaque jour à minuit, heure de Paris (Europe/Paris).'
+  const dataLabel = FEATURES.enableSeries
+    ? 'Les données (titre, réalisateur/créateur, acteurs, synopsis) proviennent de The Movie Database (TMDB).'
+    : 'Les données (titre, réalisateur, acteurs, synopsis) proviennent de The Movie Database (TMDB).'
+
   return (
     <Modal isOpen onClose={onClose} title="FAQ">
       <div className="flex flex-col gap-4 text-sm text-film-text">
         <FaqItem
           q="Combien de tentatives ai-je par jour ?"
-          a="Vous avez 3 tentatives par défi. Chaque mauvaise réponse débloque un indice supplémentaire."
+          a="Vous avez 5 tentatives par défi. Chaque mauvaise réponse débloque un indice supplémentaire."
         />
         <FaqItem
-          q="À quelle heure le nouveau film apparaît-il ?"
-          a="Un nouveau film est disponible chaque jour à minuit, heure de Paris (Europe/Paris)."
+          q={`À quelle heure le nouveau ${modeLabel} apparaît-il ?`}
+          a={dailyLabel}
         />
         <FaqItem
           q="Puis-je rejouer les anciens défis ?"
@@ -87,8 +96,8 @@ function FaqModal({ onClose }: { onClose: () => void }) {
           a="Oui, les titres originaux et les titres français sont tous les deux acceptés."
         />
         <FaqItem
-          q="D'où viennent les informations sur les films ?"
-          a="Les données (titre, réalisateur, acteurs, synopsis) proviennent de The Movie Database (TMDB)."
+          q={`D'où viennent les informations sur les ${FEATURES.enableSeries ? 'films et séries' : 'films'} ?`}
+          a={dataLabel}
         />
       </div>
     </Modal>
@@ -109,7 +118,7 @@ function PrivacyModal({ onClose }: { onClose: () => void }) {
     <Modal isOpen onClose={onClose} title="Politique de confidentialité">
       <div className="flex flex-col gap-4 text-sm text-film-text-dim leading-relaxed">
         <p>
-          <strong className="text-film-text">CinéGuessr</strong> respecte votre vie privée.
+          <strong className="text-film-text">{BRAND_NAME}</strong> respecte votre vie privée.
           Cette page explique quelles données sont collectées et comment elles sont utilisées.
         </p>
 
@@ -150,7 +159,7 @@ function PrivacyModal({ onClose }: { onClose: () => void }) {
             >
               The Movie Database (TMDB)
             </a>
-            . Votre utilisation de CinéGuessr est soumise aux conditions d'utilisation de TMDB.
+            . Votre utilisation de {BRAND_NAME} est soumise aux conditions d'utilisation de TMDB.
           </p>
         </section>
 
@@ -215,7 +224,7 @@ export function Footer() {
 
           {/* Copyright + version */}
           <div className="flex items-center justify-center gap-3 text-[10px] text-film-text-dim/50">
-            <p>© {new Date().getFullYear()} CinéGuessr. Tous droits réservés.</p>
+            <p>© {new Date().getFullYear()} {BRAND_NAME}. Tous droits réservés.</p>
             <button
               onClick={() => setModal('changelog')}
               className="hover:text-film-text-dim transition-colors cursor-pointer"

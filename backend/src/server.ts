@@ -90,7 +90,10 @@ app.use(sessionMiddleware);
 
 // ─── Global rate limiter (generous) ──────────────────────────────────────────
 // Tighter per-route limits are applied in the route files themselves.
-app.use('/api', createRateLimiter({ max: 300, windowMs: 60_000 }));
+app.use('/api', createRateLimiter({
+  max: parseInt(process.env.API_RATE_LIMIT_MAX ?? '600', 10),
+  windowMs: parseInt(process.env.API_RATE_LIMIT_WINDOW_MS ?? '60000', 10),
+}));
 
 // ─── Static files (uploaded images) ──────────────────────────────────────────
 

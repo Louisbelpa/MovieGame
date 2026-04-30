@@ -138,7 +138,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   initGame: async () => {
     try {
-      const challenge = await fetchChallenge(get().gameType)
+      const gameType = get().gameType
+      const challenge = await fetchChallenge(gameType)
+      const hasPrev = await fetchAdjacentDate(challenge.date, 'prev', gameType)
+        .then(() => true)
+        .catch((err) => (err as { status?: number }).status === 404 ? false : true)
 
       const guesses = apiAttemptsToGuesses(challenge.attempts)
       const status = deriveStatus(challenge.outcome)
@@ -150,6 +154,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
         hintsRevealed,
         status,
         viewingDate: null,
+        hasPrev,
+        hasNext: false,
       })
 
       if (status === 'won' || status === 'lost') {
@@ -159,12 +165,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         } catch {
           // result not critical for re-display
         }
-        setTimeout(() => {
-          // Don't override the tutorial modal if it's currently showing
-          if (get().ui.modalType !== 'rules') {
-            get().openModal(status === 'won' ? 'win' : 'lose')
-          }
-        }, 800)
       }
     } catch (err) {
       console.error('[initGame]', err)
@@ -204,9 +204,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         } catch {
           // result not critical
         }
-        setTimeout(() => {
-          get().openModal(status === 'won' ? 'win' : 'lose')
-        }, 800)
       }
     } catch (err) {
       const is404 = (err as { status?: number }).status === 404

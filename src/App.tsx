@@ -14,6 +14,7 @@ import { StatsModal } from '@/components/modals/StatsModal'
 import { RulesModal } from '@/components/modals/RulesModal'
 import { ArchiveModal } from '@/components/modals/ArchiveModal'
 import { useGameStore } from '@/store/gameStore'
+import { BRAND_NAME } from '@/config/features'
 
 const RULES_SEEN_KEY = 'cineguess:rules_seen'
 
@@ -26,10 +27,10 @@ function useDynamicTitle() {
     const media = gameType === 'series' ? 'la série' : 'le film'
     if (challengeNumber) {
       document.title = viewingDate
-        ? `CinéGuessr #${challengeNumber} — Ancien défi`
-        : `CinéGuessr #${challengeNumber} — Devine ${media} du jour`
+        ? `${BRAND_NAME} #${challengeNumber} — Ancien défi`
+        : `${BRAND_NAME} #${challengeNumber} — Devine ${media} du jour`
     } else {
-      document.title = `CinéGuessr — Devine ${media} du jour`
+      document.title = `${BRAND_NAME} — Devine ${media} du jour`
     }
   }, [challengeNumber, viewingDate, gameType])
 }

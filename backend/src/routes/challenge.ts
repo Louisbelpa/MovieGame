@@ -149,18 +149,19 @@ challengeRouter.get(
   (req: Request, res: Response, next: NextFunction) => {
     try {
       const days = Math.min(Math.max(1, parseInt((req.query.days as string) ?? '90', 10)), 365)
+      const type = (req.query.type === 'series' ? 'series' : 'film') as 'film' | 'series'
       const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
       const from = new Date(todayParis + 'T12:00:00Z')
       from.setUTCDate(from.getUTCDate() - days)
       const fromStr = from.toISOString().slice(0, 10)
 
       const rows = db
-        .prepare<[string, string], { challenge_date: string }>(
+        .prepare<[string, string, string], { challenge_date: string }>(
           `SELECT challenge_date FROM daily_challenges
-           WHERE challenge_date >= ? AND challenge_date <= ?
+           WHERE challenge_date >= ? AND challenge_date <= ? AND media_type = ?
            ORDER BY challenge_date DESC`
         )
-        .all(fromStr, todayParis)
+        .all(fromStr, todayParis, type)
 
       res.json({ dates: rows.map((r) => r.challenge_date) })
     } catch (err) {

@@ -1917,8 +1917,11 @@ adminRouter.get(
 // GET /api/admin/analytics/overview
 adminRouter.get(
   '/analytics/overview',
-  (_req: Request, res: Response, next: NextFunction) => {
+  (req: Request, res: Response, next: NextFunction) => {
     try {
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
+      const whereClause = mediaType ? `WHERE dc.media_type = ?` : '';
       const overview = db.prepare(`
         SELECT
           COUNT(*) AS total_sessions,
@@ -1928,8 +1931,10 @@ adminRouter.get(
           ROUND(AVG(hints_revealed), 1) AS avg_hints_per_session,
           ROUND(100.0 * SUM(CASE WHEN outcome IS NOT NULL THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0)) AS completion_rate,
           ROUND(AVG(CASE WHEN outcome IS NOT NULL THEN strftime('%s', finished_at) - strftime('%s', started_at) ELSE NULL END)) AS avg_session_duration_seconds
-        FROM game_sessions
-      `).get() as {
+        FROM game_sessions gs
+        ${joinClause}
+        ${whereClause}
+      `).get(...(mediaType ? [mediaType] : [])) as {
         total_sessions: number;
         total_unique_players: number;
         overall_win_rate: number | null;
@@ -2036,22 +2041,27 @@ adminRouter.get(
 
       const from = parseDateParam(req.query.from) ?? defaultFrom;
       const to = parseDateParam(req.query.to) ?? defaultTo;
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
+      const mediaWhere = mediaType ? `AND dc.media_type = ?` : '';
 
       const rows = db.prepare(`
         SELECT
-          date(started_at) AS date,
+          date(gs.started_at) AS date,
           COUNT(*) AS sessions_started,
-          SUM(CASE WHEN outcome IS NOT NULL THEN 1 ELSE 0 END) AS sessions_completed,
-          COUNT(DISTINCT session_token) AS unique_players,
-          ROUND(100.0 * SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN outcome IS NOT NULL THEN 1 ELSE 0 END), 0)) AS win_rate,
-          ROUND(AVG(CASE WHEN outcome IS NOT NULL THEN json_array_length(attempts) ELSE NULL END), 1) AS avg_attempts,
-          ROUND(AVG(hints_revealed), 1) AS avg_hints,
-          ROUND(100.0 * SUM(CASE WHEN outcome IS NULL THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0)) AS abandonment_rate
-        FROM game_sessions
-        WHERE date(started_at) BETWEEN ? AND ?
-        GROUP BY date(started_at)
-        ORDER BY date(started_at) ASC
-      `).all(from, to) as {
+          SUM(CASE WHEN gs.outcome IS NOT NULL THEN 1 ELSE 0 END) AS sessions_completed,
+          COUNT(DISTINCT gs.session_token) AS unique_players,
+          ROUND(100.0 * SUM(CASE WHEN gs.outcome = 'won' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN gs.outcome IS NOT NULL THEN 1 ELSE 0 END), 0)) AS win_rate,
+          ROUND(AVG(CASE WHEN gs.outcome IS NOT NULL THEN json_array_length(gs.attempts) ELSE NULL END), 1) AS avg_attempts,
+          ROUND(AVG(gs.hints_revealed), 1) AS avg_hints,
+          ROUND(100.0 * SUM(CASE WHEN gs.outcome IS NULL THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0)) AS abandonment_rate
+        FROM game_sessions gs
+        ${joinClause}
+        WHERE date(gs.started_at) BETWEEN ? AND ?
+        ${mediaWhere}
+        GROUP BY date(gs.started_at)
+        ORDER BY date(gs.started_at) ASC
+      `).all(...(mediaType ? [from, to, mediaType] : [from, to])) as {
         date: string;
         sessions_started: number;
         sessions_completed: number;
@@ -2081,15 +2091,20 @@ adminRouter.get(
 // GET /api/admin/analytics/attempts-distribution
 adminRouter.get(
   '/analytics/attempts-distribution',
-  (_req: Request, res: Response, next: NextFunction) => {
+  (req: Request, res: Response, next: NextFunction) => {
     try {
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
+      const whereMedia = mediaType ? `AND dc.media_type = ?` : '';
       const rows = db.prepare(`
-        SELECT json_array_length(attempts) AS attempt_count, COUNT(*) AS cnt
-        FROM game_sessions
-        WHERE outcome = 'won'
+        SELECT json_array_length(gs.attempts) AS attempt_count, COUNT(*) AS cnt
+        FROM game_sessions gs
+        ${joinClause}
+        WHERE gs.outcome = 'won'
+        ${whereMedia}
         GROUP BY attempt_count
         ORDER BY attempt_count ASC
-      `).all() as { attempt_count: number; cnt: number }[];
+      `).all(...(mediaType ? [mediaType] : [])) as { attempt_count: number; cnt: number }[];
 
       const result: Record<string, number> = {};
       for (const row of rows) {
@@ -2105,14 +2120,19 @@ adminRouter.get(
 // GET /api/admin/analytics/hints-distribution
 adminRouter.get(
   '/analytics/hints-distribution',
-  (_req: Request, res: Response, next: NextFunction) => {
+  (req: Request, res: Response, next: NextFunction) => {
     try {
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
+      const whereMedia = mediaType ? `WHERE dc.media_type = ?` : '';
       const rows = db.prepare(`
-        SELECT hints_revealed, COUNT(*) AS cnt
-        FROM game_sessions
-        GROUP BY hints_revealed
-        ORDER BY hints_revealed ASC
-      `).all() as { hints_revealed: number; cnt: number }[];
+        SELECT gs.hints_revealed, COUNT(*) AS cnt
+        FROM game_sessions gs
+        ${joinClause}
+        ${whereMedia}
+        GROUP BY gs.hints_revealed
+        ORDER BY gs.hints_revealed ASC
+      `).all(...(mediaType ? [mediaType] : [])) as { hints_revealed: number; cnt: number }[];
 
       const result: Record<string, number> = {};
       for (const row of rows) {
@@ -2208,15 +2228,20 @@ adminRouter.patch(
 // GET /api/admin/analytics/hourly
 adminRouter.get(
   '/analytics/hourly',
-  (_req: Request, res: Response, next: NextFunction) => {
+  (req: Request, res: Response, next: NextFunction) => {
     try {
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
+      const whereClause = mediaType ? `WHERE dc.media_type = ?` : '';
       const rows = db.prepare(`
-        SELECT CAST(strftime('%H', started_at, '+1 hour') AS INTEGER) AS hour,
+        SELECT CAST(strftime('%H', gs.started_at, '+1 hour') AS INTEGER) AS hour,
                COUNT(*) AS sessions
-        FROM game_sessions
+        FROM game_sessions gs
+        ${joinClause}
+        ${whereClause}
         GROUP BY hour
         ORDER BY hour ASC
-      `).all() as { hour: number; sessions: number }[];
+      `).all(...(mediaType ? [mediaType] : [])) as { hour: number; sessions: number }[];
 
       res.json(rows);
     } catch (err) {
@@ -2246,6 +2271,7 @@ adminRouter.get(
 
       const rows = db.prepare(`
         SELECT
+          dc.id AS challenge_id,
           dc.challenge_date,
           f.title AS film_title,
           f.year AS film_year,
@@ -2268,6 +2294,7 @@ adminRouter.get(
         GROUP BY dc.id
         ${orderClause}
       `).all() as {
+        challenge_id: number;
         challenge_date: string;
         film_title: string;
         film_year: number;
@@ -2280,9 +2307,166 @@ adminRouter.get(
       }[];
 
       res.json(rows.map((r) => ({
+        challenge_id: r.challenge_id,
         challenge_date: r.challenge_date,
         film_title: r.film_title,
         film_year: r.film_year,
+        fame_level: r.fame_level,
+        sessions: r.sessions,
+        win_rate: r.win_rate ?? 0,
+        avg_attempts: r.avg_attempts ?? 0,
+        avg_hints: r.avg_hints ?? 0,
+        most_common_wrong_guess: r.most_common_wrong_guess ?? null,
+      })));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/series?sort=win_rate|sessions|avg_hints
+adminRouter.get(
+  '/analytics/series',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sortParam = req.query.sort as string | undefined;
+      const validSorts = ['win_rate', 'sessions', 'avg_hints'] as const;
+      type SortOption = typeof validSorts[number];
+      const sort: SortOption = validSorts.includes(sortParam as SortOption)
+        ? (sortParam as SortOption)
+        : 'win_rate';
+
+      const orderClause =
+        sort === 'win_rate'
+          ? 'ORDER BY win_rate ASC'
+          : sort === 'sessions'
+          ? 'ORDER BY sessions DESC'
+          : 'ORDER BY avg_hints DESC';
+
+      const rows = db.prepare(`
+        SELECT
+          dc.id AS challenge_id,
+          dc.challenge_date,
+          s.title AS series_title,
+          s.year AS series_year,
+          s.fame_level,
+          COUNT(gs.rowid) AS sessions,
+          ROUND(100.0 * SUM(CASE WHEN gs.outcome = 'won' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN gs.outcome IS NOT NULL THEN 1 ELSE 0 END), 0)) AS win_rate,
+          ROUND(AVG(CASE WHEN gs.outcome IS NOT NULL THEN json_array_length(gs.attempts) ELSE NULL END), 1) AS avg_attempts,
+          ROUND(AVG(gs.hints_revealed), 1) AS avg_hints,
+          (
+            SELECT j.value->>'$.guess'
+            FROM game_sessions gs2, json_each(gs2.attempts) j
+            WHERE gs2.challenge_id = dc.id AND j.value->>'$.correct' = 'false'
+            GROUP BY j.value->>'$.guess'
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+          ) AS most_common_wrong_guess
+        FROM daily_challenges dc
+        JOIN series s ON s.id = dc.series_id
+        LEFT JOIN game_sessions gs ON gs.challenge_id = dc.id
+        GROUP BY dc.id
+        ${orderClause}
+      `).all() as {
+        challenge_id: number;
+        challenge_date: string;
+        series_title: string;
+        series_year: number;
+        fame_level: number;
+        sessions: number;
+        win_rate: number | null;
+        avg_attempts: number | null;
+        avg_hints: number | null;
+        most_common_wrong_guess: string | null;
+      }[];
+
+      res.json(rows.map((r) => ({
+        challenge_id: r.challenge_id,
+        challenge_date: r.challenge_date,
+        series_title: r.series_title,
+        series_year: r.series_year,
+        fame_level: r.fame_level,
+        sessions: r.sessions,
+        win_rate: r.win_rate ?? 0,
+        avg_attempts: r.avg_attempts ?? 0,
+        avg_hints: r.avg_hints ?? 0,
+        most_common_wrong_guess: r.most_common_wrong_guess ?? null,
+      })));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/challenges?mediaType=film|series&sort=win_rate|sessions|avg_hints
+adminRouter.get(
+  '/analytics/challenges',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const mediaType = req.query.mediaType === 'series' ? 'series' : 'film';
+      const sortParam = req.query.sort as string | undefined;
+      const validSorts = ['win_rate', 'sessions', 'avg_hints'] as const;
+      type SortOption = typeof validSorts[number];
+      const sort: SortOption = validSorts.includes(sortParam as SortOption)
+        ? (sortParam as SortOption)
+        : 'win_rate';
+
+      const orderClause =
+        sort === 'win_rate'
+          ? 'ORDER BY win_rate ASC'
+          : sort === 'sessions'
+          ? 'ORDER BY sessions DESC'
+          : 'ORDER BY avg_hints DESC';
+
+      const mediaJoin =
+        mediaType === 'series'
+          ? `JOIN series m ON m.id = dc.series_id`
+          : `JOIN films m ON m.id = dc.film_id`;
+
+      const rows = db.prepare(`
+        SELECT
+          dc.id AS challenge_id,
+          dc.challenge_date,
+          m.title AS title,
+          m.year AS year,
+          m.fame_level,
+          COUNT(gs.rowid) AS sessions,
+          ROUND(100.0 * SUM(CASE WHEN gs.outcome = 'won' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN gs.outcome IS NOT NULL THEN 1 ELSE 0 END), 0)) AS win_rate,
+          ROUND(AVG(CASE WHEN gs.outcome IS NOT NULL THEN json_array_length(gs.attempts) ELSE NULL END), 1) AS avg_attempts,
+          ROUND(AVG(gs.hints_revealed), 1) AS avg_hints,
+          (
+            SELECT j.value->>'$.guess'
+            FROM game_sessions gs2, json_each(gs2.attempts) j
+            WHERE gs2.challenge_id = dc.id AND j.value->>'$.correct' = 'false'
+            GROUP BY j.value->>'$.guess'
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+          ) AS most_common_wrong_guess
+        FROM daily_challenges dc
+        ${mediaJoin}
+        LEFT JOIN game_sessions gs ON gs.challenge_id = dc.id
+        WHERE dc.media_type = ?
+        GROUP BY dc.id
+        ${orderClause}
+      `).all(mediaType) as {
+        challenge_id: number;
+        challenge_date: string;
+        title: string;
+        year: number;
+        fame_level: number;
+        sessions: number;
+        win_rate: number | null;
+        avg_attempts: number | null;
+        avg_hints: number | null;
+        most_common_wrong_guess: string | null;
+      }[];
+
+      res.json(rows.map((r) => ({
+        challenge_id: r.challenge_id,
+        challenge_date: r.challenge_date,
+        media_type: mediaType,
+        title: r.title,
+        year: r.year,
         fame_level: r.fame_level,
         sessions: r.sessions,
         win_rate: r.win_rate ?? 0,
@@ -2617,18 +2801,27 @@ adminRouter.get(
     try {
       const daysParam = parseInt((req.query.days as string | undefined) ?? '0', 10);
       const useDaysFilter = !isNaN(daysParam) && daysParam > 0;
-
-      const whereClause = useDaysFilter
-        ? `WHERE started_at >= date('now', '-' || ${daysParam} || ' days')`
-        : '';
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
+      const whereMedia = mediaType ? `dc.media_type = '${mediaType}'` : '';
+      const whereDays = useDaysFilter ? `gs.started_at >= date('now', '-' || ${daysParam} || ' days')` : '';
+      const whereClause =
+        whereMedia && whereDays
+          ? `WHERE ${whereMedia} AND ${whereDays}`
+          : whereMedia
+          ? `WHERE ${whereMedia}`
+          : whereDays
+          ? `WHERE ${whereDays}`
+          : '';
 
       const rows = db.prepare(`
         SELECT days_played, COUNT(*) AS player_count
         FROM (
-          SELECT session_token, COUNT(DISTINCT date(started_at)) AS days_played
-          FROM game_sessions
+          SELECT gs.session_token, COUNT(DISTINCT date(gs.started_at)) AS days_played
+          FROM game_sessions gs
+          ${joinClause}
           ${whereClause}
-          GROUP BY session_token
+          GROUP BY gs.session_token
           HAVING days_played >= 1
         )
         GROUP BY days_played
