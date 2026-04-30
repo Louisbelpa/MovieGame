@@ -26,7 +26,8 @@ challengeRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sessionToken = res.locals.sessionToken as string;
-      const challenge = getTodayChallenge();
+      const type = (req.query.type === 'series' ? 'series' : 'film') as 'film' | 'series';
+      const challenge = getTodayChallenge(type);
       const session = getOrCreateSession(sessionToken, challenge.id);
       const payload = buildChallengePayload(challenge, session);
       res.json(payload);
@@ -58,7 +59,8 @@ challengeRouter.get(
       }
 
       const sessionToken = res.locals.sessionToken as string;
-      const challenge = getChallengeByDate(date);
+      const type = (req.query.type === 'series' ? 'series' : 'film') as 'film' | 'series';
+      const challenge = getChallengeByDate(date, type);
       const session = getOrCreateSession(sessionToken, challenge.id);
       const payload = buildChallengePayload(challenge, session);
       res.json(payload);
@@ -193,15 +195,18 @@ challengeRouter.get(
 
       const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
 
+      const type = (req.query.type === 'series' ? 'series' : 'film') as 'film' | 'series';
+      const typeFilter = type === 'series' ? 'series_id IS NOT NULL' : 'film_id IS NOT NULL';
+
       const row = direction === 'prev'
         ? db.prepare<[string, string], { challenge_date: string }>(
             `SELECT challenge_date FROM daily_challenges
-             WHERE challenge_date < ? AND challenge_date <= ?
+             WHERE challenge_date < ? AND challenge_date <= ? AND ${typeFilter}
              ORDER BY challenge_date DESC LIMIT 1`
           ).get(date, todayParis)
         : db.prepare<[string, string], { challenge_date: string }>(
             `SELECT challenge_date FROM daily_challenges
-             WHERE challenge_date > ? AND challenge_date <= ?
+             WHERE challenge_date > ? AND challenge_date <= ? AND ${typeFilter}
              ORDER BY challenge_date ASC LIMIT 1`
           ).get(date, todayParis);
 

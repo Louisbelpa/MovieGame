@@ -19,16 +19,18 @@ const RULES_SEEN_KEY = 'cineguess:rules_seen'
 function useDynamicTitle() {
   const challengeNumber = useGameStore((s) => s.challenge?.challengeNumber ?? null)
   const viewingDate = useGameStore((s) => s.viewingDate)
+  const gameType = useGameStore((s) => s.gameType)
 
   useEffect(() => {
+    const media = gameType === 'series' ? 'la série' : 'le film'
     if (challengeNumber) {
       document.title = viewingDate
         ? `CinéGuessr #${challengeNumber} — Ancien défi`
-        : `CinéGuessr #${challengeNumber} — Devine le film du jour`
+        : `CinéGuessr #${challengeNumber} — Devine ${media} du jour`
     } else {
-      document.title = 'CinéGuessr — Devine le film du jour'
+      document.title = `CinéGuessr — Devine ${media} du jour`
     }
-  }, [challengeNumber, viewingDate])
+  }, [challengeNumber, viewingDate, gameType])
 }
 
 function useFirstVisit() {
@@ -43,7 +45,8 @@ function useFirstVisit() {
   }, [openModal]) // no `status` dependency – runs once on mount
 }
 
-export default function App() {
+export default function App({ gameType = 'film' }: { gameType?: 'film' | 'series' }) {
+  void gameType // type is initialized from URL in the store; prop is accepted for main.tsx clarity
   useFirstVisit()
   useDynamicTitle()
 

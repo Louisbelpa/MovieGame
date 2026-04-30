@@ -158,16 +158,15 @@ function getTodayParis(): string {
 // ─── Public service methods ───────────────────────────────────────────────────
 
 /** Return today's challenge row (throws if not found) */
-export function getTodayChallenge(): ChallengeRow {
+export function getTodayChallenge(type: 'film' | 'series' = 'film'): ChallengeRow {
   const today = getTodayParis();
+  const filter = type === 'series' ? 'series_id IS NOT NULL' : 'film_id IS NOT NULL';
   const row = db
     .prepare<[string], ChallengeRow>(
-      `SELECT dc.* FROM daily_challenges dc
-       WHERE dc.challenge_date = ?`
-    )
-    .get(today);
-
-  if (!row) throw new Error(`No challenge scheduled for ${today}`);
+      `SELECT * FROM daily_challenges WHERE challenge_date <= ? AND ${filter}
+       ORDER BY challenge_date DESC LIMIT 1`
+    ).get(today);
+  if (!row) throw Object.assign(new Error(`No ${type} challenge scheduled`), { status: 404 });
   return row;
 }
 
@@ -181,15 +180,13 @@ export function getChallengeById(id: number): ChallengeRow {
 }
 
 /** Return a challenge by a specific date (throws if not found) */
-export function getChallengeByDate(date: string): ChallengeRow {
+export function getChallengeByDate(date: string, type: 'film' | 'series' = 'film'): ChallengeRow {
+  const filter = type === 'series' ? 'series_id IS NOT NULL' : 'film_id IS NOT NULL';
   const row = db
     .prepare<[string], ChallengeRow>(
-      `SELECT dc.* FROM daily_challenges dc
-       WHERE dc.challenge_date = ?`
-    )
-    .get(date);
-
-  if (!row) throw Object.assign(new Error(`No challenge scheduled for ${date}`), { status: 404 });
+      `SELECT * FROM daily_challenges WHERE challenge_date = ? AND ${filter}`
+    ).get(date);
+  if (!row) throw Object.assign(new Error(`No ${type} challenge for ${date}`), { status: 404 });
   return row;
 }
 
@@ -522,7 +519,7 @@ export function searchFilms(query: string, limit = 10, excludeChallengeId?: numb
 
   const todayChallenge = (() => {
     try {
-      return getTodayChallenge();
+      return getTodayChallenge('film');
     } catch {
       return null;
     }
@@ -554,7 +551,7 @@ export function searchSeries(query: string, limit = 10, excludeChallengeId?: num
 
   const todayChallenge = (() => {
     try {
-      return getTodayChallenge();
+      return getTodayChallenge('series');
     } catch {
       return null;
     }

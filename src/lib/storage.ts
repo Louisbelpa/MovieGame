@@ -1,19 +1,17 @@
 import type { GameStats, PersistedGameState } from '@/types'
 import { defaultStats } from '@/lib/utils'
 
-const KEYS = {
-  GAME: 'cineguess:game',
-  STATS: 'cineguess:stats',
-  HISTORY: 'cineguess:history',
-} as const
-
-// ─── Game history (per-date win/loss record) ──────────────────────────────────
+const keys = (type: 'film' | 'series') => ({
+  GAME: `cineguess:game:${type}`,
+  STATS: `cineguess:stats:${type}`,
+  HISTORY: `cineguess:history:${type}`,
+})
 
 export type GameHistory = Record<string, 'won' | 'lost'>
 
-export function loadHistory(): GameHistory {
+export function loadHistory(type: 'film' | 'series' = 'film'): GameHistory {
   try {
-    const raw = localStorage.getItem(KEYS.HISTORY)
+    const raw = localStorage.getItem(keys(type).HISTORY)
     return raw ? (JSON.parse(raw) as GameHistory) : {}
   } catch {
     return {}
@@ -21,53 +19,45 @@ export function loadHistory(): GameHistory {
 }
 
 /** Record the outcome for a date. Won't overwrite an existing entry. */
-export function addToHistory(date: string, outcome: 'won' | 'lost'): void {
+export function addToHistory(date: string, outcome: 'won' | 'lost', type: 'film' | 'series' = 'film'): void {
   try {
-    const history = loadHistory()
-    if (history[date]) return  // already recorded
+    const history = loadHistory(type)
+    if (history[date]) return
     history[date] = outcome
-    localStorage.setItem(KEYS.HISTORY, JSON.stringify(history))
-  } catch {
-    // quota exceeded – fail silently
-  }
+    localStorage.setItem(keys(type).HISTORY, JSON.stringify(history))
+  } catch {}
 }
 
-// ─── Game state ───────────────────────────────────────────────────────────────
-
-export function loadGameState(): PersistedGameState | null {
+export function loadGameState(type: 'film' | 'series' = 'film'): PersistedGameState | null {
   try {
-    const raw = localStorage.getItem(KEYS.GAME)
+    const raw = localStorage.getItem(keys(type).GAME)
     return raw ? (JSON.parse(raw) as PersistedGameState) : null
   } catch {
     return null
   }
 }
 
-export function saveGameState(state: PersistedGameState): void {
+export function saveGameState(state: PersistedGameState, type: 'film' | 'series' = 'film'): void {
   try {
-    localStorage.setItem(KEYS.GAME, JSON.stringify(state))
-  } catch {
-    // Storage quota exceeded — fail silently
-  }
+    localStorage.setItem(keys(type).GAME, JSON.stringify(state))
+  } catch {}
 }
 
-export function clearGameState(): void {
-  localStorage.removeItem(KEYS.GAME)
+export function clearGameState(type: 'film' | 'series' = 'film'): void {
+  localStorage.removeItem(keys(type).GAME)
 }
 
-// ─── Stats ────────────────────────────────────────────────────────────────────
-
-export function loadStats(): GameStats {
+export function loadStats(type: 'film' | 'series' = 'film'): GameStats {
   try {
-    const raw = localStorage.getItem(KEYS.STATS)
+    const raw = localStorage.getItem(keys(type).STATS)
     return raw ? (JSON.parse(raw) as GameStats) : defaultStats()
   } catch {
     return defaultStats()
   }
 }
 
-export function saveStats(stats: GameStats): void {
+export function saveStats(stats: GameStats, type: 'film' | 'series' = 'film'): void {
   try {
-    localStorage.setItem(KEYS.STATS, JSON.stringify(stats))
+    localStorage.setItem(keys(type).STATS, JSON.stringify(stats))
   } catch {}
 }

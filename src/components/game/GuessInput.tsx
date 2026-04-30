@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Search, SkipForward, Loader2 } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 import { useAutocomplete } from '@/hooks/useAutocomplete'
+import { searchMovies, searchSeries } from '@/api/client'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
@@ -27,8 +28,10 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
   const inputValue = useGameStore((s) => s.ui.inputValue)
   const setInputValue = useGameStore((s) => s.setInputValue)
   const shakeTrigger = useGameStore((s) => s.ui.shakeTrigger)
+  const gameType = useGameStore((s) => s.gameType)
 
-  const { suggestions, isLoading } = useAutocomplete(inputValue, { debounceMs: 200 })
+  const searchFn = gameType === 'series' ? searchSeries : searchMovies
+  const { suggestions, isLoading } = useAutocomplete(inputValue, searchFn, { debounceMs: 200 })
   const isOpen = suggestions.length > 0 && inputValue.length >= 2
 
   const handleSelect = (title: string) => {
@@ -95,7 +98,7 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
           value={inputValue}
           onChange={(e) => { setInputValue(e.target.value); setActiveIndex(-1) }}
           onKeyDown={handleKeyDown}
-          placeholder="Titre du film…"
+          placeholder={gameType === 'series' ? 'Titre de la série…' : 'Titre du film…'}
           disabled={disabled}
           autoComplete="off"
           spellCheck={false}
