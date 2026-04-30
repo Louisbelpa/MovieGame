@@ -327,6 +327,100 @@ export async function uploadFilmImage(filmId: number, file: File): Promise<{ url
   return res.json() as Promise<{ url: string; film: AdminFilm }>
 }
 
+// ─── Analytics ───────────────────────────────────────────────────────────────
+
+export interface AnalyticsOverview {
+  total_sessions: number
+  total_unique_players: number
+  overall_win_rate: number
+  avg_attempts_on_win: number
+  avg_hints_per_session: number
+  completion_rate: number
+  avg_session_duration_seconds: number
+}
+
+export interface DailyAnalytics {
+  date: string
+  sessions_started: number
+  sessions_completed: number
+  unique_players: number
+  win_rate: number
+  avg_attempts: number
+  avg_hints: number
+  abandonment_rate: number
+}
+
+export interface FilmAnalytics {
+  challenge_id: number
+  challenge_date: string
+  film_title: string
+  film_year: number
+  fame_level: number
+  sessions: number
+  win_rate: number
+  avg_attempts: number
+  avg_hints: number
+  most_common_wrong_guess: string | null
+}
+
+export interface WrongGuess {
+  guess: string
+  count: number
+}
+
+export interface ReturningPlayer {
+  days_played: number
+  player_count: number
+}
+
+export interface HourlyData {
+  hour: number
+  sessions: number
+}
+
+export async function getAnalyticsOverview(): Promise<AnalyticsOverview> {
+  return request<AnalyticsOverview>('/api/admin/analytics/overview')
+}
+
+export async function getAnalyticsDaily(from: string, to: string): Promise<DailyAnalytics[]> {
+  const params = new URLSearchParams({ from, to })
+  return request<DailyAnalytics[]>(`/api/admin/analytics/daily?${params}`)
+}
+
+export async function getAnalyticsFilms(
+  sort?: 'win_rate' | 'sessions' | 'avg_hints'
+): Promise<FilmAnalytics[]> {
+  const params = new URLSearchParams()
+  if (sort) params.set('sort', sort)
+  const qs = params.toString()
+  return request<FilmAnalytics[]>(`/api/admin/analytics/films${qs ? `?${qs}` : ''}`)
+}
+
+export async function getWrongGuesses(challengeId: number, limit?: number): Promise<WrongGuess[]> {
+  const params = new URLSearchParams({ challenge_id: String(challengeId) })
+  if (limit !== undefined) params.set('limit', String(limit))
+  return request<WrongGuess[]>(`/api/admin/analytics/wrong-guesses?${params}`)
+}
+
+export async function getReturningPlayers(days?: number): Promise<ReturningPlayer[]> {
+  const params = new URLSearchParams()
+  if (days !== undefined) params.set('days', String(days))
+  const qs = params.toString()
+  return request<ReturningPlayer[]>(`/api/admin/analytics/returning-players${qs ? `?${qs}` : ''}`)
+}
+
+export async function getHourlyDistribution(): Promise<HourlyData[]> {
+  return request<HourlyData[]>('/api/admin/analytics/hourly')
+}
+
+export async function getAttemptsDistribution(): Promise<Record<string, number>> {
+  return request<Record<string, number>>('/api/admin/analytics/attempts-distribution')
+}
+
+export async function getHintsDistribution(): Promise<Record<string, number>> {
+  return request<Record<string, number>>('/api/admin/analytics/hints-distribution')
+}
+
 // ─── Audit logs ───────────────────────────────────────────────────────────────
 
 export async function getAuditLogs(
