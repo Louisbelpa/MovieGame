@@ -66,8 +66,10 @@ export default function App({ gameType = 'film' }: { gameType?: 'film' | 'series
     initGame()
   }, [currentGameType, initGame])
 
+  const mode = currentGameType === 'series' ? 'series' : 'films'
+
   return (
-    <div className="min-h-dvh flex flex-col bg-film-black text-film-text">
+    <div className="min-h-dvh flex flex-col bg-film-black text-film-text" data-mode={mode}>
       <Header />
 
       <div className="flex-1">

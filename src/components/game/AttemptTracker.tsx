@@ -20,6 +20,7 @@ export function AttemptTracker({ guesses, maxAttempts }: AttemptTrackerProps) {
     >
       {Array.from({ length: maxAttempts }).map((_, i) => {
         const guess = guesses[i]
+        const isNext = !guess && i === guesses.length
         return (
           <span
             key={i}
@@ -27,13 +28,19 @@ export function AttemptTracker({ guesses, maxAttempts }: AttemptTrackerProps) {
             className={cn(
               'w-3 h-3 sm:w-2.5 sm:h-2.5 rounded-full transition-all duration-300',
               !guess
-                ? 'bg-film-border'
+                ? isNext
+                  ? '' // mode-color handled via inline style below
+                  : 'bg-film-border'
                 : guess.status === 'correct'
                 ? 'bg-film-green shadow-[0_0_6px_rgba(76,175,120,0.6)]'
                 : guess.status === 'skipped'
                 ? 'bg-film-muted'
                 : 'bg-film-red'
             )}
+            style={isNext ? {
+              background: 'var(--mode-color)',
+              boxShadow: '0 0 0 3px var(--mode-soft)',
+            } : undefined}
           />
         )
       })}

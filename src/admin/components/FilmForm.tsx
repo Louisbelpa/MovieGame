@@ -5,9 +5,9 @@
  */
 
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react'
-import { X, Images, Search, Loader2, Upload } from 'lucide-react'
+import { X, Images, Search, Loader2, Upload, Shuffle } from 'lucide-react'
 import type { AdminFilm, FilmPayload, TmdbSearchResult } from '../api'
-import { searchTmdb, getTmdbFilmDetails, uploadImage } from '../api'
+import { searchTmdb, getTmdbFilmDetails, uploadImage, getRandomTmdbFilm } from '../api'
 import { BackdropPicker } from './BackdropPicker'
 
 function resolvePreviewUrl(url: string): string {
@@ -250,7 +250,21 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [showBackdrops, setShowBackdrops] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [randomLoading, setRandomLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  async function handleRandom() {
+    setRandomLoading(true)
+    setError(null)
+    try {
+      const details = await getRandomTmdbFilm()
+      setForm({ ...details, is_active: form.is_active })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la récupération aléatoire')
+    } finally {
+      setRandomLoading(false)
+    }
+  }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -296,13 +310,25 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
 
       {/* TMDB search (only shown for new films) */}
       {!initial?.id && (
-        <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-100">
+        <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-100 space-y-2">
           <TmdbSearch onSelect={handleTmdbFill} />
+          <button
+            type="button"
+            onClick={handleRandom}
+            disabled={randomLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 bg-white rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
+          >
+            {randomLoading
+              ? <Loader2 size={13} className="animate-spin" />
+              : <Shuffle size={13} />
+            }
+            Film aléatoire
+          </button>
         </div>
       )}
 
       {/* Row: title + year */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 sm:grid-cols-3 gap-4">
         <div className="col-span-2">
           <Field label="Titre" id="title" required value={form.title} onChange={(v) => setField('title', v)} placeholder="Ex: Inception" />
         </div>
@@ -320,10 +346,8 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
 
       {/* Image URL + preview */}
       <div>
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <Field label="URL de l'image" id="image_url" required value={form.image_url} onChange={(v) => setField('image_url', v)} placeholder="https://..." />
-          </div>
+        <Field label="URL de l'image" id="image_url" required value={form.image_url} onChange={(v) => setField('image_url', v)} placeholder="https://..." />
+        <div className="flex gap-2 mt-2">
           <input
             ref={fileInputRef}
             type="file"

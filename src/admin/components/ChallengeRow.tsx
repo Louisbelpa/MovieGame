@@ -5,7 +5,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { RefreshCw, Trash2, Plus, Clapperboard, Tv, ChevronDown, AlertTriangle, History } from 'lucide-react'
+import { RefreshCw, Trash2, Plus, Clapperboard, Tv, ChevronDown, AlertTriangle, History, Pencil } from 'lucide-react'
 import type { AdminChallenge, AdminFilm, AdminSeries, MediaRef } from '../api'
 
 interface ChallengeRowProps {
@@ -17,6 +17,7 @@ interface ChallengeRowProps {
   onSchedule: (date: string, ref: MediaRef) => Promise<void>
   onUpdate: (challengeId: number, ref: MediaRef) => Promise<void>
   onDelete: (challengeId: number) => Promise<void>
+  onEditMedia?: (media: AdminFilm | AdminSeries, type: 'film' | 'series') => void
 }
 
 function formatDateShort(iso: string) {
@@ -84,7 +85,7 @@ function MediaPicker({ films, seriesList, mediaType, onSelect, onCancel, loading
   }
 
   return (
-    <div className="mt-2 bg-white border border-gray-200 rounded-xl shadow-lg p-3 space-y-2 w-80">
+    <div className="mt-2 bg-white border border-gray-200 rounded-xl shadow-lg p-3 space-y-2 w-full sm:w-80">
       {/* Tabs — hidden when mediaType is locked */}
       {!mediaType && (
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
@@ -227,6 +228,7 @@ export function ChallengeRow({
   onSchedule,
   onUpdate,
   onDelete,
+  onEditMedia,
 }: ChallengeRowProps) {
   const [picking, setPicking] = useState(false)
   const [mutating, setMutating] = useState(false)
@@ -332,30 +334,41 @@ export function ChallengeRow({
             })()}
 
             {/* Actions */}
-            {!past && (
-              <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
+            <div className="flex items-center gap-1 ml-auto flex-shrink-0">
+              {onEditMedia && (
                 <button
-                  onClick={() => setPicking((p) => !p)}
-                  title="Changer le contenu"
-                  disabled={mutating}
-                  className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-40"
+                  onClick={() => onEditMedia(media, isSeries ? 'series' : 'film')}
+                  title="Modifier la fiche"
+                  className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                 >
-                  <RefreshCw size={14} />
+                  <Pencil size={15} />
                 </button>
-                <button
-                  onClick={handleDelete}
-                  title="Supprimer"
-                  disabled={mutating}
-                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"
-                >
-                  {mutating ? (
-                    <span className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin block" />
-                  ) : (
-                    <Trash2 size={14} />
-                  )}
-                </button>
-              </div>
-            )}
+              )}
+              {!past && (
+                <>
+                  <button
+                    onClick={() => setPicking((p) => !p)}
+                    title="Changer le contenu"
+                    disabled={mutating}
+                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-40"
+                  >
+                    <RefreshCw size={15} />
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    title="Supprimer"
+                    disabled={mutating}
+                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"
+                  >
+                    {mutating ? (
+                      <span className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin block" />
+                    ) : (
+                      <Trash2 size={15} />
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
           </>
         ) : (
           <>
@@ -377,7 +390,7 @@ export function ChallengeRow({
 
       {/* Media picker dropdown */}
       {picking && !past && (
-        <div className="ml-[7.5rem]">
+        <div className="ml-0 sm:ml-[7.5rem]">
           <MediaPicker
             films={films}
             seriesList={seriesList}

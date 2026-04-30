@@ -406,71 +406,131 @@ adminRouter.get(
     try {
       const today = getTodayUTC();
 
-      const todayRow = db
+      // Today's challenges (one per type)
+      const todayFilmRow = db
         .prepare<[string], ChallengeRow>(
-          `SELECT dc.* FROM daily_challenges dc WHERE dc.challenge_date = ?`
+          `SELECT dc.* FROM daily_challenges dc WHERE dc.challenge_date = ? AND dc.media_type = 'film'`
+        )
+        .get(today);
+      const todaySeriesRow = db
+        .prepare<[string], ChallengeRow>(
+          `SELECT dc.* FROM daily_challenges dc WHERE dc.challenge_date = ? AND dc.media_type = 'series'`
         )
         .get(today);
 
-      const upcomingRows = db
+      // Upcoming challenges (7 next per type)
+      const upcomingFilmRows = db
         .prepare<[string], ChallengeRow>(
           `SELECT dc.* FROM daily_challenges dc
-           WHERE dc.challenge_date > ?
-           ORDER BY dc.challenge_date ASC
-           LIMIT 7`
+           WHERE dc.challenge_date > ? AND dc.media_type = 'film'
+           ORDER BY dc.challenge_date ASC LIMIT 7`
+        )
+        .all(today);
+      const upcomingSeriesRows = db
+        .prepare<[string], ChallengeRow>(
+          `SELECT dc.* FROM daily_challenges dc
+           WHERE dc.challenge_date > ? AND dc.media_type = 'series'
+           ORDER BY dc.challenge_date ASC LIMIT 7`
         )
         .all(today);
 
+      // Film stats
       const totalFilms = (
         db.prepare(`SELECT COUNT(*) as c FROM films WHERE is_active = 1`).get() as { c: number }
       ).c;
       const unusedFilms = (
         db.prepare(`SELECT COUNT(*) as c FROM films f WHERE is_active = 1 AND NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.film_id = f.id)`).get() as { c: number }
       ).c;
-      const totalChallenges = (
-        db.prepare(`SELECT COUNT(*) as c FROM daily_challenges`).get() as { c: number }
+      const totalFilmChallenges = (
+        db.prepare(`SELECT COUNT(*) as c FROM daily_challenges WHERE media_type = 'film'`).get() as { c: number }
       ).c;
-      // Unscheduled days in the next 30 days
+
+      // Series stats
+      const totalSeries = (
+        db.prepare(`SELECT COUNT(*) as c FROM series WHERE is_active = 1`).get() as { c: number }
+      ).c;
+      const unusedSeries = (
+        db.prepare(`SELECT COUNT(*) as c FROM series s WHERE is_active = 1 AND NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.series_id = s.id)`).get() as { c: number }
+      ).c;
+      const totalSeriesChallenges = (
+        db.prepare(`SELECT COUNT(*) as c FROM daily_challenges WHERE media_type = 'series'`).get() as { c: number }
+      ).c;
+
+      // Unscheduled days per type in next 30 days
       const next30 = Array.from({ length: 30 }, (_, i) => {
         const d = new Date(); d.setUTCDate(d.getUTCDate() + i + 1);
         return d.toISOString().slice(0, 10);
       });
-      const scheduledDates = new Set(
-        (db.prepare(`SELECT challenge_date FROM daily_challenges WHERE challenge_date > ? AND challenge_date <= ?`)
-          .all(today, next30[next30.length - 1]) as { challenge_date: string }[])
-          .map((r) => r.challenge_date)
+      const lastDay = next30[next30.length - 1];
+      const scheduledFilmDates = new Set(
+        (db.prepare(`SELECT challenge_date FROM daily_challenges WHERE media_type = 'film' AND challenge_date > ? AND challenge_date <= ?`)
+          .all(today, lastDay) as { challenge_date: string }[]).map((r) => r.challenge_date)
       );
-      const unscheduledNext30 = next30.filter((d) => !scheduledDates.has(d)).length;
+      const scheduledSeriesDates = new Set(
+        (db.prepare(`SELECT challenge_date FROM daily_challenges WHERE media_type = 'series' AND challenge_date > ? AND challenge_date <= ?`)
+          .all(today, lastDay) as { challenge_date: string }[]).map((r) => r.challenge_date)
+      );
+      const unscheduledFilmNext30 = next30.filter((d) => !scheduledFilmDates.has(d)).length;
+      const unscheduledSeriesNext30 = next30.filter((d) => !scheduledSeriesDates.has(d)).length;
 
-      const globalRow = db.prepare(`SELECT * FROM global_stats WHERE id = 1`).get() as {
-        total_games: number; total_wins: number;
-      };
-      const successRate = globalRow.total_games > 0
-        ? Math.round((globalRow.total_wins / globalRow.total_games) * 100)
-        : 0;
-
-      // Today's game activity
-      let todayGames = 0; let todayWins = 0;
-      if (todayRow) {
-        const todayStats = db.prepare<[number], { total: number; wins: number }>(
-          `SELECT COUNT(*) as total, SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) as wins
-           FROM game_sessions WHERE challenge_id = ?`
-        ).get(todayRow.id) as { total: number; wins: number } | undefined;
-        todayGames = todayStats?.total ?? 0;
-        todayWins = todayStats?.wins ?? 0;
+      // Per-type global success rates (computed live via JOIN — global_stats is mixed)
+      function getTypeSuccessRate(mediaType: 'film' | 'series') {
+        const row = db.prepare<[string], { total: number; wins: number }>(
+          `SELECT COUNT(*) as total,
+                  SUM(CASE WHEN gs.outcome = 'won' THEN 1 ELSE 0 END) as wins
+           FROM game_sessions gs
+           JOIN daily_challenges dc ON dc.id = gs.challenge_id
+           WHERE gs.outcome IS NOT NULL AND dc.media_type = ?`
+        ).get(mediaType) as { total: number; wins: number } | undefined;
+        const total = row?.total ?? 0;
+        const wins = row?.wins ?? 0;
+        return { total, wins, rate: total > 0 ? Math.round((wins / total) * 100) : null };
       }
+      const filmSuccessStats = getTypeSuccessRate('film');
+      const seriesSuccessStats = getTypeSuccessRate('series');
+      const successRate = (() => {
+        const t = filmSuccessStats.total + seriesSuccessStats.total;
+        const w = filmSuccessStats.wins + seriesSuccessStats.wins;
+        return t > 0 ? Math.round((w / t) * 100) : null;
+      })();
+
+      // Today's game activity per type (with per-challenge success rate)
+      function getTodayActivity(row: ChallengeRow | undefined) {
+        if (!row) return { games: 0, wins: 0, rate: null as number | null };
+        const s = db.prepare<[number], { total: number; wins: number }>(
+          `SELECT COUNT(*) as total, SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) as wins
+           FROM game_sessions WHERE challenge_id = ? AND outcome IS NOT NULL`
+        ).get(row.id) as { total: number; wins: number } | undefined;
+        const total = s?.total ?? 0;
+        const wins = s?.wins ?? 0;
+        return { games: total, wins, rate: total > 0 ? Math.round((wins / total) * 100) : null };
+      }
+      const filmActivity = getTodayActivity(todayFilmRow);
+      const seriesActivity = getTodayActivity(todaySeriesRow);
 
       res.json({
-        today_challenge: todayRow ? formatChallenge(todayRow) : null,
-        upcoming_challenges: upcomingRows.map(formatChallenge),
+        today_film_challenge: todayFilmRow ? formatChallenge(todayFilmRow) : null,
+        today_series_challenge: todaySeriesRow ? formatChallenge(todaySeriesRow) : null,
+        upcoming_film_challenges: upcomingFilmRows.map(formatChallenge),
+        upcoming_series_challenges: upcomingSeriesRows.map(formatChallenge),
         stats: {
           total_films: totalFilms,
           unused_films: unusedFilms,
-          total_challenges: totalChallenges,
+          total_film_challenges: totalFilmChallenges,
+          unscheduled_film_next_30: unscheduledFilmNext30,
+          today_film_games: filmActivity.games,
+          today_film_wins: filmActivity.wins,
+          today_film_rate: filmActivity.rate,
+          film_success_rate: filmSuccessStats.rate,
+          total_series: totalSeries,
+          unused_series: unusedSeries,
+          total_series_challenges: totalSeriesChallenges,
+          unscheduled_series_next_30: unscheduledSeriesNext30,
+          today_series_games: seriesActivity.games,
+          today_series_wins: seriesActivity.wins,
+          today_series_rate: seriesActivity.rate,
+          series_success_rate: seriesSuccessStats.rate,
           success_rate: successRate,
-          today_games: todayGames,
-          today_wins: todayWins,
-          unscheduled_next_30: unscheduledNext30,
         },
       });
     } catch (err) {

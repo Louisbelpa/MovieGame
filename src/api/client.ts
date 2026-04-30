@@ -77,6 +77,7 @@ export interface ResultPayload {
   synopsis: string | null
   imageUrl: string
   tmdbId: number | null
+  mediaType?: 'movie' | 'series'
   attemptsUsed: number
   maxAttempts: number
   attempts: AttemptPayload[]

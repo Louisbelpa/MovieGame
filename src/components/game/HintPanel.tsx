@@ -5,7 +5,7 @@
  */
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { Calendar, Clapperboard, User, Users, FileText, Tag, Lock } from 'lucide-react'
+import { Calendar, Clapperboard, User, Users, FileText, Tag, Lock, Layers } from 'lucide-react'
 import type { HintPayload } from '@/api/client'
 
 interface HintPanelProps {
@@ -87,6 +87,8 @@ const HINT_META: Record<
   cast:     { icon: User,         label: 'Acteur principal' },
   tagline:  { icon: FileText,     label: 'Accroche' },
   synopsis: { icon: FileText,     label: 'Synopsis' },
+  seasons:  { icon: Layers,       label: 'Saisons' },
+  creator:  { icon: Clapperboard, label: 'Créateur' },
 }
 
 function resolveHint(hint: HintPayload): {

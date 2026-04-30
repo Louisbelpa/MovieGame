@@ -81,16 +81,28 @@ export interface AdminChallenge {
 }
 
 export interface AdminDashboard {
-  today_challenge: AdminChallenge | null
-  upcoming_challenges: AdminChallenge[]
+  today_film_challenge: AdminChallenge | null
+  today_series_challenge: AdminChallenge | null
+  upcoming_film_challenges: AdminChallenge[]
+  upcoming_series_challenges: AdminChallenge[]
   stats: {
     total_films: number
     unused_films: number
-    total_challenges: number
-    success_rate: number
-    today_games: number
-    today_wins: number
-    unscheduled_next_30: number
+    total_film_challenges: number
+    unscheduled_film_next_30: number
+    today_film_games: number
+    today_film_wins: number
+    today_film_rate: number | null
+    film_success_rate: number | null
+    total_series: number
+    unused_series: number
+    total_series_challenges: number
+    unscheduled_series_next_30: number
+    today_series_games: number
+    today_series_wins: number
+    today_series_rate: number | null
+    series_success_rate: number | null
+    success_rate: number | null
   }
 }
 

@@ -78,8 +78,7 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
       <motion.div
         key={shakeTrigger}
         className={cn(
-          'flex items-center gap-2 p-1 pl-3 rounded-xl film-border',
-          'focus-within:border-film-gold/60 transition-colors min-h-[52px]',
+          'guess-input-row flex items-center gap-2 p-1 pl-3 rounded-xl film-border transition-all min-h-[52px]',
           disabled && 'opacity-50'
         )}
         animate={shakeTrigger > 0 ? { x: [-8, 8, -5, 5, 0] } : {}}

@@ -5,9 +5,9 @@
  */
 
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react'
-import { X, Images, Search, Loader2, Upload } from 'lucide-react'
+import { X, Images, Search, Loader2, Upload, Shuffle } from 'lucide-react'
 import type { AdminSeries, SeriesPayload, TmdbTvSearchResult } from '../api'
-import { searchTmdbTv, getTmdbTvDetails, uploadImage } from '../api'
+import { searchTmdbTv, getTmdbTvDetails, uploadImage, getRandomTmdbSeries } from '../api'
 import { BackdropPicker } from './BackdropPicker'
 
 function resolvePreviewUrl(url: string): string {
@@ -254,7 +254,21 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [showBackdrops, setShowBackdrops] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [randomLoading, setRandomLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  async function handleRandom() {
+    setRandomLoading(true)
+    setError(null)
+    try {
+      const details = await getRandomTmdbSeries()
+      setForm({ ...details, is_active: form.is_active })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la récupération aléatoire')
+    } finally {
+      setRandomLoading(false)
+    }
+  }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -296,13 +310,25 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
     <form onSubmit={handleSubmit} className="space-y-4">
 
       {!initial?.id && (
-        <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-100">
+        <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-100 space-y-2">
           <TmdbTvSearch onSelect={handleTmdbFill} />
+          <button
+            type="button"
+            onClick={handleRandom}
+            disabled={randomLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 bg-white rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
+          >
+            {randomLoading
+              ? <Loader2 size={13} className="animate-spin" />
+              : <Shuffle size={13} />
+            }
+            Série aléatoire
+          </button>
         </div>
       )}
 
       <div className="grid grid-cols-3 gap-4">
-        <div className="col-span-2">
+        <div className="col-span-2 min-w-0">
           <Field label="Titre" id="title" required value={form.title} onChange={(v) => setField('title', v)} placeholder="Ex: Breaking Bad" />
         </div>
         <Field label="Année" id="year" required type="number" value={form.year} onChange={(v) => setField('year', parseInt(v, 10) || 0)} placeholder="2008" />
@@ -310,7 +336,7 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
 
       <Field label="Créateur" id="creator" required value={form.creator} onChange={(v) => setField('creator', v)} placeholder="Ex: Vince Gilligan" />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Réseau / Plateforme" id="network" value={form.network ?? ''} onChange={(v) => setField('network', v || null)} placeholder="Ex: Netflix, HBO…" />
         <div>
           <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">Statut</label>
@@ -327,7 +353,7 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Nombre de saisons" id="number_of_seasons" type="number" value={form.number_of_seasons ?? ''} onChange={(v) => setField('number_of_seasons', v ? parseInt(v, 10) : null)} placeholder="Ex: 5" />
         <Field label="Langue originale" id="original_language" value={form.original_language ?? ''} onChange={(v) => setField('original_language', v || null)} placeholder="Ex: en, fr, ko…" />
       </div>
@@ -341,10 +367,8 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
 
       {/* Image URL + preview */}
       <div>
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <Field label="URL de l'image" id="image_url" required value={form.image_url} onChange={(v) => setField('image_url', v)} placeholder="https://..." />
-          </div>
+        <Field label="URL de l'image" id="image_url" required value={form.image_url} onChange={(v) => setField('image_url', v)} placeholder="https://..." />
+        <div className="flex gap-2 mt-2">
           <input
             ref={fileInputRef}
             type="file"

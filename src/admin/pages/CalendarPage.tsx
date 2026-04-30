@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { ChevronUp, ChevronDown, Sparkles, Film, Tv } from 'lucide-react'
+import { ChevronUp, ChevronDown, Sparkles, Film, Tv, X } from 'lucide-react'
 import {
   getChallenges,
   getFilms,
@@ -12,13 +12,38 @@ import {
   scheduleChallenge,
   updateChallenge,
   deleteChallenge,
+  updateFilm,
+  updateSeries,
   type AdminChallenge,
   type AdminFilm,
   type AdminSeries,
   type MediaRef,
+  type FilmPayload,
+  type SeriesPayload,
 } from '../api'
 import { AdminLayout } from '../components/AdminLayout'
 import { ChallengeRow } from '../components/ChallengeRow'
+import { FilmForm } from '../components/FilmForm'
+import { SeriesForm } from '../components/SeriesForm'
+
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-4 sm:my-8">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-900 truncate pr-4">{title}</h2>
+          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="px-4 sm:px-6 py-4 sm:py-5">{children}</div>
+      </div>
+    </div>
+  )
+}
 
 const FUTURE_DAYS = 30
 const PAST_DAYS = 7
@@ -44,6 +69,8 @@ export function CalendarPage() {
   const [showPast, setShowPast] = useState(false)
   const [autoLoading, setAutoLoading] = useState(false)
   const [autoSuccess, setAutoSuccess] = useState<string | null>(null)
+  const [editingFilm, setEditingFilm] = useState<AdminFilm | null>(null)
+  const [editingSeries, setEditingSeries] = useState<AdminSeries | null>(null)
 
   const from = showPast ? getISODate(-PAST_DAYS) : getISODate(0)
   const to = getISODate(FUTURE_DAYS - 1)
@@ -87,6 +114,25 @@ export function CalendarPage() {
 
   async function handleDelete(challengeId: number) {
     await deleteChallenge(challengeId)
+    load(from, to, mediaType)
+  }
+
+  function handleEditMedia(media: AdminFilm | AdminSeries, type: 'film' | 'series') {
+    if (type === 'series') setEditingSeries(media as AdminSeries)
+    else setEditingFilm(media as AdminFilm)
+  }
+
+  async function handleSaveFilm(payload: FilmPayload) {
+    if (!editingFilm) return
+    await updateFilm(editingFilm.id, payload)
+    setEditingFilm(null)
+    load(from, to, mediaType)
+  }
+
+  async function handleSaveSeries(payload: SeriesPayload) {
+    if (!editingSeries) return
+    await updateSeries(editingSeries.id, payload)
+    setEditingSeries(null)
     load(from, to, mediaType)
   }
 
@@ -138,7 +184,7 @@ export function CalendarPage() {
   return (
     <AdminLayout>
       {/* Media type tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4 w-fit">
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4 w-full sm:w-fit">
         <button
           onClick={() => setMediaType('film')}
           className={[
@@ -159,13 +205,13 @@ export function CalendarPage() {
         </button>
       </div>
 
-      <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <p className="text-sm text-gray-500">
           Planning des{' '}
           <span className="font-medium text-gray-800">{FUTURE_DAYS} prochains jours</span>{' '}
           — {mediaType === 'series' ? 'séries' : 'films'}.
         </p>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs text-gray-400">
             {plannedCount} / {FUTURE_DAYS} jours planifiés
           </span>
@@ -187,7 +233,7 @@ export function CalendarPage() {
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
           >
             {showPast ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-            {showPast ? 'Masquer le passé' : `${PAST_DAYS} jours passés`}
+            {showPast ? 'Masquer le passé' : `${PAST_DAYS} j. passés`}
           </button>
         </div>
       </div>
@@ -224,6 +270,7 @@ export function CalendarPage() {
                     onSchedule={handleSchedule}
                     onUpdate={handleUpdate}
                     onDelete={handleDelete}
+                    onEditMedia={handleEditMedia}
                   />
                 ))}
                 <li className="flex items-center gap-3 px-4 py-2 bg-indigo-50">
@@ -240,14 +287,35 @@ export function CalendarPage() {
                 challenge={byDate[date] ?? null}
                 films={films}
                 seriesList={seriesList}
+                mediaType={mediaType}
                 onSchedule={handleSchedule}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
+                onEditMedia={handleEditMedia}
               />
             ))}
           </ul>
         )}
       </div>
+      {editingFilm && (
+        <Modal title={`Modifier — ${editingFilm.title}`} onClose={() => setEditingFilm(null)}>
+          <FilmForm
+            initial={editingFilm}
+            onSubmit={handleSaveFilm}
+            onCancel={() => setEditingFilm(null)}
+          />
+        </Modal>
+      )}
+
+      {editingSeries && (
+        <Modal title={`Modifier — ${editingSeries.title}`} onClose={() => setEditingSeries(null)}>
+          <SeriesForm
+            initial={editingSeries}
+            onSubmit={handleSaveSeries}
+            onCancel={() => setEditingSeries(null)}
+          />
+        </Modal>
+      )}
     </AdminLayout>
   )
 }

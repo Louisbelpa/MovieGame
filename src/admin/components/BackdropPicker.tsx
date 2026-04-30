@@ -45,8 +45,8 @@ export function BackdropPicker({ filmId, tmdbId, seriesId, seriesTmdbId, onSelec
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl my-8 flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl my-4 sm:my-8 flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 shrink-0">
           <h2 className="text-base font-semibold text-gray-900">
             Choisir un backdrop TMDB
           </h2>
@@ -58,7 +58,7 @@ export function BackdropPicker({ filmId, tmdbId, seriesId, seriesTmdbId, onSelec
           </button>
         </div>
 
-        <div className="px-6 py-5 overflow-y-auto">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 overflow-y-auto">
           {loading && (
             <div className="flex items-center justify-center h-40">
               <span className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
@@ -78,7 +78,7 @@ export function BackdropPicker({ filmId, tmdbId, seriesId, seriesTmdbId, onSelec
           )}
 
           {!loading && !error && backdrops.length > 0 && (
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {backdrops.map((backdrop) => (
                 <button
                   key={backdrop.path}

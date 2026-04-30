@@ -85,7 +85,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen flex bg-gray-100">
+    <div className="min-h-screen flex bg-gray-100 text-gray-900">
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-56 flex-shrink-0 bg-gray-900 text-white flex-col">
         <NavContent />
