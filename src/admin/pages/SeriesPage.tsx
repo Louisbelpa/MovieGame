@@ -1,23 +1,23 @@
 /**
- * admin/pages/FilmsPage.tsx
- * Full CRUD for films: table + modal form.
+ * admin/pages/SeriesPage.tsx
+ * Full CRUD for TV series: table + modal form.
  */
 
 import { useEffect, useState, useCallback } from 'react'
 import { Plus, Search, X, Shuffle } from 'lucide-react'
 import {
-  getFilms,
-  createFilm,
-  updateFilm,
-  deleteFilm,
-  uploadFilmImage,
-  getRandomTmdbFilm,
-  type AdminFilm,
-  type FilmPayload,
+  getSeries,
+  createSeries,
+  updateSeries,
+  deleteSeries,
+  uploadSeriesImage,
+  getRandomTmdbSeries,
+  type AdminSeries,
+  type SeriesPayload,
 } from '../api'
 import { AdminLayout } from '../components/AdminLayout'
-import { FilmForm } from '../components/FilmForm'
-import { FilmRow } from '../components/FilmRow'
+import { SeriesForm } from '../components/SeriesForm'
+import { SeriesRow } from '../components/SeriesRow'
 import { BackdropPicker } from '../components/BackdropPicker'
 
 // ─── Simple modal wrapper ─────────────────────────────────────────────────────
@@ -55,21 +55,21 @@ function Modal({
 // ─── Confirm delete modal ─────────────────────────────────────────────────────
 
 function ConfirmDeleteModal({
-  film,
+  series,
   onConfirm,
   onCancel,
   loading,
 }: {
-  film: AdminFilm
+  series: AdminSeries
   onConfirm: () => void
   onCancel: () => void
   loading: boolean
 }) {
   return (
-    <Modal title="Supprimer le film" onClose={onCancel}>
+    <Modal title="Supprimer la série" onClose={onCancel}>
       <p className="text-sm text-gray-600 mb-6">
         Êtes-vous sûr de vouloir supprimer{' '}
-        <strong className="text-gray-900">« {film.title} »</strong> ? Cette
+        <strong className="text-gray-900">« {series.title} »</strong> ? Cette
         action est irréversible.
       </p>
       <div className="flex justify-end gap-3">
@@ -95,17 +95,17 @@ function ConfirmDeleteModal({
   )
 }
 
-// ─── FilmsPage ────────────────────────────────────────────────────────────────
+// ─── SeriesPage ───────────────────────────────────────────────────────────────
 
 type ModalState =
-  | { type: 'create'; initial?: Partial<AdminFilm> }
-  | { type: 'edit'; film: AdminFilm }
-  | { type: 'delete'; film: AdminFilm }
-  | { type: 'backdrops'; film: AdminFilm }
+  | { type: 'create'; initial?: SeriesPayload }
+  | { type: 'edit'; series: AdminSeries }
+  | { type: 'delete'; series: AdminSeries }
+  | { type: 'backdrops'; series: AdminSeries }
   | null
 
-export function FilmsPage() {
-  const [films, setFilms] = useState<AdminFilm[]>([])
+export function SeriesPage() {
+  const [seriesList, setSeriesList] = useState<AdminSeries[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -119,23 +119,10 @@ export function FilmsPage() {
     setTimeout(() => setSuccess(null), 3000)
   }
 
-  async function handleRandomFilm() {
-    setRandomLoading(true)
-    setError(null)
-    try {
-      const film = await getRandomTmdbFilm()
-      setModal({ type: 'create', initial: film as Partial<AdminFilm> })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur TMDB')
-    } finally {
-      setRandomLoading(false)
-    }
-  }
-
   const load = useCallback(() => {
     setLoading(true)
-    getFilms()
-      .then(setFilms)
+    getSeries()
+      .then(setSeriesList)
       .catch((err) => setError(err instanceof Error ? err.message : 'Erreur'))
       .finally(() => setLoading(false))
   }, [])
@@ -144,24 +131,36 @@ export function FilmsPage() {
     load()
   }, [load])
 
-  async function handleCreate(payload: FilmPayload) {
-    await createFilm(payload)
+  async function handleRandomSeries() {
+    setRandomLoading(true)
+    try {
+      const payload = await getRandomTmdbSeries()
+      setModal({ type: 'create', initial: payload })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur TMDB')
+    } finally {
+      setRandomLoading(false)
+    }
+  }
+
+  async function handleCreate(payload: SeriesPayload) {
+    await createSeries(payload)
     setModal(null)
     load()
   }
 
-  async function handleEdit(payload: FilmPayload) {
+  async function handleEdit(payload: SeriesPayload) {
     if (modal?.type !== 'edit') return
-    await updateFilm(modal.film.id, payload)
+    await updateSeries(modal.series.id, payload)
     setModal(null)
     load()
   }
 
   async function handleBackdropSelect(imageUrl: string) {
     if (modal?.type !== 'backdrops') return
-    const filmId = modal.film.id
+    const seriesId = modal.series.id
     try {
-      await updateFilm(filmId, { image_url: imageUrl })
+      await updateSeries(seriesId, { image_url: imageUrl })
       setModal(null)
       load()
       showSuccess('Image mise à jour')
@@ -170,9 +169,9 @@ export function FilmsPage() {
     }
   }
 
-  async function handleUpload(film: AdminFilm, file: File) {
+  async function handleUpload(series: AdminSeries, file: File) {
     try {
-      await uploadFilmImage(film.id, file)
+      await uploadSeriesImage(series.id, file)
       load()
       showSuccess('Image uploadée')
     } catch (err) {
@@ -184,7 +183,7 @@ export function FilmsPage() {
     if (modal?.type !== 'delete') return
     setDeleteLoading(true)
     try {
-      await deleteFilm(modal.film.id)
+      await deleteSeries(modal.series.id)
       setModal(null)
       load()
     } catch (err) {
@@ -194,32 +193,31 @@ export function FilmsPage() {
     }
   }
 
-  const filtered = films.filter(
-    (f) =>
+  const filtered = seriesList.filter(
+    (s) =>
       search.trim() === '' ||
-      f.title.toLowerCase().includes(search.toLowerCase()) ||
-      f.director.toLowerCase().includes(search.toLowerCase())
+      s.title.toLowerCase().includes(search.toLowerCase()) ||
+      s.creator.toLowerCase().includes(search.toLowerCase())
   )
 
   return (
     <AdminLayout>
       {/* Top bar */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
-        {/* Search */}
         <div className="relative flex-1 sm:max-w-xs">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher un film..."
-            className="pl-9 pr-3 py-2 text-sm text-gray-900 rounded-lg border border-gray-300 bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none w-full"
+            placeholder="Rechercher une série..."
+            className="pl-9 pr-3 py-2 text-sm rounded-lg border border-gray-300 bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none w-full"
           />
         </div>
 
         <div className="flex items-center gap-2 sm:ml-auto">
           <button
-            onClick={handleRandomFilm}
+            onClick={handleRandomSeries}
             disabled={randomLoading}
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors disabled:opacity-50"
           >
@@ -227,7 +225,7 @@ export function FilmsPage() {
               ? <span className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
               : <Shuffle size={15} />
             }
-            <span className="hidden sm:inline">Film aléatoire</span>
+            <span className="hidden sm:inline">Série aléatoire</span>
           </button>
           <button
             onClick={() => setModal({ type: 'create' })}
@@ -259,7 +257,7 @@ export function FilmsPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-gray-400 text-sm">
-            {search ? 'Aucun film trouvé pour cette recherche.' : 'Aucun film enregistré.'}
+            {search ? 'Aucune série trouvée pour cette recherche.' : 'Aucune série enregistrée.'}
           </div>
         ) : (
           <table className="w-full min-w-[400px]">
@@ -268,19 +266,19 @@ export function FilmsPage() {
                 <th className="px-3 py-3 w-20"></th>
                 <th className="px-3 py-3">Titre</th>
                 <th className="px-3 py-3 hidden sm:table-cell">Année</th>
-                <th className="px-3 py-3 hidden md:table-cell">Réalisateur</th>
+                <th className="px-3 py-3 hidden md:table-cell">Créateur</th>
                 <th className="px-3 py-3 hidden lg:table-cell">Statut</th>
                 <th className="px-3 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filtered.map((film) => (
-                <FilmRow
-                  key={film.id}
-                  film={film}
-                  onEdit={(f) => setModal({ type: 'edit', film: f })}
-                  onDelete={(f) => setModal({ type: 'delete', film: f })}
-                  onBackdrops={(f) => setModal({ type: 'backdrops', film: f })}
+              {filtered.map((series) => (
+                <SeriesRow
+                  key={series.id}
+                  series={series}
+                  onEdit={(s) => setModal({ type: 'edit', series: s })}
+                  onDelete={(s) => setModal({ type: 'delete', series: s })}
+                  onBackdrops={(s) => setModal({ type: 'backdrops', series: s })}
                   onUpload={handleUpload}
                 />
               ))}
@@ -290,14 +288,14 @@ export function FilmsPage() {
       </div>
 
       <p className="mt-2 text-xs text-gray-400">
-        {filtered.length} film{filtered.length !== 1 ? 's' : ''}
-        {search && ` sur ${films.length}`}
+        {filtered.length} série{filtered.length !== 1 ? 's' : ''}
+        {search && ` sur ${seriesList.length}`}
       </p>
 
       {/* Modals */}
       {modal?.type === 'create' && (
-        <Modal title="Ajouter un film" onClose={() => setModal(null)}>
-          <FilmForm
+        <Modal title="Ajouter une série" onClose={() => setModal(null)}>
+          <SeriesForm
             initial={modal.initial}
             onSubmit={handleCreate}
             onCancel={() => setModal(null)}
@@ -306,9 +304,9 @@ export function FilmsPage() {
       )}
 
       {modal?.type === 'edit' && (
-        <Modal title="Modifier le film" onClose={() => setModal(null)}>
-          <FilmForm
-            initial={modal.film}
+        <Modal title="Modifier la série" onClose={() => setModal(null)}>
+          <SeriesForm
+            initial={modal.series}
             onSubmit={handleEdit}
             onCancel={() => setModal(null)}
           />
@@ -317,7 +315,7 @@ export function FilmsPage() {
 
       {modal?.type === 'delete' && (
         <ConfirmDeleteModal
-          film={modal.film}
+          series={modal.series}
           onConfirm={handleDelete}
           onCancel={() => setModal(null)}
           loading={deleteLoading}
@@ -326,7 +324,7 @@ export function FilmsPage() {
 
       {modal?.type === 'backdrops' && (
         <BackdropPicker
-          filmId={modal.film.id}
+          seriesId={modal.series.id}
           onSelect={handleBackdropSelect}
           onClose={() => setModal(null)}
         />

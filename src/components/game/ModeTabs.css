@@ -1,0 +1,33 @@
+.mode-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  padding: 14px 16px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mode-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px 12px;
+  margin-bottom: -1px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #56566e;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.mode-tab:hover { color: #a09898; }
+
+.mode-tab.is-active {
+  color: var(--mode-color);
+  border-bottom-color: var(--mode-color);
+}
+
+/* Mobile : zone tactile ≥ 44px */
+@media (max-width: 640px) {
+  .mode-tab { padding: 11px 18px 13px; }
+}

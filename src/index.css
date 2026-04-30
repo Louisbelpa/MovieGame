@@ -1,5 +1,35 @@
 @import "tailwindcss";
 
+:root {
+  /* Mode films — bleu harmonisé (oklch L=0.66 C=0.14 h=245) */
+  --sg-films:       #4d8ee8;
+  --sg-films-hover: #5fa0f5;
+  --sg-films-soft:  rgba(77, 142, 232, 0.14);
+  --sg-films-ring:  rgba(77, 142, 232, 0.32);
+
+  /* Mode séries — émeraude harmonisé (oklch L=0.66 C=0.14 h=165) */
+  --sg-series:       #1eb088;
+  --sg-series-hover: #2dc89b;
+  --sg-series-soft:  rgba(30, 176, 136, 0.14);
+  --sg-series-ring:  rgba(30, 176, 136, 0.32);
+
+  /* Couleur "à jouer" dans le calendrier — doré, indépendant du mode */
+  --sg-todo:      #d4a64a;
+  --sg-todo-soft: rgba(212, 166, 74, 0.18);
+  --sg-todo-ring: rgba(212, 166, 74, 0.40);
+
+  /* Token de mode — résolu par data-mode sur l'ancêtre */
+  --mode-color: var(--sg-films);
+  --mode-soft:  var(--sg-films-soft);
+  --mode-ring:  var(--sg-films-ring);
+}
+
+[data-mode="series"] {
+  --mode-color: var(--sg-series);
+  --mode-soft:  var(--sg-series-soft);
+  --mode-ring:  var(--sg-series-ring);
+}
+
 @theme {
   --color-film-black: #16161f;
   --color-film-dark: #20202e;
@@ -55,6 +85,16 @@
   ::-webkit-scrollbar-thumb {
     background: var(--color-film-muted);
     border-radius: 3px;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
   }
 }
 
@@ -112,4 +152,18 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+.guess-input-row:focus-within {
+  border-color: var(--mode-ring);
+  box-shadow: 0 0 0 3px var(--mode-soft);
+}
+
+.btn-mode-primary {
+  background: var(--mode-color);
+  color: white;
+  font-weight: 600;
+}
+.btn-mode-primary:hover {
+  filter: brightness(1.1);
 }

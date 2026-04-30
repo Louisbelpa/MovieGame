@@ -13,6 +13,7 @@ import { GuessInput } from './GuessInput'
 import { GuessList } from './GuessList'
 import { HintPanel } from './HintPanel'
 import { AttemptTracker } from './AttemptTracker'
+import { ModeTabs } from './ModeTabs'
 import { Spinner } from '@/components/ui/Spinner'
 import { useGameStore, selectAttemptsLeft, selectCurrentHints, selectIsGameOver, getTodayParis } from '@/store/gameStore'
 
@@ -108,6 +109,7 @@ export function GamePage() {
   const skipAttempt = useGameStore((s) => s.skipAttempt)
 
   const challenge = useGameStore((s) => s.challenge)
+  const result = useGameStore((s) => s.result)
   const guesses = useGameStore((s) => s.guesses)
   const status = useGameStore((s) => s.status)
   const hintsRevealed = useGameStore((s) => s.hintsRevealed)
@@ -186,8 +188,11 @@ export function GamePage() {
           exit={{ opacity: 0, x: -slideX }}
           transition={{ duration: 0.2, ease: 'easeInOut' }}
         >
+
           {/* Date navigation */}
           <DateNavBar directionRef={directionRef} />
+          {/* Mode selector */}
+          <ModeTabs />
 
           {/* Movie image */}
           <section>
@@ -232,13 +237,18 @@ export function GamePage() {
                       : '?'}/${challenge.maxAttempts}`
                   : 'Pas cette fois…'}
               </span>
+              {result?.title && (
+                <span className="text-xs font-medium text-film-text-dim truncate max-w-[45%] text-center">
+                  {result.title} {result.year ? `(${result.year})` : ''}
+                </span>
+              )}
               <button
                 onClick={() => openModal(status === 'won' ? 'win' : 'lose')}
                 className="flex items-center gap-1.5 text-xs font-medium opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
-                title="Revoir et partager"
+                title="Voir les détails du défi"
               >
                 <Share2 size={13} />
-                Partager
+                Voir le résultat
               </button>
             </div>
           )}

@@ -6,6 +6,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { challengeRouter } from './routes/challenge.js';
 import { filmsRouter } from './routes/films.js';
+import { seriesRouter } from './routes/series.js';
 import { statsRouter } from './routes/stats.js';
 import { adminRouter } from './routes/admin.js';
 import { sessionMiddleware } from './middleware/session.js';
@@ -89,7 +90,10 @@ app.use(sessionMiddleware);
 
 // ─── Global rate limiter (generous) ──────────────────────────────────────────
 // Tighter per-route limits are applied in the route files themselves.
-app.use('/api', createRateLimiter({ max: 300, windowMs: 60_000 }));
+app.use('/api', createRateLimiter({
+  max: parseInt(process.env.API_RATE_LIMIT_MAX ?? '600', 10),
+  windowMs: parseInt(process.env.API_RATE_LIMIT_WINDOW_MS ?? '60000', 10),
+}));
 
 // ─── Static files (uploaded images) ──────────────────────────────────────────
 
@@ -99,6 +103,7 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 app.use('/api/challenge', challengeRouter);
 app.use('/api/films', filmsRouter);
+app.use('/api/series', seriesRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/admin', adminRouter);
 

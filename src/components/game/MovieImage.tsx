@@ -16,10 +16,14 @@ export function MovieImage({ imageUrl, attempt, className }: MovieImageProps) {
   return (
     <div
       className={cn(
-        'relative w-full overflow-hidden rounded-xl film-border aspect-video bg-film-gray',
+        'relative w-full overflow-hidden rounded-xl aspect-video bg-film-gray',
         'max-h-[42vh] sm:max-h-none',
         className
       )}
+      style={{
+        border: '1px solid var(--mode-ring)',
+        boxShadow: '0 0 0 4px var(--mode-soft)',
+      }}
       aria-label={`Image du film, tentative ${attempt}`}
     >
       {imageUrl ? (

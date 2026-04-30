@@ -6,13 +6,15 @@
 
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
-import { getFilmBackdrops, getBackdropsByTmdbId, type TmdbBackdrop } from '../api'
+import { getFilmBackdrops, getBackdropsByTmdbId, getSeriesBackdrops, getSeriesBackdropsByTmdbId, type TmdbBackdrop } from '../api'
 
 type BackdropPickerProps =
-  | { filmId: number; tmdbId?: never; onSelect: (imageUrl: string) => void; onClose: () => void }
-  | { tmdbId: number; filmId?: never; onSelect: (imageUrl: string) => void; onClose: () => void }
+  | { filmId: number; tmdbId?: never; seriesId?: never; seriesTmdbId?: never; onSelect: (imageUrl: string) => void; onClose: () => void }
+  | { tmdbId: number; filmId?: never; seriesId?: never; seriesTmdbId?: never; onSelect: (imageUrl: string) => void; onClose: () => void }
+  | { seriesId: number; filmId?: never; tmdbId?: never; seriesTmdbId?: never; onSelect: (imageUrl: string) => void; onClose: () => void }
+  | { seriesTmdbId: number; filmId?: never; tmdbId?: never; seriesId?: never; onSelect: (imageUrl: string) => void; onClose: () => void }
 
-export function BackdropPicker({ filmId, tmdbId, onSelect, onClose }: BackdropPickerProps) {
+export function BackdropPicker({ filmId, tmdbId, seriesId, seriesTmdbId, onSelect, onClose }: BackdropPickerProps) {
   const [backdrops, setBackdrops] = useState<TmdbBackdrop[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -20,9 +22,11 @@ export function BackdropPicker({ filmId, tmdbId, onSelect, onClose }: BackdropPi
   useEffect(() => {
     setLoading(true)
     setError(null)
-    const fetch = filmId !== undefined
-      ? getFilmBackdrops(filmId)
-      : getBackdropsByTmdbId(tmdbId!)
+    let fetch: Promise<TmdbBackdrop[]>
+    if (filmId !== undefined) fetch = getFilmBackdrops(filmId)
+    else if (tmdbId !== undefined) fetch = getBackdropsByTmdbId(tmdbId)
+    else if (seriesId !== undefined) fetch = getSeriesBackdrops(seriesId)
+    else fetch = getSeriesBackdropsByTmdbId(seriesTmdbId!)
     fetch
       .then(setBackdrops)
       .catch((err: unknown) =>
@@ -41,8 +45,8 @@ export function BackdropPicker({ filmId, tmdbId, onSelect, onClose }: BackdropPi
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl my-8 flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl my-4 sm:my-8 flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 shrink-0">
           <h2 className="text-base font-semibold text-gray-900">
             Choisir un backdrop TMDB
           </h2>
@@ -54,7 +58,7 @@ export function BackdropPicker({ filmId, tmdbId, onSelect, onClose }: BackdropPi
           </button>
         </div>
 
-        <div className="px-6 py-5 overflow-y-auto">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 overflow-y-auto">
           {loading && (
             <div className="flex items-center justify-center h-40">
               <span className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
@@ -74,7 +78,7 @@ export function BackdropPicker({ filmId, tmdbId, onSelect, onClose }: BackdropPi
           )}
 
           {!loading && !error && backdrops.length > 0 && (
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {backdrops.map((backdrop) => (
                 <button
                   key={backdrop.path}

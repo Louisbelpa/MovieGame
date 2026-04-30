@@ -26,7 +26,8 @@ challengeRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sessionToken = res.locals.sessionToken as string;
-      const challenge = getTodayChallenge();
+      const type = (req.query.type === 'series' ? 'series' : 'film') as 'film' | 'series';
+      const challenge = getTodayChallenge(type);
       const session = getOrCreateSession(sessionToken, challenge.id);
       const payload = buildChallengePayload(challenge, session);
       res.json(payload);
@@ -58,7 +59,8 @@ challengeRouter.get(
       }
 
       const sessionToken = res.locals.sessionToken as string;
-      const challenge = getChallengeByDate(date);
+      const type = (req.query.type === 'series' ? 'series' : 'film') as 'film' | 'series';
+      const challenge = getChallengeByDate(date, type);
       const session = getOrCreateSession(sessionToken, challenge.id);
       const payload = buildChallengePayload(challenge, session);
       res.json(payload);
@@ -147,18 +149,19 @@ challengeRouter.get(
   (req: Request, res: Response, next: NextFunction) => {
     try {
       const days = Math.min(Math.max(1, parseInt((req.query.days as string) ?? '90', 10)), 365)
+      const type = (req.query.type === 'series' ? 'series' : 'film') as 'film' | 'series'
       const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
       const from = new Date(todayParis + 'T12:00:00Z')
       from.setUTCDate(from.getUTCDate() - days)
       const fromStr = from.toISOString().slice(0, 10)
 
       const rows = db
-        .prepare<[string, string], { challenge_date: string }>(
+        .prepare<[string, string, string], { challenge_date: string }>(
           `SELECT challenge_date FROM daily_challenges
-           WHERE challenge_date >= ? AND challenge_date <= ?
+           WHERE challenge_date >= ? AND challenge_date <= ? AND media_type = ?
            ORDER BY challenge_date DESC`
         )
-        .all(fromStr, todayParis)
+        .all(fromStr, todayParis, type)
 
       res.json({ dates: rows.map((r) => r.challenge_date) })
     } catch (err) {
@@ -193,17 +196,19 @@ challengeRouter.get(
 
       const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
 
+      const type = (req.query.type === 'series' ? 'series' : 'film') as 'film' | 'series';
+
       const row = direction === 'prev'
-        ? db.prepare<[string, string], { challenge_date: string }>(
+        ? db.prepare<[string, string, string], { challenge_date: string }>(
             `SELECT challenge_date FROM daily_challenges
-             WHERE challenge_date < ? AND challenge_date <= ?
+             WHERE challenge_date < ? AND challenge_date <= ? AND media_type = ?
              ORDER BY challenge_date DESC LIMIT 1`
-          ).get(date, todayParis)
-        : db.prepare<[string, string], { challenge_date: string }>(
+          ).get(date, todayParis, type)
+        : db.prepare<[string, string, string], { challenge_date: string }>(
             `SELECT challenge_date FROM daily_challenges
-             WHERE challenge_date > ? AND challenge_date <= ?
+             WHERE challenge_date > ? AND challenge_date <= ? AND media_type = ?
              ORDER BY challenge_date ASC LIMIT 1`
-          ).get(date, todayParis);
+          ).get(date, todayParis, type);
 
       if (!row) {
         res.status(404).json({ error: 'No adjacent challenge found.' });

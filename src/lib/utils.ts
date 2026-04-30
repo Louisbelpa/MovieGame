@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import type { GameStats, GuessEntry, PersistedGameState } from '@/types'
+import { BRAND_NAME, PUBLIC_SITE_URL } from '@/config/features'
 
 /** Merge Tailwind classes safely */
 export function cn(...inputs: ClassValue[]) {
@@ -50,11 +51,11 @@ export function buildShareText(
   const grid = buildShareGrid(guesses)
   const max = maxAttempts ?? guesses.length
   const score = won ? `${guesses.length}/${max}` : `X/${max}`
-  const url = 'https://cineguessr.fr'
+  const url = PUBLIC_SITE_URL
   const dateFr = new Date(challengeId + 'T12:00:00Z').toLocaleDateString('fr-FR', {
     day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
   })
-  const header = challengeNumber ? `CinéGuessr #${challengeNumber} – ${dateFr}` : `CinéGuessr – ${dateFr}`
+  const header = challengeNumber ? `${BRAND_NAME} #${challengeNumber} – ${dateFr}` : `${BRAND_NAME} – ${dateFr}`
   return `${header}\n${score} ${grid}\n\n${url}`
 }
 

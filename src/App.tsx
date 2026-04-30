@@ -4,6 +4,7 @@
  */
 
 import { useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { GamePage } from '@/components/game/GamePage'
@@ -13,22 +14,25 @@ import { StatsModal } from '@/components/modals/StatsModal'
 import { RulesModal } from '@/components/modals/RulesModal'
 import { ArchiveModal } from '@/components/modals/ArchiveModal'
 import { useGameStore } from '@/store/gameStore'
+import { BRAND_NAME } from '@/config/features'
 
 const RULES_SEEN_KEY = 'cineguess:rules_seen'
 
 function useDynamicTitle() {
   const challengeNumber = useGameStore((s) => s.challenge?.challengeNumber ?? null)
   const viewingDate = useGameStore((s) => s.viewingDate)
+  const gameType = useGameStore((s) => s.gameType)
 
   useEffect(() => {
+    const media = gameType === 'series' ? 'la série' : 'le film'
     if (challengeNumber) {
       document.title = viewingDate
-        ? `CinéGuessr #${challengeNumber} — Ancien défi`
-        : `CinéGuessr #${challengeNumber} — Devine le film du jour`
+        ? `${BRAND_NAME} #${challengeNumber} — Ancien défi`
+        : `${BRAND_NAME} #${challengeNumber} — Devine ${media} du jour`
     } else {
-      document.title = 'CinéGuessr — Devine le film du jour'
+      document.title = `${BRAND_NAME} — Devine ${media} du jour`
     }
-  }, [challengeNumber, viewingDate])
+  }, [challengeNumber, viewingDate, gameType])
 }
 
 function useFirstVisit() {
@@ -43,12 +47,30 @@ function useFirstVisit() {
   }, [openModal]) // no `status` dependency – runs once on mount
 }
 
-export default function App() {
+export default function App({ gameType = 'film' }: { gameType?: 'film' | 'series' }) {
+  void gameType // type is initialized from URL in the store; prop is accepted for main.tsx clarity
   useFirstVisit()
   useDynamicTitle()
 
+  // Synchronise le mode de jeu avec l'URL
+  const location = useLocation()
+  const setGameType = useGameStore((s) => s.setGameType)
+  const currentGameType = useGameStore((s) => s.gameType)
+  const initGame = useGameStore((s) => s.initGame)
+  useEffect(() => {
+    if (location.pathname.startsWith('/series')) setGameType('series')
+    else setGameType('film')
+  }, [location.pathname, setGameType])
+
+  // Recharge le challenge quand le mode change
+  useEffect(() => {
+    initGame()
+  }, [currentGameType, initGame])
+
+  const mode = currentGameType === 'series' ? 'series' : 'films'
+
   return (
-    <div className="min-h-dvh flex flex-col bg-film-black text-film-text">
+    <div className="min-h-dvh flex flex-col bg-film-black text-film-text" data-mode={mode}>
       <Header />
 
       <div className="flex-1">
@@ -63,5 +85,5 @@ export default function App() {
       <RulesModal />
       <ArchiveModal />
     </div>
-  )
+  );
 }
