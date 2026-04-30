@@ -23,7 +23,7 @@ export function HomePage() {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'radial-gradient(clamp(30rem, 48vw, 56rem) clamp(20rem, 34vw, 38rem) at 8% -6%, rgba(245, 197, 66, 0.18), transparent 62%), radial-gradient(clamp(28rem, 46vw, 54rem) clamp(18rem, 32vw, 36rem) at 92% 78%, rgba(245, 197, 66, 0.16), transparent 64%)',
+            'radial-gradient(clamp(30rem, 48vw, 56rem) clamp(20rem, 34vw, 38rem) at 10% 6%, rgba(245, 197, 66, 0.18), transparent 62%), radial-gradient(clamp(28rem, 46vw, 54rem) clamp(18rem, 32vw, 36rem) at 92% 78%, rgba(245, 197, 66, 0.16), transparent 64%)',
         }}
       />
 
