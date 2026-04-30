@@ -8,6 +8,8 @@
 # ── Stage 1: Build frontend ────────────────────────────────────────────────────
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
+ARG VITE_ENABLE_SERIES=false
+ENV VITE_ENABLE_SERIES=$VITE_ENABLE_SERIES
 
 COPY package*.json ./
 RUN npm ci

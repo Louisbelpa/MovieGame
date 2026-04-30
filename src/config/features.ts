@@ -4,7 +4,7 @@ function envFlag(value: string | undefined, defaultValue: boolean): boolean {
 }
 
 export const FEATURES = {
-  enableSeries: envFlag(import.meta.env.VITE_ENABLE_SERIES, true),
+  enableSeries: envFlag(import.meta.env.VITE_ENABLE_SERIES, false),
 } as const
 
 export const BRAND_NAME = FEATURES.enableSeries ? 'GuessToday' : 'CinéGuessr'
