@@ -8,7 +8,7 @@ import db from '../db/database.js';
 
 const MAX_ATTEMPTS = parseInt(process.env.MAX_ATTEMPTS ?? '3', 10);
 const MAX_HINTS = 3;
-const VALID_HINTS = new Set(['year', 'director', 'genres', 'cast', 'tagline', 'synopsis']);
+const VALID_HINTS = new Set(['year', 'director', 'creator', 'genres', 'cast', 'tagline', 'synopsis']);
 const IMAGE_SOURCE = process.env.IMAGE_SOURCE ?? 'tmdb';
 const TMDB_BASE = process.env.TMDB_IMAGE_BASE_URL ?? 'https://image.tmdb.org/t/p/w500';
 
@@ -29,10 +29,29 @@ interface FilmRow {
   tmdb_id: number | null;
 }
 
+interface SeriesRow {
+  id: number;
+  title: string;
+  title_aliases: string;
+  year: number;
+  creator: string;
+  genres: string;
+  cast_members: string;
+  tagline: string | null;
+  synopsis: string | null;
+  image_url: string;
+  image_blurred_url: string | null;
+  tmdb_id: number | null;
+  number_of_seasons: number | null;
+  network: string | null;
+  status: string | null;
+}
+
 interface ChallengeRow {
   id: number;
   challenge_date: string;
-  film_id: number;
+  film_id: number | null;
+  series_id: number | null;
   challenge_number: number;
   hint_schedule: string;
 }
@@ -205,39 +224,71 @@ export function getOrCreateSession(
 /**
  * Build the public-safe challenge payload.
  * Only reveals hints up to `session.hints_revealed`.
- * NEVER includes film.title in the response.
+ * NEVER includes the answer title in the response.
  */
 export function buildChallengePayload(
   challenge: ChallengeRow,
   session: SessionRow
 ) {
-  const film = db
-    .prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`)
-    .get(challenge.film_id)!;
+  const isSeries = challenge.series_id !== null;
+
+  let title_aliases: string;
+  let year: number;
+  let genres: string;
+  let cast_members: string;
+  let tagline: string | null;
+  let synopsis: string | null;
+  let image_url: string;
+  let directorOrCreator: string;
+
+  if (isSeries) {
+    const s = db
+      .prepare<[number], SeriesRow>(`SELECT * FROM series WHERE id = ?`)
+      .get(challenge.series_id!)!;
+    title_aliases = s.title_aliases;
+    year = s.year;
+    genres = s.genres;
+    cast_members = s.cast_members;
+    tagline = s.tagline;
+    synopsis = s.synopsis;
+    image_url = s.image_url;
+    directorOrCreator = s.creator;
+  } else {
+    const film = db
+      .prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`)
+      .get(challenge.film_id!)!;
+    title_aliases = film.title_aliases;
+    year = film.year;
+    genres = film.genres;
+    cast_members = film.cast_members;
+    tagline = film.tagline;
+    synopsis = film.synopsis;
+    image_url = film.image_url;
+    directorOrCreator = film.director;
+  }
 
   const schedule: string[] = (JSON.parse(challenge.hint_schedule) as string[]).filter(h => VALID_HINTS.has(h)).slice(0, MAX_HINTS);
   const hintsRevealed = Math.min(session.hints_revealed, MAX_HINTS);
   const attempts: AttemptEntry[] = JSON.parse(session.attempts);
 
-  // Build revealed hints array – one object per unlocked hint
   const hints = schedule.slice(0, hintsRevealed).map((type) => {
     switch (type) {
-      case 'year':     return { type, value: film.year };
-      case 'director': return { type, value: film.director };
-      case 'genres':   return { type, value: JSON.parse(film.genres) as string[] };
+      case 'year':     return { type, value: year };
+      case 'director': return { type, value: directorOrCreator };
+      case 'creator':  return { type, value: directorOrCreator };
+      case 'genres':   return { type, value: JSON.parse(genres) as string[] };
       case 'cast': {
-        // Return only the first (main) actor
-        const cast = JSON.parse(film.cast_members) as string[];
+        const cast = JSON.parse(cast_members) as string[];
         return { type, value: cast.slice(0, 1) };
       }
-      case 'tagline':  return { type, value: film.tagline ?? '' };
-      case 'synopsis': return { type, value: film.synopsis ?? '' };
+      case 'tagline':  return { type, value: tagline ?? '' };
+      case 'synopsis': return { type, value: synopsis ?? '' };
       default:         return { type, value: null };
     }
   });
 
   const isGameOver = session.outcome !== null;
-  const imageUrl = resolveImageUrl(film.image_url);
+  const resolvedImageUrl = resolveImageUrl(image_url);
   const today = getTodayParis();
   const isPastChallenge = challenge.challenge_date < today;
 
@@ -246,7 +297,8 @@ export function buildChallengePayload(
     challengeNumber: challenge.challenge_number,
     date: challenge.challenge_date,
     isPastChallenge,
-    imageUrl,
+    mediaType: isSeries ? 'series' : 'film',
+    imageUrl: resolvedImageUrl,
     isGameOver,
     hintsAvailable: schedule.length,
     hintsRevealed: hintsRevealed,
@@ -254,7 +306,7 @@ export function buildChallengePayload(
     attemptsUsed: attempts.length,
     maxAttempts: MAX_ATTEMPTS,
     attempts: attempts.map((a) => ({ guess: a.guess, correct: a.correct })),
-    outcome: session.outcome,    // null | 'won' | 'lost'
+    outcome: session.outcome,
   };
 }
 
@@ -286,18 +338,27 @@ export function processGuess(
     throw Object.assign(new Error('No attempts remaining'), { status: 409 });
   }
 
-  // Fetch challenge then film (challengeId IS the challenge row id, not film id)
+  // Fetch challenge then film/series
   const challenge = db
     .prepare<[number], ChallengeRow>(`SELECT * FROM daily_challenges WHERE id = ?`)
     .get(challengeId)!;
 
-  const filmRow = db
-    .prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`)
-    .get(challenge.film_id)!;
+  let mediaTitle: string;
+  let mediaAliases: string;
+
+  if (challenge.series_id !== null) {
+    const s = db.prepare<[number], { title: string; title_aliases: string }>(`SELECT title, title_aliases FROM series WHERE id = ?`).get(challenge.series_id)!;
+    mediaTitle = s.title;
+    mediaAliases = s.title_aliases;
+  } else {
+    const f = db.prepare<[number], { title: string; title_aliases: string }>(`SELECT title, title_aliases FROM films WHERE id = ?`).get(challenge.film_id!)!;
+    mediaTitle = f.title;
+    mediaAliases = f.title_aliases;
+  }
 
   // Build accepted answers from title + aliases
-  const aliases: string[] = JSON.parse(filmRow.title_aliases);
-  const accepted = [filmRow.title, ...aliases].map(normalise);
+  const aliases: string[] = JSON.parse(mediaAliases);
+  const accepted = [mediaTitle, ...aliases].map(normalise);
   const correct = isGuessCorrect(rawGuess, accepted);
 
   // Append attempt
@@ -369,23 +430,57 @@ export function getResult(sessionToken: string, challengeId: number) {
     .prepare<[number], ChallengeRow>(`SELECT * FROM daily_challenges WHERE id = ?`)
     .get(challengeId)!;
 
+  const attempts: AttemptEntry[] = JSON.parse(session.attempts);
+
+  if (challenge.series_id !== null) {
+    const s = db
+      .prepare<[number], SeriesRow>(`SELECT * FROM series WHERE id = ?`)
+      .get(challenge.series_id)!;
+
+    return {
+      outcome: session.outcome,
+      mediaType: 'series',
+      title: s.title,
+      year: s.year,
+      director: null,
+      creator: s.creator,
+      genres: JSON.parse(s.genres),
+      cast: JSON.parse(s.cast_members),
+      tagline: s.tagline,
+      synopsis: s.synopsis,
+      imageUrl: resolveImageUrl(s.image_url),
+      tmdbId: s.tmdb_id,
+      number_of_seasons: s.number_of_seasons,
+      network: s.network,
+      status: s.status,
+      attemptsUsed: attempts.length,
+      maxAttempts: MAX_ATTEMPTS,
+      attempts: attempts.map((a) => ({ guess: a.guess, correct: a.correct })),
+      startedAt: session.started_at,
+      finishedAt: session.finished_at,
+    };
+  }
+
   const film = db
     .prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`)
-    .get(challenge.film_id)!;
-
-  const attempts: AttemptEntry[] = JSON.parse(session.attempts);
+    .get(challenge.film_id!)!;
 
   return {
     outcome: session.outcome,
+    mediaType: 'film',
     title: film.title,
     year: film.year,
     director: film.director,
+    creator: null,
     genres: JSON.parse(film.genres),
     cast: JSON.parse(film.cast_members),
     tagline: film.tagline,
     synopsis: film.synopsis,
     imageUrl: resolveImageUrl(film.image_url),
     tmdbId: film.tmdb_id,
+    number_of_seasons: null,
+    network: null,
+    status: null,
     attemptsUsed: attempts.length,
     maxAttempts: MAX_ATTEMPTS,
     attempts: attempts.map((a) => ({ guess: a.guess, correct: a.correct })),
@@ -421,7 +516,7 @@ export function getGlobalStats() {
   };
 }
 
-/** Autocomplete search – returns titles only, never exposes today's answer */
+/** Autocomplete search for films – returns titles only, never exposes today's answer */
 export function searchFilms(query: string, limit = 10, excludeChallengeId?: number) {
   if (!query || query.trim().length < 2) return [];
 
@@ -440,17 +535,47 @@ export function searchFilms(query: string, limit = 10, excludeChallengeId?: numb
        ORDER BY title ASC
        LIMIT ?`
     )
-    .all(`%${normalise(query)}%`, limit + 1); // fetch one extra to exclude today if needed
+    .all(`%${normalise(query)}%`, limit + 1);
 
-  // Filter out today's challenge film and any override challenge from autocomplete
   const excludeIds = new Set<number>();
-  if (todayChallenge) excludeIds.add(todayChallenge.film_id);
+  if (todayChallenge?.film_id) excludeIds.add(todayChallenge.film_id);
   if (excludeChallengeId) {
     const ch = db.prepare<[number], ChallengeRow>(`SELECT * FROM daily_challenges WHERE id = ?`).get(excludeChallengeId);
-    if (ch) excludeIds.add(ch.film_id);
+    if (ch?.film_id) excludeIds.add(ch.film_id);
   }
 
   const filtered = rows.filter((r) => !excludeIds.has(r.id));
+  return filtered.slice(0, limit).map((r) => ({ title: r.title, year: r.year }));
+}
 
+/** Autocomplete search for series – returns titles only, never exposes today's answer */
+export function searchSeries(query: string, limit = 10, excludeChallengeId?: number) {
+  if (!query || query.trim().length < 2) return [];
+
+  const todayChallenge = (() => {
+    try {
+      return getTodayChallenge();
+    } catch {
+      return null;
+    }
+  })();
+
+  const rows = db
+    .prepare<[string, number], { id: number; title: string; year: number }>(
+      `SELECT id, title, year FROM series
+       WHERE title_lower LIKE ? AND is_active = 1
+       ORDER BY title ASC
+       LIMIT ?`
+    )
+    .all(`%${normalise(query)}%`, limit + 1);
+
+  const excludeIds = new Set<number>();
+  if (todayChallenge?.series_id) excludeIds.add(todayChallenge.series_id);
+  if (excludeChallengeId) {
+    const ch = db.prepare<[number], ChallengeRow>(`SELECT * FROM daily_challenges WHERE id = ?`).get(excludeChallengeId);
+    if (ch?.series_id) excludeIds.add(ch.series_id);
+  }
+
+  const filtered = rows.filter((r) => !excludeIds.has(r.id));
   return filtered.slice(0, limit).map((r) => ({ title: r.title, year: r.year }));
 }

@@ -6,12 +6,13 @@
 
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Film, Calendar, LayoutDashboard, LogOut, Menu, X, ScrollText, Upload, ShieldAlert } from 'lucide-react'
+import { Film, Tv, Calendar, LayoutDashboard, LogOut, Menu, X, ScrollText, Upload, ShieldAlert } from 'lucide-react'
 import { adminLogout } from '../api'
 
 const navItems = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { to: '/admin/films', label: 'Films', icon: Film, exact: false },
+  { to: '/admin/series', label: 'Séries', icon: Tv, exact: false },
   { to: '/admin/calendar', label: 'Planning', icon: Calendar, exact: false },
   { to: '/admin/import', label: 'Import CSV', icon: Upload, exact: false },
   { to: '/admin/changelog', label: 'Changelog', icon: ScrollText, exact: false },

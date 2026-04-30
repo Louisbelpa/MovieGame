@@ -5,8 +5,8 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Film, Calendar, TrendingUp, Clapperboard, Users, AlertCircle } from 'lucide-react'
-import { getDashboard, type AdminDashboard } from '../api'
+import { Film, Calendar, TrendingUp, Clapperboard, Users, AlertCircle, Tv } from 'lucide-react'
+import { getDashboard, type AdminDashboard, type AdminChallenge } from '../api'
 import { AdminLayout } from '../components/AdminLayout'
 
 function formatDate(iso: string) {
@@ -87,30 +87,7 @@ export function DashboardPage() {
               Défi du jour
             </h2>
             {data.today_challenge ? (
-              <div className="bg-white rounded-xl border border-gray-200 p-4 flex gap-4 items-center">
-                {data.today_challenge.film.image_url ? (
-                  <img
-                    src={data.today_challenge.film.image_url}
-                    alt={data.today_challenge.film.title}
-                    className="w-20 h-14 object-cover rounded-lg flex-shrink-0 border border-gray-100"
-                  />
-                ) : (
-                  <div className="w-20 h-14 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Clapperboard size={22} className="text-gray-400" />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">
-                    {data.today_challenge.film.title}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {data.today_challenge.film.year} · {data.today_challenge.film.director}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {formatDate(data.today_challenge.date)}
-                  </p>
-                </div>
-              </div>
+              <ChallengeCard challenge={data.today_challenge} large />
             ) : (
               <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700">
                 Aucun défi planifié pour aujourd'hui.
@@ -128,28 +105,7 @@ export function DashboardPage() {
             ) : (
               <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
                 {data.upcoming_challenges.slice(0, 7).map((ch) => (
-                  <div key={ch.id} className="flex items-center gap-3 px-4 py-3">
-                    {ch.film.image_url ? (
-                      <img
-                        src={ch.film.image_url}
-                        alt={ch.film.title}
-                        className="w-10 h-7 object-cover rounded border border-gray-100 flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-10 h-7 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
-                        <Clapperboard size={13} className="text-gray-400" />
-                      </div>
-                    )}
-                    <span className="text-xs text-gray-400 w-28 flex-shrink-0">
-                      {formatDate(ch.date)}
-                    </span>
-                    <span className="text-sm text-gray-800 font-medium truncate">
-                      {ch.film.title}
-                    </span>
-                    <span className="text-xs text-gray-400 ml-auto flex-shrink-0">
-                      {ch.film.year}
-                    </span>
-                  </div>
+                  <ChallengeCard key={ch.id} challenge={ch} />
                 ))}
               </div>
             )}
@@ -175,6 +131,53 @@ export function DashboardPage() {
         </div>
       )}
     </AdminLayout>
+  )
+}
+
+// ─── Challenge card ───────────────────────────────────────────────────────────
+
+function ChallengeCard({ challenge, large }: { challenge: AdminChallenge; large?: boolean }) {
+  const media = challenge.film ?? challenge.series
+  const isSeries = challenge.mediaType === 'series'
+  const subtitle = isSeries
+    ? `${media?.year} · ${(challenge.series as { creator?: string })?.creator ?? ''}`
+    : `${media?.year} · ${(challenge.film as { director?: string })?.director ?? ''}`
+
+  if (large) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-4 flex gap-4 items-center">
+        {media?.image_url ? (
+          <img src={media.image_url} alt={media.title} className="w-20 h-14 object-cover rounded-lg flex-shrink-0 border border-gray-100" />
+        ) : (
+          <div className="w-20 h-14 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            {isSeries ? <Tv size={22} className="text-gray-400" /> : <Clapperboard size={22} className="text-gray-400" />}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-gray-900 truncate">{media?.title}</p>
+          <p className="text-sm text-gray-500">{subtitle}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{formatDate(challenge.date)}</p>
+        </div>
+        {isSeries && (
+          <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-medium flex-shrink-0">Série</span>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      {media?.image_url ? (
+        <img src={media.image_url} alt={media.title} className="w-10 h-7 object-cover rounded border border-gray-100 flex-shrink-0" />
+      ) : (
+        <div className="w-10 h-7 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
+          {isSeries ? <Tv size={13} className="text-gray-400" /> : <Clapperboard size={13} className="text-gray-400" />}
+        </div>
+      )}
+      <span className="text-xs text-gray-400 w-28 flex-shrink-0">{formatDate(challenge.date)}</span>
+      <span className="text-sm text-gray-800 font-medium truncate">{media?.title}</span>
+      <span className="text-xs text-gray-400 ml-auto flex-shrink-0">{media?.year}</span>
+    </div>
   )
 }
 

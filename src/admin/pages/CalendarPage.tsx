@@ -8,11 +8,14 @@ import { ChevronUp, ChevronDown, Sparkles } from 'lucide-react'
 import {
   getChallenges,
   getFilms,
+  getSeries,
   scheduleChallenge,
   updateChallenge,
   deleteChallenge,
   type AdminChallenge,
   type AdminFilm,
+  type AdminSeries,
+  type MediaRef,
 } from '../api'
 import { AdminLayout } from '../components/AdminLayout'
 import { ChallengeRow } from '../components/ChallengeRow'
@@ -26,7 +29,6 @@ function getISODate(offsetDays: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-/** Return ISO date strings from startOffset to endOffset (inclusive), relative to today */
 function buildDateRange(startOffset: number, endOffset: number): string[] {
   const count = endOffset - startOffset + 1
   return Array.from({ length: count }, (_, i) => getISODate(startOffset + i))
@@ -35,6 +37,7 @@ function buildDateRange(startOffset: number, endOffset: number): string[] {
 export function CalendarPage() {
   const [challenges, setChallenges] = useState<AdminChallenge[]>([])
   const [films, setFilms] = useState<AdminFilm[]>([])
+  const [seriesList, setSeriesList] = useState<AdminSeries[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showPast, setShowPast] = useState(false)
@@ -46,10 +49,11 @@ export function CalendarPage() {
 
   const load = useCallback((rangeFrom: string, rangeTo: string) => {
     setLoading(true)
-    Promise.all([getChallenges({ from: rangeFrom, to: rangeTo }), getFilms()])
-      .then(([chs, fms]) => {
+    Promise.all([getChallenges({ from: rangeFrom, to: rangeTo }), getFilms(), getSeries()])
+      .then(([chs, fms, srs]) => {
         setChallenges(chs)
         setFilms(fms.filter((f) => f.is_active))
+        setSeriesList(srs.filter((s) => s.is_active))
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Erreur'))
       .finally(() => setLoading(false))
@@ -70,13 +74,13 @@ export function CalendarPage() {
   const todayAndFuture = dateRange.filter((d) => d >= todayStr)
   const plannedCount = todayAndFuture.filter((d) => byDate[d]).length
 
-  async function handleSchedule(date: string, filmId: number) {
-    await scheduleChallenge(date, filmId)
+  async function handleSchedule(date: string, ref: MediaRef) {
+    await scheduleChallenge(date, ref)
     load(from, to)
   }
 
-  async function handleUpdate(challengeId: number, filmId: number) {
-    await updateChallenge(challengeId, filmId)
+  async function handleUpdate(challengeId: number, ref: MediaRef) {
+    await updateChallenge(challengeId, ref)
     load(from, to)
   }
 
@@ -96,18 +100,25 @@ export function CalendarPage() {
         setAutoSuccess('Tous les jours sont déjà planifiés !')
         return
       }
-      const usedIds = new Set(challenges.map((c) => c.film.id))
-      const available = films.filter((f) => !usedIds.has(f.id))
-      if (available.length === 0) {
-        setError('Aucun film disponible non encore planifié.')
+
+      // Combine unused films and series into a single pool
+      const usedFilmIds = new Set(challenges.filter((c) => c.film).map((c) => c.film!.id))
+      const usedSeriesIds = new Set(challenges.filter((c) => c.series).map((c) => c.series!.id))
+      const availableFilms = films.filter((f) => !usedFilmIds.has(f.id))
+      const availableSeries = seriesList.filter((s) => !usedSeriesIds.has(s.id))
+      const pool: MediaRef[] = [
+        ...availableFilms.map((f) => ({ filmId: f.id }) as MediaRef),
+        ...availableSeries.map((s) => ({ seriesId: s.id }) as MediaRef),
+      ].sort(() => Math.random() - 0.5)
+
+      if (pool.length === 0) {
+        setError('Aucun contenu disponible non encore planifié.')
         return
       }
-      const shuffled = [...available].sort(() => Math.random() - 0.5)
-      const toSchedule = emptyDates.slice(0, shuffled.length)
 
-      // allSettled: partial failures don't abort the whole batch
+      const toSchedule = emptyDates.slice(0, pool.length)
       const results = await Promise.allSettled(
-        toSchedule.map((date, i) => scheduleChallenge(date, shuffled[i].id))
+        toSchedule.map((date, i) => scheduleChallenge(date, pool[i]))
       )
       scheduled = results.filter((r) => r.status === 'fulfilled').length
       const failed = results.filter((r) => r.status === 'rejected').length
@@ -117,7 +128,6 @@ export function CalendarPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur auto-planification')
     } finally {
-      // Always reload so newly scheduled challenges appear
       load(from, to)
       if (scheduled > 0) {
         setAutoSuccess(`${scheduled} défi${scheduled > 1 ? 's' : ''} planifié${scheduled > 1 ? 's' : ''} automatiquement.`)
@@ -189,6 +199,7 @@ export function CalendarPage() {
                     date={date}
                     challenge={byDate[date] ?? null}
                     films={films}
+                    seriesList={seriesList}
                     onSchedule={handleSchedule}
                     onUpdate={handleUpdate}
                     onDelete={handleDelete}
@@ -207,6 +218,7 @@ export function CalendarPage() {
                 date={date}
                 challenge={byDate[date] ?? null}
                 films={films}
+                seriesList={seriesList}
                 onSchedule={handleSchedule}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}

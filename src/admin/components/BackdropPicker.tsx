@@ -6,13 +6,15 @@
 
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
-import { getFilmBackdrops, getBackdropsByTmdbId, type TmdbBackdrop } from '../api'
+import { getFilmBackdrops, getBackdropsByTmdbId, getSeriesBackdrops, getSeriesBackdropsByTmdbId, type TmdbBackdrop } from '../api'
 
 type BackdropPickerProps =
-  | { filmId: number; tmdbId?: never; onSelect: (imageUrl: string) => void; onClose: () => void }
-  | { tmdbId: number; filmId?: never; onSelect: (imageUrl: string) => void; onClose: () => void }
+  | { filmId: number; tmdbId?: never; seriesId?: never; seriesTmdbId?: never; onSelect: (imageUrl: string) => void; onClose: () => void }
+  | { tmdbId: number; filmId?: never; seriesId?: never; seriesTmdbId?: never; onSelect: (imageUrl: string) => void; onClose: () => void }
+  | { seriesId: number; filmId?: never; tmdbId?: never; seriesTmdbId?: never; onSelect: (imageUrl: string) => void; onClose: () => void }
+  | { seriesTmdbId: number; filmId?: never; tmdbId?: never; seriesId?: never; onSelect: (imageUrl: string) => void; onClose: () => void }
 
-export function BackdropPicker({ filmId, tmdbId, onSelect, onClose }: BackdropPickerProps) {
+export function BackdropPicker({ filmId, tmdbId, seriesId, seriesTmdbId, onSelect, onClose }: BackdropPickerProps) {
   const [backdrops, setBackdrops] = useState<TmdbBackdrop[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -20,9 +22,11 @@ export function BackdropPicker({ filmId, tmdbId, onSelect, onClose }: BackdropPi
   useEffect(() => {
     setLoading(true)
     setError(null)
-    const fetch = filmId !== undefined
-      ? getFilmBackdrops(filmId)
-      : getBackdropsByTmdbId(tmdbId!)
+    let fetch: Promise<TmdbBackdrop[]>
+    if (filmId !== undefined) fetch = getFilmBackdrops(filmId)
+    else if (tmdbId !== undefined) fetch = getBackdropsByTmdbId(tmdbId)
+    else if (seriesId !== undefined) fetch = getSeriesBackdrops(seriesId)
+    else fetch = getSeriesBackdropsByTmdbId(seriesTmdbId!)
     fetch
       .then(setBackdrops)
       .catch((err: unknown) =>

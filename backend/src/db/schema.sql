@@ -66,9 +66,56 @@ CREATE INDEX IF NOT EXISTS idx_films_tmdb_id     ON films (tmdb_id);
 CREATE INDEX IF NOT EXISTS idx_films_is_active   ON films (is_active);
 
 -- ---------------------------------------------------------------------------
+-- series
+--   One row per TV series. Same structure as films with series-specific fields.
+--   Uses "creator" instead of "director".
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS series (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    title           TEXT NOT NULL,
+    title_lower     TEXT NOT NULL GENERATED ALWAYS AS (lower(title)) STORED,
+
+    title_aliases   TEXT NOT NULL DEFAULT '[]',
+
+    -- First air date year
+    year            INTEGER NOT NULL,
+
+    -- Show creator(s) – revealed as hint #3
+    creator         TEXT NOT NULL,
+
+    genres          TEXT NOT NULL DEFAULT '[]',
+    cast_members    TEXT NOT NULL DEFAULT '[]',
+
+    tagline         TEXT,
+    synopsis        TEXT,
+
+    image_url       TEXT NOT NULL,
+    image_blurred_url TEXT,
+
+    tmdb_id         INTEGER UNIQUE,
+
+    -- Series-specific fields
+    number_of_seasons INTEGER,
+    network         TEXT,
+    status          TEXT,               -- 'En cours' | 'Terminée' | etc.
+    original_language TEXT,
+
+    fame_level      INTEGER NOT NULL DEFAULT 3 CHECK (fame_level BETWEEN 1 AND 5),
+    is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_series_title_lower ON series (title_lower);
+CREATE INDEX IF NOT EXISTS idx_series_tmdb_id     ON series (tmdb_id);
+CREATE INDEX IF NOT EXISTS idx_series_is_active   ON series (is_active);
+
+-- ---------------------------------------------------------------------------
 -- daily_challenges
---   Maps one calendar date (UTC, YYYY-MM-DD) to one film.
---   A unique constraint on challenge_date guarantees one film per day.
+--   Maps one calendar date (UTC, YYYY-MM-DD) to one film OR one series.
+--   Exactly one of film_id / series_id must be non-null (enforced by CHECK).
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS daily_challenges (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,7 +123,8 @@ CREATE TABLE IF NOT EXISTS daily_challenges (
     -- ISO date string, always UTC: '2025-04-25'
     challenge_date  TEXT NOT NULL UNIQUE,
 
-    film_id         INTEGER NOT NULL REFERENCES films (id) ON DELETE RESTRICT,
+    film_id         INTEGER REFERENCES films (id) ON DELETE RESTRICT,
+    series_id       INTEGER REFERENCES series (id) ON DELETE RESTRICT,
 
     -- Challenge number shown to players ("Day #42")
     challenge_number INTEGER NOT NULL,
@@ -86,11 +134,17 @@ CREATE TABLE IF NOT EXISTS daily_challenges (
     -- e.g. ["image_blurred","year","director","genres","cast","tagline","synopsis"]
     hint_schedule   TEXT NOT NULL DEFAULT '["image_blurred","year","director","genres","cast","tagline","synopsis"]',
 
-    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+
+    CHECK (
+      (film_id IS NOT NULL AND series_id IS NULL) OR
+      (film_id IS NULL AND series_id IS NOT NULL)
+    )
 );
 
-CREATE INDEX IF NOT EXISTS idx_daily_challenges_date    ON daily_challenges (challenge_date);
-CREATE INDEX IF NOT EXISTS idx_daily_challenges_film_id ON daily_challenges (film_id);
+CREATE INDEX IF NOT EXISTS idx_daily_challenges_date      ON daily_challenges (challenge_date);
+CREATE INDEX IF NOT EXISTS idx_daily_challenges_film_id   ON daily_challenges (film_id);
+CREATE INDEX IF NOT EXISTS idx_daily_challenges_series_id ON daily_challenges (series_id);
 
 -- ---------------------------------------------------------------------------
 -- game_sessions

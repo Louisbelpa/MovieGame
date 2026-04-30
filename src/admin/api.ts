@@ -24,10 +24,60 @@ export interface AdminFilm {
   fame_level: number    // 1–5, auto-filled from TMDB vote_count
 }
 
+export interface AdminSeries {
+  id: number
+  title: string
+  title_aliases: string[]
+  year: number
+  creator: string
+  genres: string[]
+  cast_members: string[]
+  tagline: string
+  synopsis: string
+  image_url: string
+  tmdb_id: number | null
+  is_active: boolean
+  used_dates: string[]
+  fame_level: number
+  number_of_seasons: number | null
+  network: string | null
+  status: string | null
+  original_language: string | null
+}
+
+export interface SeriesPayload {
+  title: string
+  title_aliases: string[]
+  year: number
+  creator: string
+  genres: string[]
+  cast_members: string[]
+  tagline: string
+  synopsis: string
+  image_url: string
+  tmdb_id: number | null
+  is_active: boolean
+  fame_level: number
+  number_of_seasons: number | null
+  network: string | null
+  status: string | null
+  original_language: string | null
+}
+
+export interface TmdbTvSearchResult {
+  tmdb_id: number
+  title: string
+  original_title: string
+  year: number
+  poster_url: string | null
+}
+
 export interface AdminChallenge {
   id: number
   date: string
-  film: AdminFilm
+  film: AdminFilm | null
+  series: AdminSeries | null
+  mediaType: 'film' | 'series'
 }
 
 export interface AdminDashboard {
@@ -199,17 +249,27 @@ export async function getChallenges(opts: { from?: string; to?: string } = {}): 
   return res.data
 }
 
-export async function scheduleChallenge(date: string, filmId: number): Promise<AdminChallenge> {
+export type MediaRef =
+  | { filmId: number; seriesId?: never }
+  | { seriesId: number; filmId?: never }
+
+export async function scheduleChallenge(date: string, ref: MediaRef): Promise<AdminChallenge> {
+  const body = 'filmId' in ref && ref.filmId !== undefined
+    ? { date, film_id: ref.filmId }
+    : { date, series_id: (ref as { seriesId: number }).seriesId }
   return request<AdminChallenge>('/api/admin/challenges', {
     method: 'POST',
-    body: JSON.stringify({ date, film_id: filmId }),
+    body: JSON.stringify(body),
   })
 }
 
-export async function updateChallenge(id: number, filmId: number): Promise<AdminChallenge> {
+export async function updateChallenge(id: number, ref: MediaRef): Promise<AdminChallenge> {
+  const body = 'filmId' in ref && ref.filmId !== undefined
+    ? { film_id: ref.filmId }
+    : { series_id: (ref as { seriesId: number }).seriesId }
   return request<AdminChallenge>(`/api/admin/challenges/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ film_id: filmId }),
+    body: JSON.stringify(body),
   })
 }
 
@@ -284,6 +344,76 @@ export async function updateChangelogEntry(id: number, payload: Omit<AdminChange
 
 export async function deleteChangelogEntry(id: number): Promise<void> {
   return request<void>(`/api/admin/changelog/${id}`, { method: 'DELETE' })
+}
+
+// ─── Series ───────────────────────────────────────────────────────────────────
+
+export async function getSeries(): Promise<AdminSeries[]> {
+  const res = await request<{ data: AdminSeries[] }>('/api/admin/series')
+  return res.data
+}
+
+export async function createSeries(payload: SeriesPayload): Promise<AdminSeries> {
+  return request<AdminSeries>('/api/admin/series', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateSeries(id: number, payload: Partial<SeriesPayload>): Promise<AdminSeries> {
+  return request<AdminSeries>(`/api/admin/series/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteSeries(id: number): Promise<void> {
+  return request<void>(`/api/admin/series/${id}`, { method: 'DELETE' })
+}
+
+export async function uploadSeriesImage(seriesId: number, file: File): Promise<{ url: string; series: AdminSeries }> {
+  const form = new FormData()
+  form.append('image', file)
+
+  const res = await fetch(`${BASE_URL}/api/admin/series/${seriesId}/image`, {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+
+  if (res.status === 401) {
+    window.location.href = '/admin/login'
+    throw new Error('Unauthorized')
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`)
+  }
+
+  return res.json() as Promise<{ url: string; series: AdminSeries }>
+}
+
+export async function getSeriesBackdrops(seriesId: number): Promise<TmdbBackdrop[]> {
+  const res = await request<{ backdrops: TmdbBackdrop[] }>(`/api/admin/series/${seriesId}/backdrops`)
+  return res.backdrops
+}
+
+export async function getSeriesBackdropsByTmdbId(tmdbId: number): Promise<TmdbBackdrop[]> {
+  const res = await request<{ backdrops: TmdbBackdrop[] }>(`/api/admin/tmdb/tv/${tmdbId}/backdrops`)
+  return res.backdrops
+}
+
+export async function searchTmdbTv(query: string): Promise<TmdbTvSearchResult[]> {
+  if (!query.trim()) return []
+  const res = await request<{ results: TmdbTvSearchResult[] }>(
+    `/api/admin/tmdb/tv/search?q=${encodeURIComponent(query)}`
+  )
+  return res.results
+}
+
+export async function getTmdbTvDetails(tmdbId: number): Promise<SeriesPayload> {
+  return request<SeriesPayload>(`/api/admin/tmdb/tv/${tmdbId}/details`)
 }
 
 // ─── CSV Import ───────────────────────────────────────────────────────────────
