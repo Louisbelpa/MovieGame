@@ -19,8 +19,13 @@ export function HomePage() {
 
   return (
     <div className="min-h-dvh flex flex-col bg-film-black text-film-text px-4 relative overflow-hidden">
-      <div className="pointer-events-none absolute -top-32 -left-24 w-72 h-72 rounded-full bg-film-gold/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-28 -right-20 w-80 h-80 rounded-full bg-film-gold/10 blur-3xl" />
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(clamp(30rem, 48vw, 56rem) clamp(20rem, 34vw, 38rem) at 8% -6%, rgba(245, 197, 66, 0.18), transparent 62%), radial-gradient(clamp(28rem, 46vw, 54rem) clamp(18rem, 32vw, 36rem) at 92% 78%, rgba(245, 197, 66, 0.16), transparent 64%)',
+        }}
+      />
 
       <div className="flex-1 w-full max-w-5xl mx-auto py-10 sm:py-14 relative">
         <div className="text-center mb-10">

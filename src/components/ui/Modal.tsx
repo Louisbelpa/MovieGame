@@ -50,7 +50,7 @@ export function Modal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-3 sm:p-4">
           {/* Backdrop */}
           <motion.div
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
@@ -66,7 +66,7 @@ export function Modal({
             aria-modal="true"
             aria-labelledby={title ? 'modal-title' : undefined}
             className={cn(
-              'relative z-10 w-full max-w-md film-border rounded-2xl p-6 shadow-2xl',
+              'relative z-10 w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto film-border rounded-2xl p-5 shadow-2xl sm:max-h-[85dvh] sm:p-6',
               className
             )}
             initial={{ opacity: 0, y: 32, scale: 0.95 }}
