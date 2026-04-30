@@ -120,31 +120,28 @@ CREATE INDEX IF NOT EXISTS idx_series_is_active   ON series (is_active);
 CREATE TABLE IF NOT EXISTS daily_challenges (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
 
-    -- ISO date string, always UTC: '2025-04-25'
-    challenge_date  TEXT NOT NULL UNIQUE,
+    -- ISO date string: '2025-04-25'
+    challenge_date  TEXT NOT NULL,
+
+    -- 'film' or 'series' — one challenge per (date, type)
+    media_type      TEXT NOT NULL DEFAULT 'film' CHECK (media_type IN ('film', 'series')),
 
     film_id         INTEGER REFERENCES films (id) ON DELETE RESTRICT,
     series_id       INTEGER REFERENCES series (id) ON DELETE RESTRICT,
 
-    -- Challenge number shown to players ("Day #42")
+    -- Challenge number shown to players — sequenced per media_type
     challenge_number INTEGER NOT NULL,
 
-    -- Pre-computed hint reveal schedule (JSON array, ordered).
-    -- Overrides defaults if curators want custom ordering.
-    -- e.g. ["image_blurred","year","director","genres","cast","tagline","synopsis"]
-    hint_schedule   TEXT NOT NULL DEFAULT '["image_blurred","year","director","genres","cast","tagline","synopsis"]',
+    hint_schedule   TEXT NOT NULL DEFAULT '["year","director","cast"]',
 
     created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
 
-    CHECK (
-      (film_id IS NOT NULL AND series_id IS NULL) OR
-      (film_id IS NULL AND series_id IS NOT NULL)
-    )
+    UNIQUE (challenge_date, media_type)
 );
 
 CREATE INDEX IF NOT EXISTS idx_daily_challenges_date      ON daily_challenges (challenge_date);
 CREATE INDEX IF NOT EXISTS idx_daily_challenges_film_id   ON daily_challenges (film_id);
--- idx_daily_challenges_series_id is created by incremental migration after the series_id column is added
+-- series_id and media_type indexes created by incremental migrations after those columns are added
 
 -- ---------------------------------------------------------------------------
 -- game_sessions

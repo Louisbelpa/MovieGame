@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { ChevronUp, ChevronDown, Sparkles } from 'lucide-react'
+import { ChevronUp, ChevronDown, Sparkles, Film, Tv } from 'lucide-react'
 import {
   getChallenges,
   getFilms,
@@ -35,6 +35,7 @@ function buildDateRange(startOffset: number, endOffset: number): string[] {
 }
 
 export function CalendarPage() {
+  const [mediaType, setMediaType] = useState<'film' | 'series'>('film')
   const [challenges, setChallenges] = useState<AdminChallenge[]>([])
   const [films, setFilms] = useState<AdminFilm[]>([])
   const [seriesList, setSeriesList] = useState<AdminSeries[]>([])
@@ -47,9 +48,9 @@ export function CalendarPage() {
   const from = showPast ? getISODate(-PAST_DAYS) : getISODate(0)
   const to = getISODate(FUTURE_DAYS - 1)
 
-  const load = useCallback((rangeFrom: string, rangeTo: string) => {
+  const load = useCallback((rangeFrom: string, rangeTo: string, mt: 'film' | 'series') => {
     setLoading(true)
-    Promise.all([getChallenges({ from: rangeFrom, to: rangeTo }), getFilms(), getSeries()])
+    Promise.all([getChallenges({ from: rangeFrom, to: rangeTo, mediaType: mt }), getFilms(), getSeries()])
       .then(([chs, fms, srs]) => {
         setChallenges(chs)
         setFilms(fms.filter((f) => f.is_active))
@@ -60,8 +61,8 @@ export function CalendarPage() {
   }, [])
 
   useEffect(() => {
-    load(from, to)
-  }, [load, from, to])
+    load(from, to, mediaType)
+  }, [load, from, to, mediaType])
 
   const byDate = Object.fromEntries(challenges.map((ch) => [ch.date, ch]))
 
@@ -76,17 +77,17 @@ export function CalendarPage() {
 
   async function handleSchedule(date: string, ref: MediaRef) {
     await scheduleChallenge(date, ref)
-    load(from, to)
+    load(from, to, mediaType)
   }
 
   async function handleUpdate(challengeId: number, ref: MediaRef) {
     await updateChallenge(challengeId, ref)
-    load(from, to)
+    load(from, to, mediaType)
   }
 
   async function handleDelete(challengeId: number) {
     await deleteChallenge(challengeId)
-    load(from, to)
+    load(from, to, mediaType)
   }
 
   async function handleAutoSchedule() {
@@ -101,15 +102,12 @@ export function CalendarPage() {
         return
       }
 
-      // Combine unused films and series into a single pool
-      const usedFilmIds = new Set(challenges.filter((c) => c.film).map((c) => c.film!.id))
-      const usedSeriesIds = new Set(challenges.filter((c) => c.series).map((c) => c.series!.id))
-      const availableFilms = films.filter((f) => !usedFilmIds.has(f.id))
-      const availableSeries = seriesList.filter((s) => !usedSeriesIds.has(s.id))
-      const pool: MediaRef[] = [
-        ...availableFilms.map((f) => ({ filmId: f.id }) as MediaRef),
-        ...availableSeries.map((s) => ({ seriesId: s.id }) as MediaRef),
-      ].sort(() => Math.random() - 0.5)
+      // Pool is restricted to the active media type
+      const usedIds = new Set(challenges.map((c) => (mediaType === 'series' ? c.series?.id : c.film?.id)).filter(Boolean) as number[])
+      const pool: MediaRef[] = mediaType === 'series'
+        ? seriesList.filter((s) => !usedIds.has(s.id)).map((s) => ({ seriesId: s.id }) as MediaRef)
+        : films.filter((f) => !usedIds.has(f.id)).map((f) => ({ filmId: f.id }) as MediaRef)
+      pool.sort(() => Math.random() - 0.5)
 
       if (pool.length === 0) {
         setError('Aucun contenu disponible non encore planifié.')
@@ -128,7 +126,7 @@ export function CalendarPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur auto-planification')
     } finally {
-      load(from, to)
+      load(from, to, mediaType)
       if (scheduled > 0) {
         setAutoSuccess(`${scheduled} défi${scheduled > 1 ? 's' : ''} planifié${scheduled > 1 ? 's' : ''} automatiquement.`)
         setTimeout(() => setAutoSuccess(null), 4000)
@@ -139,11 +137,33 @@ export function CalendarPage() {
 
   return (
     <AdminLayout>
+      {/* Media type tabs */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4 w-fit">
+        <button
+          onClick={() => setMediaType('film')}
+          className={[
+            'flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-lg transition-colors',
+            mediaType === 'film' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700',
+          ].join(' ')}
+        >
+          <Film size={14} /> Films
+        </button>
+        <button
+          onClick={() => setMediaType('series')}
+          className={[
+            'flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-lg transition-colors',
+            mediaType === 'series' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700',
+          ].join(' ')}
+        >
+          <Tv size={14} /> Séries
+        </button>
+      </div>
+
       <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
         <p className="text-sm text-gray-500">
           Planning des{' '}
-          <span className="font-medium text-gray-800">{FUTURE_DAYS} prochains jours</span>.
-          Cliquez sur <strong>Planifier</strong> pour associer un film à une date.
+          <span className="font-medium text-gray-800">{FUTURE_DAYS} prochains jours</span>{' '}
+          — {mediaType === 'series' ? 'séries' : 'films'}.
         </p>
         <div className="flex items-center gap-3">
           <span className="text-xs text-gray-400">
@@ -200,6 +220,7 @@ export function CalendarPage() {
                     challenge={byDate[date] ?? null}
                     films={films}
                     seriesList={seriesList}
+                    mediaType={mediaType}
                     onSchedule={handleSchedule}
                     onUpdate={handleUpdate}
                     onDelete={handleDelete}

@@ -90,12 +90,63 @@ const incremental: { name: string; sql: string }[] = [
   },
 ]
 
+// Multi-statement migrations that need db.exec() rather than db.prepare().run()
+const multiStatement: { name: string; sql: string }[] = [
+  {
+    name: 'add_media_type_to_daily_challenges',
+    // Recreates daily_challenges with a media_type column and UNIQUE(date,type)
+    // so films and series can have independent planning per date.
+    sql: `
+      PRAGMA foreign_keys = OFF;
+      DROP TABLE IF EXISTS daily_challenges_v2;
+      CREATE TABLE daily_challenges_v2 (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        challenge_date   TEXT NOT NULL,
+        media_type       TEXT NOT NULL DEFAULT 'film' CHECK (media_type IN ('film','series')),
+        film_id          INTEGER REFERENCES films(id) ON DELETE RESTRICT,
+        series_id        INTEGER REFERENCES series(id) ON DELETE RESTRICT,
+        challenge_number INTEGER NOT NULL,
+        hint_schedule    TEXT NOT NULL DEFAULT '["year","director","cast"]',
+        created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+        UNIQUE (challenge_date, media_type)
+      );
+      INSERT OR IGNORE INTO daily_challenges_v2
+        (id, challenge_date, media_type, film_id, series_id, challenge_number, hint_schedule, created_at)
+        SELECT id, challenge_date,
+          CASE WHEN series_id IS NOT NULL THEN 'series' ELSE 'film' END,
+          film_id, series_id, challenge_number, hint_schedule, created_at
+        FROM daily_challenges;
+      DROP TABLE daily_challenges;
+      ALTER TABLE daily_challenges_v2 RENAME TO daily_challenges;
+      CREATE INDEX IF NOT EXISTS idx_daily_challenges_date       ON daily_challenges (challenge_date);
+      CREATE INDEX IF NOT EXISTS idx_daily_challenges_film_id    ON daily_challenges (film_id);
+      CREATE INDEX IF NOT EXISTS idx_daily_challenges_series_id  ON daily_challenges (series_id);
+      CREATE INDEX IF NOT EXISTS idx_daily_challenges_media_type ON daily_challenges (media_type);
+      PRAGMA foreign_keys = ON;
+    `,
+  },
+]
+
 for (const { name, sql } of incremental) {
   try {
     db.prepare(sql).run()
     console.log(`  ✓ ${name}`)
   } catch {
     // column already exists — ignore
+  }
+}
+
+for (const { name, sql } of multiStatement) {
+  try {
+    // Only run if media_type column doesn't exist yet
+    const cols = db.prepare(`PRAGMA table_info(daily_challenges)`).all() as { name: string }[]
+    if (cols.some((c) => c.name === 'media_type')) {
+      continue
+    }
+    db.exec(sql)
+    console.log(`  ✓ ${name}`)
+  } catch (err) {
+    console.error(`  ✗ ${name}:`, err)
   }
 }
 

@@ -240,10 +240,11 @@ export async function uploadImage(file: File): Promise<string> {
 
 // ─── Calendar / Challenges ────────────────────────────────────────────────────
 
-export async function getChallenges(opts: { from?: string; to?: string } = {}): Promise<AdminChallenge[]> {
+export async function getChallenges(opts: { from?: string; to?: string; mediaType?: 'film' | 'series' } = {}): Promise<AdminChallenge[]> {
   const params = new URLSearchParams()
   if (opts.from) params.set('from', opts.from)
   if (opts.to) params.set('to', opts.to)
+  if (opts.mediaType) params.set('mediaType', opts.mediaType)
   const qs = params.toString()
   const res = await request<{ data: AdminChallenge[] }>(`/api/admin/challenges${qs ? `?${qs}` : ''}`)
   return res.data
@@ -299,6 +300,10 @@ export async function getBackdropsByTmdbId(tmdbId: number): Promise<TmdbBackdrop
 
 export async function getRandomTmdbFilm(): Promise<FilmPayload> {
   return request<FilmPayload>('/api/admin/tmdb/random')
+}
+
+export async function getRandomTmdbSeries(): Promise<SeriesPayload> {
+  return request<SeriesPayload>('/api/admin/tmdb/tv/random')
 }
 
 /** Search TMDB by movie title – returns lightweight suggestions */

@@ -160,12 +160,11 @@ function getTodayParis(): string {
 /** Return today's challenge row (throws if not found) */
 export function getTodayChallenge(type: 'film' | 'series' = 'film'): ChallengeRow {
   const today = getTodayParis();
-  const filter = type === 'series' ? 'series_id IS NOT NULL' : 'film_id IS NOT NULL';
   const row = db
-    .prepare<[string], ChallengeRow>(
-      `SELECT * FROM daily_challenges WHERE challenge_date <= ? AND ${filter}
+    .prepare<[string, string], ChallengeRow>(
+      `SELECT * FROM daily_challenges WHERE challenge_date <= ? AND media_type = ?
        ORDER BY challenge_date DESC LIMIT 1`
-    ).get(today);
+    ).get(today, type);
   if (!row) throw Object.assign(new Error(`No ${type} challenge scheduled`), { status: 404 });
   return row;
 }
@@ -181,11 +180,10 @@ export function getChallengeById(id: number): ChallengeRow {
 
 /** Return a challenge by a specific date (throws if not found) */
 export function getChallengeByDate(date: string, type: 'film' | 'series' = 'film'): ChallengeRow {
-  const filter = type === 'series' ? 'series_id IS NOT NULL' : 'film_id IS NOT NULL';
   const row = db
-    .prepare<[string], ChallengeRow>(
-      `SELECT * FROM daily_challenges WHERE challenge_date = ? AND ${filter}`
-    ).get(date);
+    .prepare<[string, string], ChallengeRow>(
+      `SELECT * FROM daily_challenges WHERE challenge_date = ? AND media_type = ?`
+    ).get(date, type);
   if (!row) throw Object.assign(new Error(`No ${type} challenge for ${date}`), { status: 404 });
   return row;
 }

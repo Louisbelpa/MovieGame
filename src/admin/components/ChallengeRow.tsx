@@ -13,6 +13,7 @@ interface ChallengeRowProps {
   challenge: AdminChallenge | null
   films: AdminFilm[]
   seriesList: AdminSeries[]
+  mediaType?: 'film' | 'series'
   onSchedule: (date: string, ref: MediaRef) => Promise<void>
   onUpdate: (challengeId: number, ref: MediaRef) => Promise<void>
   onDelete: (challengeId: number) => Promise<void>
@@ -41,13 +42,14 @@ type TabType = 'films' | 'series'
 interface MediaPickerProps {
   films: AdminFilm[]
   seriesList: AdminSeries[]
+  mediaType?: 'film' | 'series'
   onSelect: (ref: MediaRef) => void
   onCancel: () => void
   loading: boolean
 }
 
-function MediaPicker({ films, seriesList, onSelect, onCancel, loading }: MediaPickerProps) {
-  const [tab, setTab] = useState<TabType>('films')
+function MediaPicker({ films, seriesList, mediaType, onSelect, onCancel, loading }: MediaPickerProps) {
+  const [tab, setTab] = useState<TabType>(mediaType === 'series' ? 'series' : 'films')
   const [search, setSearch] = useState('')
   const [selectedRef, setSelectedRef] = useState<MediaRef | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -83,29 +85,31 @@ function MediaPicker({ films, seriesList, onSelect, onCancel, loading }: MediaPi
 
   return (
     <div className="mt-2 bg-white border border-gray-200 rounded-xl shadow-lg p-3 space-y-2 w-80">
-      {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-        <button
-          type="button"
-          onClick={() => setTab('films')}
-          className={[
-            'flex-1 flex items-center justify-center gap-1.5 py-1 text-xs font-medium rounded-md transition-colors',
-            tab === 'films' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700',
-          ].join(' ')}
-        >
-          <Clapperboard size={11} /> Films
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('series')}
-          className={[
-            'flex-1 flex items-center justify-center gap-1.5 py-1 text-xs font-medium rounded-md transition-colors',
-            tab === 'series' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700',
-          ].join(' ')}
-        >
-          <Tv size={11} /> Séries
-        </button>
-      </div>
+      {/* Tabs — hidden when mediaType is locked */}
+      {!mediaType && (
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+          <button
+            type="button"
+            onClick={() => setTab('films')}
+            className={[
+              'flex-1 flex items-center justify-center gap-1.5 py-1 text-xs font-medium rounded-md transition-colors',
+              tab === 'films' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700',
+            ].join(' ')}
+          >
+            <Clapperboard size={11} /> Films
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('series')}
+            className={[
+              'flex-1 flex items-center justify-center gap-1.5 py-1 text-xs font-medium rounded-md transition-colors',
+              tab === 'series' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700',
+            ].join(' ')}
+          >
+            <Tv size={11} /> Séries
+          </button>
+        </div>
+      )}
 
       <input
         ref={inputRef}
@@ -219,6 +223,7 @@ export function ChallengeRow({
   challenge,
   films,
   seriesList,
+  mediaType,
   onSchedule,
   onUpdate,
   onDelete,
@@ -376,6 +381,7 @@ export function ChallengeRow({
           <MediaPicker
             films={films}
             seriesList={seriesList}
+            mediaType={mediaType}
             onSelect={handleSelect}
             onCancel={() => setPicking(false)}
             loading={mutating}

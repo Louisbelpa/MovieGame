@@ -932,19 +932,26 @@ adminRouter.get(
       const from = parseDateParam(req.query.from);
       const to = parseDateParam(req.query.to);
 
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
       let query = `SELECT dc.* FROM daily_challenges dc`;
       const params: string[] = [];
+      const conditions: string[] = [];
 
       if (from && to) {
-        query += ` WHERE dc.challenge_date BETWEEN ? AND ?`;
+        conditions.push(`dc.challenge_date BETWEEN ? AND ?`);
         params.push(from, to);
       } else if (from) {
-        query += ` WHERE dc.challenge_date >= ?`;
+        conditions.push(`dc.challenge_date >= ?`);
         params.push(from);
       } else if (to) {
-        query += ` WHERE dc.challenge_date <= ?`;
+        conditions.push(`dc.challenge_date <= ?`);
         params.push(to);
       }
+      if (mediaType) {
+        conditions.push(`dc.media_type = ?`);
+        params.push(mediaType);
+      }
+      if (conditions.length) query += ` WHERE ${conditions.join(' AND ')}`;
 
       query += ` ORDER BY dc.challenge_date ASC`;
 
@@ -991,21 +998,23 @@ adminRouter.post(
         if (!series) { res.status(404).json({ error: 'Series not found or inactive.' }); return; }
       }
 
-      // Check for existing challenge on that date
+      const mediaType = hasFilm ? 'film' : 'series';
+
+      // Check for existing challenge of same type on that date
       const existing = db
-        .prepare(`SELECT id FROM daily_challenges WHERE challenge_date = ?`)
-        .get(date);
+        .prepare(`SELECT id FROM daily_challenges WHERE challenge_date = ? AND media_type = ?`)
+        .get(date, mediaType);
 
       if (existing) {
-        res.status(409).json({ error: `A challenge is already scheduled for ${date}.` });
+        res.status(409).json({ error: `A ${mediaType} challenge is already scheduled for ${date}.` });
         return;
       }
 
-      // Determine next challenge number
+      // Challenge number is per media_type
       const maxNum = (
         db
-          .prepare(`SELECT COALESCE(MAX(challenge_number), 0) AS max_num FROM daily_challenges`)
-          .get() as { max_num: number }
+          .prepare(`SELECT COALESCE(MAX(challenge_number), 0) AS max_num FROM daily_challenges WHERE media_type = ?`)
+          .get(mediaType) as { max_num: number }
       ).max_num;
 
       const hintSchedule = hasFilm
@@ -1014,10 +1023,10 @@ adminRouter.post(
 
       const result = db
         .prepare(
-          `INSERT INTO daily_challenges (challenge_date, film_id, series_id, challenge_number, hint_schedule)
-           VALUES (?, ?, ?, ?, ?)`
+          `INSERT INTO daily_challenges (challenge_date, media_type, film_id, series_id, challenge_number, hint_schedule)
+           VALUES (?, ?, ?, ?, ?, ?)`
         )
-        .run(date, hasFilm ? film_id : null, hasSeries ? series_id : null, maxNum + 1, hintSchedule);
+        .run(date, mediaType, hasFilm ? film_id : null, hasSeries ? series_id : null, maxNum + 1, hintSchedule);
 
       const created = db
         .prepare<[number], ChallengeRow>(`SELECT dc.* FROM daily_challenges dc WHERE dc.id = ?`)
@@ -1527,6 +1536,104 @@ adminRouter.get(
         tmdb_id: details.id,
         is_active: true,
         fame_level: fameFromVoteCount(details.vote_count ?? 0),
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/tmdb/tv/random
+// Fetches a random popular TV series from TMDB and returns it as a SeriesPayload.
+adminRouter.get(
+  '/tmdb/tv/random',
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const apiKey = process.env.TMDB_API_KEY;
+      if (!apiKey) {
+        res.status(400).json({ error: 'TMDB_API_KEY not configured' });
+        return;
+      }
+
+      const page = Math.floor(Math.random() * 30) + 1;
+      const discoverRes = await fetch(
+        `https://api.themoviedb.org/3/discover/tv` +
+        `?api_key=${apiKey}&language=fr-FR&sort_by=vote_count.desc` +
+        `&vote_count.gte=200&page=${page}`
+      );
+      if (!discoverRes.ok) {
+        res.status(502).json({ error: `TMDB discover error: ${discoverRes.status}` });
+        return;
+      }
+      const discoverData = (await discoverRes.json()) as { results: { id: number }[] };
+      const results = discoverData.results ?? [];
+      if (results.length === 0) {
+        res.status(502).json({ error: 'No results from TMDB' });
+        return;
+      }
+
+      const picked = results[Math.floor(Math.random() * results.length)];
+
+      const [detailsRes, creditsRes, imagesRes] = await Promise.all([
+        fetch(`https://api.themoviedb.org/3/tv/${picked.id}?api_key=${apiKey}&language=fr-FR`),
+        fetch(`https://api.themoviedb.org/3/tv/${picked.id}/aggregate_credits?api_key=${apiKey}`),
+        fetch(`https://api.themoviedb.org/3/tv/${picked.id}/images?api_key=${apiKey}&include_image_language=null`),
+      ]);
+
+      const details = (await detailsRes.json()) as {
+        id: number; name: string; original_name: string;
+        first_air_date: string; tagline: string; overview: string;
+        backdrop_path: string | null;
+        genres: { name: string }[];
+        vote_count: number;
+        number_of_seasons: number;
+        networks: { name: string }[];
+        status: string;
+        original_language: string;
+      };
+      const credits = (await creditsRes.json()) as {
+        cast: { name: string; order: number }[];
+      };
+      const images = (await imagesRes.json()) as {
+        backdrops: { file_path: string; vote_average: number }[];
+      };
+
+      const cast = (credits.cast ?? [])
+        .sort((a, b) => a.order - b.order)
+        .slice(0, 5)
+        .map((c) => c.name);
+      const genres = (details.genres ?? []).map((g) => g.name);
+
+      const bestBackdrop = (images.backdrops ?? [])
+        .sort((a, b) => b.vote_average - a.vote_average)[0];
+      const imageUrl = bestBackdrop
+        ? `https://image.tmdb.org/t/p/w1280${bestBackdrop.file_path}`
+        : details.backdrop_path
+        ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}`
+        : '';
+
+      const titleAliases: string[] = [];
+      if (details.original_name && details.original_name !== details.name) {
+        titleAliases.push(details.original_name);
+      }
+
+      res.json({
+        title: details.name,
+        title_aliases: titleAliases,
+        year: details.first_air_date ? parseInt(details.first_air_date.slice(0, 4), 10) : 0,
+        creator: '',
+        genres,
+        cast_members: cast,
+        tagline: details.tagline ?? '',
+        synopsis: details.overview ?? '',
+        image_url: imageUrl,
+        tmdb_id: details.id,
+        is_active: true,
+        fame_level: fameFromVoteCount(details.vote_count ?? 0),
+        number_of_seasons: details.number_of_seasons ?? null,
+        network: details.networks?.[0]?.name ?? null,
+        status: details.status ?? null,
+        original_language: details.original_language ?? null,
       });
     } catch (err) {
       next(err);

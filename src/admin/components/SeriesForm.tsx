@@ -17,7 +17,7 @@ function resolvePreviewUrl(url: string): string {
 }
 
 interface SeriesFormProps {
-  initial?: Partial<AdminSeries>
+  initial?: Partial<AdminSeries & SeriesPayload>
   onSubmit: (payload: SeriesPayload) => Promise<void>
   onCancel: () => void
 }

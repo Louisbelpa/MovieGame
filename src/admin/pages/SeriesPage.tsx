@@ -4,13 +4,14 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, Search, X } from 'lucide-react'
+import { Plus, Search, X, Shuffle } from 'lucide-react'
 import {
   getSeries,
   createSeries,
   updateSeries,
   deleteSeries,
   uploadSeriesImage,
+  getRandomTmdbSeries,
   type AdminSeries,
   type SeriesPayload,
 } from '../api'
@@ -97,7 +98,7 @@ function ConfirmDeleteModal({
 // ─── SeriesPage ───────────────────────────────────────────────────────────────
 
 type ModalState =
-  | { type: 'create' }
+  | { type: 'create'; initial?: SeriesPayload }
   | { type: 'edit'; series: AdminSeries }
   | { type: 'delete'; series: AdminSeries }
   | { type: 'backdrops'; series: AdminSeries }
@@ -110,6 +111,7 @@ export function SeriesPage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [modal, setModal] = useState<ModalState>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [randomLoading, setRandomLoading] = useState(false)
   const [search, setSearch] = useState('')
 
   function showSuccess(msg: string) {
@@ -128,6 +130,18 @@ export function SeriesPage() {
   useEffect(() => {
     load()
   }, [load])
+
+  async function handleRandomSeries() {
+    setRandomLoading(true)
+    try {
+      const payload = await getRandomTmdbSeries()
+      setModal({ type: 'create', initial: payload })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur TMDB')
+    } finally {
+      setRandomLoading(false)
+    }
+  }
 
   async function handleCreate(payload: SeriesPayload) {
     await createSeries(payload)
@@ -203,6 +217,17 @@ export function SeriesPage() {
 
         <div className="flex items-center gap-2 sm:ml-auto">
           <button
+            onClick={handleRandomSeries}
+            disabled={randomLoading}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            {randomLoading
+              ? <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+              : <Shuffle size={15} />
+            }
+            Aléatoire
+          </button>
+          <button
             onClick={() => setModal({ type: 'create' })}
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
           >
@@ -271,6 +296,7 @@ export function SeriesPage() {
       {modal?.type === 'create' && (
         <Modal title="Ajouter une série" onClose={() => setModal(null)}>
           <SeriesForm
+            initial={modal.initial}
             onSubmit={handleCreate}
             onCancel={() => setModal(null)}
           />
