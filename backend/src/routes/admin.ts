@@ -1590,6 +1590,7 @@ adminRouter.get(
         networks: { name: string }[];
         status: string;
         original_language: string;
+        created_by?: { name: string }[];
       };
       const credits = (await creditsRes.json()) as {
         cast: { name: string; order: number }[];
@@ -1621,7 +1622,7 @@ adminRouter.get(
         title: details.name,
         title_aliases: titleAliases,
         year: details.first_air_date ? parseInt(details.first_air_date.slice(0, 4), 10) : 0,
-        creator: '',
+        creator: Array.isArray(details.created_by) && details.created_by.length > 0 ? details.created_by[0].name : '',
         genres,
         cast_members: cast,
         tagline: details.tagline ?? '',

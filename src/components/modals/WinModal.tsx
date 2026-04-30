@@ -23,7 +23,7 @@ export function WinModal() {
   const correctAttempt = guesses.findIndex((g) => g.status === 'correct') + 1
   const maxAttempts = result.maxAttempts
   const tmdbUrl = result.tmdbId
-    ? `https://www.themoviedb.org/movie/${result.tmdbId}`
+    ? `https://www.themoviedb.org/${result.mediaType === 'series' ? 'tv' : 'movie'}/${result.tmdbId}`
     : null
 
   return (

@@ -4,6 +4,7 @@
  */
 
 import { useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { GamePage } from '@/components/game/GamePage'
@@ -50,6 +51,21 @@ export default function App({ gameType = 'film' }: { gameType?: 'film' | 'series
   useFirstVisit()
   useDynamicTitle()
 
+  // Synchronise le mode de jeu avec l'URL
+  const location = useLocation()
+  const setGameType = useGameStore((s) => s.setGameType)
+  const currentGameType = useGameStore((s) => s.gameType)
+  const initGame = useGameStore((s) => s.initGame)
+  useEffect(() => {
+    if (location.pathname.startsWith('/series')) setGameType('series')
+    else setGameType('film')
+  }, [location.pathname, setGameType])
+
+  // Recharge le challenge quand le mode change
+  useEffect(() => {
+    initGame()
+  }, [currentGameType, initGame])
+
   return (
     <div className="min-h-dvh flex flex-col bg-film-black text-film-text">
       <Header />
@@ -66,5 +82,5 @@ export default function App({ gameType = 'film' }: { gameType?: 'film' | 'series
       <RulesModal />
       <ArchiveModal />
     </div>
-  )
+  );
 }

@@ -1,6 +1,10 @@
+
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
+import { Footer } from '@/components/layout/Footer'
 import './index.css'
+
 
 const root = document.getElementById('root')!
 const path = window.location.pathname
@@ -11,7 +15,13 @@ if (path.startsWith('/admin')) {
   })
 } else if (path.startsWith('/series')) {
   import('./App').then(({ default: App }) => {
-    createRoot(root).render(<StrictMode><App gameType="series" /></StrictMode>)
+    createRoot(root).render(
+      <StrictMode>
+        <BrowserRouter>
+          <App gameType="series" />
+        </BrowserRouter>
+      </StrictMode>
+    )
   })
 } else if (path === '/' || path === '') {
   import('./components/HomePage').then(({ HomePage }) => {
@@ -19,6 +29,12 @@ if (path.startsWith('/admin')) {
   })
 } else {
   import('./App').then(({ default: App }) => {
-    createRoot(root).render(<StrictMode><App gameType="film" /></StrictMode>)
+    createRoot(root).render(
+      <StrictMode>
+        <BrowserRouter>
+          <App gameType="film" />
+        </BrowserRouter>
+      </StrictMode>
+    )
   })
 }
