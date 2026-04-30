@@ -1,4 +1,4 @@
-# CinéGuessr — Guide pour Claude Code
+# CinéGuessr / GuessToday — Guide pour Claude Code
 
 ## Architecture
 
@@ -49,7 +49,15 @@ npm run db:seed      # Films d'exemple + planning initial
 npm run dev          # Express sur http://localhost:3001
 ```
 
-## Variables d'environnement clés (`backend/.env`)
+## Variables d'environnement clés
+
+### Frontend (`/.env`)
+
+| Variable | Description |
+|----------|-------------|
+| `VITE_ENABLE_SERIES` | `false` = films only + branding `CinéGuessr`, `true` = films+séries + branding `GuessToday` |
+
+### Backend (`backend/.env`)
 
 | Variable | Description |
 |----------|-------------|
@@ -61,7 +69,7 @@ npm run dev          # Express sur http://localhost:3001
 | `CORS_ORIGIN` | Origine frontend autorisée (défaut: `http://localhost:5173`) |
 | `TMDB_API_KEY` | Clé API TMDB (back office uniquement) |
 | `IMAGE_SOURCE` | `tmdb` ou `local` |
-| `MAX_ATTEMPTS` | Tentatives par défi (défaut: 3) |
+| `MAX_ATTEMPTS` | Tentatives par défi (défaut: 5) |
 
 ## Points techniques importants
 
@@ -103,3 +111,13 @@ Ordre d'affichage : année → réalisateur → acteur principal (1 seul, `cast.
 - Pas de commentaires sauf pour les invariants non-évidents
 - Responsive : mobile-first, breakpoints `sm`, `md`, `lg`
 - Routes API préfixées `/api/`, sauf `/health`
+
+## Mode efficacité tokens (important)
+
+- Répondre court par défaut (pas de longues explications si non demandées).
+- Lire uniquement les fichiers utiles à la tâche (éviter l'exploration large).
+- Préférer des patches ciblés plutôt que de gros refactors.
+- Éviter de relire plusieurs fois les mêmes fichiers sans raison.
+- Vérifier avec `npm run build` uniquement après un lot cohérent de changements.
+- Ne pas proposer plusieurs alternatives si l'utilisateur a demandé une action directe.
+- Limiter le bruit en sortie: 1 résumé + points critiques + next step.

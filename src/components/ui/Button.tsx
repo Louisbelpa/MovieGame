@@ -12,7 +12,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    'bg-film-gold text-film-black font-semibold hover:bg-film-gold-light active:scale-95 shadow-[0_0_16px_rgba(212,168,66,0.3)]',
+    'btn-mode-primary active:scale-95',
   secondary:
     'border border-film-border bg-film-gray text-film-text hover:border-film-gold hover:text-film-gold active:scale-95',
   ghost:

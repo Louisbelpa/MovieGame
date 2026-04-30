@@ -6,12 +6,14 @@
 
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Film, Calendar, LayoutDashboard, LogOut, Menu, X, ScrollText, Upload, ShieldAlert } from 'lucide-react'
+import { Film, Tv, Calendar, LayoutDashboard, LogOut, Menu, X, ScrollText, Upload, ShieldAlert, BarChart2 } from 'lucide-react'
 import { adminLogout } from '../api'
 
 const navItems = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { to: '/admin/analytics', label: 'Analytiques', icon: BarChart2, exact: false },
   { to: '/admin/films', label: 'Films', icon: Film, exact: false },
+  { to: '/admin/series', label: 'Séries', icon: Tv, exact: false },
   { to: '/admin/calendar', label: 'Planning', icon: Calendar, exact: false },
   { to: '/admin/import', label: 'Import CSV', icon: Upload, exact: false },
   { to: '/admin/changelog', label: 'Changelog', icon: ScrollText, exact: false },
@@ -43,7 +45,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     return (
       <>
         <div className="px-6 py-5 border-b border-gray-700">
-          <span className="font-bold text-lg tracking-tight">CinéGuessr</span>
+          <span className="font-bold text-lg tracking-tight">GuessToday</span>
           <span className="ml-2 text-xs text-gray-400 uppercase tracking-widest">Admin</span>
         </div>
 
@@ -84,7 +86,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen flex bg-gray-100">
+    <div className="min-h-screen flex bg-gray-100 text-gray-900">
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-56 flex-shrink-0 bg-gray-900 text-white flex-col">
         <NavContent />
@@ -106,7 +108,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         ].join(' ')}
       >
         <div className="flex items-center justify-between px-4 py-4 border-b border-gray-700">
-          <span className="font-bold text-base">CinéGuessr Admin</span>
+          <span className="font-bold text-base">GuessToday Admin</span>
           <button
             onClick={() => setSidebarOpen(false)}
             className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700 transition-colors"

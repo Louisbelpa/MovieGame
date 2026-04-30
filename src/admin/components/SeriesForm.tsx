@@ -1,13 +1,13 @@
 /**
- * admin/components/FilmForm.tsx
- * Reusable form for creating / editing a film.
- * Supports TMDB title search with auto-fill.
+ * admin/components/SeriesForm.tsx
+ * Reusable form for creating / editing a TV series.
+ * Supports TMDB TV title search with auto-fill.
  */
 
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react'
 import { X, Images, Search, Loader2, Upload, Shuffle } from 'lucide-react'
-import type { AdminFilm, FilmPayload, TmdbSearchResult } from '../api'
-import { searchTmdb, getTmdbFilmDetails, uploadImage, getRandomTmdbFilm } from '../api'
+import type { AdminSeries, SeriesPayload, TmdbTvSearchResult } from '../api'
+import { searchTmdbTv, getTmdbTvDetails, uploadImage, getRandomTmdbSeries } from '../api'
 import { BackdropPicker } from './BackdropPicker'
 
 function resolvePreviewUrl(url: string): string {
@@ -16,9 +16,9 @@ function resolvePreviewUrl(url: string): string {
   return `https://image.tmdb.org/t/p/w300${url}`
 }
 
-interface FilmFormProps {
-  initial?: Partial<AdminFilm>
-  onSubmit: (payload: FilmPayload) => Promise<void>
+interface SeriesFormProps {
+  initial?: Partial<AdminSeries & SeriesPayload>
+  onSubmit: (payload: SeriesPayload) => Promise<void>
   onCancel: () => void
 }
 
@@ -124,15 +124,15 @@ function TextareaField({ label, id, value, onChange, placeholder }: Omit<FieldPr
   )
 }
 
-// ─── TMDB Search ──────────────────────────────────────────────────────────────
+// ─── TMDB TV Search ───────────────────────────────────────────────────────────
 
-interface TmdbSearchProps {
-  onSelect: (details: FilmPayload) => void
+interface TmdbTvSearchProps {
+  onSelect: (details: SeriesPayload) => void
 }
 
-function TmdbSearch({ onSelect }: TmdbSearchProps) {
+function TmdbTvSearch({ onSelect }: TmdbTvSearchProps) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<TmdbSearchResult[]>([])
+  const [results, setResults] = useState<TmdbTvSearchResult[]>([])
   const [searching, setSearching] = useState(false)
   const [loadingId, setLoadingId] = useState<number | null>(null)
   const [open, setOpen] = useState(false)
@@ -148,7 +148,7 @@ function TmdbSearch({ onSelect }: TmdbSearchProps) {
     debounceRef.current = setTimeout(async () => {
       setSearching(true)
       try {
-        const res = await searchTmdb(query)
+        const res = await searchTmdbTv(query)
         setResults(res)
         setOpen(res.length > 0)
       } catch {
@@ -162,11 +162,11 @@ function TmdbSearch({ onSelect }: TmdbSearchProps) {
     }
   }, [query])
 
-  async function handleSelect(result: TmdbSearchResult) {
+  async function handleSelect(result: TmdbTvSearchResult) {
     setLoadingId(result.tmdb_id)
     setOpen(false)
     try {
-      const details = await getTmdbFilmDetails(result.tmdb_id)
+      const details = await getTmdbTvDetails(result.tmdb_id)
       onSelect(details)
       setQuery('')
       setResults([])
@@ -193,7 +193,7 @@ function TmdbSearch({ onSelect }: TmdbSearchProps) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => results.length > 0 && setOpen(true)}
-          placeholder="Chercher un film par titre…"
+          placeholder="Chercher une série par titre…"
           className="w-full pl-9 pr-8 py-2 rounded-lg border border-gray-300 bg-white text-sm text-gray-800 placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
         />
       </div>
@@ -229,14 +229,14 @@ function TmdbSearch({ onSelect }: TmdbSearchProps) {
   )
 }
 
-// ─── FilmForm ─────────────────────────────────────────────────────────────────
+// ─── SeriesForm ───────────────────────────────────────────────────────────────
 
-export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
-  const [form, setForm] = useState<FilmPayload>({
+export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
+  const [form, setForm] = useState<SeriesPayload>({
     title: initial?.title ?? '',
     title_aliases: initial?.title_aliases ?? [],
     year: initial?.year ?? new Date().getFullYear(),
-    director: initial?.director ?? '',
+    creator: initial?.creator ?? '',
     genres: initial?.genres ?? [],
     cast_members: initial?.cast_members ?? [],
     tagline: initial?.tagline ?? '',
@@ -245,6 +245,10 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
     tmdb_id: initial?.tmdb_id ?? null,
     is_active: initial?.is_active ?? true,
     fame_level: initial?.fame_level ?? 3,
+    number_of_seasons: initial?.number_of_seasons ?? null,
+    network: initial?.network ?? null,
+    status: initial?.status ?? null,
+    original_language: initial?.original_language ?? null,
   })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -257,7 +261,7 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
     setRandomLoading(true)
     setError(null)
     try {
-      const details = await getRandomTmdbFilm()
+      const details = await getRandomTmdbSeries()
       setForm({ ...details, is_active: form.is_active })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la récupération aléatoire')
@@ -274,22 +278,19 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
       const url = await uploadImage(file)
       setField('image_url', url)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Échec de l\'upload')
+      setError(err instanceof Error ? err.message : "Échec de l'upload")
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
-  function setField<K extends keyof FilmPayload>(key: K, value: FilmPayload[K]) {
+  function setField<K extends keyof SeriesPayload>(key: K, value: SeriesPayload[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  function handleTmdbFill(details: FilmPayload) {
-    setForm({
-      ...details,
-      is_active: form.is_active,
-    })
+  function handleTmdbFill(details: SeriesPayload) {
+    setForm({ ...details, is_active: form.is_active })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -308,10 +309,9 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
 
-      {/* TMDB search (only shown for new films) */}
       {!initial?.id && (
         <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-100 space-y-2">
-          <TmdbSearch onSelect={handleTmdbFill} />
+          <TmdbTvSearch onSelect={handleTmdbFill} />
           <button
             type="button"
             onClick={handleRandom}
@@ -322,27 +322,48 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
               ? <Loader2 size={13} className="animate-spin" />
               : <Shuffle size={13} />
             }
-            Film aléatoire
+            Série aléatoire
           </button>
         </div>
       )}
 
-      {/* Row: title + year */}
-      <div className="grid grid-cols-3 sm:grid-cols-3 gap-4">
-        <div className="col-span-2">
-          <Field label="Titre" id="title" required value={form.title} onChange={(v) => setField('title', v)} placeholder="Ex: Inception" />
+      <div className="grid grid-cols-3 gap-4">
+        <div className="col-span-2 min-w-0">
+          <Field label="Titre" id="title" required value={form.title} onChange={(v) => setField('title', v)} placeholder="Ex: Breaking Bad" />
         </div>
-        <Field label="Année" id="year" required type="number" value={form.year} onChange={(v) => setField('year', parseInt(v, 10) || 0)} placeholder="2010" />
+        <Field label="Année" id="year" required type="number" value={form.year} onChange={(v) => setField('year', parseInt(v, 10) || 0)} placeholder="2008" />
       </div>
 
-      <Field label="Réalisateur" id="director" required value={form.director} onChange={(v) => setField('director', v)} placeholder="Ex: Christopher Nolan" />
+      <Field label="Créateur" id="creator" required value={form.creator} onChange={(v) => setField('creator', v)} placeholder="Ex: Vince Gilligan" />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Réseau / Plateforme" id="network" value={form.network ?? ''} onChange={(v) => setField('network', v || null)} placeholder="Ex: Netflix, HBO…" />
+        <div>
+          <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">Statut</label>
+          <select
+            id="status"
+            value={form.status ?? ''}
+            onChange={(e) => setField('status', e.target.value || null)}
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+          >
+            <option value="">— Non renseigné —</option>
+            <option value="En cours">En cours</option>
+            <option value="Terminée">Terminée</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Nombre de saisons" id="number_of_seasons" type="number" value={form.number_of_seasons ?? ''} onChange={(v) => setField('number_of_seasons', v ? parseInt(v, 10) : null)} placeholder="Ex: 5" />
+        <Field label="Langue originale" id="original_language" value={form.original_language ?? ''} onChange={(v) => setField('original_language', v || null)} placeholder="Ex: en, fr, ko…" />
+      </div>
 
       <TagsInput label="Titres alternatifs" tags={form.title_aliases} onChange={(tags) => setField('title_aliases', tags)} placeholder="Ajouter un alias..." />
-      <TagsInput label="Genres" tags={form.genres} onChange={(tags) => setField('genres', tags)} placeholder="Action, Drame..." />
+      <TagsInput label="Genres" tags={form.genres} onChange={(tags) => setField('genres', tags)} placeholder="Drame, Thriller..." />
       <TagsInput label="Casting" tags={form.cast_members} onChange={(tags) => setField('cast_members', tags)} placeholder="Ajouter un acteur..." />
 
-      <Field label="Tagline" id="tagline" value={form.tagline} onChange={(v) => setField('tagline', v)} placeholder="La phrase d'accroche du film" />
-      <TextareaField label="Synopsis" id="synopsis" value={form.synopsis} onChange={(v) => setField('synopsis', v)} placeholder="Résumé du film..." />
+      <Field label="Tagline" id="tagline" value={form.tagline ?? ''} onChange={(v) => setField('tagline', v)} placeholder="La phrase d'accroche de la série" />
+      <TextareaField label="Synopsis" id="synopsis" value={form.synopsis ?? ''} onChange={(v) => setField('synopsis', v)} placeholder="Résumé de la série..." />
 
       {/* Image URL + preview */}
       <div>
@@ -389,7 +410,7 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
 
       {showBackdrops && form.tmdb_id && (
         <BackdropPicker
-          tmdbId={form.tmdb_id}
+          seriesTmdbId={form.tmdb_id}
           onSelect={(url) => setField('image_url', url)}
           onClose={() => setShowBackdrops(false)}
         />
@@ -400,7 +421,7 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
       {/* Fame level */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Niveau de célébrité <span className="font-normal text-gray-400">(1 = film de niche · 5 = blockbuster)</span>
+          Niveau de célébrité <span className="font-normal text-gray-400">(1 = niche · 5 = blockbuster)</span>
         </label>
         <div className="flex gap-1">
           {[1, 2, 3, 4, 5].map((n) => (
@@ -426,7 +447,7 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
           onChange={(e) => setField('is_active', e.target.checked)}
           className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
         />
-        <span className="text-sm font-medium text-gray-700">Film actif</span>
+        <span className="text-sm font-medium text-gray-700">Série active</span>
       </label>
 
       {error && (
@@ -439,7 +460,7 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
         </button>
         <button type="submit" disabled={submitting} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2">
           {submitting && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-          {initial?.id ? 'Enregistrer' : 'Créer le film'}
+          {initial?.id ? 'Enregistrer' : 'Créer la série'}
         </button>
       </div>
     </form>

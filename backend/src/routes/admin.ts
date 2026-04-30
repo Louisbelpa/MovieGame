@@ -91,6 +91,25 @@ interface FilmBody {
   is_active?: boolean;
 }
 
+interface SeriesBody {
+  title: string;
+  title_aliases?: string[];
+  year: number;
+  creator: string;
+  genres?: string[];
+  cast_members?: string[];
+  tagline?: string;
+  synopsis?: string;
+  image_url: string;
+  tmdb_id?: number;
+  fame_level?: number;
+  is_active?: boolean;
+  number_of_seasons?: number;
+  network?: string;
+  status?: string;
+  original_language?: string;
+}
+
 interface FilmRow {
   id: number;
   title: string;
@@ -111,10 +130,34 @@ interface FilmRow {
   updated_at: string;
 }
 
+interface SeriesRow {
+  id: number;
+  title: string;
+  title_aliases: string;
+  year: number;
+  creator: string;
+  genres: string;
+  cast_members: string;
+  tagline: string | null;
+  synopsis: string | null;
+  image_url: string;
+  image_blurred_url: string | null;
+  tmdb_id: number | null;
+  number_of_seasons: number | null;
+  network: string | null;
+  status: string | null;
+  original_language: string | null;
+  is_active: number;
+  fame_level: number;
+  created_at: string;
+  updated_at: string;
+}
+
 interface ChallengeRow {
   id: number;
   challenge_date: string;
-  film_id: number;
+  film_id: number | null;
+  series_id: number | null;
   challenge_number: number;
   hint_schedule: string;
   created_at: string;
@@ -183,14 +226,60 @@ function getFilmUsedDates(filmId: number): string[] {
   return rows.map((r) => r.challenge_date);
 }
 
+function formatSeries(row: SeriesRow, usedDates?: string[]) {
+  return {
+    id: row.id,
+    title: row.title,
+    title_aliases: JSON.parse(row.title_aliases) as string[],
+    year: row.year,
+    creator: row.creator,
+    genres: JSON.parse(row.genres) as string[],
+    cast_members: JSON.parse(row.cast_members) as string[],
+    tagline: row.tagline,
+    synopsis: row.synopsis,
+    image_url: resolveAdminImageUrl(row.image_url),
+    tmdb_id: row.tmdb_id,
+    is_active: row.is_active === 1,
+    fame_level: row.fame_level ?? 3,
+    number_of_seasons: row.number_of_seasons,
+    network: row.network,
+    status: row.status,
+    original_language: row.original_language,
+    used_dates: usedDates ?? [],
+  };
+}
+
+function getSeriesUsedDates(seriesId: number): string[] {
+  const rows = db
+    .prepare<[number], { challenge_date: string }>(
+      `SELECT challenge_date FROM daily_challenges WHERE series_id = ? ORDER BY challenge_date DESC`
+    )
+    .all(seriesId);
+  return rows.map((r) => r.challenge_date);
+}
+
 function formatChallenge(row: ChallengeRow) {
+  if (row.series_id) {
+    const series = db
+      .prepare<[number], SeriesRow>(`SELECT * FROM series WHERE id = ?`)
+      .get(row.series_id)!;
+    return {
+      id: row.id,
+      date: row.challenge_date,
+      film: null,
+      series: formatSeries(series, getSeriesUsedDates(series.id)),
+      mediaType: 'series' as const,
+    };
+  }
   const film = db
     .prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`)
-    .get(row.film_id)!;
+    .get(row.film_id!)!;
   return {
     id: row.id,
     date: row.challenge_date,
     film: formatFilm(film, getFilmUsedDates(film.id)),
+    series: null,
+    mediaType: 'film' as const,
   };
 }
 
@@ -317,78 +406,131 @@ adminRouter.get(
     try {
       const today = getTodayUTC();
 
-      const todayRow = db
-        .prepare<[string], ChallengeWithFilm>(
-          `SELECT dc.*, f.title AS film_title, f.image_url AS film_image_url,
-                  f.year AS film_year, f.director AS film_director
-           FROM daily_challenges dc
-           JOIN films f ON f.id = dc.film_id
-           WHERE dc.challenge_date = ?`
+      // Today's challenges (one per type)
+      const todayFilmRow = db
+        .prepare<[string], ChallengeRow>(
+          `SELECT dc.* FROM daily_challenges dc WHERE dc.challenge_date = ? AND dc.media_type = 'film'`
+        )
+        .get(today);
+      const todaySeriesRow = db
+        .prepare<[string], ChallengeRow>(
+          `SELECT dc.* FROM daily_challenges dc WHERE dc.challenge_date = ? AND dc.media_type = 'series'`
         )
         .get(today);
 
-      const upcomingRows = db
-        .prepare<[string], ChallengeWithFilm>(
-          `SELECT dc.*, f.title AS film_title, f.image_url AS film_image_url,
-                  f.year AS film_year, f.director AS film_director
-           FROM daily_challenges dc
-           JOIN films f ON f.id = dc.film_id
-           WHERE dc.challenge_date > ?
-           ORDER BY dc.challenge_date ASC
-           LIMIT 7`
+      // Upcoming challenges (7 next per type)
+      const upcomingFilmRows = db
+        .prepare<[string], ChallengeRow>(
+          `SELECT dc.* FROM daily_challenges dc
+           WHERE dc.challenge_date > ? AND dc.media_type = 'film'
+           ORDER BY dc.challenge_date ASC LIMIT 7`
+        )
+        .all(today);
+      const upcomingSeriesRows = db
+        .prepare<[string], ChallengeRow>(
+          `SELECT dc.* FROM daily_challenges dc
+           WHERE dc.challenge_date > ? AND dc.media_type = 'series'
+           ORDER BY dc.challenge_date ASC LIMIT 7`
         )
         .all(today);
 
+      // Film stats
       const totalFilms = (
         db.prepare(`SELECT COUNT(*) as c FROM films WHERE is_active = 1`).get() as { c: number }
       ).c;
       const unusedFilms = (
         db.prepare(`SELECT COUNT(*) as c FROM films f WHERE is_active = 1 AND NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.film_id = f.id)`).get() as { c: number }
       ).c;
-      const totalChallenges = (
-        db.prepare(`SELECT COUNT(*) as c FROM daily_challenges`).get() as { c: number }
+      const totalFilmChallenges = (
+        db.prepare(`SELECT COUNT(*) as c FROM daily_challenges WHERE media_type = 'film'`).get() as { c: number }
       ).c;
-      // Unscheduled days in the next 30 days
+
+      // Series stats
+      const totalSeries = (
+        db.prepare(`SELECT COUNT(*) as c FROM series WHERE is_active = 1`).get() as { c: number }
+      ).c;
+      const unusedSeries = (
+        db.prepare(`SELECT COUNT(*) as c FROM series s WHERE is_active = 1 AND NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.series_id = s.id)`).get() as { c: number }
+      ).c;
+      const totalSeriesChallenges = (
+        db.prepare(`SELECT COUNT(*) as c FROM daily_challenges WHERE media_type = 'series'`).get() as { c: number }
+      ).c;
+
+      // Unscheduled days per type in next 30 days
       const next30 = Array.from({ length: 30 }, (_, i) => {
         const d = new Date(); d.setUTCDate(d.getUTCDate() + i + 1);
         return d.toISOString().slice(0, 10);
       });
-      const scheduledDates = new Set(
-        (db.prepare(`SELECT challenge_date FROM daily_challenges WHERE challenge_date > ? AND challenge_date <= ?`)
-          .all(today, next30[next30.length - 1]) as { challenge_date: string }[])
-          .map((r) => r.challenge_date)
+      const lastDay = next30[next30.length - 1];
+      const scheduledFilmDates = new Set(
+        (db.prepare(`SELECT challenge_date FROM daily_challenges WHERE media_type = 'film' AND challenge_date > ? AND challenge_date <= ?`)
+          .all(today, lastDay) as { challenge_date: string }[]).map((r) => r.challenge_date)
       );
-      const unscheduledNext30 = next30.filter((d) => !scheduledDates.has(d)).length;
+      const scheduledSeriesDates = new Set(
+        (db.prepare(`SELECT challenge_date FROM daily_challenges WHERE media_type = 'series' AND challenge_date > ? AND challenge_date <= ?`)
+          .all(today, lastDay) as { challenge_date: string }[]).map((r) => r.challenge_date)
+      );
+      const unscheduledFilmNext30 = next30.filter((d) => !scheduledFilmDates.has(d)).length;
+      const unscheduledSeriesNext30 = next30.filter((d) => !scheduledSeriesDates.has(d)).length;
 
-      const globalRow = db.prepare(`SELECT * FROM global_stats WHERE id = 1`).get() as {
-        total_games: number; total_wins: number;
-      };
-      const successRate = globalRow.total_games > 0
-        ? Math.round((globalRow.total_wins / globalRow.total_games) * 100)
-        : 0;
-
-      // Today's game activity
-      let todayGames = 0; let todayWins = 0;
-      if (todayRow) {
-        const todayStats = db.prepare<[number], { total: number; wins: number }>(
-          `SELECT COUNT(*) as total, SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) as wins
-           FROM game_sessions WHERE challenge_id = ?`
-        ).get(todayRow.id) as { total: number; wins: number } | undefined;
-        todayGames = todayStats?.total ?? 0;
-        todayWins = todayStats?.wins ?? 0;
+      // Per-type global success rates (computed live via JOIN — global_stats is mixed)
+      function getTypeSuccessRate(mediaType: 'film' | 'series') {
+        const row = db.prepare<[string], { total: number; wins: number }>(
+          `SELECT COUNT(*) as total,
+                  SUM(CASE WHEN gs.outcome = 'won' THEN 1 ELSE 0 END) as wins
+           FROM game_sessions gs
+           JOIN daily_challenges dc ON dc.id = gs.challenge_id
+           WHERE gs.outcome IS NOT NULL AND dc.media_type = ?`
+        ).get(mediaType) as { total: number; wins: number } | undefined;
+        const total = row?.total ?? 0;
+        const wins = row?.wins ?? 0;
+        return { total, wins, rate: total > 0 ? Math.round((wins / total) * 100) : null };
       }
+      const filmSuccessStats = getTypeSuccessRate('film');
+      const seriesSuccessStats = getTypeSuccessRate('series');
+      const successRate = (() => {
+        const t = filmSuccessStats.total + seriesSuccessStats.total;
+        const w = filmSuccessStats.wins + seriesSuccessStats.wins;
+        return t > 0 ? Math.round((w / t) * 100) : null;
+      })();
+
+      // Today's game activity per type (with per-challenge success rate)
+      function getTodayActivity(row: ChallengeRow | undefined) {
+        if (!row) return { games: 0, wins: 0, rate: null as number | null };
+        const s = db.prepare<[number], { total: number; wins: number }>(
+          `SELECT COUNT(*) as total, SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) as wins
+           FROM game_sessions WHERE challenge_id = ? AND outcome IS NOT NULL`
+        ).get(row.id) as { total: number; wins: number } | undefined;
+        const total = s?.total ?? 0;
+        const wins = s?.wins ?? 0;
+        return { games: total, wins, rate: total > 0 ? Math.round((wins / total) * 100) : null };
+      }
+      const filmActivity = getTodayActivity(todayFilmRow);
+      const seriesActivity = getTodayActivity(todaySeriesRow);
 
       res.json({
-        today_challenge: todayRow ? formatChallenge(todayRow) : null,
-        upcoming_challenges: upcomingRows.map(formatChallenge),
+        today_film_challenge: todayFilmRow ? formatChallenge(todayFilmRow) : null,
+        today_series_challenge: todaySeriesRow ? formatChallenge(todaySeriesRow) : null,
+        upcoming_film_challenges: upcomingFilmRows.map(formatChallenge),
+        upcoming_series_challenges: upcomingSeriesRows.map(formatChallenge),
         stats: {
           total_films: totalFilms,
           unused_films: unusedFilms,
-          total_challenges: totalChallenges,
+          total_film_challenges: totalFilmChallenges,
+          unscheduled_film_next_30: unscheduledFilmNext30,
+          today_film_games: filmActivity.games,
+          today_film_wins: filmActivity.wins,
+          today_film_rate: filmActivity.rate,
+          film_success_rate: filmSuccessStats.rate,
+          total_series: totalSeries,
+          unused_series: unusedSeries,
+          total_series_challenges: totalSeriesChallenges,
+          unscheduled_series_next_30: unscheduledSeriesNext30,
+          today_series_games: seriesActivity.games,
+          today_series_wins: seriesActivity.wins,
+          today_series_rate: seriesActivity.rate,
+          series_success_rate: seriesSuccessStats.rate,
           success_rate: successRate,
-          today_games: todayGames,
-          today_wins: todayWins,
-          unscheduled_next_30: unscheduledNext30,
         },
       });
     } catch (err) {
@@ -850,28 +992,31 @@ adminRouter.get(
       const from = parseDateParam(req.query.from);
       const to = parseDateParam(req.query.to);
 
-      let query = `
-        SELECT dc.*, f.title AS film_title, f.image_url AS film_image_url
-        FROM daily_challenges dc
-        JOIN films f ON f.id = dc.film_id
-      `;
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      let query = `SELECT dc.* FROM daily_challenges dc`;
       const params: string[] = [];
+      const conditions: string[] = [];
 
       if (from && to) {
-        query += ` WHERE dc.challenge_date BETWEEN ? AND ?`;
+        conditions.push(`dc.challenge_date BETWEEN ? AND ?`);
         params.push(from, to);
       } else if (from) {
-        query += ` WHERE dc.challenge_date >= ?`;
+        conditions.push(`dc.challenge_date >= ?`);
         params.push(from);
       } else if (to) {
-        query += ` WHERE dc.challenge_date <= ?`;
+        conditions.push(`dc.challenge_date <= ?`);
         params.push(to);
       }
+      if (mediaType) {
+        conditions.push(`dc.media_type = ?`);
+        params.push(mediaType);
+      }
+      if (conditions.length) query += ` WHERE ${conditions.join(' AND ')}`;
 
       query += ` ORDER BY dc.challenge_date ASC`;
 
       const rows = db
-        .prepare<string[], ChallengeWithFilm>(query)
+        .prepare<string[], ChallengeRow>(query)
         .all(...params);
 
       res.json({ data: rows.map(formatChallenge) });
@@ -886,60 +1031,68 @@ adminRouter.post(
   '/challenges',
   (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { date, film_id } = req.body as { date?: string; film_id?: number };
+      const { date, film_id, series_id } = req.body as { date?: string; film_id?: number; series_id?: number };
 
       if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || new Date(date).toISOString().slice(0, 10) !== date) {
         res.status(400).json({ error: 'Field "date" must be a valid YYYY-MM-DD string.' });
         return;
       }
-      if (!film_id || typeof film_id !== 'number') {
-        res.status(400).json({ error: 'Field "film_id" must be a number.' });
+
+      const hasFilm = film_id !== undefined && film_id !== null && typeof film_id === 'number';
+      const hasSeries = series_id !== undefined && series_id !== null && typeof series_id === 'number';
+
+      if (!hasFilm && !hasSeries) {
+        res.status(400).json({ error: 'Either "film_id" or "series_id" must be provided.' });
+        return;
+      }
+      if (hasFilm && hasSeries) {
+        res.status(400).json({ error: 'Only one of "film_id" or "series_id" may be provided.' });
         return;
       }
 
-      const film = db
-        .prepare(`SELECT id FROM films WHERE id = ? AND is_active = 1`)
-        .get(film_id);
-
-      if (!film) {
-        res.status(404).json({ error: 'Film not found or inactive.' });
-        return;
+      if (hasFilm) {
+        const film = db.prepare(`SELECT id FROM films WHERE id = ? AND is_active = 1`).get(film_id);
+        if (!film) { res.status(404).json({ error: 'Film not found or inactive.' }); return; }
+      } else {
+        const series = db.prepare(`SELECT id FROM series WHERE id = ? AND is_active = 1`).get(series_id);
+        if (!series) { res.status(404).json({ error: 'Series not found or inactive.' }); return; }
       }
 
-      // Check for existing challenge on that date
+      const mediaType = hasFilm ? 'film' : 'series';
+
+      // Check for existing challenge of same type on that date
       const existing = db
-        .prepare(`SELECT id FROM daily_challenges WHERE challenge_date = ?`)
-        .get(date);
+        .prepare(`SELECT id FROM daily_challenges WHERE challenge_date = ? AND media_type = ?`)
+        .get(date, mediaType);
 
       if (existing) {
-        res.status(409).json({ error: `A challenge is already scheduled for ${date}.` });
+        res.status(409).json({ error: `A ${mediaType} challenge is already scheduled for ${date}.` });
         return;
       }
 
-      // Determine next challenge number
+      // Challenge number is per media_type
       const maxNum = (
         db
-          .prepare(`SELECT COALESCE(MAX(challenge_number), 0) AS max_num FROM daily_challenges`)
-          .get() as { max_num: number }
+          .prepare(`SELECT COALESCE(MAX(challenge_number), 0) AS max_num FROM daily_challenges WHERE media_type = ?`)
+          .get(mediaType) as { max_num: number }
       ).max_num;
+
+      const hintSchedule = hasFilm
+        ? JSON.stringify(['year', 'director', 'cast'])
+        : JSON.stringify(['year', 'creator', 'cast']);
 
       const result = db
         .prepare(
-          `INSERT INTO daily_challenges (challenge_date, film_id, challenge_number, hint_schedule)
-           VALUES (?, ?, ?, ?)`
+          `INSERT INTO daily_challenges (challenge_date, media_type, film_id, series_id, challenge_number, hint_schedule)
+           VALUES (?, ?, ?, ?, ?, ?)`
         )
-        .run(date, film_id, maxNum + 1, JSON.stringify(['year', 'director', 'cast']));
+        .run(date, mediaType, hasFilm ? film_id : null, hasSeries ? series_id : null, maxNum + 1, hintSchedule);
 
       const created = db
-        .prepare<[number], ChallengeWithFilm>(
-          `SELECT dc.*, f.title AS film_title, f.image_url AS film_image_url
-           FROM daily_challenges dc
-           JOIN films f ON f.id = dc.film_id
-           WHERE dc.id = ?`
-        )
+        .prepare<[number], ChallengeRow>(`SELECT dc.* FROM daily_challenges dc WHERE dc.id = ?`)
         .get(result.lastInsertRowid as number)!;
 
-      logAuditEvent('challenge.create', { id: result.lastInsertRowid, date, film_id });
+      logAuditEvent('challenge.create', { id: result.lastInsertRowid, date, film_id, series_id });
       res.status(201).json(formatChallenge(created));
     } catch (err) {
       next(err);
@@ -958,9 +1111,16 @@ adminRouter.put(
         return;
       }
 
-      const { film_id } = req.body as { film_id?: number };
-      if (!film_id || typeof film_id !== 'number') {
-        res.status(400).json({ error: 'Field "film_id" must be a number.' });
+      const { film_id, series_id } = req.body as { film_id?: number; series_id?: number };
+      const hasFilm = film_id !== undefined && film_id !== null && typeof film_id === 'number';
+      const hasSeries = series_id !== undefined && series_id !== null && typeof series_id === 'number';
+
+      if (!hasFilm && !hasSeries) {
+        res.status(400).json({ error: 'Either "film_id" or "series_id" must be provided.' });
+        return;
+      }
+      if (hasFilm && hasSeries) {
+        res.status(400).json({ error: 'Only one of "film_id" or "series_id" may be provided.' });
         return;
       }
 
@@ -973,27 +1133,21 @@ adminRouter.put(
         return;
       }
 
-      const film = db
-        .prepare(`SELECT id FROM films WHERE id = ? AND is_active = 1`)
-        .get(film_id);
-
-      if (!film) {
-        res.status(404).json({ error: 'Film not found or inactive.' });
-        return;
+      if (hasFilm) {
+        const film = db.prepare(`SELECT id FROM films WHERE id = ? AND is_active = 1`).get(film_id);
+        if (!film) { res.status(404).json({ error: 'Film not found or inactive.' }); return; }
+        db.prepare(`UPDATE daily_challenges SET film_id = ?, series_id = NULL WHERE id = ?`).run(film_id, id);
+      } else {
+        const series = db.prepare(`SELECT id FROM series WHERE id = ? AND is_active = 1`).get(series_id);
+        if (!series) { res.status(404).json({ error: 'Series not found or inactive.' }); return; }
+        db.prepare(`UPDATE daily_challenges SET film_id = NULL, series_id = ? WHERE id = ?`).run(series_id, id);
       }
 
-      db.prepare(`UPDATE daily_challenges SET film_id = ? WHERE id = ?`).run(film_id, id);
-
       const updated = db
-        .prepare<[number], ChallengeWithFilm>(
-          `SELECT dc.*, f.title AS film_title, f.image_url AS film_image_url
-           FROM daily_challenges dc
-           JOIN films f ON f.id = dc.film_id
-           WHERE dc.id = ?`
-        )
+        .prepare<[number], ChallengeRow>(`SELECT dc.* FROM daily_challenges dc WHERE dc.id = ?`)
         .get(id)!;
 
-      logAuditEvent('challenge.update', { id, film_id });
+      logAuditEvent('challenge.update', { id, film_id, series_id });
       res.json(formatChallenge(updated));
     } catch (err) {
       next(err);
@@ -1009,30 +1163,32 @@ adminRouter.patch(
       const id = parseInt(req.params.id, 10);
       if (isNaN(id)) { res.status(400).json({ error: 'Invalid challenge id.' }); return; }
 
-      const { film_id } = req.body as { film_id?: number };
-      if (!film_id || typeof film_id !== 'number') {
-        res.status(400).json({ error: 'Field "film_id" must be a number.' });
-        return;
+      const { film_id, series_id } = req.body as { film_id?: number; series_id?: number };
+      const hasFilm = film_id !== undefined && film_id !== null && typeof film_id === 'number';
+      const hasSeries = series_id !== undefined && series_id !== null && typeof series_id === 'number';
+
+      if (!hasFilm && !hasSeries) {
+        res.status(400).json({ error: 'Either "film_id" or "series_id" must be provided.' }); return;
+      }
+      if (hasFilm && hasSeries) {
+        res.status(400).json({ error: 'Only one of "film_id" or "series_id" may be provided.' }); return;
       }
 
       const existing = db.prepare(`SELECT id FROM daily_challenges WHERE id = ?`).get(id);
       if (!existing) { res.status(404).json({ error: 'Challenge not found.' }); return; }
 
-      const film = db.prepare(`SELECT id FROM films WHERE id = ? AND is_active = 1`).get(film_id);
-      if (!film) { res.status(404).json({ error: 'Film not found or inactive.' }); return; }
+      if (hasFilm) {
+        const film = db.prepare(`SELECT id FROM films WHERE id = ? AND is_active = 1`).get(film_id);
+        if (!film) { res.status(404).json({ error: 'Film not found or inactive.' }); return; }
+        db.prepare(`UPDATE daily_challenges SET film_id = ?, series_id = NULL WHERE id = ?`).run(film_id, id);
+      } else {
+        const series = db.prepare(`SELECT id FROM series WHERE id = ? AND is_active = 1`).get(series_id);
+        if (!series) { res.status(404).json({ error: 'Series not found or inactive.' }); return; }
+        db.prepare(`UPDATE daily_challenges SET film_id = NULL, series_id = ? WHERE id = ?`).run(series_id, id);
+      }
 
-      db.prepare(`UPDATE daily_challenges SET film_id = ? WHERE id = ?`).run(film_id, id);
-
-      const updated = db
-        .prepare<[number], ChallengeWithFilm>(
-          `SELECT dc.*, f.title AS film_title, f.image_url AS film_image_url
-           FROM daily_challenges dc
-           JOIN films f ON f.id = dc.film_id
-           WHERE dc.id = ?`
-        )
-        .get(id)!;
-
-      logAuditEvent('challenge.update', { id, film_id });
+      const updated = db.prepare<[number], ChallengeRow>(`SELECT dc.* FROM daily_challenges dc WHERE dc.id = ?`).get(id)!;
+      logAuditEvent('challenge.update', { id, film_id, series_id });
       res.json(formatChallenge(updated));
     } catch (err) {
       next(err);
@@ -1174,11 +1330,8 @@ adminRouter.get(
       // Today's challenge stats
       const today = getTodayUTC();
       const todayChallenge = db
-        .prepare<[string], ChallengeWithFilm>(
-          `SELECT dc.*, f.title AS film_title, f.image_url AS film_image_url
-           FROM daily_challenges dc
-           JOIN films f ON f.id = dc.film_id
-           WHERE dc.challenge_date = ?`
+        .prepare<[string], ChallengeRow>(
+          `SELECT dc.* FROM daily_challenges dc WHERE dc.challenge_date = ?`
         )
         .get(today);
 
@@ -1197,13 +1350,17 @@ adminRouter.get(
 
         const total = sessionStats.total ?? 0;
         const wins = sessionStats.wins ?? 0;
+        const formatted = formatChallenge(todayChallenge);
+        const title = formatted.film?.title ?? formatted.series?.title ?? '';
+        const imageUrl = formatted.film?.image_url ?? formatted.series?.image_url ?? '';
 
         todayStats = {
           challengeId: todayChallenge.id,
           date: todayChallenge.challenge_date,
           challengeNumber: todayChallenge.challenge_number,
-          filmTitle: todayChallenge.film_title,
-          filmImageUrl: todayChallenge.film_image_url,
+          filmTitle: title,
+          filmImageUrl: imageUrl,
+          mediaType: formatted.mediaType,
           totalPlayers: total,
           totalWins: wins,
           successRate: total > 0 ? Math.round((wins / total) * 100) : 0,
@@ -1446,6 +1603,105 @@ adminRouter.get(
   }
 );
 
+// GET /api/admin/tmdb/tv/random
+// Fetches a random popular TV series from TMDB and returns it as a SeriesPayload.
+adminRouter.get(
+  '/tmdb/tv/random',
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const apiKey = process.env.TMDB_API_KEY;
+      if (!apiKey) {
+        res.status(400).json({ error: 'TMDB_API_KEY not configured' });
+        return;
+      }
+
+      const page = Math.floor(Math.random() * 30) + 1;
+      const discoverRes = await fetch(
+        `https://api.themoviedb.org/3/discover/tv` +
+        `?api_key=${apiKey}&language=fr-FR&sort_by=vote_count.desc` +
+        `&vote_count.gte=200&page=${page}`
+      );
+      if (!discoverRes.ok) {
+        res.status(502).json({ error: `TMDB discover error: ${discoverRes.status}` });
+        return;
+      }
+      const discoverData = (await discoverRes.json()) as { results: { id: number }[] };
+      const results = discoverData.results ?? [];
+      if (results.length === 0) {
+        res.status(502).json({ error: 'No results from TMDB' });
+        return;
+      }
+
+      const picked = results[Math.floor(Math.random() * results.length)];
+
+      const [detailsRes, creditsRes, imagesRes] = await Promise.all([
+        fetch(`https://api.themoviedb.org/3/tv/${picked.id}?api_key=${apiKey}&language=fr-FR`),
+        fetch(`https://api.themoviedb.org/3/tv/${picked.id}/aggregate_credits?api_key=${apiKey}`),
+        fetch(`https://api.themoviedb.org/3/tv/${picked.id}/images?api_key=${apiKey}&include_image_language=null`),
+      ]);
+
+      const details = (await detailsRes.json()) as {
+        id: number; name: string; original_name: string;
+        first_air_date: string; tagline: string; overview: string;
+        backdrop_path: string | null;
+        genres: { name: string }[];
+        vote_count: number;
+        number_of_seasons: number;
+        networks: { name: string }[];
+        status: string;
+        original_language: string;
+        created_by?: { name: string }[];
+      };
+      const credits = (await creditsRes.json()) as {
+        cast: { name: string; order: number }[];
+      };
+      const images = (await imagesRes.json()) as {
+        backdrops: { file_path: string; vote_average: number }[];
+      };
+
+      const cast = (credits.cast ?? [])
+        .sort((a, b) => a.order - b.order)
+        .slice(0, 5)
+        .map((c) => c.name);
+      const genres = (details.genres ?? []).map((g) => g.name);
+
+      const bestBackdrop = (images.backdrops ?? [])
+        .sort((a, b) => b.vote_average - a.vote_average)[0];
+      const imageUrl = bestBackdrop
+        ? `https://image.tmdb.org/t/p/w1280${bestBackdrop.file_path}`
+        : details.backdrop_path
+        ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}`
+        : '';
+
+      const titleAliases: string[] = [];
+      if (details.original_name && details.original_name !== details.name) {
+        titleAliases.push(details.original_name);
+      }
+
+      res.json({
+        title: details.name,
+        title_aliases: titleAliases,
+        year: details.first_air_date ? parseInt(details.first_air_date.slice(0, 4), 10) : 0,
+        creator: Array.isArray(details.created_by) && details.created_by.length > 0 ? details.created_by[0].name : '',
+        genres,
+        cast_members: cast,
+        tagline: details.tagline ?? '',
+        synopsis: details.overview ?? '',
+        image_url: imageUrl,
+        tmdb_id: details.id,
+        is_active: true,
+        fame_level: fameFromVoteCount(details.vote_count ?? 0),
+        number_of_seasons: details.number_of_seasons ?? null,
+        network: details.networks?.[0]?.name ?? null,
+        status: details.status ?? null,
+        original_language: details.original_language ?? null,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // GET /api/admin/tmdb/:tmdbId/backdrops
 // Fetches backdrops directly by TMDB ID — used when creating a film (no DB id yet).
 adminRouter.get(
@@ -1619,5 +1875,962 @@ adminRouter.get(
         .all();
       res.json({ data: rows.map((r) => r.action) });
     } catch (err) { next(err); }
+  }
+);
+
+// ─── Series CRUD ──────────────────────────────────────────────────────────────
+
+// GET /api/admin/series?page=1&limit=20
+adminRouter.get(
+  '/series',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const page = Math.max(1, parseInt((req.query.page as string | undefined) ?? '1', 10));
+      const limit = Math.min(
+        100,
+        Math.max(1, parseInt((req.query.limit as string | undefined) ?? '20', 10))
+      );
+      const offset = (page - 1) * limit;
+
+      const total = (
+        db.prepare(`SELECT COUNT(*) as count FROM series`).get() as { count: number }
+      ).count;
+
+      const rows = db
+        .prepare<[number, number], SeriesRow>(
+          `SELECT * FROM series ORDER BY created_at DESC LIMIT ? OFFSET ?`
+        )
+        .all(limit, offset);
+
+      res.json({
+        data: rows.map((r) => formatSeries(r, getSeriesUsedDates(r.id))),
+        pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
+
+// GET /api/admin/analytics/overview
+adminRouter.get(
+  '/analytics/overview',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
+      const whereClause = mediaType ? `WHERE dc.media_type = ?` : '';
+      const overview = db.prepare(`
+        SELECT
+          COUNT(*) AS total_sessions,
+          COUNT(DISTINCT session_token) AS total_unique_players,
+          ROUND(100.0 * SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN outcome IS NOT NULL THEN 1 ELSE 0 END), 0)) AS overall_win_rate,
+          ROUND(AVG(CASE WHEN outcome = 'won' THEN json_array_length(attempts) ELSE NULL END), 1) AS avg_attempts_on_win,
+          ROUND(AVG(hints_revealed), 1) AS avg_hints_per_session,
+          ROUND(100.0 * SUM(CASE WHEN outcome IS NOT NULL THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0)) AS completion_rate,
+          ROUND(AVG(CASE WHEN outcome IS NOT NULL THEN strftime('%s', finished_at) - strftime('%s', started_at) ELSE NULL END)) AS avg_session_duration_seconds
+        FROM game_sessions gs
+        ${joinClause}
+        ${whereClause}
+      `).get(...(mediaType ? [mediaType] : [])) as {
+        total_sessions: number;
+        total_unique_players: number;
+        overall_win_rate: number | null;
+        avg_attempts_on_win: number | null;
+        avg_hints_per_session: number | null;
+        completion_rate: number | null;
+        avg_session_duration_seconds: number | null;
+      };
+
+      res.json({
+        total_sessions: overview.total_sessions ?? 0,
+        total_unique_players: overview.total_unique_players ?? 0,
+        overall_win_rate: overview.overall_win_rate ?? 0,
+        avg_attempts_on_win: overview.avg_attempts_on_win ?? 0,
+        avg_hints_per_session: overview.avg_hints_per_session ?? 0,
+        completion_rate: overview.completion_rate ?? 0,
+        avg_session_duration_seconds: overview.avg_session_duration_seconds ?? 0,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /api/admin/series
+adminRouter.post(
+  '/series',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as SeriesBody;
+
+      if (!body.title || typeof body.title !== 'string' || !body.title.trim()) {
+        res.status(400).json({ error: 'Field "title" is required.' }); return;
+      }
+      if (body.title.length > 500) {
+        res.status(400).json({ error: 'Field "title" must be 500 characters or fewer.' }); return;
+      }
+      if (!body.year || typeof body.year !== 'number') {
+        res.status(400).json({ error: 'Field "year" must be a number.' }); return;
+      }
+      const maxYear = new Date().getFullYear() + 5;
+      if (!Number.isInteger(body.year) || body.year < 1900 || body.year > maxYear) {
+        res.status(400).json({ error: `Field "year" must be between 1900 and ${maxYear}.` }); return;
+      }
+      if (!body.creator || typeof body.creator !== 'string' || !body.creator.trim()) {
+        res.status(400).json({ error: 'Field "creator" is required.' }); return;
+      }
+      if (body.creator.length > 200) {
+        res.status(400).json({ error: 'Field "creator" must be 200 characters or fewer.' }); return;
+      }
+      if (!body.image_url || typeof body.image_url !== 'string' || !body.image_url.trim()) {
+        res.status(400).json({ error: 'Field "image_url" is required.' }); return;
+      }
+      if (body.fame_level !== undefined && (typeof body.fame_level !== 'number' || body.fame_level < 1 || body.fame_level > 5)) {
+        res.status(400).json({ error: 'Field "fame_level" must be between 1 and 5.' }); return;
+      }
+
+      const result = db
+        .prepare(
+          `INSERT INTO series
+             (title, title_aliases, year, creator, genres, cast_members,
+              tagline, synopsis, image_url, tmdb_id, fame_level, is_active,
+              number_of_seasons, network, status, original_language)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          body.title.trim(),
+          JSON.stringify(body.title_aliases ?? []),
+          body.year,
+          body.creator.trim(),
+          JSON.stringify(body.genres ?? []),
+          JSON.stringify(body.cast_members ?? []),
+          body.tagline ?? null,
+          body.synopsis ?? null,
+          body.image_url.trim(),
+          body.tmdb_id ?? null,
+          body.fame_level ?? 3,
+          body.is_active !== undefined ? (body.is_active ? 1 : 0) : 1,
+          body.number_of_seasons ?? null,
+          body.network ?? null,
+          body.status ?? null,
+          body.original_language ?? null
+        );
+
+      const created = db
+        .prepare<[number], SeriesRow>(`SELECT * FROM series WHERE id = ?`)
+        .get(result.lastInsertRowid as number)!;
+
+      logAuditEvent('series.create', { id: result.lastInsertRowid, title: body.title.trim() });
+      res.status(201).json(formatSeries(created, []));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/daily?from=YYYY-MM-DD&to=YYYY-MM-DD
+adminRouter.get(
+  '/analytics/daily',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const defaultTo = new Date().toISOString().slice(0, 10);
+      const defaultFrom = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+      const from = parseDateParam(req.query.from) ?? defaultFrom;
+      const to = parseDateParam(req.query.to) ?? defaultTo;
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
+      const mediaWhere = mediaType ? `AND dc.media_type = ?` : '';
+
+      const rows = db.prepare(`
+        SELECT
+          date(gs.started_at) AS date,
+          COUNT(*) AS sessions_started,
+          SUM(CASE WHEN gs.outcome IS NOT NULL THEN 1 ELSE 0 END) AS sessions_completed,
+          COUNT(DISTINCT gs.session_token) AS unique_players,
+          ROUND(100.0 * SUM(CASE WHEN gs.outcome = 'won' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN gs.outcome IS NOT NULL THEN 1 ELSE 0 END), 0)) AS win_rate,
+          ROUND(AVG(CASE WHEN gs.outcome IS NOT NULL THEN json_array_length(gs.attempts) ELSE NULL END), 1) AS avg_attempts,
+          ROUND(AVG(gs.hints_revealed), 1) AS avg_hints,
+          ROUND(100.0 * SUM(CASE WHEN gs.outcome IS NULL THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0)) AS abandonment_rate
+        FROM game_sessions gs
+        ${joinClause}
+        WHERE date(gs.started_at) BETWEEN ? AND ?
+        ${mediaWhere}
+        GROUP BY date(gs.started_at)
+        ORDER BY date(gs.started_at) ASC
+      `).all(...(mediaType ? [from, to, mediaType] : [from, to])) as {
+        date: string;
+        sessions_started: number;
+        sessions_completed: number;
+        unique_players: number;
+        win_rate: number | null;
+        avg_attempts: number | null;
+        avg_hints: number | null;
+        abandonment_rate: number | null;
+      }[];
+
+      res.json(rows.map((r) => ({
+        date: r.date,
+        sessions_started: r.sessions_started,
+        sessions_completed: r.sessions_completed,
+        unique_players: r.unique_players,
+        win_rate: r.win_rate ?? 0,
+        avg_attempts: r.avg_attempts ?? 0,
+        avg_hints: r.avg_hints ?? 0,
+        abandonment_rate: r.abandonment_rate ?? 0,
+      })));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/attempts-distribution
+adminRouter.get(
+  '/analytics/attempts-distribution',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
+      const whereMedia = mediaType ? `AND dc.media_type = ?` : '';
+      const rows = db.prepare(`
+        SELECT json_array_length(gs.attempts) AS attempt_count, COUNT(*) AS cnt
+        FROM game_sessions gs
+        ${joinClause}
+        WHERE gs.outcome = 'won'
+        ${whereMedia}
+        GROUP BY attempt_count
+        ORDER BY attempt_count ASC
+      `).all(...(mediaType ? [mediaType] : [])) as { attempt_count: number; cnt: number }[];
+
+      const result: Record<string, number> = {};
+      for (const row of rows) {
+        result[String(row.attempt_count)] = row.cnt;
+      }
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/hints-distribution
+adminRouter.get(
+  '/analytics/hints-distribution',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
+      const whereMedia = mediaType ? `WHERE dc.media_type = ?` : '';
+      const rows = db.prepare(`
+        SELECT gs.hints_revealed, COUNT(*) AS cnt
+        FROM game_sessions gs
+        ${joinClause}
+        ${whereMedia}
+        GROUP BY gs.hints_revealed
+        ORDER BY gs.hints_revealed ASC
+      `).all(...(mediaType ? [mediaType] : [])) as { hints_revealed: number; cnt: number }[];
+
+      const result: Record<string, number> = {};
+      for (const row of rows) {
+        result[String(row.hints_revealed)] = row.cnt;
+      }
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// PATCH /api/admin/series/:id
+adminRouter.patch(
+  '/series/:id',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) { res.status(400).json({ error: 'Invalid series id.' }); return; }
+
+      const existing = db
+        .prepare<[number], SeriesRow>(`SELECT * FROM series WHERE id = ?`)
+        .get(id);
+      if (!existing) { res.status(404).json({ error: 'Series not found.' }); return; }
+
+      const body = req.body as Partial<SeriesBody>;
+
+      if (body.title !== undefined && body.title.length > 500) {
+        res.status(400).json({ error: 'Field "title" must be 500 characters or fewer.' }); return;
+      }
+      if (body.creator !== undefined && body.creator.length > 200) {
+        res.status(400).json({ error: 'Field "creator" must be 200 characters or fewer.' }); return;
+      }
+      if (body.year !== undefined) {
+        const maxYear = new Date().getFullYear() + 5;
+        if (!Number.isInteger(body.year) || body.year < 1900 || body.year > maxYear) {
+          res.status(400).json({ error: `Field "year" must be between 1900 and ${maxYear}.` }); return;
+        }
+      }
+      if (body.fame_level !== undefined && (body.fame_level < 1 || body.fame_level > 5)) {
+        res.status(400).json({ error: 'Field "fame_level" must be between 1 and 5.' }); return;
+      }
+
+      db.prepare(
+        `UPDATE series
+         SET title        = ?,
+             title_aliases = ?,
+             year         = ?,
+             creator      = ?,
+             genres       = ?,
+             cast_members = ?,
+             tagline      = ?,
+             synopsis     = ?,
+             image_url    = ?,
+             tmdb_id      = ?,
+             fame_level   = ?,
+             is_active    = ?,
+             number_of_seasons = ?,
+             network      = ?,
+             status       = ?,
+             original_language = ?,
+             updated_at   = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+         WHERE id = ?`
+      ).run(
+        (body.title ?? existing.title).trim(),
+        JSON.stringify(body.title_aliases ?? JSON.parse(existing.title_aliases)),
+        body.year ?? existing.year,
+        (body.creator ?? existing.creator).trim(),
+        JSON.stringify(body.genres ?? JSON.parse(existing.genres)),
+        JSON.stringify(body.cast_members ?? JSON.parse(existing.cast_members)),
+        body.tagline !== undefined ? body.tagline : existing.tagline,
+        body.synopsis !== undefined ? body.synopsis : existing.synopsis,
+        (body.image_url ?? existing.image_url).trim(),
+        body.tmdb_id !== undefined ? body.tmdb_id : existing.tmdb_id,
+        body.fame_level !== undefined ? body.fame_level : (existing.fame_level ?? 3),
+        body.is_active !== undefined ? (body.is_active ? 1 : 0) : existing.is_active,
+        body.number_of_seasons !== undefined ? body.number_of_seasons : existing.number_of_seasons,
+        body.network !== undefined ? body.network : existing.network,
+        body.status !== undefined ? body.status : existing.status,
+        body.original_language !== undefined ? body.original_language : existing.original_language,
+        id
+      );
+
+      const updated = db.prepare<[number], SeriesRow>(`SELECT * FROM series WHERE id = ?`).get(id)!;
+      logAuditEvent('series.update', { id, fields: Object.keys(body) });
+      res.json(formatSeries(updated, getSeriesUsedDates(id)));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/hourly
+adminRouter.get(
+  '/analytics/hourly',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
+      const whereClause = mediaType ? `WHERE dc.media_type = ?` : '';
+      const rows = db.prepare(`
+        SELECT CAST(strftime('%H', gs.started_at, '+1 hour') AS INTEGER) AS hour,
+               COUNT(*) AS sessions
+        FROM game_sessions gs
+        ${joinClause}
+        ${whereClause}
+        GROUP BY hour
+        ORDER BY hour ASC
+      `).all(...(mediaType ? [mediaType] : [])) as { hour: number; sessions: number }[];
+
+      res.json(rows);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/films?sort=win_rate|sessions|avg_hints
+adminRouter.get(
+  '/analytics/films',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sortParam = req.query.sort as string | undefined;
+      const validSorts = ['win_rate', 'sessions', 'avg_hints'] as const;
+      type SortOption = typeof validSorts[number];
+      const sort: SortOption = validSorts.includes(sortParam as SortOption)
+        ? (sortParam as SortOption)
+        : 'win_rate';
+
+      const orderClause =
+        sort === 'win_rate'
+          ? 'ORDER BY win_rate ASC'
+          : sort === 'sessions'
+          ? 'ORDER BY sessions DESC'
+          : 'ORDER BY avg_hints DESC';
+
+      const rows = db.prepare(`
+        SELECT
+          dc.id AS challenge_id,
+          dc.challenge_date,
+          f.title AS film_title,
+          f.year AS film_year,
+          f.fame_level,
+          COUNT(gs.rowid) AS sessions,
+          ROUND(100.0 * SUM(CASE WHEN gs.outcome = 'won' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN gs.outcome IS NOT NULL THEN 1 ELSE 0 END), 0)) AS win_rate,
+          ROUND(AVG(CASE WHEN gs.outcome IS NOT NULL THEN json_array_length(gs.attempts) ELSE NULL END), 1) AS avg_attempts,
+          ROUND(AVG(gs.hints_revealed), 1) AS avg_hints,
+          (
+            SELECT j.value->>'$.guess'
+            FROM game_sessions gs2, json_each(gs2.attempts) j
+            WHERE gs2.challenge_id = dc.id AND j.value->>'$.correct' = 'false'
+            GROUP BY j.value->>'$.guess'
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+          ) AS most_common_wrong_guess
+        FROM daily_challenges dc
+        JOIN films f ON f.id = dc.film_id
+        LEFT JOIN game_sessions gs ON gs.challenge_id = dc.id
+        GROUP BY dc.id
+        ${orderClause}
+      `).all() as {
+        challenge_id: number;
+        challenge_date: string;
+        film_title: string;
+        film_year: number;
+        fame_level: number;
+        sessions: number;
+        win_rate: number | null;
+        avg_attempts: number | null;
+        avg_hints: number | null;
+        most_common_wrong_guess: string | null;
+      }[];
+
+      res.json(rows.map((r) => ({
+        challenge_id: r.challenge_id,
+        challenge_date: r.challenge_date,
+        film_title: r.film_title,
+        film_year: r.film_year,
+        fame_level: r.fame_level,
+        sessions: r.sessions,
+        win_rate: r.win_rate ?? 0,
+        avg_attempts: r.avg_attempts ?? 0,
+        avg_hints: r.avg_hints ?? 0,
+        most_common_wrong_guess: r.most_common_wrong_guess ?? null,
+      })));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/series?sort=win_rate|sessions|avg_hints
+adminRouter.get(
+  '/analytics/series',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sortParam = req.query.sort as string | undefined;
+      const validSorts = ['win_rate', 'sessions', 'avg_hints'] as const;
+      type SortOption = typeof validSorts[number];
+      const sort: SortOption = validSorts.includes(sortParam as SortOption)
+        ? (sortParam as SortOption)
+        : 'win_rate';
+
+      const orderClause =
+        sort === 'win_rate'
+          ? 'ORDER BY win_rate ASC'
+          : sort === 'sessions'
+          ? 'ORDER BY sessions DESC'
+          : 'ORDER BY avg_hints DESC';
+
+      const rows = db.prepare(`
+        SELECT
+          dc.id AS challenge_id,
+          dc.challenge_date,
+          s.title AS series_title,
+          s.year AS series_year,
+          s.fame_level,
+          COUNT(gs.rowid) AS sessions,
+          ROUND(100.0 * SUM(CASE WHEN gs.outcome = 'won' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN gs.outcome IS NOT NULL THEN 1 ELSE 0 END), 0)) AS win_rate,
+          ROUND(AVG(CASE WHEN gs.outcome IS NOT NULL THEN json_array_length(gs.attempts) ELSE NULL END), 1) AS avg_attempts,
+          ROUND(AVG(gs.hints_revealed), 1) AS avg_hints,
+          (
+            SELECT j.value->>'$.guess'
+            FROM game_sessions gs2, json_each(gs2.attempts) j
+            WHERE gs2.challenge_id = dc.id AND j.value->>'$.correct' = 'false'
+            GROUP BY j.value->>'$.guess'
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+          ) AS most_common_wrong_guess
+        FROM daily_challenges dc
+        JOIN series s ON s.id = dc.series_id
+        LEFT JOIN game_sessions gs ON gs.challenge_id = dc.id
+        GROUP BY dc.id
+        ${orderClause}
+      `).all() as {
+        challenge_id: number;
+        challenge_date: string;
+        series_title: string;
+        series_year: number;
+        fame_level: number;
+        sessions: number;
+        win_rate: number | null;
+        avg_attempts: number | null;
+        avg_hints: number | null;
+        most_common_wrong_guess: string | null;
+      }[];
+
+      res.json(rows.map((r) => ({
+        challenge_id: r.challenge_id,
+        challenge_date: r.challenge_date,
+        series_title: r.series_title,
+        series_year: r.series_year,
+        fame_level: r.fame_level,
+        sessions: r.sessions,
+        win_rate: r.win_rate ?? 0,
+        avg_attempts: r.avg_attempts ?? 0,
+        avg_hints: r.avg_hints ?? 0,
+        most_common_wrong_guess: r.most_common_wrong_guess ?? null,
+      })));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/challenges?mediaType=film|series&sort=win_rate|sessions|avg_hints
+adminRouter.get(
+  '/analytics/challenges',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const mediaType = req.query.mediaType === 'series' ? 'series' : 'film';
+      const sortParam = req.query.sort as string | undefined;
+      const validSorts = ['win_rate', 'sessions', 'avg_hints'] as const;
+      type SortOption = typeof validSorts[number];
+      const sort: SortOption = validSorts.includes(sortParam as SortOption)
+        ? (sortParam as SortOption)
+        : 'win_rate';
+
+      const orderClause =
+        sort === 'win_rate'
+          ? 'ORDER BY win_rate ASC'
+          : sort === 'sessions'
+          ? 'ORDER BY sessions DESC'
+          : 'ORDER BY avg_hints DESC';
+
+      const mediaJoin =
+        mediaType === 'series'
+          ? `JOIN series m ON m.id = dc.series_id`
+          : `JOIN films m ON m.id = dc.film_id`;
+
+      const rows = db.prepare(`
+        SELECT
+          dc.id AS challenge_id,
+          dc.challenge_date,
+          m.title AS title,
+          m.year AS year,
+          m.fame_level,
+          COUNT(gs.rowid) AS sessions,
+          ROUND(100.0 * SUM(CASE WHEN gs.outcome = 'won' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN gs.outcome IS NOT NULL THEN 1 ELSE 0 END), 0)) AS win_rate,
+          ROUND(AVG(CASE WHEN gs.outcome IS NOT NULL THEN json_array_length(gs.attempts) ELSE NULL END), 1) AS avg_attempts,
+          ROUND(AVG(gs.hints_revealed), 1) AS avg_hints,
+          (
+            SELECT j.value->>'$.guess'
+            FROM game_sessions gs2, json_each(gs2.attempts) j
+            WHERE gs2.challenge_id = dc.id AND j.value->>'$.correct' = 'false'
+            GROUP BY j.value->>'$.guess'
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+          ) AS most_common_wrong_guess
+        FROM daily_challenges dc
+        ${mediaJoin}
+        LEFT JOIN game_sessions gs ON gs.challenge_id = dc.id
+        WHERE dc.media_type = ?
+        GROUP BY dc.id
+        ${orderClause}
+      `).all(mediaType) as {
+        challenge_id: number;
+        challenge_date: string;
+        title: string;
+        year: number;
+        fame_level: number;
+        sessions: number;
+        win_rate: number | null;
+        avg_attempts: number | null;
+        avg_hints: number | null;
+        most_common_wrong_guess: string | null;
+      }[];
+
+      res.json(rows.map((r) => ({
+        challenge_id: r.challenge_id,
+        challenge_date: r.challenge_date,
+        media_type: mediaType,
+        title: r.title,
+        year: r.year,
+        fame_level: r.fame_level,
+        sessions: r.sessions,
+        win_rate: r.win_rate ?? 0,
+        avg_attempts: r.avg_attempts ?? 0,
+        avg_hints: r.avg_hints ?? 0,
+        most_common_wrong_guess: r.most_common_wrong_guess ?? null,
+      })));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// DELETE /api/admin/series/:id
+adminRouter.delete(
+  '/series/:id',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) { res.status(400).json({ error: 'Invalid series id.' }); return; }
+
+      const existing = db
+        .prepare<[number], Pick<SeriesRow, 'id'>>(`SELECT id FROM series WHERE id = ?`)
+        .get(id);
+      if (!existing) { res.status(404).json({ error: 'Series not found.' }); return; }
+
+      const scheduled = db
+        .prepare<[number], { count: number }>(
+          `SELECT COUNT(*) as count FROM daily_challenges WHERE series_id = ?`
+        )
+        .get(id);
+
+      if (scheduled && scheduled.count > 0) {
+        res.status(409).json({
+          error: `Cette série est planifiée sur ${scheduled.count} date(s). Retirez-la du planning avant de la supprimer.`,
+        });
+        return;
+      }
+
+      db.prepare(`DELETE FROM series WHERE id = ?`).run(id);
+      logAuditEvent('series.delete', { id });
+      res.json({ ok: true, id });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/wrong-guesses?challenge_id=X&limit=10
+adminRouter.get(
+  '/analytics/wrong-guesses',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const challengeId = parseInt(req.query.challenge_id as string, 10);
+      if (isNaN(challengeId)) {
+        res.status(400).json({ error: 'Query param "challenge_id" must be a valid integer.' });
+        return;
+      }
+
+      const limit = Math.min(
+        100,
+        Math.max(1, parseInt((req.query.limit as string | undefined) ?? '10', 10) || 10)
+      );
+
+      const rows = db.prepare(`
+        SELECT j.value->>'$.guess' AS guess, COUNT(*) AS count
+        FROM game_sessions gs, json_each(gs.attempts) j
+        WHERE gs.challenge_id = ? AND j.value->>'$.correct' = 'false'
+        GROUP BY guess
+        ORDER BY count DESC
+        LIMIT ?
+      `).all(challengeId, limit) as { guess: string; count: number }[];
+
+      res.json(rows);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /api/admin/series/:id/image  – upload a local image file
+adminRouter.post(
+  '/series/:id/image',
+  upload.single('image'),
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) { res.status(400).json({ error: 'Invalid series id.' }); return; }
+      if (!req.file) { res.status(400).json({ error: 'No image file received.' }); return; }
+
+      const existing = db
+        .prepare<[number], Pick<SeriesRow, 'id'>>(`SELECT id FROM series WHERE id = ?`)
+        .get(id);
+      if (!existing) {
+        fs.unlinkSync(req.file.path);
+        res.status(404).json({ error: 'Series not found.' });
+        return;
+      }
+
+      const backendUrl = (process.env.BACKEND_URL ?? 'http://localhost:3001').replace(/\/$/, '');
+      const imageUrl = `${backendUrl}/uploads/${req.file.filename}`;
+
+      db.prepare(
+        `UPDATE series SET image_url = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?`
+      ).run(imageUrl, id);
+
+      const updated = db.prepare<[number], SeriesRow>(`SELECT * FROM series WHERE id = ?`).get(id)!;
+      res.json({ url: imageUrl, series: formatSeries(updated) });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/series/:id/backdrops
+adminRouter.get(
+  '/series/:id/backdrops',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) { res.status(400).json({ error: 'Invalid series id.' }); return; }
+
+      const series = db
+        .prepare<[number], Pick<SeriesRow, 'tmdb_id'>>(`SELECT tmdb_id FROM series WHERE id = ?`)
+        .get(id);
+      if (!series) { res.status(404).json({ error: 'Series not found.' }); return; }
+      if (!series.tmdb_id) { res.status(400).json({ error: 'No TMDB ID for this series' }); return; }
+
+      const apiKey = process.env.TMDB_API_KEY;
+      if (!apiKey) { res.status(400).json({ error: 'TMDB_API_KEY not configured' }); return; }
+
+      const tmdbRes = await fetch(
+        `https://api.themoviedb.org/3/tv/${series.tmdb_id}/images?api_key=${apiKey}&include_image_language=null`
+      );
+      if (!tmdbRes.ok) { res.status(502).json({ error: `TMDB error: ${tmdbRes.status}` }); return; }
+
+      const data = (await tmdbRes.json()) as TmdbImagesResponse;
+      const backdrops = (data.backdrops ?? [])
+        .sort((a, b) => b.vote_average - a.vote_average)
+        .slice(0, 12)
+        .map((b) => ({
+          path: b.file_path,
+          url: `https://image.tmdb.org/t/p/w1280${b.file_path}`,
+          width: b.width,
+          height: b.height,
+          vote_average: b.vote_average,
+        }));
+
+      res.json({ backdrops });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── TMDB TV search ───────────────────────────────────────────────────────────
+
+// GET /api/admin/tmdb/tv/search?q=title
+adminRouter.get(
+  '/tmdb/tv/search',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const q = (req.query.q as string | undefined)?.trim();
+      if (!q || q.length < 2) { res.json({ results: [] }); return; }
+
+      const apiKey = process.env.TMDB_API_KEY;
+      if (!apiKey) { res.status(400).json({ error: 'TMDB_API_KEY not configured' }); return; }
+
+      const searchUrl =
+        `https://api.themoviedb.org/3/search/tv` +
+        `?api_key=${apiKey}&language=fr-FR&query=${encodeURIComponent(q)}&page=1`;
+
+      const tmdbRes = await fetch(searchUrl);
+      if (!tmdbRes.ok) { res.status(502).json({ error: `TMDB error: ${tmdbRes.status}` }); return; }
+
+      const data = (await tmdbRes.json()) as {
+        results: {
+          id: number;
+          name: string;
+          original_name: string;
+          first_air_date: string;
+          poster_path: string | null;
+        }[];
+      };
+
+      const results = (data.results ?? []).slice(0, 8).map((m) => ({
+        tmdb_id: m.id,
+        title: m.name,
+        original_title: m.original_name,
+        year: m.first_air_date ? parseInt(m.first_air_date.slice(0, 4), 10) : 0,
+        poster_url: m.poster_path
+          ? `https://image.tmdb.org/t/p/w185${m.poster_path}`
+          : null,
+      }));
+
+      res.json({ results });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/tmdb/tv/:tmdbId/details
+adminRouter.get(
+  '/tmdb/tv/:tmdbId/details',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const tmdbId = parseInt(req.params.tmdbId, 10);
+      if (isNaN(tmdbId)) { res.status(400).json({ error: 'Invalid TMDB id.' }); return; }
+
+      const apiKey = process.env.TMDB_API_KEY;
+      if (!apiKey) { res.status(400).json({ error: 'TMDB_API_KEY not configured' }); return; }
+
+      const [detailsRes, creditsRes, imagesRes] = await Promise.all([
+        fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${apiKey}&language=fr-FR`),
+        fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/aggregate_credits?api_key=${apiKey}`),
+        fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/images?api_key=${apiKey}&include_image_language=null`),
+      ]);
+
+      const details = (await detailsRes.json()) as {
+        id: number;
+        name: string;
+        original_name: string;
+        first_air_date: string;
+        tagline: string;
+        overview: string;
+        backdrop_path: string | null;
+        genres: { name: string }[];
+        vote_count: number;
+        number_of_seasons: number;
+        networks: { name: string }[];
+        status: string;
+        original_language: string;
+        created_by: { name: string }[];
+      };
+      const credits = (await creditsRes.json()) as {
+        cast: { name: string }[];
+      };
+      const images = (await imagesRes.json()) as {
+        backdrops: { file_path: string; vote_average: number }[];
+      };
+
+      const creator = (details.created_by ?? []).map((c) => c.name).join(', ');
+      const cast = (credits.cast ?? []).slice(0, 5).map((c) => c.name);
+      const genres = (details.genres ?? []).map((g) => g.name);
+      const network = (details.networks ?? [])[0]?.name ?? '';
+
+      const bestBackdrop = (images.backdrops ?? [])
+        .sort((a, b) => b.vote_average - a.vote_average)[0];
+      const imageUrl = bestBackdrop
+        ? `https://image.tmdb.org/t/p/w1280${bestBackdrop.file_path}`
+        : details.backdrop_path
+        ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}`
+        : '';
+
+      const titleAliases: string[] = [];
+      if (details.original_name && details.original_name !== details.name) {
+        titleAliases.push(details.original_name);
+      }
+
+      const statusMap: Record<string, string> = {
+        'Ended': 'Terminée',
+        'Canceled': 'Terminée',
+        'Returning Series': 'En cours',
+        'In Production': 'En cours',
+        'Planned': 'En cours',
+      };
+
+      res.json({
+        title: details.name,
+        title_aliases: titleAliases,
+        year: details.first_air_date ? parseInt(details.first_air_date.slice(0, 4), 10) : 0,
+        creator,
+        genres,
+        cast_members: cast,
+        tagline: details.tagline ?? '',
+        synopsis: details.overview ?? '',
+        image_url: imageUrl,
+        tmdb_id: details.id,
+        is_active: true,
+        fame_level: fameFromVoteCount(details.vote_count ?? 0),
+        number_of_seasons: details.number_of_seasons ?? null,
+        network,
+        status: statusMap[details.status] ?? details.status ?? null,
+        original_language: details.original_language ?? null,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/tmdb/tv/:tmdbId/backdrops
+adminRouter.get(
+  '/tmdb/tv/:tmdbId/backdrops',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const tmdbId = parseInt(req.params.tmdbId, 10);
+      if (isNaN(tmdbId)) { res.status(400).json({ error: 'Invalid TMDB id.' }); return; }
+
+      const apiKey = process.env.TMDB_API_KEY;
+      if (!apiKey) { res.status(400).json({ error: 'TMDB_API_KEY not configured' }); return; }
+
+      const tmdbRes = await fetch(
+        `https://api.themoviedb.org/3/tv/${tmdbId}/images?api_key=${apiKey}&include_image_language=null`
+      );
+      if (!tmdbRes.ok) { res.status(502).json({ error: `TMDB error: ${tmdbRes.status}` }); return; }
+
+      const data = (await tmdbRes.json()) as TmdbImagesResponse;
+      const backdrops = (data.backdrops ?? [])
+        .sort((a, b) => b.vote_average - a.vote_average)
+        .slice(0, 12)
+        .map((b) => ({
+          path: b.file_path,
+          url: `https://image.tmdb.org/t/p/w1280${b.file_path}`,
+          width: b.width,
+          height: b.height,
+          vote_average: b.vote_average,
+        }));
+
+      res.json({ backdrops });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /api/admin/analytics/returning-players?days=30
+adminRouter.get(
+  '/analytics/returning-players',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const daysParam = parseInt((req.query.days as string | undefined) ?? '0', 10);
+      const useDaysFilter = !isNaN(daysParam) && daysParam > 0;
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
+      const whereMedia = mediaType ? `dc.media_type = '${mediaType}'` : '';
+      const whereDays = useDaysFilter ? `gs.started_at >= date('now', '-' || ${daysParam} || ' days')` : '';
+      const whereClause =
+        whereMedia && whereDays
+          ? `WHERE ${whereMedia} AND ${whereDays}`
+          : whereMedia
+          ? `WHERE ${whereMedia}`
+          : whereDays
+          ? `WHERE ${whereDays}`
+          : '';
+
+      const rows = db.prepare(`
+        SELECT days_played, COUNT(*) AS player_count
+        FROM (
+          SELECT gs.session_token, COUNT(DISTINCT date(gs.started_at)) AS days_played
+          FROM game_sessions gs
+          ${joinClause}
+          ${whereClause}
+          GROUP BY gs.session_token
+          HAVING days_played >= 1
+        )
+        GROUP BY days_played
+        ORDER BY days_played ASC
+      `).all() as { days_played: number; player_count: number }[];
+
+      res.json(rows);
+    } catch (err) {
+      next(err);
+    }
   }
 );

@@ -11,6 +11,23 @@
  */
 
 import rateLimit, { Options } from 'express-rate-limit';
+import { Request } from 'express';
+import { ADMIN_COOKIE } from './adminAuth.js';
+
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function adminKeyGenerator(req: Request): string {
+  // Keep abuse protection by IP, but split buckets per authenticated admin identity.
+  const adminToken = req.signedCookies?.[ADMIN_COOKIE] as string | undefined;
+  const identity = adminToken ? `admin:${adminToken}` : 'anon';
+  const ip = req.ip ?? 'unknown';
+  return `${identity}:${ip}`;
+}
 
 export function createRateLimiter(
   opts: Partial<Options> & { max: number; windowMs: number }
@@ -28,24 +45,25 @@ export function createRateLimiter(
 
 /** Strict limiter for the /guess endpoint */
 export const guessLimiter = createRateLimiter({
-  max: parseInt(process.env.GUESS_RATE_LIMIT_MAX ?? '30', 10),
-  windowMs: parseInt(process.env.GUESS_RATE_LIMIT_WINDOW_MS ?? '60000', 10),
+  max: envInt('GUESS_RATE_LIMIT_MAX', 30),
+  windowMs: envInt('GUESS_RATE_LIMIT_WINDOW_MS', 60_000),
 });
 
 /** Relaxed limiter for autocomplete search */
 export const searchLimiter = createRateLimiter({
-  max: 60,
-  windowMs: 60_000,
+  max: envInt('SEARCH_RATE_LIMIT_MAX', 60),
+  windowMs: envInt('SEARCH_RATE_LIMIT_WINDOW_MS', 60_000),
 });
 
-/** Limiter for authenticated admin operations (30 req/min) */
+/** Limiter for authenticated admin operations */
 export const adminLimiter = createRateLimiter({
-  max: 30,
-  windowMs: 60_000,
+  max: envInt('ADMIN_RATE_LIMIT_MAX', 180),
+  windowMs: envInt('ADMIN_RATE_LIMIT_WINDOW_MS', 60_000),
+  keyGenerator: adminKeyGenerator,
 });
 
 /** Very strict limiter for the login endpoint — stops brute-force (10 req/min) */
 export const loginLimiter = createRateLimiter({
-  max: 10,
-  windowMs: 60_000,
+  max: envInt('LOGIN_RATE_LIMIT_MAX', 10),
+  windowMs: envInt('LOGIN_RATE_LIMIT_WINDOW_MS', 60_000),
 });
