@@ -822,15 +822,15 @@ export function WikiPersonsPage() {
         ) : persons.length === 0 ? (
           <div className="h-36 flex items-center justify-center text-sm text-gray-400">Aucune personnalité trouvée.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[700px]">
+          <div>
+            <table className="w-full min-w-[400px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   <th className="px-3 py-3">Photo</th>
                   <th className="px-3 py-3">Nom</th>
-                  <th className="px-3 py-3">Type</th>
-                  <th className="px-3 py-3">Statut</th>
-                  <th className="px-3 py-3">Défis</th>
+                  <th className="px-3 py-3 hidden sm:table-cell">Type</th>
+                  <th className="px-3 py-3 hidden md:table-cell">Statut</th>
+                  <th className="px-3 py-3 hidden lg:table-cell">Défis</th>
                   <th className="px-3 py-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -856,7 +856,7 @@ export function WikiPersonsPage() {
                         {person.wikipedia_url && <a href={person.wikipedia_url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-700"><ExternalLink size={12} /></a>}
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-sm text-gray-600">
+                    <td className="px-3 py-3 text-sm text-gray-600 hidden sm:table-cell">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                         person.person_type === 'politician'
                           ? 'bg-indigo-100 text-indigo-700'
@@ -867,14 +867,14 @@ export function WikiPersonsPage() {
                         {personTypeLabel(person.person_type)}
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-sm">
+                    <td className="px-3 py-3 text-sm hidden md:table-cell">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                         person.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
                       }`}>
                         {person.is_active ? 'Actif' : 'Inactif'}
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-sm text-gray-600">{person.used_dates.length}</td>
+                    <td className="px-3 py-3 text-sm text-gray-600 hidden lg:table-cell">{person.used_dates.length}</td>
                     <td className="px-3 py-3">
                       <div className="flex justify-end items-center gap-1">
                         <button onClick={() => setModal({ type: 'edit', person })} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Pencil size={14} /></button>
