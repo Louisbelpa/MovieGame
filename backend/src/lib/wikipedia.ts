@@ -73,9 +73,15 @@ function detectPersonType(wikitext: string): 'politician' | 'sportsperson' {
     'Infobox tennis biography', 'Infobox basketball biography', 'Infobox ice hockey player',
     'Infobox cyclist', 'Infobox swimmer', 'Infobox athlete', 'Infobox golfer',
     'Infobox boxer', 'Infobox racing driver', 'Infobox cricketer',
+    'Infobox Footballeur', 'Infobox Biographie2', 'Infobox Joueur de tennis',
+    'Infobox Basketteur', 'Infobox Rugbyman', 'Infobox Cycliste', 'Infobox Nageur',
   ]
   const lower = wikitext.toLowerCase()
   if (sportKeywords.some(k => lower.includes(k.toLowerCase()))) return 'sportsperson'
+  // Heuristic fallback for many FR sport infoboxes.
+  if (/\|\s*club\d+\s*=/.test(wikitext) || /\|\s*année\d+\s*=/.test(wikitext) || /\|\s*poste\s*=/.test(wikitext)) {
+    return 'sportsperson'
+  }
   return 'politician'
 }
 
@@ -152,6 +158,33 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
     })
   }
 
+  // FR fallback: club1/année1/matchs1/buts1 keys are very common.
+  const frClubRows = [...wikitext.matchAll(/\|\s*club(\d+)\s*=\s*([^\n|]+)/g)]
+  if (frClubRows.length > 0) {
+    for (const m of frClubRows) {
+      const idx = m[1]
+      const clubName = stripLinks(m[2]).trim()
+      if (!clubName) continue
+
+      const yearsRaw = wikitext.match(new RegExp(`\\|\\s*(?:année|years)${idx}\\s*=\\s*([^\\n|]+)`, 'i'))?.[1] ?? ''
+      const appsRaw = wikitext.match(new RegExp(`\\|\\s*(?:matchs|apps)${idx}\\s*=\\s*([^\\n|]+)`, 'i'))?.[1] ?? ''
+      const goalsRaw = wikitext.match(new RegExp(`\\|\\s*(?:buts|goals)${idx}\\s*=\\s*([^\\n|]+)`, 'i'))?.[1] ?? ''
+
+      const yearRange = yearsRaw.match(/(\d{4})\s*[-–]\s*(\d{4}|\s*)/)
+      const singleYear = yearsRaw.match(/\b(1[89]\d{2}|20\d{2})\b/)
+      const apps = parseInt(stripLinks(appsRaw).replace(/[^\d-]/g, ''), 10)
+      const goals = parseInt(stripLinks(goalsRaw).replace(/[^\d-]/g, ''), 10)
+
+      clubs.push({
+        name: clubName,
+        start_year: yearRange ? parseInt(yearRange[1], 10) : (singleYear ? parseInt(singleYear[1], 10) : null),
+        end_year: yearRange?.[2]?.trim() ? parseInt(yearRange[2], 10) : null,
+        appearances: Number.isFinite(apps) ? apps : null,
+        goals: Number.isFinite(goals) ? goals : null,
+      })
+    }
+  }
+
   // National team
   const ntName = stripLinks(wikitext.match(/\|\s*nationalteam\s*=\s*([^\n|]+)/)?.[1] ?? '').trim()
   const ntCaps = wikitext.match(/\|\s*nationalcaps\s*=\s*([^\n|]+)/)?.[1]
@@ -164,19 +197,20 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
   } : null
 
   const birthYear = extractYear(
-    wikitext.match(/\|\s*birth_date\s*=\s*([^\n|]+)/)?.[1] ?? ''
+    wikitext.match(/\|\s*(?:birth_date|date de naissance)\s*=\s*([^\n|]+)/i)?.[1] ?? ''
   )
 
   const sport = stripLinks(
-    wikitext.match(/\|\s*sport\s*=\s*([^\n|]+)/)?.[1] ?? 'Football'
+    wikitext.match(/\|\s*sport\s*=\s*([^\n|]+)/)?.[1]
+      ?? (wikitext.match(/\{\{Infobox\s+Footballeur/i) ? 'Football' : 'Sport')
   ).trim()
 
   const position = stripLinks(
-    wikitext.match(/\|\s*position\s*=\s*([^\n|]+)/)?.[1] ?? ''
+    wikitext.match(/\|\s*(?:position|poste)\s*=\s*([^\n|]+)/i)?.[1] ?? ''
   ).trim() || null
 
   const nationality = stripLinks(
-    wikitext.match(/\|\s*nationality\s*=\s*([^\n|]+)/)?.[1] ?? ''
+    wikitext.match(/\|\s*(?:nationality|nationalité)\s*=\s*([^\n|]+)/i)?.[1] ?? ''
   ).trim() || null
 
   return {

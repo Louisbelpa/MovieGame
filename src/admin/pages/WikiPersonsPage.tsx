@@ -26,6 +26,23 @@ const RANDOM_WIKI_SLUGS = [
   'Michael_Jordan',
 ]
 
+function isNotFoundError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false
+  const msg = err.message.toLowerCase()
+  return msg.includes('404') || msg.includes('not found')
+}
+
+function shuffledSlugs(): string[] {
+  const copy = [...RANDOM_WIKI_SLUGS]
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const tmp = copy[i]
+    copy[i] = copy[j]
+    copy[j] = tmp
+  }
+  return copy
+}
+
 type ModalState =
   | { type: 'create' }
   | { type: 'edit'; person: AdminWikiPerson }
@@ -109,19 +126,33 @@ function WikiPersonForm({
   }
 
   async function handleRandomWikipedia() {
-    const randomSlug = RANDOM_WIKI_SLUGS[Math.floor(Math.random() * RANDOM_WIKI_SLUGS.length)]
     setLoadingRandomWiki(true)
     setError(null)
     try {
-      setSlug(randomSlug)
-      const data = await fetchWikipediaPerson(randomSlug, 'fr')
-      setName(data.name)
-      setPersonType(data.person_type)
-      setInfoboxData(JSON.stringify(data.infobox_data, null, 2))
-      setHintSchedule(JSON.stringify(data.hint_schedule, null, 2))
-      setPhotoUrl(data.photo_url ?? '')
-      setExtract(data.extract ?? '')
-      setWikipediaUrl(data.wikipedia_url ?? '')
+      const candidates = shuffledSlugs()
+      let loaded = false
+
+      for (const candidate of candidates) {
+        try {
+          const data = await fetchWikipediaPerson(candidate, 'fr')
+          setSlug(candidate)
+          setName(data.name)
+          setPersonType(data.person_type)
+          setInfoboxData(JSON.stringify(data.infobox_data, null, 2))
+          setHintSchedule(JSON.stringify(data.hint_schedule, null, 2))
+          setPhotoUrl(data.photo_url ?? '')
+          setExtract(data.extract ?? '')
+          setWikipediaUrl(data.wikipedia_url ?? '')
+          loaded = true
+          break
+        } catch (err) {
+          if (!isNotFoundError(err)) throw err
+        }
+      }
+
+      if (!loaded) {
+        throw new Error('Aucun profil Wikipedia aléatoire valide trouvé. Réessaie.')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur wikipedia aléatoire')
     } finally {
