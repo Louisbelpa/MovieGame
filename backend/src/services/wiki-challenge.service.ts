@@ -142,6 +142,42 @@ function getSupplementalHintKeys(personType: WikiPersonRow['person_type']): stri
   return ['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials']
 }
 
+function normalizeMediaUrl(raw: string | null | undefined): string | null {
+  if (!raw || !raw.trim()) return null
+  const v = raw.trim()
+  if (v.startsWith('//')) return `https:${v}`
+  return v
+}
+
+function parseHintSchedule(raw: string, personType: WikiPersonRow['person_type']): string[] {
+  const allowed = new Set(getSupplementalHintKeys(personType))
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((v): v is string => typeof v === 'string')
+      .filter((key) => allowed.has(key))
+  } catch {
+    return []
+  }
+}
+
+function hasUsableHintValue(hint: { type: string; value: unknown } | null): boolean {
+  if (!hint) return false
+  if (hint.type === 'wiki_name_initials' || hint.type === 'wiki_name_length') return true
+  if (hint.value === null || hint.value === undefined) return false
+  if (typeof hint.value === 'string' && !hint.value.trim()) return false
+  return true
+}
+
+function computeHintSchedule(person: WikiPersonRow, challengeScheduleRaw: string): string[] {
+  const preferred = parseHintSchedule(challengeScheduleRaw, person.person_type)
+  const fallback = getSupplementalHintKeys(person.person_type)
+  const merged = (preferred.length > 0 ? preferred : fallback).slice(0, MAX_HINTS)
+  const usable = merged.filter((key) => hasUsableHintValue(resolveHint(key, person)))
+  return (usable.length > 0 ? usable : merged).slice(0, MAX_HINTS)
+}
+
 function buildVisibleProfile(person: WikiPersonRow): { type: 'politician'; roles: PoliticianRoleView[] } | {
   type: 'sportsperson'
   clubs: SportClubView[]
@@ -300,7 +336,7 @@ export function buildWikiChallengePayload(challenge: WikiChallengeRow, session: 
     .prepare<[number], WikiPersonRow>(`SELECT * FROM wiki_persons WHERE id = ?`)
     .get(challenge.wiki_person_id)!
 
-  const schedule = getSupplementalHintKeys(person.person_type).slice(0, MAX_HINTS)
+  const schedule = computeHintSchedule(person, challenge.hint_schedule)
   const hintsRevealed = Math.min(session.hints_revealed, MAX_HINTS)
   const attempts: AttemptEntry[] = JSON.parse(session.attempts)
 
@@ -318,7 +354,7 @@ export function buildWikiChallengePayload(challenge: WikiChallengeRow, session: 
     isPastChallenge: challenge.challenge_date < today,
     mediaType: 'wiki' as const,
     personType: person.person_type,
-    photoUrl: person.photo_url,
+    photoUrl: normalizeMediaUrl(person.photo_url),
     profile: buildVisibleProfile(person),
     isGameOver: session.outcome !== null,
     hintsAvailable: schedule.length,
@@ -350,22 +386,36 @@ export function processWikiGuess(
     .prepare<[number], WikiChallengeRow>(`SELECT * FROM daily_challenges WHERE id = ?`)
     .get(challengeId)!
 
-  const person = db
+  const answerPerson = db
     .prepare<[number], { name: string; name_aliases: string }>(
       `SELECT name, name_aliases FROM wiki_persons WHERE id = ?`
     )
     .get(challenge.wiki_person_id)!
 
-  const aliases: string[] = JSON.parse(person.name_aliases)
-  const accepted = [person.name, ...aliases].map(normalise)
+  const aliases: string[] = JSON.parse(answerPerson.name_aliases)
+  const accepted = [answerPerson.name, ...aliases].map(normalise)
   const correct = isGuessCorrect(rawGuess, accepted)
 
   attempts.push({ guess: rawGuess, correct, ts: new Date().toISOString() })
 
-  const personType = db
-    .prepare<[number], { person_type: WikiPersonRow['person_type'] }>(`SELECT person_type FROM wiki_persons WHERE id = ?`)
-    .get(challenge.wiki_person_id)!.person_type
-  const schedule = getSupplementalHintKeys(personType).slice(0, MAX_HINTS)
+  const hintPerson = db
+    .prepare<[number], Pick<WikiPersonRow, 'name' | 'person_type' | 'infobox_data'>>(
+      `SELECT name, person_type, infobox_data FROM wiki_persons WHERE id = ?`
+    )
+    .get(challenge.wiki_person_id)!
+  const personForHints: WikiPersonRow = {
+    id: challenge.wiki_person_id,
+    name: hintPerson.name,
+    name_aliases: '[]',
+    person_type: hintPerson.person_type,
+    infobox_data: hintPerson.infobox_data,
+    hint_schedule: challenge.hint_schedule,
+    photo_url: null,
+    extract: null,
+    wikipedia_url: null,
+    difficulty: 3,
+  }
+  const schedule = computeHintSchedule(personForHints, challenge.hint_schedule)
   let newOutcome: 'won' | 'lost' | null = null
   let newHintsRevealed = Math.min(session.hints_revealed, MAX_HINTS)
   let nextHintUnlocked = false
@@ -420,7 +470,7 @@ export function getWikiResult(sessionToken: string, challengeId: number) {
     name: person.name,
     personType: person.person_type,
     extract: person.extract,
-    photoUrl: person.photo_url,
+    photoUrl: normalizeMediaUrl(person.photo_url),
     wikipediaUrl: person.wikipedia_url,
     attemptsUsed: attempts.length,
     maxAttempts: MAX_ATTEMPTS,

@@ -705,6 +705,14 @@ function WikiPersonForm({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Photo URL</label>
           <input value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          {photoUrl.trim() && (
+            <img
+              src={photoUrl}
+              alt="Aperçu"
+              className="mt-2 h-24 w-24 rounded-lg object-cover border border-gray-200"
+              onError={(e) => { e.currentTarget.style.display = 'none' }}
+            />
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Wikipedia URL</label>
@@ -783,7 +791,7 @@ export function WikiPersonsPage() {
       setError(null)
       setSuccess(null)
       await deleteWikiPerson(modal.person.id)
-      setSuccess('Personnalité Wikipedia désactivée.')
+      setSuccess('Personnalité Wikipedia supprimée.')
       setModal(null)
       load()
     } catch (err) {
@@ -817,6 +825,7 @@ export function WikiPersonsPage() {
           <table className="w-full min-w-[700px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3">Photo</th>
                 <th className="px-3 py-3">Nom</th>
                 <th className="px-3 py-3">Type</th>
                 <th className="px-3 py-3">Statut</th>
@@ -827,6 +836,18 @@ export function WikiPersonsPage() {
             <tbody className="divide-y divide-gray-50">
               {persons.map((person) => (
                 <tr key={person.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-3">
+                    {person.photo_url ? (
+                      <img
+                        src={person.photo_url}
+                        alt={person.name}
+                        className="h-12 w-12 rounded-lg object-cover border border-gray-200"
+                        onError={(e) => { e.currentTarget.style.display = 'none' }}
+                      />
+                    ) : (
+                      <div className="h-12 w-12 rounded-lg bg-gray-100 border border-gray-200" />
+                    )}
+                  </td>
                   <td className="px-3 py-3">
                     <div className="font-medium text-sm text-gray-900">{person.name}</div>
                     <div className="text-xs text-gray-400 flex items-center gap-1.5">
@@ -879,7 +900,7 @@ export function WikiPersonsPage() {
       {modal?.type === 'delete' && (
         <Modal title="Supprimer la personnalité" onClose={() => setModal(null)}>
           <p className="text-sm text-gray-600 mb-6">
-            Confirmer la désactivation de <strong className="text-gray-900">« {modal.person.name} »</strong> ?
+            Confirmer la suppression de <strong className="text-gray-900">« {modal.person.name} »</strong> ?
           </p>
           <div className="flex justify-end gap-3">
             <button onClick={() => setModal(null)} disabled={deleting} className="px-4 py-2 text-sm border rounded-lg disabled:opacity-50">Annuler</button>

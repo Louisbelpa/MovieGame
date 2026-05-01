@@ -127,6 +127,15 @@ function normalizeValue(s: string | null | undefined): string | null {
   return normalized || null
 }
 
+function normalizeMediaUrl(url: string | null | undefined, lang: string): string | null {
+  if (!url) return null
+  const v = url.trim()
+  if (!v) return null
+  if (v.startsWith('//')) return `https:${v}`
+  if (v.startsWith('/')) return `https://${lang}.wikipedia.org${v}`
+  return v
+}
+
 /** Detect person type from infobox template name */
 function detectPersonType(wikitext: string): WikiPersonType {
   const sportKeywords = [
@@ -699,7 +708,7 @@ export async function fetchWikipediaData(slug: string, lang = 'fr'): Promise<Wik
   return {
     name: summary.title,
     extract: summary.extract?.slice(0, 500) || null,
-    photo_url: summary.thumbnail?.source ?? null,
+    photo_url: normalizeMediaUrl(summary.thumbnail?.source ?? null, lang),
     wikipedia_url: summary.content_urls?.desktop?.page ?? `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(slug)}`,
     infobox_data,
     person_type: personType,

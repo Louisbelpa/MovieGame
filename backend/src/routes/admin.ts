@@ -276,6 +276,12 @@ function getSeriesUsedDates(seriesId: number): string[] {
 }
 
 function formatWikiPerson(row: WikiPersonRow, usedDates?: string[]) {
+  const photoUrl = (() => {
+    if (!row.photo_url) return null
+    const v = row.photo_url.trim()
+    if (!v) return null
+    return v.startsWith('//') ? `https:${v}` : v
+  })()
   return {
     id: row.id,
     name: row.name,
@@ -285,8 +291,8 @@ function formatWikiPerson(row: WikiPersonRow, usedDates?: string[]) {
     wikipedia_slug: row.wikipedia_slug,
     infobox_data: JSON.parse(row.infobox_data) as Record<string, unknown>,
     hint_schedule: JSON.parse(row.hint_schedule) as string[],
-    image_url: row.photo_url,
-    photo_url: row.photo_url,
+    image_url: photoUrl,
+    photo_url: photoUrl,
     extract: row.extract,
     wikipedia_url: row.wikipedia_url,
     difficulty: row.difficulty,
@@ -3011,7 +3017,9 @@ adminRouter.post('/wiki-persons', (req: Request, res: Response, next: NextFuncti
       String(wikipedia_slug),
       safeInfobox,
       safeHintSchedule,
-      typeof photo_url === 'string' && photo_url.trim() ? photo_url : null,
+      typeof photo_url === 'string' && photo_url.trim()
+        ? (photo_url.trim().startsWith('//') ? `https:${photo_url.trim()}` : photo_url.trim())
+        : null,
       typeof extract === 'string' && extract.trim() ? extract : null,
       typeof wikipedia_url === 'string' && wikipedia_url.trim() ? wikipedia_url : null,
       typeof difficulty === 'number' ? difficulty : parseInt(String(difficulty ?? 3), 10) || 3
@@ -3077,7 +3085,11 @@ adminRouter.put('/wiki-persons/:id', (req: Request, res: Response, next: NextFun
       typeof wikipedia_slug === 'string' ? wikipedia_slug : null,
       safeInfoboxData,
       safeHintSchedule,
-      photo_url !== undefined ? (typeof photo_url === 'string' && photo_url.trim() ? photo_url : null) : null,
+      photo_url !== undefined
+        ? (typeof photo_url === 'string' && photo_url.trim()
+            ? (photo_url.trim().startsWith('//') ? `https:${photo_url.trim()}` : photo_url.trim())
+            : null)
+        : null,
       extract !== undefined ? (typeof extract === 'string' && extract.trim() ? extract : null) : null,
       wikipedia_url !== undefined ? (typeof wikipedia_url === 'string' && wikipedia_url.trim() ? wikipedia_url : null) : null,
       safeDifficulty,
@@ -3096,7 +3108,18 @@ adminRouter.delete('/wiki-persons/:id', (req: Request, res: Response, next: Next
   try {
     const id = parseInt(req.params.id, 10)
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid wiki person id.' }); return }
-    const deleteRes = db.prepare(`UPDATE wiki_persons SET is_active = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?`).run(id)
+    const existing = db.prepare<[number], Pick<WikiPersonRow, 'id'>>(`SELECT id FROM wiki_persons WHERE id = ?`).get(id)
+    if (!existing) { res.status(404).json({ error: 'Wiki person not found.' }); return }
+    const scheduled = db
+      .prepare<[number], { count: number }>(`SELECT COUNT(*) as count FROM daily_challenges WHERE wiki_person_id = ?`)
+      .get(id)
+    if (scheduled && scheduled.count > 0) {
+      res.status(409).json({
+        error: `Cette personnalité est planifiée sur ${scheduled.count} date(s). Retire-la du planning avant suppression.`,
+      })
+      return
+    }
+    const deleteRes = db.prepare(`DELETE FROM wiki_persons WHERE id = ?`).run(id)
     if (deleteRes.changes === 0) { res.status(404).json({ error: 'Wiki person not found.' }); return }
     logAuditEvent('wiki_person_deleted', { id })
     res.json({ ok: true })
