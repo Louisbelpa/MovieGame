@@ -148,6 +148,7 @@ export function WikiGamePage() {
           {/* Hints — primary content, shown prominently */}
           {(currentHints.length > 0 || challenge.hintsAvailable > 0) && (
             <WikiHintPanel
+              profile={challenge.profile}
               hints={currentHints}
               hintsAvailable={challenge.hintsAvailable}
               hintsRevealed={hintsRevealed}

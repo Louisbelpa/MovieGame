@@ -185,10 +185,51 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
     }
   }
 
+  // EN/intl fallback: club1/years1/caps1/goals1 keys.
+  const genericClubRows = [...wikitext.matchAll(/\|\s*clubs?(\d+)\s*=\s*([^\n|]+)/gi)]
+  if (genericClubRows.length > 0) {
+    for (const m of genericClubRows) {
+      const idx = m[1]
+      const clubName = stripLinks(m[2]).trim()
+      if (!clubName) continue
+
+      const yearsRaw = wikitext.match(new RegExp(`\\|\\s*years${idx}\\s*=\\s*([^\\n|]+)`, 'i'))?.[1] ?? ''
+      const appsRaw = wikitext.match(new RegExp(`\\|\\s*(?:caps|apps)${idx}\\s*=\\s*([^\\n|]+)`, 'i'))?.[1] ?? ''
+      const goalsRaw = wikitext.match(new RegExp(`\\|\\s*goals${idx}\\s*=\\s*([^\\n|]+)`, 'i'))?.[1] ?? ''
+
+      const yearRange = yearsRaw.match(/(\d{4})\s*[-–]\s*(\d{4}|\s*)/)
+      const singleYear = yearsRaw.match(/\b(1[89]\d{2}|20\d{2})\b/)
+      const apps = parseInt(stripLinks(appsRaw).replace(/[^\d-]/g, ''), 10)
+      const goals = parseInt(stripLinks(goalsRaw).replace(/[^\d-]/g, ''), 10)
+
+      clubs.push({
+        name: clubName,
+        start_year: yearRange ? parseInt(yearRange[1], 10) : (singleYear ? parseInt(singleYear[1], 10) : null),
+        end_year: yearRange?.[2]?.trim() ? parseInt(yearRange[2], 10) : null,
+        appearances: Number.isFinite(apps) ? apps : null,
+        goals: Number.isFinite(goals) ? goals : null,
+      })
+    }
+  }
+
+  // De-duplicate clubs collected from multiple infobox styles.
+  const dedupedClubs: WikiClub[] = []
+  const seenClubs = new Set<string>()
+  for (const club of clubs) {
+    const key = `${club.name.toLowerCase()}|${club.start_year ?? ''}|${club.end_year ?? ''}`
+    if (seenClubs.has(key)) continue
+    seenClubs.add(key)
+    dedupedClubs.push(club)
+  }
+
   // National team
-  const ntName = stripLinks(wikitext.match(/\|\s*nationalteam\s*=\s*([^\n|]+)/)?.[1] ?? '').trim()
-  const ntCaps = wikitext.match(/\|\s*nationalcaps\s*=\s*([^\n|]+)/)?.[1]
-  const ntGoals = wikitext.match(/\|\s*nationalgoals\s*=\s*([^\n|]+)/)?.[1]
+  const ntName = stripLinks(
+    wikitext.match(/\|\s*nationalteam(?:\d+)?\s*=\s*([^\n|]+)/i)?.[1]
+      ?? wikitext.match(/\|\s*(?:sélection nationale|equipe nationale)\s*=\s*([^\n|]+)/i)?.[1]
+      ?? ''
+  ).trim()
+  const ntCaps = wikitext.match(/\|\s*nationalcaps(?:\d+)?\s*=\s*([^\n|]+)/i)?.[1]
+  const ntGoals = wikitext.match(/\|\s*nationalgoals(?:\d+)?\s*=\s*([^\n|]+)/i)?.[1]
 
   const national_team = ntName ? {
     name: ntName,
@@ -202,7 +243,10 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
 
   const sport = stripLinks(
     wikitext.match(/\|\s*sport\s*=\s*([^\n|]+)/)?.[1]
-      ?? (wikitext.match(/\{\{Infobox\s+Footballeur/i) ? 'Football' : 'Sport')
+      ?? (wikitext.match(/\{\{Infobox\s+Footballeur/i) ? 'Football'
+        : wikitext.match(/\{\{Infobox\s+Joueur de tennis/i) ? 'Tennis'
+          : wikitext.match(/\{\{Infobox\s+Basketteur/i) ? 'Basket-ball'
+            : 'Sport')
   ).trim()
 
   const position = stripLinks(
@@ -216,7 +260,7 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
   return {
     sport: sport || 'Football',
     position,
-    clubs: clubs.slice(0, 8),
+    clubs: dedupedClubs.slice(0, 8),
     national_team,
     birth_year: birthYear,
     nationality,
@@ -225,9 +269,9 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
 
 function defaultHintSchedule(personType: 'politician' | 'sportsperson'): string[] {
   if (personType === 'politician') {
-    return ['roles_titles_only', 'roles_with_dates', 'roles_with_countries', 'predecessor_names', 'birth_year_party']
+    return ['birth_year', 'nationality', 'party', 'name_initials', 'name_length']
   }
-  return ['clubs_names_only', 'clubs_with_years', 'clubs_with_stats', 'national_team', 'sport_position_birth']
+  return ['birth_year', 'nationality', 'position', 'name_initials', 'name_length']
 }
 
 export async function fetchWikipediaData(slug: string, lang = 'fr'): Promise<WikiFetchResult> {

@@ -32,6 +32,28 @@ export interface WikiAttemptPayload {
   correct: boolean
 }
 
+export type WikiVisibleProfile =
+  | {
+      type: 'politician'
+      roles: Array<{
+        title: string
+        years: string
+        country: string | null
+        predecessor: string | null
+        successor: string | null
+      }>
+    }
+  | {
+      type: 'sportsperson'
+      clubs: Array<{
+        name: string
+        years: string
+        apps: number | null
+        goals: number | null
+      }>
+      nationalTeam: { name: string; caps: number | null; goals: number | null } | null
+    }
+
 export interface WikiChallengePayload {
   challengeId: number
   challengeNumber: number
@@ -39,6 +61,7 @@ export interface WikiChallengePayload {
   isPastChallenge: boolean
   mediaType: 'wiki'
   personType: 'politician' | 'sportsperson'
+  profile: WikiVisibleProfile
   isGameOver: boolean
   hintsAvailable: number
   hintsRevealed: number

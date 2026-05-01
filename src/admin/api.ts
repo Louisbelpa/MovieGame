@@ -126,8 +126,10 @@ export interface AdminChallenge {
 export interface AdminDashboard {
   today_film_challenge: AdminChallenge | null
   today_series_challenge: AdminChallenge | null
+  today_wiki_challenge: AdminChallenge | null
   upcoming_film_challenges: AdminChallenge[]
   upcoming_series_challenges: AdminChallenge[]
+  upcoming_wiki_challenges: AdminChallenge[]
   stats: {
     total_films: number
     unused_films: number
@@ -145,6 +147,14 @@ export interface AdminDashboard {
     today_series_wins: number
     today_series_rate: number | null
     series_success_rate: number | null
+    total_wiki_persons: number
+    unused_wiki_persons: number
+    total_wiki_challenges: number
+    unscheduled_wiki_next_30: number
+    today_wiki_games: number
+    today_wiki_wins: number
+    today_wiki_rate: number | null
+    wiki_success_rate: number | null
     success_rate: number | null
   }
 }

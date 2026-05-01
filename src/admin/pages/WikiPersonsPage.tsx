@@ -279,8 +279,10 @@ export function WikiPersonsPage() {
   const [persons, setPersons] = useState<AdminWikiPerson[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [modal, setModal] = useState<ModalState>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -296,6 +298,7 @@ export function WikiPersonsPage() {
 
   async function handleCreate(payload: WikiPersonPayload) {
     await createWikiPerson(payload)
+    setSuccess('Personnalité Wikipedia créée.')
     setModal(null)
     load()
   }
@@ -303,15 +306,22 @@ export function WikiPersonsPage() {
   async function handleEdit(payload: WikiPersonPayload) {
     if (modal?.type !== 'edit') return
     await updateWikiPerson(modal.person.id, payload)
+    setSuccess('Personnalité Wikipedia mise à jour.')
     setModal(null)
     load()
   }
 
   async function handleDelete() {
     if (modal?.type !== 'delete') return
-    await deleteWikiPerson(modal.person.id)
-    setModal(null)
-    load()
+    setDeleting(true)
+    try {
+      await deleteWikiPerson(modal.person.id)
+      setSuccess('Personnalité Wikipedia désactivée.')
+      setModal(null)
+      load()
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -327,6 +337,7 @@ export function WikiPersonsPage() {
       </div>
 
       {error && <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">{error}</div>}
+      {success && <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-4 py-3 text-sm">{success}</div>}
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {loading ? (
@@ -354,9 +365,19 @@ export function WikiPersonsPage() {
                       {person.wikipedia_url && <a href={person.wikipedia_url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-700"><ExternalLink size={12} /></a>}
                     </div>
                   </td>
-                  <td className="px-3 py-3 text-sm text-gray-600">{person.person_type === 'politician' ? 'Politicien' : 'Sportif'}</td>
+                  <td className="px-3 py-3 text-sm text-gray-600">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      person.person_type === 'politician' ? 'bg-indigo-100 text-indigo-700' : 'bg-violet-100 text-violet-700'
+                    }`}>
+                      {person.person_type === 'politician' ? 'Politicien' : 'Sportif'}
+                    </span>
+                  </td>
                   <td className="px-3 py-3 text-sm">
-                    <span className={person.is_active ? 'text-emerald-700' : 'text-gray-500'}>{person.is_active ? 'Actif' : 'Inactif'}</span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      person.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {person.is_active ? 'Actif' : 'Inactif'}
+                    </span>
                   </td>
                   <td className="px-3 py-3 text-sm text-gray-600">{person.used_dates.length}</td>
                   <td className="px-3 py-3">
@@ -388,8 +409,10 @@ export function WikiPersonsPage() {
             Confirmer la désactivation de <strong className="text-gray-900">« {modal.person.name} »</strong> ?
           </p>
           <div className="flex justify-end gap-3">
-            <button onClick={() => setModal(null)} className="px-4 py-2 text-sm border rounded-lg">Annuler</button>
-            <button onClick={handleDelete} className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700">Supprimer</button>
+            <button onClick={() => setModal(null)} disabled={deleting} className="px-4 py-2 text-sm border rounded-lg disabled:opacity-50">Annuler</button>
+            <button onClick={handleDelete} disabled={deleting} className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50">
+              {deleting ? 'Suppression…' : 'Supprimer'}
+            </button>
           </div>
         </Modal>
       )}

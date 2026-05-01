@@ -478,6 +478,11 @@ adminRouter.get(
           `SELECT dc.* FROM daily_challenges dc WHERE dc.challenge_date = ? AND dc.media_type = 'series'`
         )
         .get(today);
+      const todayWikiRow = db
+        .prepare<[string], ChallengeRow>(
+          `SELECT dc.* FROM daily_challenges dc WHERE dc.challenge_date = ? AND dc.media_type = 'wiki'`
+        )
+        .get(today);
 
       // Upcoming challenges (7 next per type)
       const upcomingFilmRows = db
@@ -491,6 +496,13 @@ adminRouter.get(
         .prepare<[string], ChallengeRow>(
           `SELECT dc.* FROM daily_challenges dc
            WHERE dc.challenge_date > ? AND dc.media_type = 'series'
+           ORDER BY dc.challenge_date ASC LIMIT 7`
+        )
+        .all(today);
+      const upcomingWikiRows = db
+        .prepare<[string], ChallengeRow>(
+          `SELECT dc.* FROM daily_challenges dc
+           WHERE dc.challenge_date > ? AND dc.media_type = 'wiki'
            ORDER BY dc.challenge_date ASC LIMIT 7`
         )
         .all(today);
@@ -516,6 +528,15 @@ adminRouter.get(
       const totalSeriesChallenges = (
         db.prepare(`SELECT COUNT(*) as c FROM daily_challenges WHERE media_type = 'series'`).get() as { c: number }
       ).c;
+      const totalWikiPersons = (
+        db.prepare(`SELECT COUNT(*) as c FROM wiki_persons WHERE is_active = 1`).get() as { c: number }
+      ).c;
+      const unusedWikiPersons = (
+        db.prepare(`SELECT COUNT(*) as c FROM wiki_persons wp WHERE is_active = 1 AND NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.wiki_person_id = wp.id)`).get() as { c: number }
+      ).c;
+      const totalWikiChallenges = (
+        db.prepare(`SELECT COUNT(*) as c FROM daily_challenges WHERE media_type = 'wiki'`).get() as { c: number }
+      ).c;
 
       // Unscheduled days per type in next 30 days
       const next30 = Array.from({ length: 30 }, (_, i) => {
@@ -531,11 +552,16 @@ adminRouter.get(
         (db.prepare(`SELECT challenge_date FROM daily_challenges WHERE media_type = 'series' AND challenge_date > ? AND challenge_date <= ?`)
           .all(today, lastDay) as { challenge_date: string }[]).map((r) => r.challenge_date)
       );
+      const scheduledWikiDates = new Set(
+        (db.prepare(`SELECT challenge_date FROM daily_challenges WHERE media_type = 'wiki' AND challenge_date > ? AND challenge_date <= ?`)
+          .all(today, lastDay) as { challenge_date: string }[]).map((r) => r.challenge_date)
+      );
       const unscheduledFilmNext30 = next30.filter((d) => !scheduledFilmDates.has(d)).length;
       const unscheduledSeriesNext30 = next30.filter((d) => !scheduledSeriesDates.has(d)).length;
+      const unscheduledWikiNext30 = next30.filter((d) => !scheduledWikiDates.has(d)).length;
 
       // Per-type global success rates (computed live via JOIN — global_stats is mixed)
-      function getTypeSuccessRate(mediaType: 'film' | 'series') {
+      function getTypeSuccessRate(mediaType: 'film' | 'series' | 'wiki') {
         const row = db.prepare<[string], { total: number; wins: number }>(
           `SELECT COUNT(*) as total,
                   SUM(CASE WHEN gs.outcome = 'won' THEN 1 ELSE 0 END) as wins
@@ -549,9 +575,10 @@ adminRouter.get(
       }
       const filmSuccessStats = getTypeSuccessRate('film');
       const seriesSuccessStats = getTypeSuccessRate('series');
+      const wikiSuccessStats = getTypeSuccessRate('wiki');
       const successRate = (() => {
-        const t = filmSuccessStats.total + seriesSuccessStats.total;
-        const w = filmSuccessStats.wins + seriesSuccessStats.wins;
+        const t = filmSuccessStats.total + seriesSuccessStats.total + wikiSuccessStats.total;
+        const w = filmSuccessStats.wins + seriesSuccessStats.wins + wikiSuccessStats.wins;
         return t > 0 ? Math.round((w / t) * 100) : null;
       })();
 
@@ -568,12 +595,15 @@ adminRouter.get(
       }
       const filmActivity = getTodayActivity(todayFilmRow);
       const seriesActivity = getTodayActivity(todaySeriesRow);
+      const wikiActivity = getTodayActivity(todayWikiRow);
 
       res.json({
         today_film_challenge: todayFilmRow ? formatChallenge(todayFilmRow) : null,
         today_series_challenge: todaySeriesRow ? formatChallenge(todaySeriesRow) : null,
+        today_wiki_challenge: todayWikiRow ? formatChallenge(todayWikiRow) : null,
         upcoming_film_challenges: upcomingFilmRows.map(formatChallenge),
         upcoming_series_challenges: upcomingSeriesRows.map(formatChallenge),
+        upcoming_wiki_challenges: upcomingWikiRows.map(formatChallenge),
         stats: {
           total_films: totalFilms,
           unused_films: unusedFilms,
@@ -591,6 +621,14 @@ adminRouter.get(
           today_series_wins: seriesActivity.wins,
           today_series_rate: seriesActivity.rate,
           series_success_rate: seriesSuccessStats.rate,
+          total_wiki_persons: totalWikiPersons,
+          unused_wiki_persons: unusedWikiPersons,
+          total_wiki_challenges: totalWikiChallenges,
+          unscheduled_wiki_next_30: unscheduledWikiNext30,
+          today_wiki_games: wikiActivity.games,
+          today_wiki_wins: wikiActivity.wins,
+          today_wiki_rate: wikiActivity.rate,
+          wiki_success_rate: wikiSuccessStats.rate,
           success_rate: successRate,
         },
       });
@@ -2909,6 +2947,32 @@ adminRouter.get('/wiki-persons', adminAuth, adminLimiter, (req: Request, res: Re
   } catch (err) { next(err) }
 })
 
+function normalizeWikiHintSchedule(raw: unknown, personType: unknown): string {
+  const normalizedPersonType = personType === 'sportsperson' ? 'sportsperson' : 'politician';
+  const allowedByType = normalizedPersonType === 'sportsperson'
+    ? new Set(['birth_year', 'nationality', 'position', 'name_initials', 'name_length'])
+    : new Set(['birth_year', 'nationality', 'party', 'name_initials', 'name_length']);
+  const fallback = normalizedPersonType === 'sportsperson'
+    ? ['birth_year', 'nationality', 'position', 'name_initials', 'name_length']
+    : ['birth_year', 'nationality', 'party', 'name_initials', 'name_length'];
+
+  const parseCandidate = (value: unknown): string[] => {
+    if (Array.isArray(value)) return value.filter((k): k is string => typeof k === 'string');
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value) as unknown;
+        if (Array.isArray(parsed)) return parsed.filter((k): k is string => typeof k === 'string');
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const picked = parseCandidate(raw).filter((key) => allowedByType.has(key));
+  return JSON.stringify(picked.length > 0 ? picked : fallback);
+}
+
 // POST /api/admin/wiki-persons
 adminRouter.post('/wiki-persons', adminAuth, adminLimiter, (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -2924,7 +2988,7 @@ adminRouter.post('/wiki-persons', adminAuth, adminLimiter, (req: Request, res: R
 
     const safeAliases = typeof name_aliases === 'string' ? name_aliases : JSON.stringify(name_aliases)
     const safeInfobox = typeof infobox_data === 'string' ? infobox_data : JSON.stringify(infobox_data)
-    const safeHintSchedule = typeof hint_schedule === 'string' ? hint_schedule : JSON.stringify(hint_schedule)
+    const safeHintSchedule = normalizeWikiHintSchedule(hint_schedule, person_type)
 
     const result = db.prepare(`
       INSERT INTO wiki_persons (name, name_aliases, person_type, wikipedia_slug, infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty)
@@ -2964,10 +3028,14 @@ adminRouter.put('/wiki-persons/:id', adminAuth, adminLimiter, (req: Request, res
       infobox_data === undefined
         ? null
         : (typeof infobox_data === 'string' ? infobox_data : JSON.stringify(infobox_data))
+    const currentPersonType =
+      person_type === undefined
+        ? (db.prepare<[number], { person_type: 'politician' | 'sportsperson' }>(`SELECT person_type FROM wiki_persons WHERE id = ?`).get(id)?.person_type ?? 'politician')
+        : person_type
     const safeHintSchedule =
       hint_schedule === undefined
         ? null
-        : (typeof hint_schedule === 'string' ? hint_schedule : JSON.stringify(hint_schedule))
+        : normalizeWikiHintSchedule(hint_schedule, currentPersonType)
     const safeDifficulty =
       difficulty === undefined ? null : (typeof difficulty === 'number' ? difficulty : (parseInt(String(difficulty), 10) || null))
     const safeIsActive =

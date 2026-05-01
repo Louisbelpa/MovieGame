@@ -86,6 +86,21 @@ interface SportspersonData {
   nationality: string | null
 }
 
+interface PoliticianRoleView {
+  title: string
+  years: string
+  country: string | null
+  predecessor: string | null
+  successor: string | null
+}
+
+interface SportClubView {
+  name: string
+  years: string
+  apps: number | null
+  goals: number | null
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getTodayParis(): string {
@@ -97,6 +112,52 @@ function formatYearRange(start: number | null, end: number | null): string {
   return end ? `${start}–${end}` : `${start}–présent`
 }
 
+function computeInitials(name: string): string {
+  const parts = name
+    .split(/[\s-]+/)
+    .map(p => p.trim())
+    .filter(Boolean)
+  return parts.map(p => p[0]?.toUpperCase()).filter(Boolean).join('')
+}
+
+function computeNameLength(name: string): number {
+  return name.replace(/[\s'-]/g, '').length
+}
+
+function getSupplementalHintKeys(personType: WikiPersonRow['person_type']): string[] {
+  if (personType === 'politician') {
+    return ['birth_year', 'nationality', 'party', 'name_initials', 'name_length']
+  }
+  return ['birth_year', 'nationality', 'position', 'name_initials', 'name_length']
+}
+
+function buildVisibleProfile(person: WikiPersonRow): { type: 'politician'; roles: PoliticianRoleView[] } | {
+  type: 'sportsperson'
+  clubs: SportClubView[]
+  nationalTeam: SportspersonData['national_team']
+} {
+  const data = JSON.parse(person.infobox_data)
+  if (person.person_type === 'politician') {
+    const p = data as PoliticianData
+    const roles = (p.roles ?? []).map((r) => ({
+      title: r.title_redacted || r.title,
+      years: formatYearRange(r.start_year, r.end_year),
+      country: r.country,
+      predecessor: r.predecessor,
+      successor: r.successor,
+    }))
+    return { type: 'politician', roles }
+  }
+  const s = data as SportspersonData
+  const clubs = (s.clubs ?? []).map((c) => ({
+    name: c.name,
+    years: formatYearRange(c.start_year, c.end_year),
+    apps: c.appearances,
+    goals: c.goals,
+  }))
+  return { type: 'sportsperson', clubs, nationalTeam: s.national_team }
+}
+
 /**
  * Resolves a hint_schedule key against the person's infobox_data.
  * Returns a structured { type, value } hint object safe to send to the client.
@@ -106,79 +167,35 @@ function resolveHint(key: string, person: WikiPersonRow): { type: string; value:
 
   if (person.person_type === 'politician') {
     const p = data as PoliticianData
-    const roles = p.roles ?? []
 
     switch (key) {
-      case 'roles_titles_only':
-        return { type: 'wiki_roles_titles', value: roles.map(r => r.title_redacted || r.title) }
-
-      case 'roles_with_dates':
-        return {
-          type: 'wiki_roles_dates',
-          value: roles.map(r => ({
-            title: r.title_redacted || r.title,
-            years: formatYearRange(r.start_year, r.end_year),
-          })),
-        }
-
-      case 'roles_with_countries':
-        return {
-          type: 'wiki_roles_countries',
-          value: roles.map(r => ({
-            title: r.title,
-            years: formatYearRange(r.start_year, r.end_year),
-            country: r.country,
-          })),
-        }
-
-      case 'predecessor_names':
-        return {
-          type: 'wiki_predecessor',
-          value: roles
-            .filter(r => r.predecessor || r.successor)
-            .map(r => ({ title: r.title, predecessor: r.predecessor, successor: r.successor })),
-        }
-
-      case 'birth_year_party':
-        return { type: 'wiki_birth_party', value: { birth_year: p.birth_year, party: p.party } }
+      case 'birth_year':
+        return { type: 'wiki_birth_year', value: p.birth_year }
+      case 'nationality':
+        return { type: 'wiki_nationality', value: p.nationality }
+      case 'party':
+        return { type: 'wiki_party', value: p.party }
+      case 'name_initials':
+        return { type: 'wiki_name_initials', value: computeInitials(person.name) }
+      case 'name_length':
+        return { type: 'wiki_name_length', value: computeNameLength(person.name) }
     }
   }
 
   if (person.person_type === 'sportsperson') {
     const s = data as SportspersonData
-    const clubs = s.clubs ?? []
 
     switch (key) {
-      case 'clubs_names_only':
-        return { type: 'wiki_clubs_names', value: clubs.map(c => c.name) }
-
-      case 'clubs_with_years':
-        return {
-          type: 'wiki_clubs_years',
-          value: clubs.map(c => ({ name: c.name, years: formatYearRange(c.start_year, c.end_year) })),
-        }
-
-      case 'clubs_with_stats':
-        return {
-          type: 'wiki_clubs_stats',
-          value: clubs.map(c => ({
-            name: c.name,
-            years: formatYearRange(c.start_year, c.end_year),
-            apps: c.appearances,
-            goals: c.goals,
-          })),
-        }
-
-      case 'national_team':
-        return s.national_team
-          ? { type: 'wiki_national_team', value: s.national_team }
-          : null
-
-      case 'sport_position_birth':
-        return {
-          type: 'wiki_sport_position',
-          value: { sport: s.sport, position: s.position, birth_year: s.birth_year },
-        }
+      case 'birth_year':
+        return { type: 'wiki_birth_year', value: s.birth_year }
+      case 'nationality':
+        return { type: 'wiki_nationality', value: s.nationality }
+      case 'position':
+        return { type: 'wiki_position', value: s.position }
+      case 'name_initials':
+        return { type: 'wiki_name_initials', value: computeInitials(person.name) }
+      case 'name_length':
+        return { type: 'wiki_name_length', value: computeNameLength(person.name) }
     }
   }
 
@@ -242,7 +259,7 @@ export function buildWikiChallengePayload(challenge: WikiChallengeRow, session: 
     .prepare<[number], WikiPersonRow>(`SELECT * FROM wiki_persons WHERE id = ?`)
     .get(challenge.wiki_person_id)!
 
-  const schedule: string[] = JSON.parse(challenge.hint_schedule).slice(0, MAX_HINTS)
+  const schedule = getSupplementalHintKeys(person.person_type).slice(0, MAX_HINTS)
   const hintsRevealed = Math.min(session.hints_revealed, MAX_HINTS)
   const attempts: AttemptEntry[] = JSON.parse(session.attempts)
 
@@ -260,6 +277,7 @@ export function buildWikiChallengePayload(challenge: WikiChallengeRow, session: 
     isPastChallenge: challenge.challenge_date < today,
     mediaType: 'wiki' as const,
     personType: person.person_type,
+    profile: buildVisibleProfile(person),
     isGameOver: session.outcome !== null,
     hintsAvailable: schedule.length,
     hintsRevealed,
@@ -302,7 +320,10 @@ export function processWikiGuess(
 
   attempts.push({ guess: rawGuess, correct, ts: new Date().toISOString() })
 
-  const schedule: string[] = JSON.parse(challenge.hint_schedule).slice(0, MAX_HINTS)
+  const personType = db
+    .prepare<[number], { person_type: WikiPersonRow['person_type'] }>(`SELECT person_type FROM wiki_persons WHERE id = ?`)
+    .get(challenge.wiki_person_id)!.person_type
+  const schedule = getSupplementalHintKeys(personType).slice(0, MAX_HINTS)
   let newOutcome: 'won' | 'lost' | null = null
   let newHintsRevealed = Math.min(session.hints_revealed, MAX_HINTS)
   let nextHintUnlocked = false
