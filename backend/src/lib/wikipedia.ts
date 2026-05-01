@@ -97,6 +97,7 @@ function stripLinks(s: string): string {
       }
       return ''
     })
+    .replace(/<br\s*\/?>/gi, ', ')
     .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2')
     .replace(/\[\[([^\]]+)\]\]/g, '$1')
     .replace(/\[\[/g, '')
@@ -116,8 +117,11 @@ function extractYear(s: string): number | null {
 function normalizeValue(s: string | null | undefined): string | null {
   if (!s) return null
   const normalized = s
+    .replace(/\b[A-Z]{2,4}-d\b/g, ' ')
+    .replace(/([\p{Ll}])([\p{Lu}])/gu, '$1, $2')
     .replace(/\s+/g, ' ')
     .replace(/\s*([,/;:])\s*/g, '$1 ')
+    .replace(/,\s*,+/g, ', ')
     .replace(/\s{2,}/g, ' ')
     .trim()
   return normalized || null

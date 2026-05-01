@@ -12,7 +12,17 @@ export function WikiLoseModal() {
 
   if (!result) return null
 
-  const personTypeLabel = result.personType === 'sportsperson' ? 'Sportif·ve' : 'Politicien·ne'
+  const personTypeLabel = (() => {
+    switch (result.personType) {
+      case 'sportsperson': return 'Sportif·ve'
+      case 'artist': return 'Artiste'
+      case 'scientist': return 'Scientifique'
+      case 'entrepreneur': return 'Entrepreneur·e'
+      case 'writer': return 'Écrivain·e'
+      case 'historical_figure': return 'Personnalité historique'
+      default: return 'Politicien·ne'
+    }
+  })()
 
   return (
     <Modal isOpen={isOpen} onClose={closeModal}>
@@ -26,20 +36,24 @@ export function WikiLoseModal() {
           <p className="text-film-text-dim text-sm mt-1">Vous découvrirez la réponse ci-dessous</p>
         </div>
 
-        <div className="w-full film-border rounded-xl overflow-hidden">
+        <div className="w-full film-border rounded-xl overflow-hidden bg-film-black/40">
           {result.photoUrl && (
             <img src={result.photoUrl} alt={result.name}
               className="w-full h-40 object-cover object-top" />
           )}
           <div className="p-3 text-left">
-            <p className="font-title text-lg font-semibold text-film-text leading-tight">
+            <p className="text-[10px] uppercase tracking-wider text-film-text-dim mb-1">Article Wikipédia</p>
+            <p className="font-title text-xl font-semibold text-film-text leading-tight">
               {result.name}
             </p>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               <Badge variant="gold">{personTypeLabel}</Badge>
             </div>
             {result.extract && (
-              <p className="text-xs text-film-text-dim mt-2 line-clamp-3">{result.extract}</p>
+              <div className="mt-3 pt-2 border-t border-film-border/50">
+                <p className="text-[10px] uppercase tracking-wider text-film-text-dim mb-1">Résumé</p>
+                <p className="text-xs text-film-text-dim line-clamp-4">{result.extract}</p>
+              </div>
             )}
           </div>
         </div>
