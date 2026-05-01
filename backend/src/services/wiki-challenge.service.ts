@@ -81,6 +81,7 @@ interface SportspersonData {
   sport: string | null
   position: string | null
   clubs: WikiClub[]
+  career_highlights?: Array<{ label: string; value: string }>
   national_team: { name: string; caps: number | null; goals: number | null } | null
   birth_year: number | null
   nationality: string | null
@@ -181,6 +182,8 @@ function computeHintSchedule(person: WikiPersonRow, challengeScheduleRaw: string
 function buildVisibleProfile(person: WikiPersonRow): { type: 'politician'; roles: PoliticianRoleView[] } | {
   type: 'sportsperson'
   clubs: SportClubView[]
+  sport: string | null
+  careerHighlights: Array<{ label: string; value: string }>
   nationalTeam: SportspersonData['national_team']
 } | {
   type: 'generic'
@@ -208,7 +211,13 @@ function buildVisibleProfile(person: WikiPersonRow): { type: 'politician'; roles
       apps: c.appearances,
       goals: c.goals,
     }))
-    return { type: 'sportsperson', clubs, nationalTeam: s.national_team }
+    return {
+      type: 'sportsperson',
+      clubs,
+      sport: s.sport,
+      careerHighlights: (s.career_highlights ?? []).slice(0, 6),
+      nationalTeam: s.national_team,
+    }
   }
   const g = data as GenericPersonData
   return {

@@ -45,11 +45,16 @@ export type WikiVisibleProfile =
     }
   | {
       type: 'sportsperson'
+      sport: string | null
       clubs: Array<{
         name: string
         years: string
         apps: number | null
         goals: number | null
+      }>
+      careerHighlights: Array<{
+        label: string
+        value: string
       }>
       nationalTeam: { name: string; caps: number | null; goals: number | null } | null
     }

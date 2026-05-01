@@ -118,29 +118,45 @@ function VisibleProfile({ profile }: { profile: WikiVisibleProfile }) {
     <div className="rounded-lg film-border overflow-hidden">
       <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
         <Trophy size={13} className="text-film-gold shrink-0" />
-        <span className="text-[10px] font-semibold text-film-text-dim uppercase tracking-wider">Carrière sportive</span>
+        <span className="text-[10px] font-semibold text-film-text-dim uppercase tracking-wider">
+          Carrière sportive{profile.sport ? ` (${profile.sport})` : ''}
+        </span>
       </div>
       <div className="px-3 pb-2.5">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-[10px] text-film-text-dim uppercase">
-              <th className="text-left pb-1 font-medium">Club</th>
-              <th className="text-right pb-1 font-medium">Années</th>
-              <th className="text-right pb-1 font-medium">M.</th>
-              <th className="text-right pb-1 font-medium">B.</th>
-            </tr>
-          </thead>
-          <tbody>
-            {profile.clubs.map((c, i) => (
-              <tr key={i} className="border-t border-film-border/30">
-                <td className="py-1 pr-2 text-film-text">{c.name}</td>
-                <td className="py-1 pr-2 text-film-text-dim text-right whitespace-nowrap">{c.years || '–'}</td>
-                <td className="py-1 pr-2 text-film-text-dim text-right">{c.apps ?? '–'}</td>
-                <td className="py-1 text-film-text-dim text-right">{c.goals ?? '–'}</td>
+        {profile.clubs.length > 0 ? (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-[10px] text-film-text-dim uppercase">
+                <th className="text-left pb-1 font-medium">Club</th>
+                <th className="text-right pb-1 font-medium">Années</th>
+                <th className="text-right pb-1 font-medium">M.</th>
+                <th className="text-right pb-1 font-medium">B.</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {profile.clubs.map((c, i) => (
+                <tr key={i} className="border-t border-film-border/30">
+                  <td className="py-1 pr-2 text-film-text">{c.name}</td>
+                  <td className="py-1 pr-2 text-film-text-dim text-right whitespace-nowrap">{c.years || '–'}</td>
+                  <td className="py-1 pr-2 text-film-text-dim text-right">{c.apps ?? '–'}</td>
+                  <td className="py-1 text-film-text-dim text-right">{c.goals ?? '–'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div className="space-y-1.5 text-sm">
+            {profile.careerHighlights.length > 0 ? (
+              profile.careerHighlights.map((h, idx) => (
+                <p key={idx} className="text-film-text">
+                  <span className="text-film-text-dim">{h.label}:</span> {h.value}
+                </p>
+              ))
+            ) : (
+              <p className="text-film-text-dim">Carrière en cours de consolidation.</p>
+            )}
+          </div>
+        )}
         {profile.nationalTeam && (
           <p className="mt-2 text-xs text-film-text-dim">
             Équipe nationale: <span className="text-film-text">{profile.nationalTeam.name}</span>

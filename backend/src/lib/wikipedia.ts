@@ -33,6 +33,7 @@ export interface WikiSportspersonData {
   sport: string | null
   position: string | null
   clubs: WikiClub[]
+  career_highlights?: Array<{ label: string; value: string }>
   national_team: { name: string; caps: number | null; goals: number | null } | null
   birth_year: number | null
   nationality: string | null
@@ -77,12 +78,41 @@ interface WikidataFallback {
   era: string | null
 }
 
+const USER_AGENT = 'MovieGame/1.0 (admin tool)'
+const RETRY_STATUS = new Set([408, 425, 429, 500, 502, 503, 504])
+
 async function safeJson<T>(res: Response): Promise<T | null> {
   try {
     return await res.json() as T
   } catch {
     return null
   }
+}
+
+async function fetchWithRetry(url: string, init: RequestInit = {}, maxAttempts = 4): Promise<Response> {
+  let lastError: Error | null = null
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const res = await fetch(url, {
+        ...init,
+        headers: { 'User-Agent': USER_AGENT, ...(init.headers ?? {}) },
+      })
+      if (res.ok) return res
+      if (!RETRY_STATUS.has(res.status) || attempt === maxAttempts) return res
+      const retryAfter = Number(res.headers.get('retry-after') ?? '')
+      const waitMs = Number.isFinite(retryAfter)
+        ? Math.max(500, retryAfter * 1000)
+        : Math.min(8000, 600 * (2 ** (attempt - 1)))
+      await new Promise((resolve) => setTimeout(resolve, waitMs))
+      continue
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err))
+      if (attempt === maxAttempts) break
+      const waitMs = Math.min(8000, 600 * (2 ** (attempt - 1)))
+      await new Promise((resolve) => setTimeout(resolve, waitMs))
+    }
+  }
+  throw (lastError ?? new Error(`Network request failed for ${url}`))
 }
 
 /** Strip wikilinks: [[Target|Label]] → Label, [[Target]] → Target */
@@ -134,6 +164,33 @@ function normalizeMediaUrl(url: string | null | undefined, lang: string): string
   if (v.startsWith('//')) return `https:${v}`
   if (v.startsWith('/')) return `https://${lang}.wikipedia.org${v}`
   return v
+}
+
+function extractPositiveInteger(raw: string): number | null {
+  const clean = stripLinks(raw).replace(/[^\d]/g, '').trim()
+  if (!clean) return null
+  const n = parseInt(clean, 10)
+  return Number.isFinite(n) && n >= 0 ? n : null
+}
+
+function inferBirthYearFromExtract(extract: string | null | undefined): number | null {
+  if (!extract) return null
+  const normalized = extract.replace(/\u00a0/g, ' ')
+  const aroundBirth = normalized.match(/\bné[e]?\b[\s\S]{0,60}?\b(1[5-9]\d{2}|20\d{2})\b/i)
+  if (aroundBirth) return parseInt(aroundBirth[1], 10)
+  const firstYear = normalized.match(/\b(1[5-9]\d{2}|20\d{2})\b/)
+  return firstYear ? parseInt(firstYear[1], 10) : null
+}
+
+function applyBirthYearFallback(infobox: WikiInfoboxData, birthYear: number | null): WikiInfoboxData {
+  if (!birthYear) return infobox
+  if ('roles' in infobox) {
+    return { ...infobox, birth_year: infobox.birth_year ?? birthYear }
+  }
+  if ('clubs' in infobox) {
+    return { ...infobox, birth_year: infobox.birth_year ?? birthYear }
+  }
+  return { ...infobox, birth_year: infobox.birth_year ?? birthYear }
 }
 
 /** Detect person type from infobox template name */
@@ -436,6 +493,19 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
           : wikitext.match(/\{\{Infobox\s+Basketteur/i) ? 'Basket-ball'
             : 'Sport')
   ).trim()
+  const isTennisProfile = /tennis/i.test(sport)
+
+  const cleanedClubs = dedupedClubs
+    .map((club) => ({
+      ...club,
+      name: normalizeValue(
+        club.name
+          .replace(/^[|:•\s]+/, '')
+          .replace(/\bFichier:[^|,\n]+/gi, '')
+          .replace(/\s{2,}/g, ' ')
+      ) ?? '',
+    }))
+    .filter((club) => club.name.length > 1)
 
   const position = stripLinks(
     wikitext.match(/\|\s*(?:position|poste)\s*=\s*([^\n|]+)/i)?.[1] ?? ''
@@ -443,10 +513,30 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
 
   const nationality = stripLinks(readInfoboxField(fields, ['nationality', 'nationalité', 'nation sportive'])).trim() || null
 
+  const careerHighlights: Array<{ label: string; value: string }> = []
+  const pushHighlight = (label: string, value: string | null) => {
+    const v = normalizeValue(value)
+    if (!v) return
+    if (careerHighlights.some((h) => h.label === label && h.value === v)) return
+    careerHighlights.push({ label, value: v })
+  }
+  const singlesTitles = extractPositiveInteger(readInfoboxField(fields, ['singlestitles', 'titres en simple', 'titres simple']))
+  const doublesTitles = extractPositiveInteger(readInfoboxField(fields, ['doublestitles', 'titres en double', 'titres double']))
+  const highestSingles = normalizeValue(stripLinks(readInfoboxField(fields, ['highestsinglesranking', 'meilleur classement en simple', 'classement simple'])))
+  const highestDoubles = normalizeValue(stripLinks(readInfoboxField(fields, ['highestdoublesranking', 'meilleur classement en double', 'classement double'])))
+  const turnedPro = normalizeValue(stripLinks(readInfoboxField(fields, ['turnedpro', 'début carrière pro', 'debut carriere pro'])))
+
+  if (singlesTitles != null) pushHighlight('Titres en simple', String(singlesTitles))
+  if (doublesTitles != null) pushHighlight('Titres en double', String(doublesTitles))
+  pushHighlight('Meilleur classement simple', highestSingles)
+  pushHighlight('Meilleur classement double', highestDoubles)
+  pushHighlight('Début carrière pro', turnedPro)
+
   return {
     sport: sport || 'Football',
     position,
-    clubs: dedupedClubs.slice(0, 8),
+    clubs: isTennisProfile ? [] : cleanedClubs.slice(0, 8),
+    career_highlights: careerHighlights.slice(0, 6),
     national_team,
     birth_year: birthYear,
     nationality,
@@ -472,7 +562,7 @@ function parseGenericData(wikitext: string, domain: string): WikiGenericData {
 
 async function fetchWikidataEntityId(slug: string, lang: string): Promise<string | null> {
   const url = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=pageprops&titles=${encodeURIComponent(slug)}&format=json&formatversion=2`
-  const res = await fetch(url, { headers: { 'User-Agent': 'MovieGame/1.0 (admin tool)' } })
+  const res = await fetchWithRetry(url)
   if (!res.ok) return null
   const json = await safeJson<{
     query?: { pages?: Array<{ pageprops?: { wikibase_item?: string } }> }
@@ -483,7 +573,7 @@ async function fetchWikidataEntityId(slug: string, lang: string): Promise<string
 
 async function fetchWikidataFallback(entityId: string, lang: string): Promise<WikidataFallback | null> {
   const url = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${encodeURIComponent(entityId)}&props=labels|claims&languages=${encodeURIComponent(lang)}|en&format=json`
-  const res = await fetch(url, { headers: { 'User-Agent': 'MovieGame/1.0 (admin tool)' } })
+  const res = await fetchWithRetry(url)
   if (!res.ok) return null
   const json = await safeJson<{
     entities?: Record<string, {
@@ -513,7 +603,7 @@ async function fetchWikidataFallback(entityId: string, lang: string): Promise<Wi
     if (ids.length === 0) return []
     const idsChunk = ids.slice(0, 8).join('|')
     const entitiesUrl = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${encodeURIComponent(idsChunk)}&props=labels&languages=${encodeURIComponent(lang)}|en&format=json`
-    const r = await fetch(entitiesUrl, { headers: { 'User-Agent': 'MovieGame/1.0 (admin tool)' } })
+    const r = await fetchWithRetry(entitiesUrl)
     if (!r.ok) return []
     const j = await safeJson<{
       entities?: Record<string, { labels?: Record<string, { value: string }> }>
@@ -539,6 +629,23 @@ async function fetchWikidataFallback(entityId: string, lang: string): Promise<Wi
     notable_work: normalizeValue(notableWorkLabels[0] ?? null),
     era: null,
   }
+}
+
+async function fetchWikipediaImageFallback(slug: string, lang: string): Promise<string | null> {
+  const url = `https://${lang}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(slug)}&prop=pageimages&piprop=original|thumbnail&pithumbsize=1000&format=json&formatversion=2`
+  const res = await fetchWithRetry(url)
+  if (!res.ok) return null
+  const json = await safeJson<{
+    query?: {
+      pages?: Array<{
+        original?: { source?: string }
+        thumbnail?: { source?: string }
+      }>
+    }
+  }>(res)
+  if (!json) return null
+  const page = json.query?.pages?.[0]
+  return normalizeMediaUrl(page?.original?.source ?? page?.thumbnail?.source ?? null, lang)
 }
 
 function inferTypeFromWikidataOccupations(occupations: string[]): WikiPersonType | null {
@@ -581,6 +688,7 @@ function applyWikidataFallback(
         sport: normalizeValue(s.sport ?? null),
         position: normalizeValue(s.position ?? null),
         clubs: s.clubs ?? [],
+        career_highlights: s.career_highlights ?? [],
         national_team: s.national_team ?? null,
         birth_year: s.birth_year ?? fallback.birth_year,
         nationality: normalizeValue(s.nationality ?? fallback.nationality),
@@ -638,8 +746,10 @@ function evaluateParseQuality(
     if (!p.party) { score -= 10; warnings.push('Parti manquant') }
   } else if (personType === 'sportsperson') {
     const s = infoboxData as WikiSportspersonData
-    if ((s.clubs ?? []).length === 0) { score -= 35; warnings.push('Aucun club extrait') }
-    if (!s.position) { score -= 15; warnings.push('Poste manquant') }
+    const isTennisProfile = /tennis/i.test(s.sport ?? '')
+    const hasCareerData = (s.clubs ?? []).length > 0 || (s.career_highlights ?? []).length > 0
+    if (!hasCareerData) { score -= 35; warnings.push('Aucune carrière sportive extraite') }
+    if (!isTennisProfile && !s.position) { score -= 15; warnings.push('Poste manquant') }
     if (!s.birth_year) { score -= 20; warnings.push('Année de naissance manquante') }
     if (!s.nationality) { score -= 15; warnings.push('Nationalité manquante') }
   } else {
@@ -656,26 +766,48 @@ function evaluateParseQuality(
 export async function fetchWikipediaData(slug: string, lang = 'fr'): Promise<WikiFetchResult> {
   // 1. Summary (extract + thumbnail)
   const summaryUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(slug)}`
-  const summaryRes = await fetch(summaryUrl, { headers: { 'User-Agent': 'MovieGame/1.0 (admin tool)' } })
+  const summaryRes = await fetchWithRetry(summaryUrl)
   if (!summaryRes.ok) throw new Error(`Wikipedia summary fetch failed: ${summaryRes.status}`)
   const summary = await safeJson<{
     title: string
     extract: string
     description?: string
     thumbnail?: { source: string }
+    originalimage?: { source: string }
     content_urls?: { desktop?: { page?: string } }
   }>(summaryRes)
   if (!summary) throw new Error('Wikipedia summary parse failed')
 
   // 2. Wikitext (infobox)
   const wikitextUrl = `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(slug)}&prop=wikitext&format=json&formatversion=2`
-  const wikitextRes = await fetch(wikitextUrl, { headers: { 'User-Agent': 'MovieGame/1.0 (admin tool)' } })
+  const wikitextRes = await fetchWithRetry(wikitextUrl)
   if (!wikitextRes.ok) throw new Error(`Wikipedia wikitext fetch failed: ${wikitextRes.status}`)
   const wikitextJson = await safeJson<{ parse?: { wikitext: string } }>(wikitextRes)
   if (!wikitextJson) throw new Error('Wikipedia wikitext parse failed')
   const wikitext = wikitextJson.parse?.wikitext ?? ''
 
-  let personType = detectPersonTypeFromSummary(summary.description) ?? detectPersonType(wikitext)
+  let resolvedPhotoUrl = normalizeMediaUrl(
+    summary.originalimage?.source ?? summary.thumbnail?.source ?? null,
+    lang
+  )
+  if (!resolvedPhotoUrl) {
+    try {
+      resolvedPhotoUrl = await fetchWikipediaImageFallback(slug, lang)
+    } catch {
+      resolvedPhotoUrl = null
+    }
+  }
+
+  let wikidata: WikidataFallback | null = null
+  try {
+    const entityId = await fetchWikidataEntityId(slug, lang)
+    if (entityId) wikidata = await fetchWikidataFallback(entityId, lang)
+  } catch {
+    wikidata = null
+  }
+
+  const wikidataType = wikidata ? inferTypeFromWikidataOccupations(wikidata.occupations) : null
+  let personType = wikidataType ?? detectPersonTypeFromSummary(summary.description) ?? detectPersonType(wikitext)
   let infobox_data: WikiInfoboxData = personType === 'politician'
     ? parsePoliticianData(wikitext)
     : personType === 'sportsperson'
@@ -690,25 +822,20 @@ export async function fetchWikipediaData(slug: string, lang = 'fr'): Promise<Wik
               ? parseGenericData(wikitext, 'Littérature')
               : parseGenericData(wikitext, 'Histoire')
 
-  // 3. Fallback Wikidata for fragile/missing fields.
-  try {
-    const entityId = await fetchWikidataEntityId(slug, lang)
-    if (entityId) {
-      const wikidata = await fetchWikidataFallback(entityId, lang)
-      const resolved = applyWikidataFallback(personType, infobox_data, wikidata)
-      personType = resolved.personType
-      infobox_data = resolved.infobox
-    }
-  } catch {
-    // Keep infobox-based result when Wikidata is unavailable.
-  }
+  // 3. Apply structured Wikidata fallback for fragile/missing fields.
+  const resolved = applyWikidataFallback(personType, infobox_data, wikidata)
+  personType = resolved.personType
+  infobox_data = applyBirthYearFallback(
+    resolved.infobox,
+    inferBirthYearFromExtract(summary.extract)
+  )
 
-  const quality = evaluateParseQuality(personType, infobox_data, !!summary.thumbnail?.source)
+  const quality = evaluateParseQuality(personType, infobox_data, !!resolvedPhotoUrl)
 
   return {
     name: summary.title,
     extract: summary.extract?.slice(0, 500) || null,
-    photo_url: normalizeMediaUrl(summary.thumbnail?.source ?? null, lang),
+    photo_url: resolvedPhotoUrl,
     wikipedia_url: summary.content_urls?.desktop?.page ?? `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(slug)}`,
     infobox_data,
     person_type: personType,
