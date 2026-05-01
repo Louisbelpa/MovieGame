@@ -2830,19 +2830,31 @@ adminRouter.post('/wiki-persons', adminAuth, adminLimiter, (req: Request, res: R
       name, name_aliases = '[]', person_type = 'politician',
       wikipedia_slug, infobox_data = '{}', hint_schedule = '[]',
       photo_url, extract, wikipedia_url, difficulty = 3,
-    } = req.body as Record<string, string | number>
+    } = req.body as Record<string, unknown>
 
     if (!name || !wikipedia_slug) {
       res.status(400).json({ error: 'name and wikipedia_slug are required.' }); return
     }
 
+    const safeAliases = typeof name_aliases === 'string' ? name_aliases : JSON.stringify(name_aliases)
+    const safeInfobox = typeof infobox_data === 'string' ? infobox_data : JSON.stringify(infobox_data)
+    const safeHintSchedule = typeof hint_schedule === 'string' ? hint_schedule : JSON.stringify(hint_schedule)
+
     const result = db.prepare(`
       INSERT INTO wiki_persons (name, name_aliases, person_type, wikipedia_slug, infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(name, name_aliases, person_type, wikipedia_slug,
-       typeof infobox_data === 'string' ? infobox_data : JSON.stringify(infobox_data),
-       typeof hint_schedule === 'string' ? hint_schedule : JSON.stringify(hint_schedule),
-       photo_url || null, extract || null, wikipedia_url || null, difficulty)
+    `).run(
+      String(name),
+      safeAliases,
+      String(person_type),
+      String(wikipedia_slug),
+      safeInfobox,
+      safeHintSchedule,
+      typeof photo_url === 'string' && photo_url.trim() ? photo_url : null,
+      typeof extract === 'string' && extract.trim() ? extract : null,
+      typeof wikipedia_url === 'string' && wikipedia_url.trim() ? wikipedia_url : null,
+      typeof difficulty === 'number' ? difficulty : parseInt(String(difficulty ?? 3), 10) || 3
+    )
 
     logAuditEvent('wiki_person_created', { id: result.lastInsertRowid, name })
     res.status(201).json({ id: result.lastInsertRowid })
@@ -2856,7 +2868,26 @@ adminRouter.put('/wiki-persons/:id', adminAuth, adminLimiter, (req: Request, res
     const {
       name, name_aliases, person_type, wikipedia_slug,
       infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty, is_active,
-    } = req.body as Record<string, string | number>
+    } = req.body as Record<string, unknown>
+
+    const safeNameAliases =
+      name_aliases === undefined
+        ? null
+        : (typeof name_aliases === 'string' ? name_aliases : JSON.stringify(name_aliases))
+    const safeInfoboxData =
+      infobox_data === undefined
+        ? null
+        : (typeof infobox_data === 'string' ? infobox_data : JSON.stringify(infobox_data))
+    const safeHintSchedule =
+      hint_schedule === undefined
+        ? null
+        : (typeof hint_schedule === 'string' ? hint_schedule : JSON.stringify(hint_schedule))
+    const safeDifficulty =
+      difficulty === undefined ? null : (typeof difficulty === 'number' ? difficulty : (parseInt(String(difficulty), 10) || null))
+    const safeIsActive =
+      is_active === undefined
+        ? null
+        : (typeof is_active === 'boolean' ? (is_active ? 1 : 0) : (parseInt(String(is_active), 10) ? 1 : 0))
 
     db.prepare(`
       UPDATE wiki_persons SET
@@ -2874,13 +2905,17 @@ adminRouter.put('/wiki-persons/:id', adminAuth, adminLimiter, (req: Request, res
         updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
       WHERE id = ?
     `).run(
-      name || null, name_aliases || null, person_type || null, wikipedia_slug || null,
-      infobox_data ? (typeof infobox_data === 'string' ? infobox_data : JSON.stringify(infobox_data)) : null,
-      hint_schedule ? (typeof hint_schedule === 'string' ? hint_schedule : JSON.stringify(hint_schedule)) : null,
-      photo_url !== undefined ? (photo_url || null) : null,
-      extract !== undefined ? (extract || null) : null,
-      wikipedia_url !== undefined ? (wikipedia_url || null) : null,
-      difficulty || null, is_active !== undefined ? is_active : null,
+      typeof name === 'string' ? name : null,
+      safeNameAliases,
+      typeof person_type === 'string' ? person_type : null,
+      typeof wikipedia_slug === 'string' ? wikipedia_slug : null,
+      safeInfoboxData,
+      safeHintSchedule,
+      photo_url !== undefined ? (typeof photo_url === 'string' && photo_url.trim() ? photo_url : null) : null,
+      extract !== undefined ? (typeof extract === 'string' && extract.trim() ? extract : null) : null,
+      wikipedia_url !== undefined ? (typeof wikipedia_url === 'string' && wikipedia_url.trim() ? wikipedia_url : null) : null,
+      safeDifficulty,
+      safeIsActive,
       id
     )
 
