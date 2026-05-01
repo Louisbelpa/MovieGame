@@ -158,6 +158,7 @@ interface ChallengeRow {
   challenge_date: string;
   film_id: number | null;
   series_id: number | null;
+  wiki_person_id: number | null;
   challenge_number: number;
   hint_schedule: string;
   created_at: string;
@@ -166,6 +167,21 @@ interface ChallengeRow {
 interface ChallengeWithFilm extends ChallengeRow {
   film_title: string;
   film_image_url: string;
+}
+
+interface WikiPersonRow {
+  id: number;
+  name: string;
+  name_aliases: string;
+  person_type: 'politician' | 'sportsperson';
+  wikipedia_slug: string;
+  infobox_data: string;
+  hint_schedule: string;
+  photo_url: string | null;
+  extract: string | null;
+  wikipedia_url: string | null;
+  difficulty: number;
+  is_active: number;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -259,7 +275,49 @@ function getSeriesUsedDates(seriesId: number): string[] {
   return rows.map((r) => r.challenge_date);
 }
 
+function formatWikiPerson(row: WikiPersonRow, usedDates?: string[]) {
+  return {
+    id: row.id,
+    name: row.name,
+    title: row.name,
+    title_aliases: JSON.parse(row.name_aliases) as string[],
+    person_type: row.person_type,
+    wikipedia_slug: row.wikipedia_slug,
+    infobox_data: JSON.parse(row.infobox_data) as Record<string, unknown>,
+    hint_schedule: JSON.parse(row.hint_schedule) as string[],
+    image_url: row.photo_url,
+    photo_url: row.photo_url,
+    extract: row.extract,
+    wikipedia_url: row.wikipedia_url,
+    difficulty: row.difficulty,
+    is_active: row.is_active === 1,
+    used_dates: usedDates ?? [],
+  };
+}
+
+function getWikiUsedDates(wikiPersonId: number): string[] {
+  const rows = db
+    .prepare<[number], { challenge_date: string }>(
+      `SELECT challenge_date FROM daily_challenges WHERE wiki_person_id = ? ORDER BY challenge_date DESC`
+    )
+    .all(wikiPersonId);
+  return rows.map((r) => r.challenge_date);
+}
+
 function formatChallenge(row: ChallengeRow) {
+  if (row.wiki_person_id) {
+    const person = db
+      .prepare<[number], WikiPersonRow>(`SELECT * FROM wiki_persons WHERE id = ?`)
+      .get(row.wiki_person_id)!;
+    return {
+      id: row.id,
+      date: row.challenge_date,
+      film: null,
+      series: null,
+      wiki: formatWikiPerson(person, getWikiUsedDates(person.id)),
+      mediaType: 'wiki' as const,
+    };
+  }
   if (row.series_id) {
     const series = db
       .prepare<[number], SeriesRow>(`SELECT * FROM series WHERE id = ?`)
@@ -269,6 +327,7 @@ function formatChallenge(row: ChallengeRow) {
       date: row.challenge_date,
       film: null,
       series: formatSeries(series, getSeriesUsedDates(series.id)),
+      wiki: null,
       mediaType: 'series' as const,
     };
   }
@@ -280,6 +339,7 @@ function formatChallenge(row: ChallengeRow) {
     date: row.challenge_date,
     film: formatFilm(film, getFilmUsedDates(film.id)),
     series: null,
+    wiki: null,
     mediaType: 'film' as const,
   };
 }
@@ -991,7 +1051,13 @@ adminRouter.get(
       const from = parseDateParam(req.query.from);
       const to = parseDateParam(req.query.to);
 
-      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const mediaType = req.query.mediaType === 'series'
+        ? 'series'
+        : req.query.mediaType === 'film'
+          ? 'film'
+          : req.query.mediaType === 'wiki'
+            ? 'wiki'
+            : null;
       let query = `SELECT dc.* FROM daily_challenges dc`;
       const params: string[] = [];
       const conditions: string[] = [];
@@ -1030,7 +1096,7 @@ adminRouter.post(
   '/challenges',
   (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { date, film_id, series_id } = req.body as { date?: string; film_id?: number; series_id?: number };
+      const { date, film_id, series_id, wiki_person_id } = req.body as { date?: string; film_id?: number; series_id?: number; wiki_person_id?: number };
 
       if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || new Date(date).toISOString().slice(0, 10) !== date) {
         res.status(400).json({ error: 'Field "date" must be a valid YYYY-MM-DD string.' });
@@ -1039,25 +1105,29 @@ adminRouter.post(
 
       const hasFilm = film_id !== undefined && film_id !== null && typeof film_id === 'number';
       const hasSeries = series_id !== undefined && series_id !== null && typeof series_id === 'number';
+      const hasWiki = wiki_person_id !== undefined && wiki_person_id !== null && typeof wiki_person_id === 'number';
 
-      if (!hasFilm && !hasSeries) {
-        res.status(400).json({ error: 'Either "film_id" or "series_id" must be provided.' });
+      if (!hasFilm && !hasSeries && !hasWiki) {
+        res.status(400).json({ error: 'Either "film_id", "series_id" or "wiki_person_id" must be provided.' });
         return;
       }
-      if (hasFilm && hasSeries) {
-        res.status(400).json({ error: 'Only one of "film_id" or "series_id" may be provided.' });
+      if ((hasFilm ? 1 : 0) + (hasSeries ? 1 : 0) + (hasWiki ? 1 : 0) > 1) {
+        res.status(400).json({ error: 'Only one of "film_id", "series_id" or "wiki_person_id" may be provided.' });
         return;
       }
 
       if (hasFilm) {
         const film = db.prepare(`SELECT id FROM films WHERE id = ? AND is_active = 1`).get(film_id);
         if (!film) { res.status(404).json({ error: 'Film not found or inactive.' }); return; }
-      } else {
+      } else if (hasSeries) {
         const series = db.prepare(`SELECT id FROM series WHERE id = ? AND is_active = 1`).get(series_id);
         if (!series) { res.status(404).json({ error: 'Series not found or inactive.' }); return; }
+      } else {
+        const person = db.prepare(`SELECT id FROM wiki_persons WHERE id = ? AND is_active = 1`).get(wiki_person_id);
+        if (!person) { res.status(404).json({ error: 'Wiki person not found or inactive.' }); return; }
       }
 
-      const mediaType = hasFilm ? 'film' : 'series';
+      const mediaType = hasFilm ? 'film' : hasSeries ? 'series' : 'wiki';
 
       // Check for existing challenge of same type on that date
       const existing = db
@@ -1076,22 +1146,28 @@ adminRouter.post(
           .get(mediaType) as { max_num: number }
       ).max_num;
 
-      const hintSchedule = hasFilm
+      let hintSchedule = hasFilm
         ? JSON.stringify(['year', 'director', 'cast'])
         : JSON.stringify(['year', 'creator', 'cast']);
+      if (hasWiki) {
+        const wikiHintRow = db
+          .prepare<[number], { hint_schedule: string }>(`SELECT hint_schedule FROM wiki_persons WHERE id = ?`)
+          .get(wiki_person_id!)!;
+        hintSchedule = wikiHintRow.hint_schedule;
+      }
 
       const result = db
         .prepare(
-          `INSERT INTO daily_challenges (challenge_date, media_type, film_id, series_id, challenge_number, hint_schedule)
-           VALUES (?, ?, ?, ?, ?, ?)`
+          `INSERT INTO daily_challenges (challenge_date, media_type, film_id, series_id, wiki_person_id, challenge_number, hint_schedule)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
         )
-        .run(date, mediaType, hasFilm ? film_id : null, hasSeries ? series_id : null, maxNum + 1, hintSchedule);
+        .run(date, mediaType, hasFilm ? film_id : null, hasSeries ? series_id : null, hasWiki ? wiki_person_id : null, maxNum + 1, hintSchedule);
 
       const created = db
         .prepare<[number], ChallengeRow>(`SELECT dc.* FROM daily_challenges dc WHERE dc.id = ?`)
         .get(result.lastInsertRowid as number)!;
 
-      logAuditEvent('challenge.create', { id: result.lastInsertRowid, date, film_id, series_id });
+      logAuditEvent('challenge.create', { id: result.lastInsertRowid, date, film_id, series_id, wiki_person_id });
       res.status(201).json(formatChallenge(created));
     } catch (err) {
       next(err);
@@ -1110,16 +1186,17 @@ adminRouter.put(
         return;
       }
 
-      const { film_id, series_id } = req.body as { film_id?: number; series_id?: number };
+      const { film_id, series_id, wiki_person_id } = req.body as { film_id?: number; series_id?: number; wiki_person_id?: number };
       const hasFilm = film_id !== undefined && film_id !== null && typeof film_id === 'number';
       const hasSeries = series_id !== undefined && series_id !== null && typeof series_id === 'number';
+      const hasWiki = wiki_person_id !== undefined && wiki_person_id !== null && typeof wiki_person_id === 'number';
 
-      if (!hasFilm && !hasSeries) {
-        res.status(400).json({ error: 'Either "film_id" or "series_id" must be provided.' });
+      if (!hasFilm && !hasSeries && !hasWiki) {
+        res.status(400).json({ error: 'Either "film_id", "series_id" or "wiki_person_id" must be provided.' });
         return;
       }
-      if (hasFilm && hasSeries) {
-        res.status(400).json({ error: 'Only one of "film_id" or "series_id" may be provided.' });
+      if ((hasFilm ? 1 : 0) + (hasSeries ? 1 : 0) + (hasWiki ? 1 : 0) > 1) {
+        res.status(400).json({ error: 'Only one of "film_id", "series_id" or "wiki_person_id" may be provided.' });
         return;
       }
 
@@ -1135,18 +1212,22 @@ adminRouter.put(
       if (hasFilm) {
         const film = db.prepare(`SELECT id FROM films WHERE id = ? AND is_active = 1`).get(film_id);
         if (!film) { res.status(404).json({ error: 'Film not found or inactive.' }); return; }
-        db.prepare(`UPDATE daily_challenges SET film_id = ?, series_id = NULL WHERE id = ?`).run(film_id, id);
-      } else {
+        db.prepare(`UPDATE daily_challenges SET film_id = ?, series_id = NULL, wiki_person_id = NULL WHERE id = ?`).run(film_id, id);
+      } else if (hasSeries) {
         const series = db.prepare(`SELECT id FROM series WHERE id = ? AND is_active = 1`).get(series_id);
         if (!series) { res.status(404).json({ error: 'Series not found or inactive.' }); return; }
-        db.prepare(`UPDATE daily_challenges SET film_id = NULL, series_id = ? WHERE id = ?`).run(series_id, id);
+        db.prepare(`UPDATE daily_challenges SET film_id = NULL, series_id = ?, wiki_person_id = NULL WHERE id = ?`).run(series_id, id);
+      } else {
+        const person = db.prepare(`SELECT id FROM wiki_persons WHERE id = ? AND is_active = 1`).get(wiki_person_id);
+        if (!person) { res.status(404).json({ error: 'Wiki person not found or inactive.' }); return; }
+        db.prepare(`UPDATE daily_challenges SET film_id = NULL, series_id = NULL, wiki_person_id = ? WHERE id = ?`).run(wiki_person_id, id);
       }
 
       const updated = db
         .prepare<[number], ChallengeRow>(`SELECT dc.* FROM daily_challenges dc WHERE dc.id = ?`)
         .get(id)!;
 
-      logAuditEvent('challenge.update', { id, film_id, series_id });
+      logAuditEvent('challenge.update', { id, film_id, series_id, wiki_person_id });
       res.json(formatChallenge(updated));
     } catch (err) {
       next(err);
@@ -1162,15 +1243,16 @@ adminRouter.patch(
       const id = parseInt(req.params.id, 10);
       if (isNaN(id)) { res.status(400).json({ error: 'Invalid challenge id.' }); return; }
 
-      const { film_id, series_id } = req.body as { film_id?: number; series_id?: number };
+      const { film_id, series_id, wiki_person_id } = req.body as { film_id?: number; series_id?: number; wiki_person_id?: number };
       const hasFilm = film_id !== undefined && film_id !== null && typeof film_id === 'number';
       const hasSeries = series_id !== undefined && series_id !== null && typeof series_id === 'number';
+      const hasWiki = wiki_person_id !== undefined && wiki_person_id !== null && typeof wiki_person_id === 'number';
 
-      if (!hasFilm && !hasSeries) {
-        res.status(400).json({ error: 'Either "film_id" or "series_id" must be provided.' }); return;
+      if (!hasFilm && !hasSeries && !hasWiki) {
+        res.status(400).json({ error: 'Either "film_id", "series_id" or "wiki_person_id" must be provided.' }); return;
       }
-      if (hasFilm && hasSeries) {
-        res.status(400).json({ error: 'Only one of "film_id" or "series_id" may be provided.' }); return;
+      if ((hasFilm ? 1 : 0) + (hasSeries ? 1 : 0) + (hasWiki ? 1 : 0) > 1) {
+        res.status(400).json({ error: 'Only one of "film_id", "series_id" or "wiki_person_id" may be provided.' }); return;
       }
 
       const existing = db.prepare(`SELECT id FROM daily_challenges WHERE id = ?`).get(id);
@@ -1179,15 +1261,19 @@ adminRouter.patch(
       if (hasFilm) {
         const film = db.prepare(`SELECT id FROM films WHERE id = ? AND is_active = 1`).get(film_id);
         if (!film) { res.status(404).json({ error: 'Film not found or inactive.' }); return; }
-        db.prepare(`UPDATE daily_challenges SET film_id = ?, series_id = NULL WHERE id = ?`).run(film_id, id);
-      } else {
+        db.prepare(`UPDATE daily_challenges SET film_id = ?, series_id = NULL, wiki_person_id = NULL WHERE id = ?`).run(film_id, id);
+      } else if (hasSeries) {
         const series = db.prepare(`SELECT id FROM series WHERE id = ? AND is_active = 1`).get(series_id);
         if (!series) { res.status(404).json({ error: 'Series not found or inactive.' }); return; }
-        db.prepare(`UPDATE daily_challenges SET film_id = NULL, series_id = ? WHERE id = ?`).run(series_id, id);
+        db.prepare(`UPDATE daily_challenges SET film_id = NULL, series_id = ?, wiki_person_id = NULL WHERE id = ?`).run(series_id, id);
+      } else {
+        const person = db.prepare(`SELECT id FROM wiki_persons WHERE id = ? AND is_active = 1`).get(wiki_person_id);
+        if (!person) { res.status(404).json({ error: 'Wiki person not found or inactive.' }); return; }
+        db.prepare(`UPDATE daily_challenges SET film_id = NULL, series_id = NULL, wiki_person_id = ? WHERE id = ?`).run(wiki_person_id, id);
       }
 
       const updated = db.prepare<[number], ChallengeRow>(`SELECT dc.* FROM daily_challenges dc WHERE dc.id = ?`).get(id)!;
-      logAuditEvent('challenge.update', { id, film_id, series_id });
+      logAuditEvent('challenge.update', { id, film_id, series_id, wiki_person_id });
       res.json(formatChallenge(updated));
     } catch (err) {
       next(err);

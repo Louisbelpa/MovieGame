@@ -4,11 +4,12 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { ChevronDown, Sparkles, Film, Tv, X } from 'lucide-react'
+import { ChevronDown, Sparkles, Film, Tv, X, Landmark } from 'lucide-react'
 import {
   getChallenges,
   getFilms,
   getSeries,
+  getWikiPersons,
   scheduleChallenge,
   updateChallenge,
   deleteChallenge,
@@ -17,6 +18,7 @@ import {
   type AdminChallenge,
   type AdminFilm,
   type AdminSeries,
+  type AdminWikiPerson,
   type MediaRef,
   type FilmPayload,
   type SeriesPayload,
@@ -61,10 +63,11 @@ function buildDateRange(startOffset: number, endOffset: number): string[] {
 }
 
 export function CalendarPage() {
-  const [mediaType, setMediaType] = useState<'film' | 'series'>('film')
+  const [mediaType, setMediaType] = useState<'film' | 'series' | 'wiki'>('film')
   const [challenges, setChallenges] = useState<AdminChallenge[]>([])
   const [films, setFilms] = useState<AdminFilm[]>([])
   const [seriesList, setSeriesList] = useState<AdminSeries[]>([])
+  const [wikiPersons, setWikiPersons] = useState<AdminWikiPerson[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showPast, setShowPast] = useState(false)
@@ -79,13 +82,14 @@ export function CalendarPage() {
   const from = getISODate(-PAST_DAYS)
   const to = getISODate(FUTURE_DAYS - 1)
 
-  const load = useCallback((rangeFrom: string, rangeTo: string, mt: 'film' | 'series') => {
+  const load = useCallback((rangeFrom: string, rangeTo: string, mt: 'film' | 'series' | 'wiki') => {
     setLoading(true)
-    Promise.all([getChallenges({ from: rangeFrom, to: rangeTo, mediaType: mt }), getFilms(), getSeries()])
-      .then(([chs, fms, srs]) => {
+    Promise.all([getChallenges({ from: rangeFrom, to: rangeTo, mediaType: mt }), getFilms(), getSeries(), getWikiPersons({ limit: 500 })])
+      .then(([chs, fms, srs, wps]) => {
         setChallenges(chs)
         setFilms(fms.filter((f) => f.is_active))
         setSeriesList(srs.filter((s) => s.is_active))
+        setWikiPersons(wps.data.filter((p) => p.is_active))
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Erreur'))
       .finally(() => setLoading(false))
@@ -132,7 +136,11 @@ export function CalendarPage() {
     load(from, to, mediaType)
   }
 
-  function handleEditMedia(media: AdminFilm | AdminSeries, type: 'film' | 'series') {
+  function handleEditMedia(media: AdminFilm | AdminSeries | AdminWikiPerson, type: 'film' | 'series' | 'wiki') {
+    if (type === 'wiki') {
+      window.location.href = '/admin/wiki'
+      return
+    }
     if (type === 'series') setEditingSeries(media as AdminSeries)
     else setEditingFilm(media as AdminFilm)
   }
@@ -164,10 +172,14 @@ export function CalendarPage() {
       }
 
       // Pool is restricted to the active media type
-      const usedIds = new Set(challenges.map((c) => (mediaType === 'series' ? c.series?.id : c.film?.id)).filter(Boolean) as number[])
+      const usedIds = new Set(challenges.map((c) =>
+        mediaType === 'series' ? c.series?.id : mediaType === 'wiki' ? c.wiki?.id : c.film?.id
+      ).filter(Boolean) as number[])
       const pool: MediaRef[] = mediaType === 'series'
         ? seriesList.filter((s) => !usedIds.has(s.id)).map((s) => ({ seriesId: s.id }) as MediaRef)
-        : films.filter((f) => !usedIds.has(f.id)).map((f) => ({ filmId: f.id }) as MediaRef)
+        : mediaType === 'wiki'
+          ? wikiPersons.filter((p) => !usedIds.has(p.id)).map((p) => ({ wikiPersonId: p.id }) as MediaRef)
+          : films.filter((f) => !usedIds.has(f.id)).map((f) => ({ filmId: f.id }) as MediaRef)
       pool.sort(() => Math.random() - 0.5)
 
       if (pool.length === 0) {
@@ -206,6 +218,7 @@ export function CalendarPage() {
         options={[
           { id: 'film', label: 'Films', icon: <Film size={14} /> },
           { id: 'series', label: 'Séries', icon: <Tv size={14} /> },
+          { id: 'wiki', label: 'Wikipedia', icon: <Landmark size={14} /> },
         ]}
       />
 
@@ -213,7 +226,7 @@ export function CalendarPage() {
         <p className="text-sm text-gray-500">
           Planning des{' '}
           <span className="font-medium text-gray-800">{FUTURE_DAYS} prochains jours</span>{' '}
-          — {mediaType === 'series' ? 'séries' : 'films'}.
+          — {mediaType === 'series' ? 'séries' : mediaType === 'wiki' ? 'personnalités Wikipedia' : 'films'}.
         </p>
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs text-gray-400">
@@ -282,6 +295,7 @@ export function CalendarPage() {
                           challenge={byDate[date] ?? null}
                           films={films}
                           seriesList={seriesList}
+                          wikiPersons={wikiPersons}
                           mediaType={mediaType}
                           onSchedule={handleSchedule}
                           onUpdate={handleUpdate}
@@ -307,6 +321,7 @@ export function CalendarPage() {
                 challenge={byDate[date] ?? null}
                 films={films}
                 seriesList={seriesList}
+                wikiPersons={wikiPersons}
                 mediaType={mediaType}
                 onSchedule={handleSchedule}
                 onUpdate={handleUpdate}

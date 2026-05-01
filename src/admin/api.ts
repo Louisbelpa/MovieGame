@@ -48,11 +48,13 @@ export interface AdminSeries {
 export interface AdminWikiPerson {
   id: number
   name: string
+  title: string
   name_aliases: string[]
   person_type: 'politician' | 'sportsperson'
   wikipedia_slug: string
   infobox_data: Record<string, unknown>
   hint_schedule: string[]
+  image_url: string | null
   photo_url: string | null
   extract: string | null
   wikipedia_url: string | null
@@ -117,7 +119,8 @@ export interface AdminChallenge {
   date: string
   film: AdminFilm | null
   series: AdminSeries | null
-  mediaType: 'film' | 'series'
+  wiki: AdminWikiPerson | null
+  mediaType: 'film' | 'series' | 'wiki'
 }
 
 export interface AdminDashboard {
@@ -292,7 +295,7 @@ export async function uploadImage(file: File): Promise<string> {
 
 // ─── Calendar / Challenges ────────────────────────────────────────────────────
 
-export async function getChallenges(opts: { from?: string; to?: string; mediaType?: 'film' | 'series' } = {}): Promise<AdminChallenge[]> {
+export async function getChallenges(opts: { from?: string; to?: string; mediaType?: 'film' | 'series' | 'wiki' } = {}): Promise<AdminChallenge[]> {
   const params = new URLSearchParams()
   if (opts.from) params.set('from', opts.from)
   if (opts.to) params.set('to', opts.to)
@@ -305,11 +308,15 @@ export async function getChallenges(opts: { from?: string; to?: string; mediaTyp
 export type MediaRef =
   | { filmId: number; seriesId?: never }
   | { seriesId: number; filmId?: never }
+  | { wikiPersonId: number; filmId?: never; seriesId?: never }
 
 export async function scheduleChallenge(date: string, ref: MediaRef): Promise<AdminChallenge> {
-  const body = 'filmId' in ref && ref.filmId !== undefined
-    ? { date, film_id: ref.filmId }
-    : { date, series_id: (ref as { seriesId: number }).seriesId }
+  const body =
+    'filmId' in ref && ref.filmId !== undefined
+      ? { date, film_id: ref.filmId }
+      : 'seriesId' in ref && ref.seriesId !== undefined
+        ? { date, series_id: ref.seriesId }
+        : { date, wiki_person_id: (ref as { wikiPersonId: number }).wikiPersonId }
   return request<AdminChallenge>('/api/admin/challenges', {
     method: 'POST',
     body: JSON.stringify(body),
@@ -317,9 +324,12 @@ export async function scheduleChallenge(date: string, ref: MediaRef): Promise<Ad
 }
 
 export async function updateChallenge(id: number, ref: MediaRef): Promise<AdminChallenge> {
-  const body = 'filmId' in ref && ref.filmId !== undefined
-    ? { film_id: ref.filmId }
-    : { series_id: (ref as { seriesId: number }).seriesId }
+  const body =
+    'filmId' in ref && ref.filmId !== undefined
+      ? { film_id: ref.filmId }
+      : 'seriesId' in ref && ref.seriesId !== undefined
+        ? { series_id: ref.seriesId }
+        : { wiki_person_id: (ref as { wikiPersonId: number }).wikiPersonId }
   return request<AdminChallenge>(`/api/admin/challenges/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(body),
@@ -447,11 +457,13 @@ function mapWikiPerson(raw: Record<string, unknown>): AdminWikiPerson {
   return {
     id: Number(raw.id),
     name: String(raw.name ?? ''),
+    title: String(raw.title ?? raw.name ?? ''),
     name_aliases: parseJsonArray(raw.name_aliases),
     person_type: raw.person_type === 'sportsperson' ? 'sportsperson' : 'politician',
     wikipedia_slug: String(raw.wikipedia_slug ?? ''),
     infobox_data: parseJsonObject(raw.infobox_data),
     hint_schedule: parseJsonArray(raw.hint_schedule),
+    image_url: raw.image_url ? String(raw.image_url) : (raw.photo_url ? String(raw.photo_url) : null),
     photo_url: raw.photo_url ? String(raw.photo_url) : null,
     extract: raw.extract ? String(raw.extract) : null,
     wikipedia_url: raw.wikipedia_url ? String(raw.wikipedia_url) : null,
