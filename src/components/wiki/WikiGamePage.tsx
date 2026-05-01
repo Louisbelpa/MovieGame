@@ -139,26 +139,15 @@ export function WikiGamePage() {
 
       {challenge && (
         <motion.main key={challenge.date}
-          className="max-w-2xl mx-auto px-3 sm:px-4 py-3 sm:py-6 flex flex-col gap-3 sm:gap-5"
+          className="max-w-2xl mx-auto px-3 sm:px-4 py-3 sm:py-6 pb-24 sm:pb-6 flex flex-col gap-3 sm:gap-5"
           initial={{ opacity: 0, x: slideX }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -slideX }}
           transition={{ duration: 0.2, ease: 'easeInOut' }}>
 
           <DateNavBar directionRef={directionRef} />
 
-          {/* Hints — primary content, shown prominently */}
-          {(currentHints.length > 0 || challenge.hintsAvailable > 0) && (
-            <WikiHintPanel
-              photoUrl={challenge.photoUrl}
-              profile={challenge.profile}
-              hints={currentHints}
-              hintsAvailable={challenge.hintsAvailable}
-              hintsRevealed={hintsRevealed}
-            />
-          )}
-
           {/* Attempt tracker + input */}
           {!isGameOver && (
-            <section className="flex flex-col gap-3">
+            <section className="flex flex-col gap-3 order-1 md:order-2 sticky bottom-2 z-20 rounded-xl border border-film-border bg-film-black/90 backdrop-blur p-2">
               <div className="flex items-center justify-between">
                 <AttemptTracker guesses={guesses} maxAttempts={challenge.maxAttempts} />
                 <span className="text-xs text-film-text-dim font-mono">
@@ -172,6 +161,19 @@ export function WikiGamePage() {
                 disabled={isGameOver}
               />
             </section>
+          )}
+
+          {/* Hints — primary content, shown prominently */}
+          {(currentHints.length > 0 || challenge.hintsAvailable > 0) && (
+            <div className="order-2 md:order-1">
+              <WikiHintPanel
+                photoUrl={challenge.photoUrl}
+                profile={challenge.profile}
+                hints={currentHints}
+                hintsAvailable={challenge.hintsAvailable}
+                hintsRevealed={hintsRevealed}
+              />
+            </div>
           )}
 
           {/* Game over recap */}

@@ -248,7 +248,21 @@ function MediaPicker({ films, seriesList, wikiPersons, mediaType, onSelect, onCa
                       <AlertTriangle size={9} /> Doublon
                     </span>
                   )}
-                  <span className="text-xs text-gray-400 flex-shrink-0">{p.person_type === 'politician' ? 'Politique' : 'Sport'}</span>
+                  <span className="text-xs text-gray-400 flex-shrink-0">
+                    {p.person_type === 'politician'
+                      ? 'Politique'
+                      : p.person_type === 'sportsperson'
+                        ? 'Sport'
+                        : p.person_type === 'artist'
+                          ? 'Art'
+                          : p.person_type === 'scientist'
+                            ? 'Science'
+                            : p.person_type === 'entrepreneur'
+                              ? 'Business'
+                              : p.person_type === 'writer'
+                                ? 'Litterature'
+                                : 'Histoire'}
+                  </span>
                 </button>
               )
             })

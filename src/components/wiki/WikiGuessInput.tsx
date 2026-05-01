@@ -54,7 +54,7 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
       <motion.div
         key={shakeTrigger}
         className={cn(
-          'flex items-center gap-2 p-1 pl-3 rounded-xl film-border transition-all min-h-[52px]',
+          'grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] items-center gap-2 p-2 sm:p-1 sm:pl-3 rounded-xl film-border transition-all min-h-[52px]',
           disabled && 'opacity-50'
         )}
         animate={shakeTrigger > 0 ? { x: [-8, 8, -5, 5, 0] } : {}}
@@ -75,21 +75,24 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
           placeholder="Entrez un nom…"
           disabled={disabled}
           autoComplete="off"
+          enterKeyHint="search"
           spellCheck={false}
-          className="flex-1 bg-transparent text-film-text placeholder:text-film-text-dim text-sm outline-none min-w-0 py-2 sm:text-sm text-base"
+          className="w-full bg-transparent text-film-text placeholder:text-film-text-dim text-sm outline-none min-w-0 py-2 text-base sm:text-sm"
         />
         {isLoading && <Loader2 size={14} className="text-film-text-dim animate-spin shrink-0" />}
-        <Button variant="ghost" size="sm" onClick={onSkip} disabled={disabled}
-          title="Passer cette tentative" className="shrink-0 text-film-text-dim min-h-[44px] min-w-[44px] gap-1">
-          <SkipForward size={14} />
-          <span className="text-xs">Passer</span>
-        </Button>
-        <Button variant="primary" size="sm"
-          onClick={() => inputValue.trim() && handleSelect(inputValue.trim())}
-          disabled={disabled || !inputValue.trim()}
-          className="shrink-0 min-h-[44px] px-4">
-          Deviner
-        </Button>
+        <div className="grid grid-cols-2 gap-2 sm:contents">
+          <Button variant="ghost" size="sm" onClick={onSkip} disabled={disabled}
+            title="Passer cette tentative" className="shrink-0 text-film-text-dim min-h-[44px] min-w-[44px] gap-1">
+            <SkipForward size={14} />
+            <span className="text-xs">Passer</span>
+          </Button>
+          <Button variant="primary" size="sm"
+            onClick={() => inputValue.trim() && handleSelect(inputValue.trim())}
+            disabled={disabled || !inputValue.trim()}
+            className="shrink-0 min-h-[44px] px-4">
+            Deviner
+          </Button>
+        </div>
       </motion.div>
 
       <p className="mt-1.5 text-xs text-film-text-dim text-right">
@@ -99,7 +102,7 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
       <AnimatePresence>
         {isOpen && (
           <motion.ul id={listboxId} role="listbox" aria-label="Suggestions de personnalités"
-            className="absolute z-20 top-full mt-1 w-full film-border rounded-xl overflow-hidden shadow-2xl max-h-60 overflow-y-auto"
+            className="absolute z-20 top-full mt-1 w-full film-border rounded-xl overflow-hidden shadow-2xl max-h-44 sm:max-h-60 overflow-y-auto"
             initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.15 }}>
             {suggestions.map((s, i) => (

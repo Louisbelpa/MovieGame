@@ -17,6 +17,8 @@ interface WikiHintPanelProps {
 
 export function WikiHintPanel({ photoUrl, profile, hints, hintsAvailable, hintsRevealed }: WikiHintPanelProps) {
   const lockedCount = hintsAvailable - hintsRevealed
+  const shownLocked = Math.min(2, lockedCount)
+  const hiddenLocked = Math.max(0, lockedCount - shownLocked)
 
   return (
     <section aria-label="Profil et indices" className="w-full flex flex-col gap-2">
@@ -25,7 +27,7 @@ export function WikiHintPanel({ photoUrl, profile, hints, hintsAvailable, hintsR
           <img
             src={photoUrl}
             alt="Portrait flouté"
-            className="w-full h-48 object-cover blur-md scale-110"
+            className="w-full h-32 sm:h-48 object-cover blur-md scale-110"
           />
           <div className="absolute inset-0 bg-black/20" />
           <span className="absolute left-2 top-2 text-[10px] uppercase tracking-wider font-semibold px-2 py-1 rounded bg-black/50 text-white">
@@ -47,9 +49,12 @@ export function WikiHintPanel({ photoUrl, profile, hints, hintsAvailable, hintsR
         ))}
       </AnimatePresence>
 
-      {Array.from({ length: lockedCount }).map((_, i) => (
+      {Array.from({ length: shownLocked }).map((_, i) => (
         <LockedSlot key={`locked-${i}`} />
       ))}
+      {hiddenLocked > 0 && (
+        <p className="text-[11px] text-film-text-dim text-center">+{hiddenLocked} indice(s) verrouillé(s)</p>
+      )}
     </section>
   )
 }
@@ -97,6 +102,19 @@ function VisibleProfile({ profile }: { profile: WikiVisibleProfile }) {
   }
 
   return (
+    profile.type === 'generic' ? (
+      <div className="rounded-lg film-border overflow-hidden">
+        <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
+          <Briefcase size={13} className="text-film-gold shrink-0" />
+          <span className="text-[10px] font-semibold text-film-text-dim uppercase tracking-wider">Repères biographiques</span>
+        </div>
+        <div className="px-3 pb-2.5 text-sm text-film-text space-y-1.5">
+          <p><span className="text-film-text-dim">Domaine:</span> {profile.domain ?? '—'}</p>
+          <p><span className="text-film-text-dim">Oeuvre/fait notable:</span> {profile.notableWork ?? '—'}</p>
+          <p><span className="text-film-text-dim">Periode:</span> {profile.era ?? '—'}</p>
+        </div>
+      </div>
+    ) : (
     <div className="rounded-lg film-border overflow-hidden">
       <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
         <Trophy size={13} className="text-film-gold shrink-0" />
@@ -132,6 +150,7 @@ function VisibleProfile({ profile }: { profile: WikiVisibleProfile }) {
         )}
       </div>
     </div>
+    )
   )
 }
 
@@ -171,6 +190,10 @@ function HintContent({ hint }: { hint: WikiHintPayload }) {
       return <SimpleHint label="Parti politique" value={(hint.value as string | null) ?? 'Non renseigné'} icon={Briefcase} />
     case 'wiki_position':
       return <SimpleHint label="Poste" value={(hint.value as string | null) ?? 'Non renseigné'} icon={Trophy} />
+    case 'wiki_domain':
+      return <SimpleHint label="Domaine" value={(hint.value as string | null) ?? 'Non renseigné'} icon={Briefcase} />
+    case 'wiki_notable_work':
+      return <SimpleHint label="Oeuvre/Fait notable" value={(hint.value as string | null) ?? 'Non renseigné'} icon={Lightbulb} />
     case 'wiki_name_initials':
       return <SimpleHint label="Initiales du nom" value={String(hint.value)} icon={Lightbulb} />
     case 'wiki_name_length':

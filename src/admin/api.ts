@@ -50,7 +50,7 @@ export interface AdminWikiPerson {
   name: string
   title: string
   name_aliases: string[]
-  person_type: 'politician' | 'sportsperson'
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure'
   wikipedia_slug: string
   infobox_data: Record<string, unknown>
   hint_schedule: string[]
@@ -66,7 +66,7 @@ export interface AdminWikiPerson {
 export interface WikiPersonPayload {
   name: string
   name_aliases: string[]
-  person_type: 'politician' | 'sportsperson'
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure'
   wikipedia_slug: string
   infobox_data: Record<string, unknown>
   hint_schedule: string[]
@@ -83,7 +83,7 @@ export interface WikipediaFetchPayload {
   photo_url: string | null
   wikipedia_url: string
   infobox_data: Record<string, unknown>
-  person_type: 'politician' | 'sportsperson'
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure'
   hint_schedule: string[]
 }
 
@@ -464,12 +464,17 @@ function parseUsedDates(value: unknown): string[] {
 }
 
 function mapWikiPerson(raw: Record<string, unknown>): AdminWikiPerson {
+  const personTypeRaw = String(raw.person_type ?? 'politician')
+  const person_type: AdminWikiPerson['person_type'] =
+    personTypeRaw === 'sportsperson' || personTypeRaw === 'artist' || personTypeRaw === 'scientist' || personTypeRaw === 'entrepreneur' || personTypeRaw === 'writer' || personTypeRaw === 'historical_figure'
+      ? personTypeRaw
+      : 'politician'
   return {
     id: Number(raw.id),
     name: String(raw.name ?? ''),
     title: String(raw.title ?? raw.name ?? ''),
-    name_aliases: parseJsonArray(raw.name_aliases),
-    person_type: raw.person_type === 'sportsperson' ? 'sportsperson' : 'politician',
+    name_aliases: parseJsonArray(raw.name_aliases ?? raw.title_aliases),
+    person_type,
     wikipedia_slug: String(raw.wikipedia_slug ?? ''),
     infobox_data: parseJsonObject(raw.infobox_data),
     hint_schedule: parseJsonArray(raw.hint_schedule),

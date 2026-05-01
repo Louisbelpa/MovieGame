@@ -173,7 +173,7 @@ interface WikiPersonRow {
   id: number;
   name: string;
   name_aliases: string;
-  person_type: 'politician' | 'sportsperson';
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure';
   wikipedia_slug: string;
   infobox_data: string;
   hint_schedule: string;
@@ -280,7 +280,7 @@ function formatWikiPerson(row: WikiPersonRow, usedDates?: string[]) {
     id: row.id,
     name: row.name,
     title: row.name,
-    title_aliases: JSON.parse(row.name_aliases) as string[],
+    name_aliases: JSON.parse(row.name_aliases) as string[],
     person_type: row.person_type,
     wikipedia_slug: row.wikipedia_slug,
     infobox_data: JSON.parse(row.infobox_data) as Record<string, unknown>,
@@ -2938,23 +2938,34 @@ adminRouter.get('/wiki-persons', adminAuth, adminLimiter, (req: Request, res: Re
       GROUP BY wp.id
       ORDER BY wp.created_at DESC
       LIMIT ? OFFSET ?
-    `).all(...params)
+    `).all(...params) as (WikiPersonRow & { used_dates: string | null })[]
 
     const total = (db.prepare(`SELECT COUNT(*) AS n FROM wiki_persons ${where}`)
       .get(...(search ? [search] : [])) as { n: number }).n
 
-    res.json({ data: rows, total, page, limit })
+    const data = rows.map((row) => formatWikiPerson(
+      row,
+      (row.used_dates ?? '').split(',').map((d) => d.trim()).filter(Boolean)
+    ))
+
+    res.json({ data, total, page, limit })
   } catch (err) { next(err) }
 })
 
 function normalizeWikiHintSchedule(raw: unknown, personType: unknown): string {
-  const normalizedPersonType = personType === 'sportsperson' ? 'sportsperson' : 'politician';
-  const allowedByType = normalizedPersonType === 'sportsperson'
-    ? new Set(['birth_year', 'nationality', 'position', 'name_initials', 'name_length'])
-    : new Set(['birth_year', 'nationality', 'party', 'name_initials', 'name_length']);
-  const fallback = normalizedPersonType === 'sportsperson'
-    ? ['birth_year', 'nationality', 'position', 'name_initials', 'name_length']
-    : ['birth_year', 'nationality', 'party', 'name_initials', 'name_length'];
+  const normalizedPersonType = String(personType ?? 'politician');
+  const isSport = normalizedPersonType === 'sportsperson';
+  const isPolitician = normalizedPersonType === 'politician';
+  const allowedByType = isPolitician
+    ? new Set(['birth_year', 'nationality', 'party', 'name_initials', 'name_length'])
+    : isSport
+      ? new Set(['birth_year', 'nationality', 'position', 'name_initials', 'name_length'])
+      : new Set(['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials']);
+  const fallback = isPolitician
+    ? ['birth_year', 'nationality', 'party', 'name_initials', 'name_length']
+    : isSport
+      ? ['birth_year', 'nationality', 'position', 'name_initials', 'name_length']
+      : ['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials'];
 
   const parseCandidate = (value: unknown): string[] => {
     if (Array.isArray(value)) return value.filter((k): k is string => typeof k === 'string');
@@ -3015,6 +3026,7 @@ adminRouter.post('/wiki-persons', adminAuth, adminLimiter, (req: Request, res: R
 adminRouter.put('/wiki-persons/:id', adminAuth, adminLimiter, (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id, 10)
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid wiki person id.' }); return }
     const {
       name, name_aliases, person_type, wikipedia_slug,
       infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty, is_active,
@@ -3030,7 +3042,7 @@ adminRouter.put('/wiki-persons/:id', adminAuth, adminLimiter, (req: Request, res
         : (typeof infobox_data === 'string' ? infobox_data : JSON.stringify(infobox_data))
     const currentPersonType =
       person_type === undefined
-        ? (db.prepare<[number], { person_type: 'politician' | 'sportsperson' }>(`SELECT person_type FROM wiki_persons WHERE id = ?`).get(id)?.person_type ?? 'politician')
+        ? (db.prepare<[number], { person_type: WikiPersonRow['person_type'] }>(`SELECT person_type FROM wiki_persons WHERE id = ?`).get(id)?.person_type ?? 'politician')
         : person_type
     const safeHintSchedule =
       hint_schedule === undefined
@@ -3043,7 +3055,7 @@ adminRouter.put('/wiki-persons/:id', adminAuth, adminLimiter, (req: Request, res
         ? null
         : (typeof is_active === 'boolean' ? (is_active ? 1 : 0) : (parseInt(String(is_active), 10) ? 1 : 0))
 
-    db.prepare(`
+    const updateRes = db.prepare(`
       UPDATE wiki_persons SET
         name = COALESCE(?, name),
         name_aliases = COALESCE(?, name_aliases),
@@ -3072,6 +3084,7 @@ adminRouter.put('/wiki-persons/:id', adminAuth, adminLimiter, (req: Request, res
       safeIsActive,
       id
     )
+    if (updateRes.changes === 0) { res.status(404).json({ error: 'Wiki person not found.' }); return }
 
     logAuditEvent('wiki_person_updated', { id })
     res.json({ ok: true })
@@ -3082,7 +3095,9 @@ adminRouter.put('/wiki-persons/:id', adminAuth, adminLimiter, (req: Request, res
 adminRouter.delete('/wiki-persons/:id', adminAuth, adminLimiter, (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id, 10)
-    db.prepare(`UPDATE wiki_persons SET is_active = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?`).run(id)
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid wiki person id.' }); return }
+    const deleteRes = db.prepare(`UPDATE wiki_persons SET is_active = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?`).run(id)
+    if (deleteRes.changes === 0) { res.status(404).json({ error: 'Wiki person not found.' }); return }
     logAuditEvent('wiki_person_deleted', { id })
     res.json({ ok: true })
   } catch (err) { next(err) }

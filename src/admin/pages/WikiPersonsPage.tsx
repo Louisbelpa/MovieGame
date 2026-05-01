@@ -43,13 +43,26 @@ function shuffledSlugs(): string[] {
   return copy
 }
 
+function personTypeLabel(personType: PersonType): string {
+  switch (personType) {
+    case 'politician': return 'Politicien'
+    case 'sportsperson': return 'Sportif'
+    case 'artist': return 'Artiste'
+    case 'scientist': return 'Scientifique'
+    case 'entrepreneur': return 'Entrepreneur'
+    case 'writer': return 'Ecrivain'
+    case 'historical_figure': return 'Historique'
+    default: return 'Profil'
+  }
+}
+
 type ModalState =
   | { type: 'create' }
   | { type: 'edit'; person: AdminWikiPerson }
   | { type: 'delete'; person: AdminWikiPerson }
   | null
 
-type PersonType = 'politician' | 'sportsperson'
+type PersonType = 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure'
 
 interface WikiRoleFormRow {
   title: string
@@ -104,9 +117,29 @@ function parseAliasesInput(raw: string): string[] {
 }
 
 function getAllowedHintKeys(personType: PersonType): string[] {
-  return personType === 'politician'
-    ? ['birth_year', 'nationality', 'party', 'name_initials', 'name_length']
-    : ['birth_year', 'nationality', 'position', 'name_initials', 'name_length']
+  if (personType === 'politician') {
+    return ['birth_year', 'nationality', 'party', 'name_initials', 'name_length']
+  }
+  if (personType === 'sportsperson') {
+    return ['birth_year', 'nationality', 'position', 'name_initials', 'name_length']
+  }
+  return ['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials']
+}
+
+function parseGenericInfobox(raw: Record<string, unknown>): {
+  domain: string | null
+  notable_work: string | null
+  era: string | null
+  birth_year: number | null
+  nationality: string | null
+} {
+  return {
+    domain: typeof raw.domain === 'string' ? raw.domain : null,
+    notable_work: typeof raw.notable_work === 'string' ? raw.notable_work : null,
+    era: typeof raw.era === 'string' ? raw.era : null,
+    birth_year: typeof raw.birth_year === 'number' ? raw.birth_year : null,
+    nationality: typeof raw.nationality === 'string' ? raw.nationality : null,
+  }
 }
 
 function parsePoliticianInfobox(raw: Record<string, unknown>): PoliticianInfoboxForm {
@@ -213,6 +246,9 @@ function WikiPersonForm({
   const [nationalTeamName, setNationalTeamName] = useState('')
   const [nationalTeamCaps, setNationalTeamCaps] = useState('')
   const [nationalTeamGoals, setNationalTeamGoals] = useState('')
+  const [domain, setDomain] = useState('')
+  const [notableWork, setNotableWork] = useState('')
+  const [era, setEra] = useState('')
   const [loadingWiki, setLoadingWiki] = useState(false)
   const [loadingRandomWiki, setLoadingRandomWiki] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -220,7 +256,8 @@ function WikiPersonForm({
 
   useEffect(() => {
     const raw = initial?.infobox_data ?? {}
-    if ((initial?.person_type ?? personType) === 'politician') {
+    const currentType = (initial?.person_type ?? personType)
+    if (currentType === 'politician') {
       const p = parsePoliticianInfobox(raw)
       setParty(p.party ?? '')
       setBirthYear(p.birth_year != null ? String(p.birth_year) : '')
@@ -230,7 +267,7 @@ function WikiPersonForm({
           .map((r) => [r.title, r.start_year ?? '', r.end_year ?? '', r.country ?? ''].join(' | '))
           .join('\n')
       )
-    } else {
+    } else if (currentType === 'sportsperson') {
       const s = parseSportInfobox(raw)
       setSport(s.sport ?? '')
       setPosition(s.position ?? '')
@@ -244,6 +281,13 @@ function WikiPersonForm({
       setNationalTeamName(s.national_team?.name ?? '')
       setNationalTeamCaps(s.national_team?.caps != null ? String(s.national_team.caps) : '')
       setNationalTeamGoals(s.national_team?.goals != null ? String(s.national_team.goals) : '')
+    } else {
+      const g = parseGenericInfobox(raw)
+      setBirthYear(g.birth_year != null ? String(g.birth_year) : '')
+      setNationality(g.nationality ?? '')
+      setDomain(g.domain ?? '')
+      setNotableWork(g.notable_work ?? '')
+      setEra(g.era ?? '')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial?.id])
@@ -291,21 +335,42 @@ function WikiPersonForm({
       return
     }
 
-    const s = parseSportInfobox(data.infobox_data)
-    setSport(s.sport ?? '')
-    setPosition(s.position ?? '')
-    setBirthYear(s.birth_year != null ? String(s.birth_year) : '')
-    setNationality(s.nationality ?? '')
-    setClubsText(
-      s.clubs
-        .map((c) => [c.name, c.start_year ?? '', c.end_year ?? '', c.appearances ?? '', c.goals ?? ''].join(' | '))
-        .join('\n')
-    )
-    setNationalTeamName(s.national_team?.name ?? '')
-    setNationalTeamCaps(s.national_team?.caps != null ? String(s.national_team.caps) : '')
-    setNationalTeamGoals(s.national_team?.goals != null ? String(s.national_team.goals) : '')
+    if (data.person_type === 'sportsperson') {
+      const s = parseSportInfobox(data.infobox_data)
+      setSport(s.sport ?? '')
+      setPosition(s.position ?? '')
+      setBirthYear(s.birth_year != null ? String(s.birth_year) : '')
+      setNationality(s.nationality ?? '')
+      setClubsText(
+        s.clubs
+          .map((c) => [c.name, c.start_year ?? '', c.end_year ?? '', c.appearances ?? '', c.goals ?? ''].join(' | '))
+          .join('\n')
+      )
+      setNationalTeamName(s.national_team?.name ?? '')
+      setNationalTeamCaps(s.national_team?.caps != null ? String(s.national_team.caps) : '')
+      setNationalTeamGoals(s.national_team?.goals != null ? String(s.national_team.goals) : '')
+      setParty('')
+      setRolesText('')
+      setDomain('')
+      setNotableWork('')
+      setEra('')
+      return
+    }
+
+    const g = parseGenericInfobox(data.infobox_data)
+    setBirthYear(g.birth_year != null ? String(g.birth_year) : '')
+    setNationality(g.nationality ?? '')
+    setDomain(g.domain ?? '')
+    setNotableWork(g.notable_work ?? '')
+    setEra(g.era ?? '')
     setParty('')
     setRolesText('')
+    setSport('')
+    setPosition('')
+    setClubsText('')
+    setNationalTeamName('')
+    setNationalTeamCaps('')
+    setNationalTeamGoals('')
   }
 
   function parseRolesInput(): WikiRoleFormRow[] {
@@ -404,7 +469,8 @@ function WikiPersonForm({
             birth_year: toNullableNumber(birthYear),
             nationality: toNullableString(nationality),
           }
-        : {
+        : personType === 'sportsperson'
+          ? {
             sport: toNullableString(sport),
             position: toNullableString(position),
             clubs: parseClubsInput(),
@@ -415,6 +481,13 @@ function WikiPersonForm({
                   goals: toNullableNumber(nationalTeamGoals),
                 }
               : null,
+            birth_year: toNullableNumber(birthYear),
+            nationality: toNullableString(nationality),
+          }
+          : {
+            domain: toNullableString(domain),
+            notable_work: toNullableString(notableWork),
+            era: toNullableString(era),
             birth_year: toNullableNumber(birthYear),
             nationality: toNullableString(nationality),
           }
@@ -477,6 +550,11 @@ function WikiPersonForm({
           <select value={personType} onChange={(e) => setPersonType(e.target.value as PersonType)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
             <option value="politician">Politicien</option>
             <option value="sportsperson">Sportif</option>
+            <option value="artist">Artiste</option>
+            <option value="scientist">Scientifique</option>
+            <option value="entrepreneur">Entrepreneur</option>
+            <option value="writer">Ecrivain</option>
+            <option value="historical_figure">Personnalite historique</option>
           </select>
         </div>
         <div>
@@ -536,7 +614,7 @@ function WikiPersonForm({
             <textarea rows={6} value={rolesText} onChange={(e) => setRolesText(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs font-mono" />
           </div>
         </div>
-      ) : (
+      ) : personType === 'sportsperson' ? (
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Sport</label>
@@ -573,6 +651,29 @@ function WikiPersonForm({
               <label className="block text-sm font-medium text-gray-700 mb-1">Buts</label>
               <input value={nationalTeamGoals} onChange={(e) => setNationalTeamGoals(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
             </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Domaine</label>
+            <input value={domain} onChange={(e) => setDomain(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nationalité</label>
+            <input value={nationality} onChange={(e) => setNationality(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Année de naissance</label>
+            <input value={birthYear} onChange={(e) => setBirthYear(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Période</label>
+            <input value={era} onChange={(e) => setEra(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Oeuvre / fait notable</label>
+            <textarea rows={3} value={notableWork} onChange={(e) => setNotableWork(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
           </div>
         </div>
       )}
@@ -712,9 +813,13 @@ export function WikiPersonsPage() {
                   </td>
                   <td className="px-3 py-3 text-sm text-gray-600">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                      person.person_type === 'politician' ? 'bg-indigo-100 text-indigo-700' : 'bg-violet-100 text-violet-700'
+                      person.person_type === 'politician'
+                        ? 'bg-indigo-100 text-indigo-700'
+                        : person.person_type === 'sportsperson'
+                          ? 'bg-violet-100 text-violet-700'
+                          : 'bg-slate-100 text-slate-700'
                     }`}>
-                      {person.person_type === 'politician' ? 'Politicien' : 'Sportif'}
+                      {personTypeLabel(person.person_type)}
                     </span>
                   </td>
                   <td className="px-3 py-3 text-sm">

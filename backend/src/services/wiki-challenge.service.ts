@@ -16,7 +16,7 @@ interface WikiPersonRow {
   id: number
   name: string
   name_aliases: string
-  person_type: 'politician' | 'sportsperson'
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure'
   infobox_data: string
   hint_schedule: string
   photo_url: string | null
@@ -86,6 +86,14 @@ interface SportspersonData {
   nationality: string | null
 }
 
+interface GenericPersonData {
+  domain: string | null
+  notable_work: string | null
+  era: string | null
+  birth_year: number | null
+  nationality: string | null
+}
+
 interface PoliticianRoleView {
   title: string
   years: string
@@ -128,13 +136,21 @@ function getSupplementalHintKeys(personType: WikiPersonRow['person_type']): stri
   if (personType === 'politician') {
     return ['birth_year', 'nationality', 'party', 'name_initials', 'name_length']
   }
-  return ['birth_year', 'nationality', 'position', 'name_initials', 'name_length']
+  if (personType === 'sportsperson') {
+    return ['birth_year', 'nationality', 'position', 'name_initials', 'name_length']
+  }
+  return ['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials']
 }
 
 function buildVisibleProfile(person: WikiPersonRow): { type: 'politician'; roles: PoliticianRoleView[] } | {
   type: 'sportsperson'
   clubs: SportClubView[]
   nationalTeam: SportspersonData['national_team']
+} | {
+  type: 'generic'
+  domain: string | null
+  notableWork: string | null
+  era: string | null
 } {
   const data = JSON.parse(person.infobox_data)
   if (person.person_type === 'politician') {
@@ -148,14 +164,23 @@ function buildVisibleProfile(person: WikiPersonRow): { type: 'politician'; roles
     }))
     return { type: 'politician', roles }
   }
-  const s = data as SportspersonData
-  const clubs = (s.clubs ?? []).map((c) => ({
-    name: c.name,
-    years: formatYearRange(c.start_year, c.end_year),
-    apps: c.appearances,
-    goals: c.goals,
-  }))
-  return { type: 'sportsperson', clubs, nationalTeam: s.national_team }
+  if (person.person_type === 'sportsperson') {
+    const s = data as SportspersonData
+    const clubs = (s.clubs ?? []).map((c) => ({
+      name: c.name,
+      years: formatYearRange(c.start_year, c.end_year),
+      apps: c.appearances,
+      goals: c.goals,
+    }))
+    return { type: 'sportsperson', clubs, nationalTeam: s.national_team }
+  }
+  const g = data as GenericPersonData
+  return {
+    type: 'generic',
+    domain: g.domain,
+    notableWork: g.notable_work,
+    era: g.era,
+  }
 }
 
 /**
@@ -197,6 +222,22 @@ function resolveHint(key: string, person: WikiPersonRow): { type: string; value:
       case 'name_length':
         return { type: 'wiki_name_length', value: computeNameLength(person.name) }
     }
+  }
+
+  const g = data as GenericPersonData
+  switch (key) {
+    case 'birth_year':
+      return { type: 'wiki_birth_year', value: g.birth_year }
+    case 'nationality':
+      return { type: 'wiki_nationality', value: g.nationality }
+    case 'domain':
+      return { type: 'wiki_domain', value: g.domain }
+    case 'notable_work':
+      return { type: 'wiki_notable_work', value: g.notable_work }
+    case 'name_initials':
+      return { type: 'wiki_name_initials', value: computeInitials(person.name) }
+    case 'name_length':
+      return { type: 'wiki_name_length', value: computeNameLength(person.name) }
   }
 
   return null

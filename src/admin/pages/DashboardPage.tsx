@@ -11,6 +11,18 @@ import {
   AlertCircle, AlertTriangle, CalendarDays, Landmark, UserRound,
 } from 'lucide-react'
 import { getDashboard, type AdminDashboard, type AdminChallenge } from '../api'
+function wikiTypeLabel(type: string | undefined): string {
+  switch (type) {
+    case 'politician': return 'Politique'
+    case 'sportsperson': return 'Sport'
+    case 'artist': return 'Art'
+    case 'scientist': return 'Science'
+    case 'entrepreneur': return 'Business'
+    case 'writer': return 'Litterature'
+    case 'historical_figure': return 'Histoire'
+    default: return 'Wiki'
+  }
+}
 import { AdminLayout } from '../components/AdminLayout'
 import { SegmentedToggle } from '../components/SegmentedToggle'
 
@@ -269,7 +281,7 @@ function ChallengeCard({ challenge }: { challenge: AdminChallenge }) {
   const subtitle = isSeries
     ? `${challenge.series?.year ?? '—'} · ${(challenge.series as { creator?: string })?.creator ?? ''}`
     : isWiki
-      ? `${challenge.wiki?.person_type === 'politician' ? 'Politique' : 'Sport'} · difficulté ${challenge.wiki?.difficulty ?? '—'}`
+      ? `${wikiTypeLabel(challenge.wiki?.person_type)} · difficulté ${challenge.wiki?.difficulty ?? '—'}`
       : `${challenge.film?.year ?? '—'} · ${(challenge.film as { director?: string })?.director ?? ''}`
 
   return (
@@ -319,7 +331,7 @@ function UpcomingList({ challenges }: { challenges: AdminChallenge[] }) {
                 <span className="text-xs text-gray-400 w-20 sm:w-24 flex-shrink-0">{formatDateShort(ch.date)}</span>
                 <span className="text-sm text-gray-800 font-medium truncate">{media?.title}</span>
                 <span className="text-xs text-gray-400 ml-auto flex-shrink-0">
-                  {isWiki ? (ch.wiki?.person_type === 'politician' ? 'Politique' : 'Sport') : (ch.series?.year ?? ch.film?.year ?? '—')}
+                  {isWiki ? wikiTypeLabel(ch.wiki?.person_type) : (ch.series?.year ?? ch.film?.year ?? '—')}
                 </span>
               </div>
             )
