@@ -110,7 +110,9 @@ export const useWikiStore = create<WikiStore>((set, get) => ({
         try { set({ result: await fetchWikiResult(challenge.challengeId) }) } catch {}
       }
     } catch (err) {
-      console.error('[wikiStore.initGame]', err)
+      const is404 = (err as { status?: number }).status === 404
+      set({ status: is404 ? 'not_found' : 'idle' })
+      if (!is404) console.error('[wikiStore.initGame]', err)
     }
   },
 

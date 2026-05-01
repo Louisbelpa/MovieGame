@@ -131,8 +131,8 @@ export function WikiGamePage() {
           className="max-w-2xl mx-auto px-3 sm:px-4 py-3 sm:py-6 flex flex-col gap-3">
           <DateNavBar directionRef={directionRef} />
           <div className="flex flex-col items-center justify-center min-h-[50vh] gap-2 text-center">
-            <p className="text-film-text font-semibold">Aucun défi pour cette date.</p>
-            <p className="text-film-text-dim text-sm">Utilisez les flèches pour naviguer vers une date avec un défi.</p>
+            <p className="text-film-text font-semibold">Aucun défi planifié pour aujourd'hui.</p>
+            <p className="text-film-text-dim text-sm">Ajoutez une personnalité dans l'admin et planifiez un défi pour cette date.</p>
           </div>
         </motion.div>
       )}
