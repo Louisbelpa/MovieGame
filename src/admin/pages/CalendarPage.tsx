@@ -67,8 +67,9 @@ export function CalendarPage() {
   const [seriesList, setSeriesList] = useState<AdminSeries[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showPast, setShowPast] = useState(false)
-  const [renderPast, setRenderPast] = useState(false)
+  const allowPast = import.meta.env.VITE_ALLOW_PAST_SCHEDULING === 'true'
+  const [showPast, setShowPast] = useState(allowPast)
+  const [renderPast, setRenderPast] = useState(allowPast)
   const [pastHeight, setPastHeight] = useState(0)
   const [autoLoading, setAutoLoading] = useState(false)
   const [autoSuccess, setAutoSuccess] = useState<string | null>(null)
@@ -270,7 +271,9 @@ export function CalendarPage() {
               <li className="p-0 list-none">
                 <div
                   className="overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out"
-                  style={{ maxHeight: showPast ? `${pastHeight}px` : '0px', opacity: showPast ? 1 : 0 }}
+                  style={allowPast
+                    ? { maxHeight: showPast ? 'none' : '0px', opacity: showPast ? 1 : 0 }
+                    : { maxHeight: showPast ? `${pastHeight}px` : '0px', opacity: showPast ? 1 : 0 }}
                   onTransitionEnd={handlePastTransitionEnd}
                 >
                   <div ref={pastContentRef}>
