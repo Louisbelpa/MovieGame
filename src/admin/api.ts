@@ -181,17 +181,14 @@ export async function adminLogin(username: string | undefined, password: string)
 }
 
 /** Check whether the server requires a username in addition to a password. */
-export async function checkAdminConfig(): Promise<{ requiresUsername: boolean }> {
-  // POST with dummy password to trigger a 401 that tells us whether username is required
-  // A simpler approach: try to hit a public-safe config endpoint, or just check login response
-  // We use a dedicated endpoint: GET /api/admin/config (unauthenticated)
+export async function checkAdminConfig(): Promise<{ requiresUsername: boolean; allowPastScheduling: boolean }> {
   try {
     const res = await fetch(`${BASE_URL}/api/admin/config`, { credentials: 'include' })
-    if (res.ok) return res.json() as Promise<{ requiresUsername: boolean }>
+    if (res.ok) return res.json() as Promise<{ requiresUsername: boolean; allowPastScheduling: boolean }>
   } catch {
     // ignore
   }
-  return { requiresUsername: false }
+  return { requiresUsername: false, allowPastScheduling: false }
 }
 
 export async function adminLogout(): Promise<void> {

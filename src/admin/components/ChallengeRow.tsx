@@ -19,6 +19,7 @@ interface ChallengeRowProps {
   onDelete: (challengeId: number) => Promise<void>
   onEditMedia?: (media: AdminFilm | AdminSeries, type: 'film' | 'series') => void
   rowClassName?: string
+  allowPast?: boolean
 }
 
 function formatDateShort(iso: string) {
@@ -231,12 +232,13 @@ export function ChallengeRow({
   onDelete,
   onEditMedia,
   rowClassName,
+  allowPast = false,
 }: ChallengeRowProps) {
   const [picking, setPicking] = useState(false)
   const [mutating, setMutating] = useState(false)
 
   const today = isToday(date)
-  const past = isPast(date)
+  const past = allowPast ? false : isPast(date)
 
   const media = challenge?.film ?? challenge?.series ?? null
   const isSeries = !!(challenge?.series)
