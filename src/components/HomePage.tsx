@@ -51,7 +51,7 @@ export function HomePage() {
                   exit={{ y: -10, opacity: 0 }}
                   transition={{ duration: 0.35, ease: 'easeOut' }}
                   className="absolute inset-0 inline-flex items-center justify-center"
-                  style={{ color: iconPhase === 'wiki' ? '#c4b5fd' : 'var(--film-gold, #f5c542)' }}
+                  style={{ color: 'var(--film-gold, #f5c542)' }}
                 >
                   {iconPhase === 'tv' ? <Tv size={20} /> : iconPhase === 'wiki' ? <BookOpen size={20} /> : <Film size={20} />}
                 </motion.span>

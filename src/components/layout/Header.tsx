@@ -30,7 +30,7 @@ export function Header() {
   const displayNumber = lastNumberRef.current
 
   const icon = isWiki
-    ? <BookOpen size={22} className="text-[#c4b5fd]" aria-hidden />
+    ? <BookOpen size={22} className="text-film-gold" aria-hidden />
     : gameType === 'series'
       ? <Tv size={22} className="text-film-gold" aria-hidden />
       : <Film size={22} className="text-film-gold" aria-hidden />

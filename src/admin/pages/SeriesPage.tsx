@@ -260,30 +260,32 @@ export function SeriesPage() {
             {search ? 'Aucune série trouvée pour cette recherche.' : 'Aucune série enregistrée.'}
           </div>
         ) : (
-          <table className="w-full min-w-[400px]">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                <th className="px-3 py-3 w-20"></th>
-                <th className="px-3 py-3">Titre</th>
-                <th className="px-3 py-3 hidden sm:table-cell">Année</th>
-                <th className="px-3 py-3 hidden md:table-cell">Créateur</th>
-                <th className="px-3 py-3 hidden lg:table-cell">Statut</th>
-                <th className="px-3 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filtered.map((series) => (
-                <SeriesRow
-                  key={series.id}
-                  series={series}
-                  onEdit={(s) => setModal({ type: 'edit', series: s })}
-                  onDelete={(s) => setModal({ type: 'delete', series: s })}
-                  onBackdrops={(s) => setModal({ type: 'backdrops', series: s })}
-                  onUpload={handleUpload}
-                />
-              ))}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[400px]">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-3 w-20"></th>
+                  <th className="px-3 py-3">Titre</th>
+                  <th className="px-3 py-3 hidden sm:table-cell">Année</th>
+                  <th className="px-3 py-3 hidden md:table-cell">Créateur</th>
+                  <th className="px-3 py-3 hidden lg:table-cell">Statut</th>
+                  <th className="px-3 py-3 text-right whitespace-nowrap">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filtered.map((series) => (
+                  <SeriesRow
+                    key={series.id}
+                    series={series}
+                    onEdit={(s) => setModal({ type: 'edit', series: s })}
+                    onDelete={(s) => setModal({ type: 'delete', series: s })}
+                    onBackdrops={(s) => setModal({ type: 'backdrops', series: s })}
+                    onUpload={handleUpload}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

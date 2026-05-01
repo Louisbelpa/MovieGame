@@ -8,7 +8,7 @@ import db from '../db/database.js'
 import { normalise, isGuessCorrect } from '../lib/matching.js'
 
 const MAX_ATTEMPTS = parseInt(process.env.MAX_ATTEMPTS ?? '3', 10)
-const MAX_HINTS = 5
+const MAX_HINTS = 3
 
 // ─── Internal types ───────────────────────────────────────────────────────────
 

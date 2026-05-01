@@ -782,7 +782,7 @@ export function WikiPersonsPage() {
         ) : persons.length === 0 ? (
           <div className="h-36 flex items-center justify-center text-sm text-gray-400">Aucune personnalité trouvée.</div>
         ) : (
-          <div>
+          <div className="overflow-x-auto">
             <table className="w-full min-w-[400px] table-fixed">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">

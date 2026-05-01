@@ -3151,8 +3151,7 @@ adminRouter.get('/wiki-persons/random', async (req: Request, res: Response, next
             schema:isPartOf <https://${lang}.wikipedia.org/> ;
             schema:name ?frTitle .
       }
-      ORDER BY RAND()
-      LIMIT 10
+      LIMIT 50
     `
 
     const sparqlUrl = `https://query.wikidata.org/sparql?query=${encodeURIComponent(sparql)}&format=json`

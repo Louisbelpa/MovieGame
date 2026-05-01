@@ -461,6 +461,7 @@ function parseJsonObject(value: unknown): Record<string, unknown> {
 }
 
 function parseUsedDates(value: unknown): string[] {
+  if (Array.isArray(value)) return (value as unknown[]).map(String).filter(Boolean)
   if (typeof value !== 'string' || !value.trim()) return []
   return value.split(',').map((v) => v.trim()).filter(Boolean)
 }
