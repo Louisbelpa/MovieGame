@@ -236,7 +236,7 @@ export function ChallengeRow({
   const [mutating, setMutating] = useState(false)
 
   const today = isToday(date)
-  const past = isPast(date)
+  const past = import.meta.env.VITE_ALLOW_PAST_SCHEDULING === 'true' ? false : isPast(date)
 
   const media = challenge?.film ?? challenge?.series ?? null
   const isSeries = !!(challenge?.series)
