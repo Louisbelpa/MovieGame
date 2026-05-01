@@ -190,7 +190,8 @@ function fameFromVoteCount(voteCount: number): number {
 
 function resolveAdminImageUrl(url: string): string {
   if (!url) return url;
-  return url.startsWith('http') ? url : `${TMDB_BASE_ADMIN}${url}`;
+  if (url.startsWith('http') || url.startsWith('/uploads/')) return url;
+  return `${TMDB_BASE_ADMIN}${url}`;
 }
 
 function parseDateParam(raw: unknown): string | null {
@@ -855,8 +856,7 @@ adminRouter.post(
         return;
       }
 
-      const backendUrl = (process.env.BACKEND_URL ?? 'http://localhost:3001').replace(/\/$/, '');
-      const imageUrl = `${backendUrl}/uploads/${req.file.filename}`;
+      const imageUrl = `/uploads/${req.file.filename}`;
 
       db.prepare(
         `UPDATE films SET image_url = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?`
@@ -877,8 +877,7 @@ adminRouter.post(
   (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) { res.status(400).json({ error: 'No image file received.' }); return; }
-      const backendUrl = (process.env.BACKEND_URL ?? 'http://localhost:3001').replace(/\/$/, '');
-      const url = `${backendUrl}/uploads/${req.file.filename}`;
+      const url = `/uploads/${req.file.filename}`;
       res.json({ url });
     } catch (err) {
       next(err);
@@ -2566,8 +2565,7 @@ adminRouter.post(
         return;
       }
 
-      const backendUrl = (process.env.BACKEND_URL ?? 'http://localhost:3001').replace(/\/$/, '');
-      const imageUrl = `${backendUrl}/uploads/${req.file.filename}`;
+      const imageUrl = `/uploads/${req.file.filename}`;
 
       db.prepare(
         `UPDATE series SET image_url = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?`
