@@ -54,8 +54,12 @@ if (path.startsWith('/admin')) {
   }
 } else if (path === '/' || path === '') {
   document.title = FEATURES.enableSeries
-    ? `${BRAND_NAME} — Devine le film ou la série du jour`
-    : `${BRAND_NAME} — Devine le film du jour`
+    ? (FEATURES.enableWiki
+      ? `${BRAND_NAME} — Devine le film, la série ou la personnalité du jour`
+      : `${BRAND_NAME} — Devine le film ou la série du jour`)
+    : (FEATURES.enableWiki
+      ? `${BRAND_NAME} — Devine le film ou la personnalité du jour`
+      : `${BRAND_NAME} — Devine le film du jour`)
   import('./components/HomePage').then(({ HomePage }) => {
     createRoot(root).render(<StrictMode><HomePage /></StrictMode>)
   })

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Search, X, WandSparkles, ExternalLink, Trash2, Pencil } from 'lucide-react'
+import { Plus, Search, X, WandSparkles, ExternalLink, Trash2, Pencil, Shuffle } from 'lucide-react'
 import {
   getWikiPersons,
   createWikiPerson,
@@ -10,6 +10,21 @@ import {
   type WikiPersonPayload,
 } from '../api'
 import { AdminLayout } from '../components/AdminLayout'
+
+const RANDOM_WIKI_SLUGS = [
+  'Emmanuel_Macron',
+  'Barack_Obama',
+  'Angela_Merkel',
+  'Nelson_Mandela',
+  'Volodymyr_Zelenskyy',
+  'Lionel_Messi',
+  'Cristiano_Ronaldo',
+  'Kylian_Mbappé',
+  'Zinedine_Zidane',
+  'Rafael_Nadal',
+  'Serena_Williams',
+  'Michael_Jordan',
+]
 
 type ModalState =
   | { type: 'create' }
@@ -66,6 +81,7 @@ function WikiPersonForm({
   const [difficulty, setDifficulty] = useState(initial?.difficulty ?? 3)
   const [isActive, setIsActive] = useState(initial?.is_active ?? true)
   const [loadingWiki, setLoadingWiki] = useState(false)
+  const [loadingRandomWiki, setLoadingRandomWiki] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -89,6 +105,27 @@ function WikiPersonForm({
       setError(err instanceof Error ? err.message : 'Erreur auto-remplissage Wikipedia')
     } finally {
       setLoadingWiki(false)
+    }
+  }
+
+  async function handleRandomWikipedia() {
+    const randomSlug = RANDOM_WIKI_SLUGS[Math.floor(Math.random() * RANDOM_WIKI_SLUGS.length)]
+    setLoadingRandomWiki(true)
+    setError(null)
+    try {
+      setSlug(randomSlug)
+      const data = await fetchWikipediaPerson(randomSlug, 'fr')
+      setName(data.name)
+      setPersonType(data.person_type)
+      setInfoboxData(JSON.stringify(data.infobox_data, null, 2))
+      setHintSchedule(JSON.stringify(data.hint_schedule, null, 2))
+      setPhotoUrl(data.photo_url ?? '')
+      setExtract(data.extract ?? '')
+      setWikipediaUrl(data.wikipedia_url ?? '')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur wikipedia aléatoire')
+    } finally {
+      setLoadingRandomWiki(false)
     }
   }
 
@@ -130,10 +167,21 @@ function WikiPersonForm({
           <label className="block text-sm font-medium text-gray-700 mb-1">Slug Wikipedia</label>
           <div className="flex gap-2">
             <input value={slug} onChange={(e) => setSlug(e.target.value)} required className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-            <button type="button" onClick={handleFetchWikipedia} disabled={loadingWiki} className="px-3 py-2 text-xs font-medium text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 disabled:opacity-50 inline-flex items-center gap-1.5">
+            <button type="button" onClick={handleFetchWikipedia} disabled={loadingWiki || loadingRandomWiki} className="px-3 py-2 text-xs font-medium text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 disabled:opacity-50 inline-flex items-center gap-1.5">
               <WandSparkles size={14} />
               {loadingWiki ? 'Chargement…' : 'Wiki'}
             </button>
+            {!initial && (
+              <button
+                type="button"
+                onClick={handleRandomWikipedia}
+                disabled={loadingWiki || loadingRandomWiki}
+                className="px-3 py-2 text-xs font-medium text-violet-700 bg-violet-50 rounded-lg hover:bg-violet-100 disabled:opacity-50 inline-flex items-center gap-1.5"
+              >
+                <Shuffle size={14} />
+                {loadingRandomWiki ? 'Aléatoire…' : 'Au hasard'}
+              </button>
+            )}
           </div>
         </div>
       </div>
