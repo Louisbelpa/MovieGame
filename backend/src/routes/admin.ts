@@ -1256,15 +1256,15 @@ adminRouter.put(
       if (hasFilm) {
         const film = db.prepare(`SELECT id FROM films WHERE id = ? AND is_active = 1`).get(film_id);
         if (!film) { res.status(404).json({ error: 'Film not found or inactive.' }); return; }
-        db.prepare(`UPDATE daily_challenges SET film_id = ?, series_id = NULL, wiki_person_id = NULL WHERE id = ?`).run(film_id, id);
+        db.prepare(`UPDATE daily_challenges SET film_id = ?, series_id = NULL, wiki_person_id = NULL, media_type = 'film' WHERE id = ?`).run(film_id, id);
       } else if (hasSeries) {
         const series = db.prepare(`SELECT id FROM series WHERE id = ? AND is_active = 1`).get(series_id);
         if (!series) { res.status(404).json({ error: 'Series not found or inactive.' }); return; }
-        db.prepare(`UPDATE daily_challenges SET film_id = NULL, series_id = ?, wiki_person_id = NULL WHERE id = ?`).run(series_id, id);
+        db.prepare(`UPDATE daily_challenges SET film_id = NULL, series_id = ?, wiki_person_id = NULL, media_type = 'series' WHERE id = ?`).run(series_id, id);
       } else {
         const person = db.prepare(`SELECT id FROM wiki_persons WHERE id = ? AND is_active = 1`).get(wiki_person_id);
         if (!person) { res.status(404).json({ error: 'Wiki person not found or inactive.' }); return; }
-        db.prepare(`UPDATE daily_challenges SET film_id = NULL, series_id = NULL, wiki_person_id = ? WHERE id = ?`).run(wiki_person_id, id);
+        db.prepare(`UPDATE daily_challenges SET film_id = NULL, series_id = NULL, wiki_person_id = ?, media_type = 'wiki' WHERE id = ?`).run(wiki_person_id, id);
       }
 
       const updated = db
@@ -1305,15 +1305,15 @@ adminRouter.patch(
       if (hasFilm) {
         const film = db.prepare(`SELECT id FROM films WHERE id = ? AND is_active = 1`).get(film_id);
         if (!film) { res.status(404).json({ error: 'Film not found or inactive.' }); return; }
-        db.prepare(`UPDATE daily_challenges SET film_id = ?, series_id = NULL, wiki_person_id = NULL WHERE id = ?`).run(film_id, id);
+        db.prepare(`UPDATE daily_challenges SET film_id = ?, series_id = NULL, wiki_person_id = NULL, media_type = 'film' WHERE id = ?`).run(film_id, id);
       } else if (hasSeries) {
         const series = db.prepare(`SELECT id FROM series WHERE id = ? AND is_active = 1`).get(series_id);
         if (!series) { res.status(404).json({ error: 'Series not found or inactive.' }); return; }
-        db.prepare(`UPDATE daily_challenges SET film_id = NULL, series_id = ?, wiki_person_id = NULL WHERE id = ?`).run(series_id, id);
+        db.prepare(`UPDATE daily_challenges SET film_id = NULL, series_id = ?, wiki_person_id = NULL, media_type = 'series' WHERE id = ?`).run(series_id, id);
       } else {
         const person = db.prepare(`SELECT id FROM wiki_persons WHERE id = ? AND is_active = 1`).get(wiki_person_id);
         if (!person) { res.status(404).json({ error: 'Wiki person not found or inactive.' }); return; }
-        db.prepare(`UPDATE daily_challenges SET film_id = NULL, series_id = NULL, wiki_person_id = ? WHERE id = ?`).run(wiki_person_id, id);
+        db.prepare(`UPDATE daily_challenges SET film_id = NULL, series_id = NULL, wiki_person_id = ?, media_type = 'wiki' WHERE id = ?`).run(wiki_person_id, id);
       }
 
       const updated = db.prepare<[number], ChallengeRow>(`SELECT dc.* FROM daily_challenges dc WHERE dc.id = ?`).get(id)!;

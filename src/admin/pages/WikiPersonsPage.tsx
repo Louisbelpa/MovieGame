@@ -123,7 +123,7 @@ function getAllowedHintKeys(personType: PersonType): string[] {
   if (personType === 'sportsperson') {
     return ['birth_year', 'nationality', 'position', 'name_initials', 'name_length']
   }
-  return ['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials']
+  return ['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials', 'name_length']
 }
 
 function parseGenericInfobox(raw: Record<string, unknown>): {

@@ -58,7 +58,7 @@ function deriveStatus(outcome: WikiChallengePayload['outcome']): GameStatus {
 function apiAttemptsToGuesses(attempts: WikiChallengePayload['attempts']): GuessEntry[] {
   return attempts.map(a => ({
     value: a.guess,
-    status: a.correct ? 'correct' : 'wrong',
+    status: a.correct ? 'correct' : a.guess === '' ? 'skipped' : 'wrong',
     timestamp: Date.now(),
   } as GuessEntry))
 }

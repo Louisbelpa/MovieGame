@@ -140,7 +140,7 @@ function getSupplementalHintKeys(personType: WikiPersonRow['person_type']): stri
   if (personType === 'sportsperson') {
     return ['birth_year', 'nationality', 'position', 'name_initials', 'name_length']
   }
-  return ['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials']
+  return ['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials', 'name_length']
 }
 
 function normalizeMediaUrl(raw: string | null | undefined): string | null {

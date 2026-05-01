@@ -68,6 +68,9 @@ function VisibleProfile({ profile }: { profile: WikiVisibleProfile }) {
           <span className="text-[10px] font-semibold text-film-text-dim uppercase tracking-wider">Fonctions politiques</span>
         </div>
         <div className="px-3 pb-2.5">
+          {profile.roles.length === 0 ? (
+            <p className="text-sm text-film-text-dim italic">Fonctions non renseignées.</p>
+          ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-[10px] text-film-text-dim uppercase">
@@ -86,6 +89,7 @@ function VisibleProfile({ profile }: { profile: WikiVisibleProfile }) {
               ))}
             </tbody>
           </table>
+          )}
           <div className="mt-2 space-y-1">
             {profile.roles
               .filter((r) => r.predecessor || r.successor)
