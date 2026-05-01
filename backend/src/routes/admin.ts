@@ -3126,6 +3126,64 @@ adminRouter.delete('/wiki-persons/:id', (req: Request, res: Response, next: Next
   } catch (err) { next(err) }
 })
 
+// GET /api/admin/wiki-persons/random?lang=fr&minFame=30
+// Queries Wikidata SPARQL for a random notable person with a Wikipedia article.
+// minFame = minimum sitelinks count (≈ notoriety across language editions).
+adminRouter.get('/wiki-persons/random', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const lang = typeof req.query.lang === 'string' ? req.query.lang : 'fr'
+    const minFame = Math.max(5, Math.min(100, parseInt(String(req.query.minFame ?? '30'), 10) || 30))
+
+    const sparql = `
+      SELECT ?frTitle WHERE {
+        ?person wdt:P31 wd:Q5 ;
+                wdt:P569 ?birthDate ;
+                wikibase:sitelinks ?n .
+        FILTER(YEAR(?birthDate) >= 1900 && ?n >= ${minFame})
+        ?fr schema:about ?person ;
+            schema:isPartOf <https://${lang}.wikipedia.org/> ;
+            schema:name ?frTitle .
+      }
+      ORDER BY RAND()
+      LIMIT 10
+    `
+
+    const sparqlUrl = `https://query.wikidata.org/sparql?query=${encodeURIComponent(sparql)}&format=json`
+    const sparqlRes = await fetch(sparqlUrl, {
+      headers: {
+        'Accept': 'application/sparql-results+json',
+        'User-Agent': 'MovieGame/1.0 (admin tool)',
+      },
+      signal: AbortSignal.timeout(30_000),
+    })
+
+    if (!sparqlRes.ok) {
+      res.status(502).json({ error: `Wikidata SPARQL error: ${sparqlRes.status}` })
+      return
+    }
+
+    const data = await sparqlRes.json() as {
+      results?: { bindings?: Array<{ frTitle?: { value: string } }> }
+    }
+    const bindings = data.results?.bindings ?? []
+    if (bindings.length === 0) {
+      res.status(404).json({ error: 'Aucun résultat Wikidata. Essaie de réduire minFame.' })
+      return
+    }
+
+    const picked = bindings[Math.floor(Math.random() * bindings.length)]
+    const slug = picked.frTitle?.value?.replace(/ /g, '_') ?? null
+    if (!slug) {
+      res.status(500).json({ error: 'Slug introuvable dans la réponse Wikidata.' })
+      return
+    }
+
+    res.json({ slug })
+  } catch (err) {
+    next(err)
+  }
+})
+
 // POST /api/admin/wiki-persons/fetch-wikipedia
 adminRouter.post('/wiki-persons/fetch-wikipedia', async (req: Request, res: Response, next: NextFunction) => {
   try {

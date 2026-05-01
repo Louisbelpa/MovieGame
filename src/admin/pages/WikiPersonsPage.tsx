@@ -6,42 +6,12 @@ import {
   updateWikiPerson,
   deleteWikiPerson,
   fetchWikipediaPerson,
+  fetchRandomWikiSlug,
   type AdminWikiPerson,
   type WikiPersonPayload,
 } from '../api'
 import { AdminLayout } from '../components/AdminLayout'
 
-const RANDOM_WIKI_SLUGS = [
-  'Emmanuel_Macron',
-  'Barack_Obama',
-  'Angela_Merkel',
-  'Nelson_Mandela',
-  'Volodymyr_Zelenskyy',
-  'Lionel_Messi',
-  'Cristiano_Ronaldo',
-  'Kylian_Mbappé',
-  'Zinedine_Zidane',
-  'Rafael_Nadal',
-  'Serena_Williams',
-  'Michael_Jordan',
-]
-
-function isNotFoundError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false
-  const msg = err.message.toLowerCase()
-  return msg.includes('404') || msg.includes('not found')
-}
-
-function shuffledSlugs(): string[] {
-  const copy = [...RANDOM_WIKI_SLUGS]
-  for (let i = copy.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1))
-    const tmp = copy[i]
-    copy[i] = copy[j]
-    copy[j] = tmp
-  }
-  return copy
-}
 
 function personTypeLabel(personType: PersonType): string {
   switch (personType) {
@@ -439,24 +409,10 @@ function WikiPersonForm({
     setLoadingRandomWiki(true)
     setError(null)
     try {
-      const candidates = shuffledSlugs()
-      let loaded = false
-
-      for (const candidate of candidates) {
-        try {
-          const data = await fetchWikipediaPerson(candidate, 'fr')
-          setSlug(candidate)
-          applyWikipediaData(data)
-          loaded = true
-          break
-        } catch (err) {
-          if (!isNotFoundError(err)) throw err
-        }
-      }
-
-      if (!loaded) {
-        throw new Error('Aucun profil Wikipedia aléatoire valide trouvé. Réessaie.')
-      }
+      const { slug: randomSlug } = await fetchRandomWikiSlug('fr', 30)
+      const data = await fetchWikipediaPerson(randomSlug, 'fr')
+      setSlug(randomSlug)
+      applyWikipediaData(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur wikipedia aléatoire')
     } finally {

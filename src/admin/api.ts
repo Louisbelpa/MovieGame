@@ -528,6 +528,10 @@ export async function deleteWikiPerson(id: number): Promise<void> {
   await request<{ ok: boolean }>(`/api/admin/wiki-persons/${id}`, { method: 'DELETE' })
 }
 
+export async function fetchRandomWikiSlug(lang = 'fr', minFame = 30): Promise<{ slug: string }> {
+  return request<{ slug: string }>(`/api/admin/wiki-persons/random?lang=${encodeURIComponent(lang)}&minFame=${minFame}`)
+}
+
 export async function fetchWikipediaPerson(slug: string, lang = 'fr'): Promise<WikipediaFetchPayload> {
   return request<WikipediaFetchPayload>('/api/admin/wiki-persons/fetch-wikipedia', {
     method: 'POST',
