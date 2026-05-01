@@ -277,6 +277,7 @@ export function buildWikiChallengePayload(challenge: WikiChallengeRow, session: 
     isPastChallenge: challenge.challenge_date < today,
     mediaType: 'wiki' as const,
     personType: person.person_type,
+    photoUrl: person.photo_url,
     profile: buildVisibleProfile(person),
     isGameOver: session.outcome !== null,
     hintsAvailable: schedule.length,

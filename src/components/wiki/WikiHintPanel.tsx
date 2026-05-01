@@ -8,17 +8,32 @@ import { Briefcase, Calendar, Flag, Trophy, Lock, Lightbulb } from 'lucide-react
 import type { WikiHintPayload, WikiVisibleProfile } from '@/api/wikiClient'
 
 interface WikiHintPanelProps {
+  photoUrl: string | null
   profile: WikiVisibleProfile
   hints: WikiHintPayload[]
   hintsAvailable: number
   hintsRevealed: number
 }
 
-export function WikiHintPanel({ profile, hints, hintsAvailable, hintsRevealed }: WikiHintPanelProps) {
+export function WikiHintPanel({ photoUrl, profile, hints, hintsAvailable, hintsRevealed }: WikiHintPanelProps) {
   const lockedCount = hintsAvailable - hintsRevealed
 
   return (
     <section aria-label="Profil et indices" className="w-full flex flex-col gap-2">
+      {photoUrl && (
+        <div className="rounded-lg film-border overflow-hidden relative">
+          <img
+            src={photoUrl}
+            alt="Portrait flouté"
+            className="w-full h-48 object-cover blur-md scale-110"
+          />
+          <div className="absolute inset-0 bg-black/20" />
+          <span className="absolute left-2 top-2 text-[10px] uppercase tracking-wider font-semibold px-2 py-1 rounded bg-black/50 text-white">
+            Photo floutée
+          </span>
+        </div>
+      )}
+
       <h3 className="text-xs font-semibold text-film-text-dim uppercase tracking-wider">Informations visibles</h3>
       <VisibleProfile profile={profile} />
 

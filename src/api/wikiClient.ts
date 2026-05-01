@@ -61,6 +61,7 @@ export interface WikiChallengePayload {
   isPastChallenge: boolean
   mediaType: 'wiki'
   personType: 'politician' | 'sportsperson'
+  photoUrl: string | null
   profile: WikiVisibleProfile
   isGameOver: boolean
   hintsAvailable: number

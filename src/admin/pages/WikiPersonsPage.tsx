@@ -49,6 +49,125 @@ type ModalState =
   | { type: 'delete'; person: AdminWikiPerson }
   | null
 
+type PersonType = 'politician' | 'sportsperson'
+
+interface WikiRoleFormRow {
+  title: string
+  start_year: number | null
+  end_year: number | null
+  country: string | null
+  predecessor: string | null
+  successor: string | null
+}
+
+interface WikiClubFormRow {
+  name: string
+  start_year: number | null
+  end_year: number | null
+  appearances: number | null
+  goals: number | null
+}
+
+interface PoliticianInfoboxForm {
+  roles: WikiRoleFormRow[]
+  party: string | null
+  birth_year: number | null
+  nationality: string | null
+}
+
+interface SportInfoboxForm {
+  sport: string | null
+  position: string | null
+  clubs: WikiClubFormRow[]
+  national_team: { name: string; caps: number | null; goals: number | null } | null
+  birth_year: number | null
+  nationality: string | null
+}
+
+function toNullableString(v: string): string | null {
+  const trimmed = v.trim()
+  return trimmed ? trimmed : null
+}
+
+function toNullableNumber(v: string): number | null {
+  const trimmed = v.trim()
+  if (!trimmed) return null
+  const n = parseInt(trimmed, 10)
+  return Number.isFinite(n) ? n : null
+}
+
+function parseAliasesInput(raw: string): string[] {
+  return raw
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean)
+}
+
+function getAllowedHintKeys(personType: PersonType): string[] {
+  return personType === 'politician'
+    ? ['birth_year', 'nationality', 'party', 'name_initials', 'name_length']
+    : ['birth_year', 'nationality', 'position', 'name_initials', 'name_length']
+}
+
+function parsePoliticianInfobox(raw: Record<string, unknown>): PoliticianInfoboxForm {
+  const rolesRaw = Array.isArray(raw.roles) ? raw.roles : []
+  const roles: WikiRoleFormRow[] = rolesRaw
+    .map((r) => {
+      const role = r as Record<string, unknown>
+      return {
+        title: String(role.title ?? '').trim(),
+        start_year: typeof role.start_year === 'number' ? role.start_year : null,
+        end_year: typeof role.end_year === 'number' ? role.end_year : null,
+        country: typeof role.country === 'string' ? role.country : null,
+        predecessor: typeof role.predecessor === 'string' ? role.predecessor : null,
+        successor: typeof role.successor === 'string' ? role.successor : null,
+      }
+    })
+    .filter((r) => r.title)
+
+  return {
+    roles,
+    party: typeof raw.party === 'string' ? raw.party : null,
+    birth_year: typeof raw.birth_year === 'number' ? raw.birth_year : null,
+    nationality: typeof raw.nationality === 'string' ? raw.nationality : null,
+  }
+}
+
+function parseSportInfobox(raw: Record<string, unknown>): SportInfoboxForm {
+  const clubsRaw = Array.isArray(raw.clubs) ? raw.clubs : []
+  const clubs: WikiClubFormRow[] = clubsRaw
+    .map((c) => {
+      const club = c as Record<string, unknown>
+      return {
+        name: String(club.name ?? '').trim(),
+        start_year: typeof club.start_year === 'number' ? club.start_year : null,
+        end_year: typeof club.end_year === 'number' ? club.end_year : null,
+        appearances: typeof club.appearances === 'number' ? club.appearances : null,
+        goals: typeof club.goals === 'number' ? club.goals : null,
+      }
+    })
+    .filter((c) => c.name)
+
+  const ntRaw = (raw.national_team && typeof raw.national_team === 'object')
+    ? (raw.national_team as Record<string, unknown>)
+    : null
+
+  return {
+    sport: typeof raw.sport === 'string' ? raw.sport : null,
+    position: typeof raw.position === 'string' ? raw.position : null,
+    clubs,
+    national_team: ntRaw
+      ? {
+          name: String(ntRaw.name ?? '').trim(),
+          caps: typeof ntRaw.caps === 'number' ? ntRaw.caps : null,
+          goals: typeof ntRaw.goals === 'number' ? ntRaw.goals : null,
+        }
+      : null,
+    birth_year: typeof raw.birth_year === 'number' ? raw.birth_year : null,
+    nationality: typeof raw.nationality === 'string' ? raw.nationality : null,
+  }
+}
+
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -65,18 +184,6 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   )
 }
 
-function parseJsonObject(value: string): Record<string, unknown> {
-  const parsed = JSON.parse(value) as unknown
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('JSON objet invalide')
-  return parsed as Record<string, unknown>
-}
-
-function parseJsonStringArray(value: string): string[] {
-  const parsed = JSON.parse(value) as unknown
-  if (!Array.isArray(parsed) || !parsed.every((v) => typeof v === 'string')) throw new Error('JSON tableau de strings invalide')
-  return parsed
-}
-
 function WikiPersonForm({
   initial,
   onSubmit,
@@ -88,19 +195,156 @@ function WikiPersonForm({
 }) {
   const [name, setName] = useState(initial?.name ?? '')
   const [slug, setSlug] = useState(initial?.wikipedia_slug ?? '')
-  const [personType, setPersonType] = useState<'politician' | 'sportsperson'>(initial?.person_type ?? 'politician')
-  const [aliases, setAliases] = useState(JSON.stringify(initial?.name_aliases ?? [], null, 2))
-  const [infoboxData, setInfoboxData] = useState(JSON.stringify(initial?.infobox_data ?? {}, null, 2))
-  const [hintSchedule, setHintSchedule] = useState(JSON.stringify(initial?.hint_schedule ?? [], null, 2))
+  const [personType, setPersonType] = useState<PersonType>(initial?.person_type ?? 'politician')
+  const [aliasesInput, setAliasesInput] = useState((initial?.name_aliases ?? []).join(', '))
+  const [selectedHints, setSelectedHints] = useState<string[]>(initial?.hint_schedule ?? getAllowedHintKeys(initial?.person_type ?? 'politician'))
   const [photoUrl, setPhotoUrl] = useState(initial?.photo_url ?? '')
   const [extract, setExtract] = useState(initial?.extract ?? '')
   const [wikipediaUrl, setWikipediaUrl] = useState(initial?.wikipedia_url ?? '')
   const [difficulty, setDifficulty] = useState(initial?.difficulty ?? 3)
   const [isActive, setIsActive] = useState(initial?.is_active ?? true)
+  const [party, setParty] = useState('')
+  const [birthYear, setBirthYear] = useState('')
+  const [nationality, setNationality] = useState('')
+  const [rolesText, setRolesText] = useState('')
+  const [sport, setSport] = useState('')
+  const [position, setPosition] = useState('')
+  const [clubsText, setClubsText] = useState('')
+  const [nationalTeamName, setNationalTeamName] = useState('')
+  const [nationalTeamCaps, setNationalTeamCaps] = useState('')
+  const [nationalTeamGoals, setNationalTeamGoals] = useState('')
   const [loadingWiki, setLoadingWiki] = useState(false)
   const [loadingRandomWiki, setLoadingRandomWiki] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const raw = initial?.infobox_data ?? {}
+    if ((initial?.person_type ?? personType) === 'politician') {
+      const p = parsePoliticianInfobox(raw)
+      setParty(p.party ?? '')
+      setBirthYear(p.birth_year != null ? String(p.birth_year) : '')
+      setNationality(p.nationality ?? '')
+      setRolesText(
+        p.roles
+          .map((r) => [r.title, r.start_year ?? '', r.end_year ?? '', r.country ?? ''].join(' | '))
+          .join('\n')
+      )
+    } else {
+      const s = parseSportInfobox(raw)
+      setSport(s.sport ?? '')
+      setPosition(s.position ?? '')
+      setBirthYear(s.birth_year != null ? String(s.birth_year) : '')
+      setNationality(s.nationality ?? '')
+      setClubsText(
+        s.clubs
+          .map((c) => [c.name, c.start_year ?? '', c.end_year ?? '', c.appearances ?? '', c.goals ?? ''].join(' | '))
+          .join('\n')
+      )
+      setNationalTeamName(s.national_team?.name ?? '')
+      setNationalTeamCaps(s.national_team?.caps != null ? String(s.national_team.caps) : '')
+      setNationalTeamGoals(s.national_team?.goals != null ? String(s.national_team.goals) : '')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial?.id])
+
+  useEffect(() => {
+    const allowed = getAllowedHintKeys(personType)
+    setSelectedHints((prev) => {
+      const filtered = prev.filter((k) => allowed.includes(k))
+      return filtered.length > 0 ? filtered : allowed
+    })
+  }, [personType])
+
+  function applyWikipediaData(data: {
+    name: string
+    person_type: PersonType
+    infobox_data: Record<string, unknown>
+    hint_schedule: string[]
+    photo_url: string | null
+    extract: string | null
+    wikipedia_url: string
+  }) {
+    setName(data.name)
+    setPersonType(data.person_type)
+    setSelectedHints(data.hint_schedule.length > 0 ? data.hint_schedule : getAllowedHintKeys(data.person_type))
+    setPhotoUrl(data.photo_url ?? '')
+    setExtract(data.extract ?? '')
+    setWikipediaUrl(data.wikipedia_url ?? '')
+
+    if (data.person_type === 'politician') {
+      const p = parsePoliticianInfobox(data.infobox_data)
+      setParty(p.party ?? '')
+      setBirthYear(p.birth_year != null ? String(p.birth_year) : '')
+      setNationality(p.nationality ?? '')
+      setRolesText(
+        p.roles
+          .map((r) => [r.title, r.start_year ?? '', r.end_year ?? '', r.country ?? ''].join(' | '))
+          .join('\n')
+      )
+      setSport('')
+      setPosition('')
+      setClubsText('')
+      setNationalTeamName('')
+      setNationalTeamCaps('')
+      setNationalTeamGoals('')
+      return
+    }
+
+    const s = parseSportInfobox(data.infobox_data)
+    setSport(s.sport ?? '')
+    setPosition(s.position ?? '')
+    setBirthYear(s.birth_year != null ? String(s.birth_year) : '')
+    setNationality(s.nationality ?? '')
+    setClubsText(
+      s.clubs
+        .map((c) => [c.name, c.start_year ?? '', c.end_year ?? '', c.appearances ?? '', c.goals ?? ''].join(' | '))
+        .join('\n')
+    )
+    setNationalTeamName(s.national_team?.name ?? '')
+    setNationalTeamCaps(s.national_team?.caps != null ? String(s.national_team.caps) : '')
+    setNationalTeamGoals(s.national_team?.goals != null ? String(s.national_team.goals) : '')
+    setParty('')
+    setRolesText('')
+  }
+
+  function parseRolesInput(): WikiRoleFormRow[] {
+    return rolesText
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [title = '', start = '', end = '', country = ''] = line.split('|').map((v) => v.trim())
+        return {
+          title,
+          title_redacted: title,
+          start_year: toNullableNumber(start),
+          end_year: toNullableNumber(end),
+          country: toNullableString(country),
+          predecessor: null,
+          successor: null,
+        } as WikiRoleFormRow
+      })
+      .filter((r) => r.title)
+  }
+
+  function parseClubsInput(): WikiClubFormRow[] {
+    return clubsText
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [name = '', start = '', end = '', apps = '', goals = ''] = line.split('|').map((v) => v.trim())
+        return {
+          name,
+          start_year: toNullableNumber(start),
+          end_year: toNullableNumber(end),
+          appearances: toNullableNumber(apps),
+          goals: toNullableNumber(goals),
+        }
+      })
+      .filter((c) => c.name)
+  }
 
   async function handleFetchWikipedia() {
     if (!slug.trim()) {
@@ -111,13 +355,7 @@ function WikiPersonForm({
     setError(null)
     try {
       const data = await fetchWikipediaPerson(slug.trim(), 'fr')
-      setName(data.name)
-      setPersonType(data.person_type)
-      setInfoboxData(JSON.stringify(data.infobox_data, null, 2))
-      setHintSchedule(JSON.stringify(data.hint_schedule, null, 2))
-      setPhotoUrl(data.photo_url ?? '')
-      setExtract(data.extract ?? '')
-      setWikipediaUrl(data.wikipedia_url ?? '')
+      applyWikipediaData(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur auto-remplissage Wikipedia')
     } finally {
@@ -136,13 +374,7 @@ function WikiPersonForm({
         try {
           const data = await fetchWikipediaPerson(candidate, 'fr')
           setSlug(candidate)
-          setName(data.name)
-          setPersonType(data.person_type)
-          setInfoboxData(JSON.stringify(data.infobox_data, null, 2))
-          setHintSchedule(JSON.stringify(data.hint_schedule, null, 2))
-          setPhotoUrl(data.photo_url ?? '')
-          setExtract(data.extract ?? '')
-          setWikipediaUrl(data.wikipedia_url ?? '')
+          applyWikipediaData(data)
           loaded = true
           break
         } catch (err) {
@@ -165,13 +397,35 @@ function WikiPersonForm({
     setSubmitting(true)
     setError(null)
     try {
+      const infoboxData: Record<string, unknown> = personType === 'politician'
+        ? {
+            roles: parseRolesInput(),
+            party: toNullableString(party),
+            birth_year: toNullableNumber(birthYear),
+            nationality: toNullableString(nationality),
+          }
+        : {
+            sport: toNullableString(sport),
+            position: toNullableString(position),
+            clubs: parseClubsInput(),
+            national_team: toNullableString(nationalTeamName)
+              ? {
+                  name: nationalTeamName.trim(),
+                  caps: toNullableNumber(nationalTeamCaps),
+                  goals: toNullableNumber(nationalTeamGoals),
+                }
+              : null,
+            birth_year: toNullableNumber(birthYear),
+            nationality: toNullableString(nationality),
+          }
+
       const payload: WikiPersonPayload = {
         name: name.trim(),
         wikipedia_slug: slug.trim(),
         person_type: personType,
-        name_aliases: parseJsonStringArray(aliases),
-        infobox_data: parseJsonObject(infoboxData),
-        hint_schedule: parseJsonStringArray(hintSchedule),
+        name_aliases: parseAliasesInput(aliasesInput),
+        infobox_data: infoboxData,
+        hint_schedule: selectedHints,
         photo_url: photoUrl.trim() || null,
         extract: extract.trim() || null,
         wikipedia_url: wikipediaUrl.trim() || null,
@@ -220,7 +474,7 @@ function WikiPersonForm({
       <div className="grid sm:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-          <select value={personType} onChange={(e) => setPersonType(e.target.value as 'politician' | 'sportsperson')} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+          <select value={personType} onChange={(e) => setPersonType(e.target.value as PersonType)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
             <option value="politician">Politicien</option>
             <option value="sportsperson">Sportif</option>
           </select>
@@ -236,17 +490,92 @@ function WikiPersonForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Alias (JSON string[])</label>
-        <textarea rows={3} value={aliases} onChange={(e) => setAliases(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono" />
+        <label className="block text-sm font-medium text-gray-700 mb-1">Alias (séparés par des virgules)</label>
+        <input value={aliasesInput} onChange={(e) => setAliasesInput(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Ex: Leo Messi, L. Messi" />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Hint schedule (JSON string[])</label>
-        <textarea rows={3} value={hintSchedule} onChange={(e) => setHintSchedule(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono" />
+        <label className="block text-sm font-medium text-gray-700 mb-2">Indices complémentaires utilisés</label>
+        <div className="grid sm:grid-cols-2 gap-2">
+          {getAllowedHintKeys(personType).map((hintKey) => (
+            <label key={hintKey} className="inline-flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={selectedHints.includes(hintKey)}
+                onChange={(e) => {
+                  setSelectedHints((prev) => {
+                    if (e.target.checked) return [...prev, hintKey]
+                    const next = prev.filter((k) => k !== hintKey)
+                    return next.length > 0 ? next : [hintKey]
+                  })
+                }}
+              />
+              {hintKey}
+            </label>
+          ))}
+        </div>
       </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Infobox data (JSON object)</label>
-        <textarea rows={8} value={infoboxData} onChange={(e) => setInfoboxData(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs font-mono" />
-      </div>
+
+      {personType === 'politician' ? (
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Parti politique</label>
+            <input value={party} onChange={(e) => setParty(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nationalité</label>
+            <input value={nationality} onChange={(e) => setNationality(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Année de naissance</label>
+            <input value={birthYear} onChange={(e) => setBirthYear(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Fonctions (1 ligne = titre | début | fin | pays)
+            </label>
+            <textarea rows={6} value={rolesText} onChange={(e) => setRolesText(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs font-mono" />
+          </div>
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sport</label>
+            <input value={sport} onChange={(e) => setSport(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Poste</label>
+            <input value={position} onChange={(e) => setPosition(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nationalité</label>
+            <input value={nationality} onChange={(e) => setNationality(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Année de naissance</label>
+            <input value={birthYear} onChange={(e) => setBirthYear(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Clubs (1 ligne = club | début | fin | matchs | buts)
+            </label>
+            <textarea rows={6} value={clubsText} onChange={(e) => setClubsText(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs font-mono" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Équipe nationale</label>
+            <input value={nationalTeamName} onChange={(e) => setNationalTeamName(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sélections</label>
+              <input value={nationalTeamCaps} onChange={(e) => setNationalTeamCaps(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Buts</label>
+              <input value={nationalTeamGoals} onChange={(e) => setNationalTeamGoals(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
@@ -297,28 +626,44 @@ export function WikiPersonsPage() {
   }, [load])
 
   async function handleCreate(payload: WikiPersonPayload) {
-    await createWikiPerson(payload)
-    setSuccess('Personnalité Wikipedia créée.')
-    setModal(null)
-    load()
+    try {
+      setError(null)
+      setSuccess(null)
+      await createWikiPerson(payload)
+      setSuccess('Personnalité Wikipedia créée.')
+      setModal(null)
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur création')
+    }
   }
 
   async function handleEdit(payload: WikiPersonPayload) {
     if (modal?.type !== 'edit') return
-    await updateWikiPerson(modal.person.id, payload)
-    setSuccess('Personnalité Wikipedia mise à jour.')
-    setModal(null)
-    load()
+    try {
+      setError(null)
+      setSuccess(null)
+      await updateWikiPerson(modal.person.id, payload)
+      setSuccess('Personnalité Wikipedia mise à jour.')
+      setModal(null)
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur mise à jour')
+    }
   }
 
   async function handleDelete() {
     if (modal?.type !== 'delete') return
     setDeleting(true)
     try {
+      setError(null)
+      setSuccess(null)
       await deleteWikiPerson(modal.person.id)
       setSuccess('Personnalité Wikipedia désactivée.')
       setModal(null)
       load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur suppression')
     } finally {
       setDeleting(false)
     }
@@ -400,7 +745,7 @@ export function WikiPersonsPage() {
       )}
       {modal?.type === 'edit' && (
         <Modal title={`Modifier — ${modal.person.name}`} onClose={() => setModal(null)}>
-          <WikiPersonForm initial={modal.person} onSubmit={handleEdit} onCancel={() => setModal(null)} />
+          <WikiPersonForm key={modal.person.id} initial={modal.person} onSubmit={handleEdit} onCancel={() => setModal(null)} />
         </Modal>
       )}
       {modal?.type === 'delete' && (

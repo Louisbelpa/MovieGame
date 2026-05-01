@@ -53,10 +53,20 @@ export interface WikiFetchResult {
 /** Strip wikilinks: [[Target|Label]] → Label, [[Target]] → Target */
 function stripLinks(s: string): string {
   return s
+    .replace(/\{\{lang\|[^|]+\|([^}]+)\}\}/gi, '$1')
+    .replace(/\{\{ill\|([^|}]+)(?:\|[^}]*)?\}\}/gi, '$1')
+    .replace(/\{\{([^{}]+)\}\}/g, (_m, inner: string) => {
+      const parts = inner.split('|').map((p) => p.trim()).filter(Boolean)
+      for (let i = parts.length - 1; i >= 0; i -= 1) {
+        if (!parts[i].includes('=')) return parts[i]
+      }
+      return ''
+    })
     .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2')
     .replace(/\[\[([^\]]+)\]\]/g, '$1')
-    .replace(/\{\{[^}]+\}\}/g, '')
     .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s{2,}/g, ' ')
     .trim()
 }
 
@@ -85,26 +95,34 @@ function detectPersonType(wikitext: string): 'politician' | 'sportsperson' {
   return 'politician'
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function readInfoboxField(wikitext: string, keys: string[]): string {
+  for (const key of keys) {
+    const m = wikitext.match(new RegExp(`\\|\\s*${escapeRegExp(key)}\\s*=\\s*([^\\n|]+)`, 'i'))
+    if (m?.[1]) return m[1]
+  }
+  return ''
+}
+
 function parsePoliticianData(wikitext: string): WikiPoliticianData {
   const roles: WikiRole[] = []
 
-  // Extract office blocks: office, term_start, term_end, predecessor, successor
-  const officeMatches = [...wikitext.matchAll(/\|\s*office\s*=\s*([^\n|]+)/g)]
+  // Extract office blocks with numbered/un-numbered variants (EN + FR).
+  const officeMatches = [...wikitext.matchAll(/\|\s*(?:office|fonction)(\d*)\s*=\s*([^\n|]+)/gi)]
   for (const m of officeMatches) {
-    const title = stripLinks(m[1]).trim()
+    const suffix = m[1] ?? ''
+    const title = stripLinks(m[2]).trim()
     if (!title) continue
 
-    const offsetAfter = m.index! + m[0].length
-    const block = wikitext.slice(offsetAfter, offsetAfter + 800)
-
-    const termStart = block.match(/\|\s*term_start\d*\s*=\s*([^\n|]+)/)?.[1] ?? ''
-    const termEnd = block.match(/\|\s*term_end\d*\s*=\s*([^\n|]+)/)?.[1] ?? ''
-    const pred = block.match(/\|\s*predecessor\d*\s*=\s*([^\n|]+)/)?.[1] ?? ''
-    const succ = block.match(/\|\s*successor\d*\s*=\s*([^\n|]+)/)?.[1] ?? ''
-
-    // Redact country from title: replace country name with [PAYS]
-    const countryMatch = block.match(/\|\s*country\d*\s*=\s*([^\n|]+)/)
-    const country = countryMatch ? stripLinks(countryMatch[1]).trim() : null
+    const termStart = readInfoboxField(wikitext, [`term_start${suffix}`, `term start${suffix}`, `début mandat${suffix}`, `mandat début${suffix}`])
+    const termEnd = readInfoboxField(wikitext, [`term_end${suffix}`, `term end${suffix}`, `fin mandat${suffix}`, `mandat fin${suffix}`])
+    const pred = readInfoboxField(wikitext, [`predecessor${suffix}`, `prédécesseur${suffix}`])
+    const succ = readInfoboxField(wikitext, [`successor${suffix}`, `successeur${suffix}`])
+    const countryRaw = readInfoboxField(wikitext, [`country${suffix}`, `pays${suffix}`])
+    const country = stripLinks(countryRaw).trim() || null
 
     const titleRedacted = country ? title.replace(new RegExp(country, 'gi'), '[PAYS]') : title
 
@@ -120,16 +138,12 @@ function parsePoliticianData(wikitext: string): WikiPoliticianData {
   }
 
   const birthYear = extractYear(
-    wikitext.match(/\|\s*birth_date\s*=\s*([^\n|]+)/)?.[1] ?? ''
+    readInfoboxField(wikitext, ['birth_date', 'date de naissance', 'naissance'])
   )
 
-  const party = stripLinks(
-    wikitext.match(/\|\s*party\s*=\s*([^\n|]+)/)?.[1] ?? ''
-  ).trim() || null
+  const party = stripLinks(readInfoboxField(wikitext, ['party', 'parti politique', 'parti'])).trim() || null
 
-  const nationality = stripLinks(
-    wikitext.match(/\|\s*nationality\s*=\s*([^\n|]+)/)?.[1] ?? ''
-  ).trim() || null
+  const nationality = stripLinks(readInfoboxField(wikitext, ['nationality', 'nationalité', 'citoyenneté'])).trim() || null
 
   return { roles: roles.slice(0, 6), party, birth_year: birthYear, nationality }
 }
@@ -139,22 +153,27 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
 
   // clubs section: | clubs = \n {{fb cl|Club}} \n ...
   const clubsBlock = wikitext.match(/\|\s*clubs\s*=\s*([\s\S]*?)(?=\n\s*\|(?![\s\S]*?\|\s*clubs))/)?.[1] ?? ''
-  const yearsBlock = wikitext.match(/\|\s*clinyears\s*=\s*([\s\S]*?)(?=\n\s*\|)/)?.[1] ?? ''
-  const capsBlock = wikitext.match(/\|\s*clingoals\s*=\s*([\s\S]*?)(?=\n\s*\|)/)?.[1] ?? ''
+  const yearsBlock = wikitext.match(/\|\s*(?:clubyears|years)\s*=\s*([\s\S]*?)(?=\n\s*\|)/i)?.[1] ?? ''
+  const capsBlock = wikitext.match(/\|\s*(?:clubcaps|caps|apps)\s*=\s*([\s\S]*?)(?=\n\s*\|)/i)?.[1] ?? ''
+  const goalsBlock = wikitext.match(/\|\s*(?:clubgoals|goals)\s*=\s*([\s\S]*?)(?=\n\s*\|)/i)?.[1] ?? ''
 
   // Try simpler club extraction from list lines
   const clubLines = clubsBlock.split('\n').map(l => stripLinks(l).trim()).filter(Boolean)
   const yearLines = yearsBlock.split('\n').map(l => l.trim()).filter(Boolean)
+  const capsLines = capsBlock.split('\n').map(l => stripLinks(l).replace(/[^\d-]/g, '').trim()).filter(Boolean)
+  const goalsLines = goalsBlock.split('\n').map(l => stripLinks(l).replace(/[^\d-]/g, '').trim()).filter(Boolean)
 
   for (let i = 0; i < clubLines.length; i++) {
     const yearStr = yearLines[i] ?? ''
     const yearRange = yearStr.match(/(\d{4})\s*[-–]\s*(\d{4}|\s*)/)
+    const caps = parseInt(capsLines[i] ?? '', 10)
+    const goals = parseInt(goalsLines[i] ?? '', 10)
     clubs.push({
       name: clubLines[i],
       start_year: yearRange ? parseInt(yearRange[1], 10) : null,
       end_year: yearRange?.[2]?.trim() ? parseInt(yearRange[2], 10) : null,
-      appearances: null,
-      goals: null,
+      appearances: Number.isFinite(caps) ? caps : null,
+      goals: Number.isFinite(goals) ? goals : null,
     })
   }
 
