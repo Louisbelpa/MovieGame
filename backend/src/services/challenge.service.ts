@@ -77,7 +77,8 @@ interface AttemptEntry {
 
 function resolveImageUrl(raw: string): string {
   if (IMAGE_SOURCE === 'tmdb') {
-    return raw.startsWith('http') ? raw : `${TMDB_BASE}${raw}`;
+    if (raw.startsWith('http') || raw.startsWith('/uploads/')) return raw;
+    return `${TMDB_BASE}${raw}`;
   }
   return raw; // local path served by Express static middleware
 }
