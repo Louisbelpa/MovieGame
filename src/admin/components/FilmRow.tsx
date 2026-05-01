@@ -39,7 +39,7 @@ export function FilmRow({ film, onEdit, onDelete, onBackdrops, onUpload }: FilmR
   }
 
   return (
-    <tr className="hover:bg-gray-50 transition-colors">
+    <tr className="hover:bg-gray-50 transition-colors group">
       {/* Thumbnail */}
       <td className="px-3 py-3 w-20">
         {film.image_url ? (
@@ -100,7 +100,7 @@ export function FilmRow({ film, onEdit, onDelete, onBackdrops, onUpload }: FilmR
       </td>
 
       {/* Actions */}
-      <td className="px-3 py-3 text-right">
+      <td className="sticky right-0 bg-white group-hover:bg-gray-50 transition-colors px-3 py-3 text-right border-l border-gray-100 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
         <div className="flex items-center justify-end gap-1">
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
           <button onClick={() => fileInputRef.current?.click()} title="Uploader une image" className="p-2 sm:p-1.5 bg-teal-50 text-teal-600 sm:bg-transparent sm:text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors">

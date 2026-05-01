@@ -269,7 +269,7 @@ export function SeriesPage() {
                   <th className="px-3 py-3 hidden sm:table-cell">Année</th>
                   <th className="px-3 py-3 hidden md:table-cell">Créateur</th>
                   <th className="px-3 py-3 hidden lg:table-cell">Statut</th>
-                  <th className="px-3 py-3 text-right whitespace-nowrap">Actions</th>
+                  <th className="sticky right-0 bg-gray-50 px-3 py-3 text-right whitespace-nowrap border-l border-gray-100">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">

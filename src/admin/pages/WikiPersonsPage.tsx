@@ -791,12 +791,12 @@ export function WikiPersonsPage() {
                   <th className="px-3 py-3 hidden sm:table-cell">Type</th>
                   <th className="px-3 py-3 hidden md:table-cell">Statut</th>
                   <th className="px-3 py-3 hidden lg:table-cell">Défis</th>
-                  <th className="px-3 py-3 text-right w-24">Actions</th>
+                  <th className="sticky right-0 bg-gray-50 px-3 py-3 text-right w-24 border-l border-gray-100">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {persons.map((person) => (
-                  <tr key={person.id} className="hover:bg-gray-50">
+                  <tr key={person.id} className="hover:bg-gray-50 group">
                     <td className="px-3 py-3 w-20">
                       {person.photo_url ? (
                         <img
@@ -860,7 +860,7 @@ export function WikiPersonsPage() {
                       </span>
                     </td>
                     <td className="px-3 py-3 text-sm text-gray-600 hidden lg:table-cell">{person.used_dates.length}</td>
-                    <td className="px-3 py-3 w-24">
+                    <td className="sticky right-0 bg-white group-hover:bg-gray-50 transition-colors px-3 py-3 w-24 border-l border-gray-100 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
                       <div className="flex justify-end items-center gap-1 whitespace-nowrap">
                         <button onClick={() => setModal({ type: 'edit', person })} className="p-2 sm:p-1.5 bg-indigo-50 text-indigo-600 sm:bg-transparent sm:text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Pencil size={14} /></button>
                         <button onClick={() => setModal({ type: 'delete', person })} className="p-2 sm:p-1.5 bg-red-50 text-red-600 sm:bg-transparent sm:text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14} /></button>
