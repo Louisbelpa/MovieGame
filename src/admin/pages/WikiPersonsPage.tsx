@@ -823,37 +823,41 @@ export function WikiPersonsPage() {
           <div className="h-36 flex items-center justify-center text-sm text-gray-400">Aucune personnalité trouvée.</div>
         ) : (
           <div>
-            <table className="w-full min-w-[400px]">
+            <table className="w-full min-w-[400px] table-fixed">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  <th className="px-3 py-3">Photo</th>
+                  <th className="px-3 py-3 w-20"></th>
                   <th className="px-3 py-3">Nom</th>
                   <th className="px-3 py-3 hidden sm:table-cell">Type</th>
                   <th className="px-3 py-3 hidden md:table-cell">Statut</th>
                   <th className="px-3 py-3 hidden lg:table-cell">Défis</th>
-                  <th className="px-3 py-3 text-right">Actions</th>
+                  <th className="px-3 py-3 text-right w-24">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {persons.map((person) => (
                   <tr key={person.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-3 w-20">
                       {person.photo_url ? (
                         <img
                           src={person.photo_url}
                           alt={person.name}
-                          className="h-12 w-12 rounded-lg object-cover border border-gray-200"
+                          className="h-10 w-16 rounded-md object-cover border border-gray-200"
                           onError={(e) => { e.currentTarget.style.display = 'none' }}
                         />
                       ) : (
-                        <div className="h-12 w-12 rounded-lg bg-gray-100 border border-gray-200" />
+                        <div className="h-10 w-16 rounded-md bg-gray-100 border border-gray-200" />
                       )}
                     </td>
                     <td className="px-3 py-3">
-                      <div className="font-medium text-sm text-gray-900">{person.name}</div>
-                      <div className="text-xs text-gray-400 flex items-center gap-1.5">
-                        {person.wikipedia_slug}
-                        {person.wikipedia_url && <a href={person.wikipedia_url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-700"><ExternalLink size={12} /></a>}
+                      <div className="flex flex-col gap-0.5">
+                        <div className="font-medium text-sm text-gray-900 truncate max-w-[170px] sm:max-w-[220px]">
+                          {person.name}
+                        </div>
+                        <div className="text-xs text-gray-400 flex items-center gap-1.5 min-w-0">
+                          <span className="truncate">{person.wikipedia_slug}</span>
+                          {person.wikipedia_url && <a href={person.wikipedia_url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-700 flex-shrink-0"><ExternalLink size={12} /></a>}
+                        </div>
                       </div>
                     </td>
                     <td className="px-3 py-3 text-sm text-gray-600 hidden sm:table-cell">
@@ -875,8 +879,8 @@ export function WikiPersonsPage() {
                       </span>
                     </td>
                     <td className="px-3 py-3 text-sm text-gray-600 hidden lg:table-cell">{person.used_dates.length}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex justify-end items-center gap-1">
+                    <td className="px-3 py-3 w-24">
+                      <div className="flex justify-end items-center gap-1 whitespace-nowrap">
                         <button onClick={() => setModal({ type: 'edit', person })} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Pencil size={14} /></button>
                         <button onClick={() => setModal({ type: 'delete', person })} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={14} /></button>
                       </div>
