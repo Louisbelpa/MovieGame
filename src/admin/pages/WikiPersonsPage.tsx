@@ -822,68 +822,70 @@ export function WikiPersonsPage() {
         ) : persons.length === 0 ? (
           <div className="h-36 flex items-center justify-center text-sm text-gray-400">Aucune personnalité trouvée.</div>
         ) : (
-          <table className="w-full min-w-[700px]">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                <th className="px-3 py-3">Photo</th>
-                <th className="px-3 py-3">Nom</th>
-                <th className="px-3 py-3">Type</th>
-                <th className="px-3 py-3">Statut</th>
-                <th className="px-3 py-3">Défis</th>
-                <th className="px-3 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {persons.map((person) => (
-                <tr key={person.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-3">
-                    {person.photo_url ? (
-                      <img
-                        src={person.photo_url}
-                        alt={person.name}
-                        className="h-12 w-12 rounded-lg object-cover border border-gray-200"
-                        onError={(e) => { e.currentTarget.style.display = 'none' }}
-                      />
-                    ) : (
-                      <div className="h-12 w-12 rounded-lg bg-gray-100 border border-gray-200" />
-                    )}
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="font-medium text-sm text-gray-900">{person.name}</div>
-                    <div className="text-xs text-gray-400 flex items-center gap-1.5">
-                      {person.wikipedia_slug}
-                      {person.wikipedia_url && <a href={person.wikipedia_url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-700"><ExternalLink size={12} /></a>}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-sm text-gray-600">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                      person.person_type === 'politician'
-                        ? 'bg-indigo-100 text-indigo-700'
-                        : person.person_type === 'sportsperson'
-                          ? 'bg-violet-100 text-violet-700'
-                          : 'bg-slate-100 text-slate-700'
-                    }`}>
-                      {personTypeLabel(person.person_type)}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-sm">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                      person.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {person.is_active ? 'Actif' : 'Inactif'}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-sm text-gray-600">{person.used_dates.length}</td>
-                  <td className="px-3 py-3">
-                    <div className="flex justify-end items-center gap-1">
-                      <button onClick={() => setModal({ type: 'edit', person })} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Pencil size={14} /></button>
-                      <button onClick={() => setModal({ type: 'delete', person })} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={14} /></button>
-                    </div>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[700px]">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-3">Photo</th>
+                  <th className="px-3 py-3">Nom</th>
+                  <th className="px-3 py-3">Type</th>
+                  <th className="px-3 py-3">Statut</th>
+                  <th className="px-3 py-3">Défis</th>
+                  <th className="px-3 py-3 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {persons.map((person) => (
+                  <tr key={person.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-3">
+                      {person.photo_url ? (
+                        <img
+                          src={person.photo_url}
+                          alt={person.name}
+                          className="h-12 w-12 rounded-lg object-cover border border-gray-200"
+                          onError={(e) => { e.currentTarget.style.display = 'none' }}
+                        />
+                      ) : (
+                        <div className="h-12 w-12 rounded-lg bg-gray-100 border border-gray-200" />
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="font-medium text-sm text-gray-900">{person.name}</div>
+                      <div className="text-xs text-gray-400 flex items-center gap-1.5">
+                        {person.wikipedia_slug}
+                        {person.wikipedia_url && <a href={person.wikipedia_url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-700"><ExternalLink size={12} /></a>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-sm text-gray-600">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        person.person_type === 'politician'
+                          ? 'bg-indigo-100 text-indigo-700'
+                          : person.person_type === 'sportsperson'
+                            ? 'bg-violet-100 text-violet-700'
+                            : 'bg-slate-100 text-slate-700'
+                      }`}>
+                        {personTypeLabel(person.person_type)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-sm">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        person.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {person.is_active ? 'Actif' : 'Inactif'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-sm text-gray-600">{person.used_dates.length}</td>
+                    <td className="px-3 py-3">
+                      <div className="flex justify-end items-center gap-1">
+                        <button onClick={() => setModal({ type: 'edit', person })} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Pencil size={14} /></button>
+                        <button onClick={() => setModal({ type: 'delete', person })} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={14} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
