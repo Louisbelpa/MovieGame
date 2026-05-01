@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Search, X, WandSparkles, ExternalLink, Trash2, Pencil, Shuffle } from 'lucide-react'
+import { Plus, Search, X, WandSparkles, ExternalLink, Trash2, Pencil, Shuffle, History } from 'lucide-react'
 import {
   getWikiPersons,
   createWikiPerson,
@@ -667,7 +667,9 @@ function WikiPersonForm({
             <img
               src={photoUrl}
               alt="Aperçu"
-              className="mt-2 h-24 w-24 rounded-lg object-cover border border-gray-200"
+              className="mt-2 h-24 w-24 rounded-lg object-cover object-top border border-gray-200"
+              crossOrigin="anonymous"
+              referrerPolicy="no-referrer"
               onError={(e) => { e.currentTarget.style.display = 'none' }}
             />
           )}
@@ -800,7 +802,9 @@ export function WikiPersonsPage() {
                         <img
                           src={person.photo_url}
                           alt={person.name}
-                          className="h-10 w-16 rounded-md object-cover border border-gray-200"
+                          className="h-10 w-16 rounded-md object-cover object-top border border-gray-200"
+                          crossOrigin="anonymous"
+                          referrerPolicy="no-referrer"
                           onError={(e) => { e.currentTarget.style.display = 'none' }}
                         />
                       ) : (
@@ -816,6 +820,25 @@ export function WikiPersonsPage() {
                           <span className="truncate">{person.wikipedia_slug}</span>
                           {person.wikipedia_url && <a href={person.wikipedia_url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-700 flex-shrink-0"><ExternalLink size={12} /></a>}
                         </div>
+                        {(() => {
+                          const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
+                          const past = (person.used_dates ?? []).filter((d) => d <= today)
+                          const upcoming = (person.used_dates ?? []).filter((d) => d > today)
+                          return (
+                            <div className="flex flex-wrap gap-1 mt-0.5">
+                              {past.length > 0 && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-emerald-100 text-emerald-700">
+                                  <History size={9} />Joué {past.length}×
+                                </span>
+                              )}
+                              {upcoming.length > 0 && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-blue-100 text-blue-700">
+                                  Planifié
+                                </span>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </div>
                     </td>
                     <td className="px-3 py-3 text-sm text-gray-600 hidden sm:table-cell">
@@ -839,8 +862,8 @@ export function WikiPersonsPage() {
                     <td className="px-3 py-3 text-sm text-gray-600 hidden lg:table-cell">{person.used_dates.length}</td>
                     <td className="px-3 py-3 w-24">
                       <div className="flex justify-end items-center gap-1 whitespace-nowrap">
-                        <button onClick={() => setModal({ type: 'edit', person })} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Pencil size={14} /></button>
-                        <button onClick={() => setModal({ type: 'delete', person })} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={14} /></button>
+                        <button onClick={() => setModal({ type: 'edit', person })} className="p-2 sm:p-1.5 bg-indigo-50 text-indigo-600 sm:bg-transparent sm:text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Pencil size={14} /></button>
+                        <button onClick={() => setModal({ type: 'delete', person })} className="p-2 sm:p-1.5 bg-red-50 text-red-600 sm:bg-transparent sm:text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14} /></button>
                       </div>
                     </td>
                   </tr>

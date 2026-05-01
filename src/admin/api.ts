@@ -725,14 +725,14 @@ export async function getAnalyticsOverview(): Promise<AnalyticsOverview> {
   return request<AnalyticsOverview>('/api/admin/analytics/overview')
 }
 
-export async function getAnalyticsOverviewByMedia(mediaType?: 'film' | 'series'): Promise<AnalyticsOverview> {
+export async function getAnalyticsOverviewByMedia(mediaType?: 'film' | 'series' | 'wiki'): Promise<AnalyticsOverview> {
   const params = new URLSearchParams()
   if (mediaType) params.set('mediaType', mediaType)
   const qs = params.toString()
   return request<AnalyticsOverview>(`/api/admin/analytics/overview${qs ? `?${qs}` : ''}`)
 }
 
-export async function getAnalyticsDaily(from: string, to: string, mediaType?: 'film' | 'series'): Promise<DailyAnalytics[]> {
+export async function getAnalyticsDaily(from: string, to: string, mediaType?: 'film' | 'series' | 'wiki'): Promise<DailyAnalytics[]> {
   const params = new URLSearchParams({ from, to })
   if (mediaType) params.set('mediaType', mediaType)
   return request<DailyAnalytics[]>(`/api/admin/analytics/daily?${params}`)
@@ -757,7 +757,7 @@ export async function getAnalyticsSeries(
 }
 
 export async function getAnalyticsChallenges(
-  mediaType: 'film' | 'series',
+  mediaType: 'film' | 'series' | 'wiki',
   sort?: 'win_rate' | 'sessions' | 'avg_hints'
 ): Promise<ChallengeAnalytics[]> {
   const params = new URLSearchParams({ mediaType })
@@ -778,7 +778,7 @@ export async function getReturningPlayers(days?: number): Promise<ReturningPlaye
   return request<ReturningPlayer[]>(`/api/admin/analytics/returning-players${qs ? `?${qs}` : ''}`)
 }
 
-export async function getReturningPlayersByMedia(days?: number, mediaType?: 'film' | 'series'): Promise<ReturningPlayer[]> {
+export async function getReturningPlayersByMedia(days?: number, mediaType?: 'film' | 'series' | 'wiki'): Promise<ReturningPlayer[]> {
   const params = new URLSearchParams()
   if (days !== undefined) params.set('days', String(days))
   if (mediaType) params.set('mediaType', mediaType)
@@ -786,21 +786,21 @@ export async function getReturningPlayersByMedia(days?: number, mediaType?: 'fil
   return request<ReturningPlayer[]>(`/api/admin/analytics/returning-players${qs ? `?${qs}` : ''}`)
 }
 
-export async function getHourlyDistribution(mediaType?: 'film' | 'series'): Promise<HourlyData[]> {
+export async function getHourlyDistribution(mediaType?: 'film' | 'series' | 'wiki'): Promise<HourlyData[]> {
   const params = new URLSearchParams()
   if (mediaType) params.set('mediaType', mediaType)
   const qs = params.toString()
   return request<HourlyData[]>(`/api/admin/analytics/hourly${qs ? `?${qs}` : ''}`)
 }
 
-export async function getAttemptsDistribution(mediaType?: 'film' | 'series'): Promise<Record<string, number>> {
+export async function getAttemptsDistribution(mediaType?: 'film' | 'series' | 'wiki'): Promise<Record<string, number>> {
   const params = new URLSearchParams()
   if (mediaType) params.set('mediaType', mediaType)
   const qs = params.toString()
   return request<Record<string, number>>(`/api/admin/analytics/attempts-distribution${qs ? `?${qs}` : ''}`)
 }
 
-export async function getHintsDistribution(mediaType?: 'film' | 'series'): Promise<Record<string, number>> {
+export async function getHintsDistribution(mediaType?: 'film' | 'series' | 'wiki'): Promise<Record<string, number>> {
   const params = new URLSearchParams()
   if (mediaType) params.set('mediaType', mediaType)
   const qs = params.toString()

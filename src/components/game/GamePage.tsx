@@ -271,12 +271,7 @@ export function GamePage() {
           )}
 
           {/* Guess history */}
-          <section>
-            <h3 className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-2">
-              Tentatives
-            </h3>
-            <GuessList guesses={guesses} maxAttempts={challenge.maxAttempts} />
-          </section>
+          <GuessList guesses={guesses} maxAttempts={challenge.maxAttempts} />
         </motion.main>
       )}
     </AnimatePresence>

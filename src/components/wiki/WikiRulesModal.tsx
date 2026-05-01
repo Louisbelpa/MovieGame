@@ -58,8 +58,26 @@ export function WikiRulesModal() {
             <div className="flex items-start gap-3 p-3 rounded-lg film-border">
               <CheckCircle2 size={16} className="text-film-gold mt-0.5 shrink-0" />
               <div>
-                <p className="font-medium">Vous avez {3} tentatives</p>
+                <p className="font-medium">Vous avez 3 tentatives</p>
                 <p className="text-film-text-dim text-xs mt-0.5">Entrez le nom de la personnalité ou choisissez dans l'autocomplétion. Vous pouvez passer une tentative pour débloquer un indice.</p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg film-border">
+              <p className="font-medium text-xs mb-2">Signification des pastilles</p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="flex items-center gap-1.5 text-xs">
+                  <span className="w-5 h-5 rounded-full bg-film-green flex items-center justify-center text-film-black font-bold text-[10px]">✓</span>
+                  <span className="text-film-text">Correct</span>
+                </span>
+                <span className="flex items-center gap-1.5 text-xs">
+                  <span className="w-5 h-5 rounded-full bg-film-red flex items-center justify-center text-white font-bold text-[10px]">✗</span>
+                  <span className="text-film-text">Incorrect</span>
+                </span>
+                <span className="flex items-center gap-1.5 text-xs">
+                  <span className="w-5 h-5 rounded-full bg-film-border/60 flex items-center justify-center text-film-text-dim text-[10px]">→</span>
+                  <span className="text-film-text">Passé</span>
+                </span>
               </div>
             </div>
           </div>

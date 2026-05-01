@@ -50,7 +50,7 @@ export function WikiWinModal() {
         {/* Person reveal card (article-like) */}
         <div className="w-full film-border rounded-xl overflow-hidden bg-film-black/40">
           {result.photoUrl && (
-            <img src={result.photoUrl} alt={result.name}
+            <img src={result.photoUrl} alt={result.name} crossOrigin="anonymous" referrerPolicy="no-referrer"
               className="w-full h-40 object-cover object-top" />
           )}
           <div className="p-3 text-left">

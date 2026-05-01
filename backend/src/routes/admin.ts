@@ -2048,7 +2048,7 @@ adminRouter.get(
   '/analytics/overview',
   (req: Request, res: Response, next: NextFunction) => {
     try {
-      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : req.query.mediaType === 'wiki' ? 'wiki' : null;
       const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
       const whereClause = mediaType ? `WHERE dc.media_type = ?` : '';
       const overview = db.prepare(`
@@ -2170,7 +2170,7 @@ adminRouter.get(
 
       const from = parseDateParam(req.query.from) ?? defaultFrom;
       const to = parseDateParam(req.query.to) ?? defaultTo;
-      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : req.query.mediaType === 'wiki' ? 'wiki' : null;
       const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
       const mediaWhere = mediaType ? `AND dc.media_type = ?` : '';
 
@@ -2222,7 +2222,7 @@ adminRouter.get(
   '/analytics/attempts-distribution',
   (req: Request, res: Response, next: NextFunction) => {
     try {
-      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : req.query.mediaType === 'wiki' ? 'wiki' : null;
       const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
       const whereMedia = mediaType ? `AND dc.media_type = ?` : '';
       const rows = db.prepare(`
@@ -2251,7 +2251,7 @@ adminRouter.get(
   '/analytics/hints-distribution',
   (req: Request, res: Response, next: NextFunction) => {
     try {
-      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : req.query.mediaType === 'wiki' ? 'wiki' : null;
       const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
       const whereMedia = mediaType ? `WHERE dc.media_type = ?` : '';
       const rows = db.prepare(`
@@ -2359,7 +2359,7 @@ adminRouter.get(
   '/analytics/hourly',
   (req: Request, res: Response, next: NextFunction) => {
     try {
-      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : req.query.mediaType === 'wiki' ? 'wiki' : null;
       const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
       const whereClause = mediaType ? `WHERE dc.media_type = ?` : '';
       const rows = db.prepare(`
@@ -2532,7 +2532,8 @@ adminRouter.get(
   '/analytics/challenges',
   (req: Request, res: Response, next: NextFunction) => {
     try {
-      const mediaType = req.query.mediaType === 'series' ? 'series' : 'film';
+      const rawMediaType = req.query.mediaType;
+      const mediaType = rawMediaType === 'series' ? 'series' : rawMediaType === 'wiki' ? 'wiki' : 'film';
       const sortParam = req.query.sort as string | undefined;
       const validSorts = ['win_rate', 'sessions', 'avg_hints'] as const;
       type SortOption = typeof validSorts[number];
@@ -2550,15 +2551,21 @@ adminRouter.get(
       const mediaJoin =
         mediaType === 'series'
           ? `JOIN series m ON m.id = dc.series_id`
+          : mediaType === 'wiki'
+          ? `JOIN wiki_persons m ON m.id = dc.wiki_person_id`
           : `JOIN films m ON m.id = dc.film_id`;
+
+      const titleCol = mediaType === 'wiki' ? `m.name` : `m.title`;
+      const yearCol = mediaType === 'wiki' ? `0` : `m.year`;
+      const fameCol = mediaType === 'wiki' ? `m.difficulty` : `m.fame_level`;
 
       const rows = db.prepare(`
         SELECT
           dc.id AS challenge_id,
           dc.challenge_date,
-          m.title AS title,
-          m.year AS year,
-          m.fame_level,
+          ${titleCol} AS title,
+          ${yearCol} AS year,
+          ${fameCol} AS fame_level,
           COUNT(gs.rowid) AS sessions,
           ROUND(100.0 * SUM(CASE WHEN gs.outcome = 'won' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN gs.outcome IS NOT NULL THEN 1 ELSE 0 END), 0)) AS win_rate,
           ROUND(AVG(CASE WHEN gs.outcome IS NOT NULL THEN json_array_length(gs.attempts) ELSE NULL END), 1) AS avg_attempts,
@@ -3202,7 +3209,7 @@ adminRouter.get(
     try {
       const daysParam = parseInt((req.query.days as string | undefined) ?? '0', 10);
       const useDaysFilter = !isNaN(daysParam) && daysParam > 0;
-      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : null;
+      const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : req.query.mediaType === 'wiki' ? 'wiki' : null;
       const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
       const whereMedia = mediaType ? `dc.media_type = '${mediaType}'` : '';
       const whereDays = useDaysFilter ? `gs.started_at >= date('now', '-' || ${daysParam} || ' days')` : '';

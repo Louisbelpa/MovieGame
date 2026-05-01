@@ -1,18 +1,24 @@
 import type { ReactNode } from 'react'
-import { Film, Tv, Sparkles, Eye, Keyboard, Lightbulb, Landmark } from 'lucide-react'
+import { Film, Tv, Sparkles, Eye, Keyboard, Lightbulb, Landmark, BookOpen } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Footer } from '@/components/layout/Footer'
 import { FEATURES, BRAND_NAME } from '@/config/features'
 
+type IconPhase = 'film' | 'tv' | 'wiki'
 
 export function HomePage() {
-  const [showTvIcon, setShowTvIcon] = useState(false)
+  const [iconPhase, setIconPhase] = useState<IconPhase>('film')
 
   useEffect(() => {
-    if (!FEATURES.enableSeries) return
+    const modes: IconPhase[] = FEATURES.enableWiki
+      ? (FEATURES.enableSeries ? ['film', 'tv', 'wiki'] : ['film', 'wiki'])
+      : (FEATURES.enableSeries ? ['film', 'tv'] : ['film'])
+    if (modes.length < 2) return
+    let i = 0
     const id = window.setInterval(() => {
-      setShowTvIcon((prev) => !prev)
+      i = (i + 1) % modes.length
+      setIconPhase(modes[i])
     }, 2800)
     return () => window.clearInterval(id)
   }, [])
@@ -38,40 +44,17 @@ export function HomePage() {
           <div className="inline-flex items-center gap-2 sm:gap-2.5 mb-3">
             <span className="relative w-6 h-6 inline-flex items-center justify-center" aria-hidden>
               <AnimatePresence mode="wait">
-                {FEATURES.enableSeries ? (
-                  showTvIcon ? (
-                    <motion.span
-                      key="tv"
-                      initial={{ y: 10, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      exit={{ y: -10, opacity: 0 }}
-                      transition={{ duration: 0.35, ease: 'easeOut' }}
-                      className="absolute inset-0 inline-flex items-center justify-center text-film-gold"
-                    >
-                      <Tv size={20} />
-                    </motion.span>
-                  ) : (
-                    <motion.span
-                      key="film"
-                      initial={{ y: 10, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      exit={{ y: -10, opacity: 0 }}
-                      transition={{ duration: 0.35, ease: 'easeOut' }}
-                      className="absolute inset-0 inline-flex items-center justify-center text-film-gold"
-                    >
-                      <Film size={20} />
-                    </motion.span>
-                  )
-                ) : (
-                  <motion.span
-                    key="film-static"
-                    initial={{ opacity: 1 }}
-                    animate={{ opacity: 1 }}
-                    className="absolute inset-0 inline-flex items-center justify-center text-film-gold"
-                  >
-                    <Film size={20} />
-                  </motion.span>
-                )}
+                <motion.span
+                  key={iconPhase}
+                  initial={{ y: 10, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: -10, opacity: 0 }}
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                  className="absolute inset-0 inline-flex items-center justify-center"
+                  style={{ color: iconPhase === 'wiki' ? '#c4b5fd' : 'var(--film-gold, #f5c542)' }}
+                >
+                  {iconPhase === 'tv' ? <Tv size={20} /> : iconPhase === 'wiki' ? <BookOpen size={20} /> : <Film size={20} />}
+                </motion.span>
               </AnimatePresence>
             </span>
 
@@ -80,10 +63,16 @@ export function HomePage() {
             </h1>
           </div>
           <p className="text-film-text-dim text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
-            Devinez le film ou la série du jour.
+            {FEATURES.enableWiki
+              ? 'Devinez le film, la série ou la personnalité du jour.'
+              : FEATURES.enableSeries
+                ? 'Devinez le film ou la série du jour.'
+                : 'Devinez le film du jour.'}
           </p>
           <p className="text-film-text-dim text-sm sm:text-base max-w-xl mx-auto leading-relaxed mt-1">
-            Une image, 5 tentatives, des indices qui se débloquent à chaque erreur.
+            {FEATURES.enableWiki
+              ? 'Des indices progressifs se débloquent à chaque erreur. Trois modes de jeu, un défi par jour.'
+              : 'Une image, 5 tentatives, des indices qui se débloquent à chaque erreur.'}
           </p>
         </div>
 
@@ -171,13 +160,13 @@ export function HomePage() {
           <div className="grid sm:grid-cols-3 gap-3">
             <HowToCard
               icon={<Eye size={15} className="text-film-gold" />}
-              title="1. Observez l'image"
-              description="Regardez l'image du jour et repérez les détails utiles."
+              title="1. Observez les indices"
+              description={FEATURES.enableWiki ? "Une image (films/séries) ou un profil (Wikipedia) s'affiche." : "Regardez l'image du jour et repérez les détails utiles."}
             />
             <HowToCard
               icon={<Keyboard size={15} className="text-film-gold" />}
               title="2. Faites une proposition"
-              description="Entrez un titre de film ou de série. Vous avez 5 tentatives."
+              description={FEATURES.enableWiki ? "Entrez un titre ou un nom. Chaque mode a son propre compteur de tentatives." : "Entrez un titre de film ou de série. Vous avez 5 tentatives."}
             />
             <HowToCard
               icon={<Lightbulb size={15} className="text-film-gold" />}

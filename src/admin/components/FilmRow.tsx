@@ -103,16 +103,16 @@ export function FilmRow({ film, onEdit, onDelete, onBackdrops, onUpload }: FilmR
       <td className="px-3 py-3 text-right">
         <div className="flex items-center justify-end gap-1">
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-          <button onClick={() => fileInputRef.current?.click()} title="Uploader une image" className="p-1.5 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors">
+          <button onClick={() => fileInputRef.current?.click()} title="Uploader une image" className="p-2 sm:p-1.5 bg-teal-50 text-teal-600 sm:bg-transparent sm:text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors">
             <Upload size={14} />
           </button>
-          <button onClick={() => onBackdrops(film)} title="Backdrops TMDB" className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors">
+          <button onClick={() => onBackdrops(film)} title="Backdrops TMDB" className="p-2 sm:p-1.5 bg-amber-50 text-amber-600 sm:bg-transparent sm:text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors">
             <Images size={14} />
           </button>
-          <button onClick={() => onEdit(film)} title="Modifier" className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
+          <button onClick={() => onEdit(film)} title="Modifier" className="p-2 sm:p-1.5 bg-indigo-50 text-indigo-600 sm:bg-transparent sm:text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
             <Pencil size={14} />
           </button>
-          <button onClick={() => onDelete(film)} title="Supprimer" className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+          <button onClick={() => onDelete(film)} title="Supprimer" className="p-2 sm:p-1.5 bg-red-50 text-red-600 sm:bg-transparent sm:text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
             <Trash2 size={14} />
           </button>
         </div>

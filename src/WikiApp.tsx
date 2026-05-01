@@ -8,6 +8,8 @@ import { WikiGamePage } from '@/components/wiki/WikiGamePage'
 import { WikiWinModal } from '@/components/wiki/WikiWinModal'
 import { WikiLoseModal } from '@/components/wiki/WikiLoseModal'
 import { WikiRulesModal } from '@/components/wiki/WikiRulesModal'
+import { WikiStatsModal } from '@/components/wiki/WikiStatsModal'
+import { WikiArchiveModal } from '@/components/wiki/WikiArchiveModal'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { useWikiStore } from '@/store/wikiStore'
@@ -43,6 +45,8 @@ export function WikiApp() {
         </>
       )}
       <WikiRulesModal />
+      <WikiStatsModal />
+      <WikiArchiveModal />
     </div>
   )
 }

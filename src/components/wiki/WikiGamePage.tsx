@@ -1,7 +1,6 @@
 /**
  * wiki/WikiGamePage.tsx
  * Main game view for the Wikipedia person-guessing game.
- * No movie image — hints are the primary content.
  */
 
 import { useEffect, useCallback, useRef } from 'react'
@@ -21,14 +20,10 @@ import {
   getTodayParis,
 } from '@/store/wikiStore'
 
-// ─── Date helpers ─────────────────────────────────────────────────────────────
-
 function formatDateFr(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00Z')
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
 }
-
-// ─── DateNavBar ───────────────────────────────────────────────────────────────
 
 function DateNavBar({ directionRef }: { directionRef: React.MutableRefObject<'prev' | 'next'> }) {
   const viewingDate = useWikiStore((s) => s.viewingDate)
@@ -58,7 +53,6 @@ function DateNavBar({ directionRef }: { directionRef: React.MutableRefObject<'pr
           title={!hasPrev ? 'Pas de défi antérieur' : 'Défi précédent'}>
           <ChevronLeft size={18} />
         </button>
-
         <div className="flex items-center gap-2 text-sm">
           <Calendar size={13} className="text-film-text-dim" />
           {isToday ? (
@@ -74,7 +68,6 @@ function DateNavBar({ directionRef }: { directionRef: React.MutableRefObject<'pr
             </span>
           )}
         </div>
-
         <button onClick={goForward} disabled={isToday || isLoading || !hasNext}
           className="p-1.5 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
           title={isToday ? "C'est le défi du jour" : !hasNext ? 'Pas de défi suivant' : 'Défi suivant'}>
@@ -89,8 +82,6 @@ function DateNavBar({ directionRef }: { directionRef: React.MutableRefObject<'pr
     </div>
   )
 }
-
-// ─── WikiGamePage ─────────────────────────────────────────────────────────────
 
 export function WikiGamePage() {
   const initGame = useWikiStore((s) => s.initGame)
@@ -145,9 +136,20 @@ export function WikiGamePage() {
 
           <DateNavBar directionRef={directionRef} />
 
+          {/* Profile + hints — primary content */}
+          {(currentHints.length > 0 || challenge.hintsAvailable > 0) && (
+            <WikiHintPanel
+              photoUrl={challenge.photoUrl}
+              profile={challenge.profile}
+              hints={currentHints}
+              hintsAvailable={challenge.hintsAvailable}
+              hintsRevealed={hintsRevealed}
+            />
+          )}
+
           {/* Attempt tracker + input */}
           {!isGameOver && (
-            <section className="flex flex-col gap-3 order-1 md:order-2 sticky bottom-2 z-20 rounded-xl border border-film-border bg-film-black/90 backdrop-blur p-2">
+            <section className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <AttemptTracker guesses={guesses} maxAttempts={challenge.maxAttempts} />
                 <span className="text-xs text-film-text-dim font-mono">
@@ -163,19 +165,6 @@ export function WikiGamePage() {
             </section>
           )}
 
-          {/* Hints — primary content, shown prominently */}
-          {(currentHints.length > 0 || challenge.hintsAvailable > 0) && (
-            <div className="order-2 md:order-1">
-              <WikiHintPanel
-                photoUrl={challenge.photoUrl}
-                profile={challenge.profile}
-                hints={currentHints}
-                hintsAvailable={challenge.hintsAvailable}
-                hintsRevealed={hintsRevealed}
-              />
-            </div>
-          )}
-
           {/* Game over recap */}
           {isGameOver && (
             <div className={`flex items-center justify-between gap-2 py-2.5 px-4 rounded-lg text-sm font-semibold
@@ -184,7 +173,7 @@ export function WikiGamePage() {
                 : 'bg-film-red/10 border border-film-red/30 text-film-red'}`}>
               <span>
                 {status === 'won'
-                  ? `Bravo ! Trouvé en ${guesses.findIndex(g => g.status === 'correct') + 1}/${challenge.maxAttempts}`
+                  ? `Bravo ! Trouvé en ${guesses.findIndex(g => g.status === 'correct') + 1}/${challenge.maxAttempts}`
                   : 'Pas cette fois…'}
               </span>
               {result?.name && (
@@ -203,12 +192,7 @@ export function WikiGamePage() {
           )}
 
           {/* Guess history */}
-          <section>
-            <h3 className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-2">
-              Tentatives
-            </h3>
-            <GuessList guesses={guesses} maxAttempts={challenge.maxAttempts} />
-          </section>
+          <GuessList guesses={guesses} maxAttempts={challenge.maxAttempts} />
         </motion.main>
       )}
     </AnimatePresence>
