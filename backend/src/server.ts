@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { challengeRouter } from './routes/challenge.js';
+import { wikiChallengeRouter } from './routes/wiki-challenge.js';
 import { filmsRouter } from './routes/films.js';
 import { seriesRouter } from './routes/series.js';
 import { statsRouter } from './routes/stats.js';
@@ -102,6 +103,7 @@ app.use(express.static(path.join(__dirname, '../public')));
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 app.use('/api/challenge', challengeRouter);
+app.use('/api/wiki', wikiChallengeRouter);
 app.use('/api/films', filmsRouter);
 app.use('/api/series', seriesRouter);
 app.use('/api/stats', statsRouter);

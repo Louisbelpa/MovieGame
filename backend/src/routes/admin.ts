@@ -2792,6 +2792,124 @@ adminRouter.get(
   }
 );
 
+// ─── Wiki Persons CRUD ────────────────────────────────────────────────────────
+
+// GET /api/admin/wiki-persons
+adminRouter.get('/wiki-persons', adminAuth, adminLimiter, (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const page = Math.max(1, parseInt((req.query.page as string) ?? '1', 10))
+    const limit = Math.min(100, parseInt((req.query.limit as string) ?? '50', 10))
+    const offset = (page - 1) * limit
+    const search = (req.query.q as string) ?? ''
+
+    const where = search ? `WHERE name_lower LIKE '%' || lower(?) || '%'` : ''
+    const params = search ? [search, limit, offset] : [limit, offset]
+
+    const rows = db.prepare(`
+      SELECT wp.*,
+        GROUP_CONCAT(DISTINCT date(dc.challenge_date)) AS used_dates
+      FROM wiki_persons wp
+      LEFT JOIN daily_challenges dc ON dc.wiki_person_id = wp.id
+      ${where}
+      GROUP BY wp.id
+      ORDER BY wp.created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(...params)
+
+    const total = (db.prepare(`SELECT COUNT(*) AS n FROM wiki_persons ${where}`)
+      .get(...(search ? [search] : [])) as { n: number }).n
+
+    res.json({ data: rows, total, page, limit })
+  } catch (err) { next(err) }
+})
+
+// POST /api/admin/wiki-persons
+adminRouter.post('/wiki-persons', adminAuth, adminLimiter, (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const {
+      name, name_aliases = '[]', person_type = 'politician',
+      wikipedia_slug, infobox_data = '{}', hint_schedule = '[]',
+      photo_url, extract, wikipedia_url, difficulty = 3,
+    } = req.body as Record<string, string | number>
+
+    if (!name || !wikipedia_slug) {
+      res.status(400).json({ error: 'name and wikipedia_slug are required.' }); return
+    }
+
+    const result = db.prepare(`
+      INSERT INTO wiki_persons (name, name_aliases, person_type, wikipedia_slug, infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(name, name_aliases, person_type, wikipedia_slug,
+       typeof infobox_data === 'string' ? infobox_data : JSON.stringify(infobox_data),
+       typeof hint_schedule === 'string' ? hint_schedule : JSON.stringify(hint_schedule),
+       photo_url || null, extract || null, wikipedia_url || null, difficulty)
+
+    logAuditEvent('wiki_person_created', { id: result.lastInsertRowid, name })
+    res.status(201).json({ id: result.lastInsertRowid })
+  } catch (err) { next(err) }
+})
+
+// PUT /api/admin/wiki-persons/:id
+adminRouter.put('/wiki-persons/:id', adminAuth, adminLimiter, (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id, 10)
+    const {
+      name, name_aliases, person_type, wikipedia_slug,
+      infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty, is_active,
+    } = req.body as Record<string, string | number>
+
+    db.prepare(`
+      UPDATE wiki_persons SET
+        name = COALESCE(?, name),
+        name_aliases = COALESCE(?, name_aliases),
+        person_type = COALESCE(?, person_type),
+        wikipedia_slug = COALESCE(?, wikipedia_slug),
+        infobox_data = COALESCE(?, infobox_data),
+        hint_schedule = COALESCE(?, hint_schedule),
+        photo_url = COALESCE(?, photo_url),
+        extract = COALESCE(?, extract),
+        wikipedia_url = COALESCE(?, wikipedia_url),
+        difficulty = COALESCE(?, difficulty),
+        is_active = COALESCE(?, is_active),
+        updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+      WHERE id = ?
+    `).run(
+      name || null, name_aliases || null, person_type || null, wikipedia_slug || null,
+      infobox_data ? (typeof infobox_data === 'string' ? infobox_data : JSON.stringify(infobox_data)) : null,
+      hint_schedule ? (typeof hint_schedule === 'string' ? hint_schedule : JSON.stringify(hint_schedule)) : null,
+      photo_url !== undefined ? (photo_url || null) : null,
+      extract !== undefined ? (extract || null) : null,
+      wikipedia_url !== undefined ? (wikipedia_url || null) : null,
+      difficulty || null, is_active !== undefined ? is_active : null,
+      id
+    )
+
+    logAuditEvent('wiki_person_updated', { id })
+    res.json({ ok: true })
+  } catch (err) { next(err) }
+})
+
+// DELETE /api/admin/wiki-persons/:id
+adminRouter.delete('/wiki-persons/:id', adminAuth, adminLimiter, (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = parseInt(req.params.id, 10)
+    db.prepare(`UPDATE wiki_persons SET is_active = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?`).run(id)
+    logAuditEvent('wiki_person_deleted', { id })
+    res.json({ ok: true })
+  } catch (err) { next(err) }
+})
+
+// POST /api/admin/wiki-persons/fetch-wikipedia
+adminRouter.post('/wiki-persons/fetch-wikipedia', adminAuth, adminLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { slug, lang = 'fr' } = req.body as { slug?: string; lang?: string }
+    if (!slug) { res.status(400).json({ error: 'slug is required.' }); return }
+    const { fetchWikipediaData } = await import('../lib/wikipedia.js')
+    const data = await fetchWikipediaData(slug, lang)
+    res.json(data)
+  } catch (err) { next(err) }
+})
+
 // GET /api/admin/analytics/returning-players?days=30
 adminRouter.get(
   '/analytics/returning-players',

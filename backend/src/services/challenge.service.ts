@@ -5,6 +5,7 @@
  */
 
 import db from '../db/database.js';
+import { normalise, isGuessCorrect } from '../lib/matching.js';
 
 const MAX_ATTEMPTS = parseInt(process.env.MAX_ATTEMPTS ?? '3', 10);
 const MAX_HINTS = 3;
@@ -75,80 +76,12 @@ interface AttemptEntry {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function resolveImageUrl(raw: string): string {
+export function resolveImageUrl(raw: string): string {
   if (IMAGE_SOURCE === 'tmdb') {
     if (raw.startsWith('http') || raw.startsWith('/uploads/')) return raw;
     return `${TMDB_BASE}${raw}`;
   }
   return raw; // local path served by Express static middleware
-}
-
-/** Normalise a guess: lowercase, strip punctuation, collapse whitespace */
-function normalise(str: string): string {
-  return str
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '') // remove accents
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-/** Strip common leading articles from an already-normalised string */
-function stripArticles(s: string): string {
-  return s.replace(/^(le|la|les|l|the|an|a|un|une|des)\s+/, '');
-}
-
-/** Levenshtein distance between two strings */
-function levenshtein(a: string, b: string): number {
-  const m = a.length, n = b.length;
-  const dp: number[] = Array.from({ length: n + 1 }, (_, i) => i);
-  for (let i = 1; i <= m; i++) {
-    let prev = dp[0];
-    dp[0] = i;
-    for (let j = 1; j <= n; j++) {
-      const tmp = dp[j];
-      dp[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j], dp[j - 1]);
-      prev = tmp;
-    }
-  }
-  return dp[n];
-}
-
-/** Max allowed typos based on title length (post-normalisation) */
-function typoThreshold(len: number): number {
-  if (len < 6) return 0;
-  if (len < 13) return 1;
-  return 2;
-}
-
-/**
- * Returns true if rawGuess matches any accepted title.
- * Matching rules (in order):
- *   1. Exact match after normalisation
- *   2. Match after stripping leading articles from both sides
- *   3. Fuzzy match (Levenshtein ≤ threshold) on full normalised title
- *   4. Fuzzy match after stripping articles
- */
-function isGuessCorrect(rawGuess: string, normalisedAccepted: string[]): boolean {
-  const normGuess = normalise(rawGuess);
-  const strippedGuess = stripArticles(normGuess);
-
-  for (const acc of normalisedAccepted) {
-    if (normGuess === acc) return true;
-
-    const strippedAcc = stripArticles(acc);
-    if (strippedGuess === strippedAcc && strippedAcc.length > 0) return true;
-
-    const threshold = typoThreshold(acc.length);
-    if (threshold > 0 && levenshtein(normGuess, acc) <= threshold) return true;
-
-    if (strippedAcc.length > 0) {
-      const t2 = typoThreshold(strippedAcc.length);
-      if (t2 > 0 && levenshtein(strippedGuess, strippedAcc) <= t2) return true;
-    }
-  }
-  return false;
 }
 
 /** Returns current date in Europe/Paris timezone as YYYY-MM-DD */

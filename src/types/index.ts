@@ -13,7 +13,7 @@ export type HintType =
   | 'synopsis'
   | 'country'
 
-export type MediaType = 'film' | 'series'
+export type MediaType = 'film' | 'series' | 'wiki'
 
 // ─── API response shapes ─────────────────────────────────────────────────────
 

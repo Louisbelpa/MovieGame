@@ -1,7 +1,7 @@
 import type { GameStats, PersistedGameState } from '@/types'
 import { defaultStats } from '@/lib/utils'
 
-const keys = (type: 'film' | 'series') => ({
+const keys = (type: 'film' | 'series' | 'wiki') => ({
   GAME: `cineguess:game:${type}`,
   STATS: `cineguess:stats:${type}`,
   HISTORY: `cineguess:history:${type}`,
@@ -9,7 +9,7 @@ const keys = (type: 'film' | 'series') => ({
 
 export type GameHistory = Record<string, 'won' | 'lost'>
 
-export function loadHistory(type: 'film' | 'series' = 'film'): GameHistory {
+export function loadHistory(type: 'film' | 'series' | 'wiki' = 'film'): GameHistory {
   try {
     const raw = localStorage.getItem(keys(type).HISTORY)
     return raw ? (JSON.parse(raw) as GameHistory) : {}
@@ -19,7 +19,7 @@ export function loadHistory(type: 'film' | 'series' = 'film'): GameHistory {
 }
 
 /** Record the outcome for a date. Won't overwrite an existing entry. */
-export function addToHistory(date: string, outcome: 'won' | 'lost', type: 'film' | 'series' = 'film'): void {
+export function addToHistory(date: string, outcome: 'won' | 'lost', type: 'film' | 'series' | 'wiki' = 'film'): void {
   try {
     const history = loadHistory(type)
     if (history[date]) return
@@ -28,7 +28,7 @@ export function addToHistory(date: string, outcome: 'won' | 'lost', type: 'film'
   } catch {}
 }
 
-export function loadGameState(type: 'film' | 'series' = 'film'): PersistedGameState | null {
+export function loadGameState(type: 'film' | 'series' | 'wiki' = 'film'): PersistedGameState | null {
   try {
     const raw = localStorage.getItem(keys(type).GAME)
     return raw ? (JSON.parse(raw) as PersistedGameState) : null
@@ -37,17 +37,17 @@ export function loadGameState(type: 'film' | 'series' = 'film'): PersistedGameSt
   }
 }
 
-export function saveGameState(state: PersistedGameState, type: 'film' | 'series' = 'film'): void {
+export function saveGameState(state: PersistedGameState, type: 'film' | 'series' | 'wiki' = 'film'): void {
   try {
     localStorage.setItem(keys(type).GAME, JSON.stringify(state))
   } catch {}
 }
 
-export function clearGameState(type: 'film' | 'series' = 'film'): void {
+export function clearGameState(type: 'film' | 'series' | 'wiki' = 'film'): void {
   localStorage.removeItem(keys(type).GAME)
 }
 
-export function loadStats(type: 'film' | 'series' = 'film'): GameStats {
+export function loadStats(type: 'film' | 'series' | 'wiki' = 'film'): GameStats {
   try {
     const raw = localStorage.getItem(keys(type).STATS)
     return raw ? (JSON.parse(raw) as GameStats) : defaultStats()
@@ -56,7 +56,7 @@ export function loadStats(type: 'film' | 'series' = 'film'): GameStats {
   }
 }
 
-export function saveStats(stats: GameStats, type: 'film' | 'series' = 'film'): void {
+export function saveStats(stats: GameStats, type: 'film' | 'series' | 'wiki' = 'film'): void {
   try {
     localStorage.setItem(keys(type).STATS, JSON.stringify(stats))
   } catch {}
