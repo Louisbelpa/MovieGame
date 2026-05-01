@@ -16,7 +16,7 @@ interface WikiPersonRow {
   id: number
   name: string
   name_aliases: string
-  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure'
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic'
   infobox_data: string
   hint_schedule: string
   photo_url: string | null

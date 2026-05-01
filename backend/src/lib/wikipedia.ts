@@ -47,6 +47,7 @@ export type WikiPersonType =
   | 'entrepreneur'
   | 'writer'
   | 'historical_figure'
+  | 'generic'
 
 export interface WikiGenericData {
   domain: string | null
@@ -166,6 +167,14 @@ function normalizeMediaUrl(url: string | null | undefined, lang: string): string
   return v
 }
 
+/** Resize a Wikimedia Commons thumb URL to a target pixel width. */
+function upscaleWikimediaThumb(url: string | null | undefined, targetWidth: number): string | null {
+  if (!url) return null
+  const normalized = url.startsWith('//') ? `https:${url}` : url
+  // Pattern: .../thumb/x/xx/File.jpg/320px-File.jpg
+  return normalized.replace(/\/(\d+)px-([^/]+)$/, `/${targetWidth}px-$2`)
+}
+
 function extractPositiveInteger(raw: string): number | null {
   const clean = stripLinks(raw).replace(/[^\d]/g, '').trim()
   if (!clean) return null
@@ -195,43 +204,68 @@ function applyBirthYearFallback(infobox: WikiInfoboxData, birthYear: number | nu
 
 /** Detect person type from infobox template name */
 function detectPersonType(wikitext: string): WikiPersonType {
-  const sportKeywords = [
-    'Infobox football biography', 'Infobox sportsperson', 'Infobox rugby biography',
-    'Infobox tennis biography', 'Infobox basketball biography', 'Infobox ice hockey player',
-    'Infobox cyclist', 'Infobox swimmer', 'Infobox athlete', 'Infobox golfer',
-    'Infobox boxer', 'Infobox racing driver', 'Infobox cricketer',
-    'Infobox Footballeur', 'Infobox Joueur de tennis',
-    'Infobox Basketteur', 'Infobox Joueur de basket-ball', 'Infobox Rugbyman', 'Infobox Cycliste', 'Infobox Nageur',
-  ]
   const lower = wikitext.toLowerCase()
-  if (sportKeywords.some(k => lower.includes(k.toLowerCase()))) return 'sportsperson'
-  const artistKeywords = ['infobox artiste', 'infobox acteur', 'infobox musicien', 'infobox chanteur', 'infobox comedian']
+  const sportKeywords = [
+    'infobox football biography', 'infobox sportsperson', 'infobox rugby biography',
+    'infobox tennis biography', 'infobox basketball biography', 'infobox ice hockey player',
+    'infobox cyclist', 'infobox swimmer', 'infobox athlete', 'infobox golfer',
+    'infobox boxer', 'infobox racing driver', 'infobox cricketer', 'infobox baseball biography',
+    'infobox volleyballer', 'infobox handball player',
+    'infobox footballeur', 'infobox joueur de tennis', 'infobox joueur de basket-ball',
+    'infobox basketteur', 'infobox rugbyman', 'infobox cycliste', 'infobox nageur',
+    'infobox sportif',
+  ]
+  if (sportKeywords.some(k => lower.includes(k))) return 'sportsperson'
+  const politicianKeywords = [
+    'infobox personnalité politique', 'infobox politicien', 'infobox politician',
+    'infobox officeholder', 'infobox government official', 'infobox président',
+    'infobox premier ministre', 'infobox ministre', 'infobox chef d\'état',
+  ]
+  if (politicianKeywords.some(k => lower.includes(k))) return 'politician'
+  const artistKeywords = [
+    'infobox artiste', 'infobox acteur', 'infobox musicien', 'infobox chanteur',
+    'infobox comedian', 'infobox actor', 'infobox singer', 'infobox musician',
+    'infobox entertainer', 'infobox artist', 'infobox réalisateur', 'infobox director',
+  ]
   if (artistKeywords.some(k => lower.includes(k))) return 'artist'
-  const scientistKeywords = ['infobox scientifique', 'infobox scientist']
+  const scientistKeywords = [
+    'infobox scientifique', 'infobox scientist', 'infobox academic',
+    'infobox mathematician', 'infobox philosopher',
+  ]
   if (scientistKeywords.some(k => lower.includes(k))) return 'scientist'
-  const entrepreneurKeywords = ['infobox entrepreneur', 'infobox businessperson']
+  const entrepreneurKeywords = [
+    'infobox entrepreneur', 'infobox businessperson', 'infobox business magnate',
+    'infobox chef d\'entreprise',
+  ]
   if (entrepreneurKeywords.some(k => lower.includes(k))) return 'entrepreneur'
-  const writerKeywords = ['infobox écrivain', 'infobox writer', 'infobox auteur']
+  const writerKeywords = [
+    'infobox écrivain', 'infobox writer', 'infobox auteur', 'infobox author',
+    'infobox poet', 'infobox poète',
+  ]
   if (writerKeywords.some(k => lower.includes(k))) return 'writer'
-  const historicalKeywords = ['infobox monarque', 'infobox monarch', 'infobox military person']
+  const historicalKeywords = [
+    'infobox monarque', 'infobox monarch', 'infobox military person',
+    'infobox noble', 'infobox royalty', 'infobox emperor', 'infobox pope',
+  ]
   if (historicalKeywords.some(k => lower.includes(k))) return 'historical_figure'
-  // Heuristic fallback for many FR sport infoboxes.
+  // Heuristics based on infobox field presence
   if (/\|\s*club\d+\s*=/.test(wikitext) || /\|\s*année\d+\s*=/.test(wikitext) || /\|\s*poste\s*=/.test(wikitext)) {
     return 'sportsperson'
   }
-  return 'politician'
+  if (/\|\s*(?:office|fonction)\d*\s*=/.test(wikitext)) return 'politician'
+  return 'generic'
 }
 
 function detectPersonTypeFromSummary(description: string | undefined): WikiPersonType | null {
   const d = (description ?? '').toLowerCase()
   if (!d) return null
-  if (/(footballeur|joueur|athlète|sportif|tennis|basket|rugby|cycliste|nageur)/.test(d)) return 'sportsperson'
-  if (/(chanteur|chanteuse|acteur|actrice|artiste|musicien|musicienne|rappeur|rappeuse|compositeur)/.test(d)) return 'artist'
-  if (/(scientifique|physicien|chimiste|mathématicien|biologiste|astronome)/.test(d)) return 'scientist'
-  if (/(entrepreneur|homme d'affaires|femme d'affaires|businessman|businesswoman|investisseur)/.test(d)) return 'entrepreneur'
-  if (/(écrivain|ecrivaine|romancier|poète|poete|auteur)/.test(d)) return 'writer'
-  if (/(empereur|roi|reine|monarque|personnalité historique|historien antique)/.test(d)) return 'historical_figure'
-  if (/(politique|président|premier ministre|ministre|député|sénateur)/.test(d)) return 'politician'
+  if (/(footballeu[rs]e?|joueu[rs]e?|athlète|sportif|sportive|tennis|basket|rugby|cycliste|nageuse?|handballeu[rs]e?|volleyballer|boxeu[rs]e?)/.test(d)) return 'sportsperson'
+  if (/(chanteu[rs]e?|acteu[rs]|actrice|artiste|musicien|musicienne|rappeu[rs]e?|compositeu[rs]e?|réalisateu[rs]e?|comédien|comédienne)/.test(d)) return 'artist'
+  if (/(scientifique|physicien|chimiste|mathématicien|biologiste|astronome|informaticien|ingénieur)/.test(d)) return 'scientist'
+  if (/(entrepreneur|homme d'affaires|femme d'affaires|businessman|businesswoman|investisseur|chef d'entreprise|dirigeant)/.test(d)) return 'entrepreneur'
+  if (/(écrivain|écrivaine|romancier|romancière|poète|poétesse|auteur|auteure|dramaturge|journaliste)/.test(d)) return 'writer'
+  if (/(empereur|impératrice|roi|reine|monarque|personnalité historique|duc|duchesse|prince|princesse)/.test(d)) return 'historical_figure'
+  if (/(homme politique|femme politique|président|présidente|premier ministre|ministre|député|sénateur|maire|gouverneur|chancelier)/.test(d)) return 'politician'
   return null
 }
 
@@ -632,20 +666,17 @@ async function fetchWikidataFallback(entityId: string, lang: string): Promise<Wi
 }
 
 async function fetchWikipediaImageFallback(slug: string, lang: string): Promise<string | null> {
-  const url = `https://${lang}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(slug)}&prop=pageimages&piprop=original|thumbnail&pithumbsize=1000&format=json&formatversion=2`
+  const url = `https://${lang}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(slug)}&prop=pageimages&piprop=thumbnail&pithumbsize=400&format=json&formatversion=2`
   const res = await fetchWithRetry(url)
   if (!res.ok) return null
   const json = await safeJson<{
     query?: {
-      pages?: Array<{
-        original?: { source?: string }
-        thumbnail?: { source?: string }
-      }>
+      pages?: Array<{ thumbnail?: { source?: string } }>
     }
   }>(res)
   if (!json) return null
   const page = json.query?.pages?.[0]
-  return normalizeMediaUrl(page?.original?.source ?? page?.thumbnail?.source ?? null, lang)
+  return normalizeMediaUrl(page?.thumbnail?.source ?? null, lang)
 }
 
 function inferTypeFromWikidataOccupations(occupations: string[]): WikiPersonType | null {
@@ -786,8 +817,10 @@ export async function fetchWikipediaData(slug: string, lang = 'fr'): Promise<Wik
   if (!wikitextJson) throw new Error('Wikipedia wikitext parse failed')
   const wikitext = wikitextJson.parse?.wikitext ?? ''
 
+  // Prefer resized thumbnail (small, fast) over full-resolution original (can be 20–50 MB)
+  const thumbUpscaled = upscaleWikimediaThumb(summary.thumbnail?.source, 400)
   let resolvedPhotoUrl = normalizeMediaUrl(
-    summary.originalimage?.source ?? summary.thumbnail?.source ?? null,
+    thumbUpscaled ?? summary.thumbnail?.source ?? null,
     lang
   )
   if (!resolvedPhotoUrl) {

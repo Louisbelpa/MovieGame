@@ -50,7 +50,7 @@ export interface AdminWikiPerson {
   name: string
   title: string
   name_aliases: string[]
-  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure'
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic'
   wikipedia_slug: string
   infobox_data: Record<string, unknown>
   hint_schedule: string[]
@@ -66,7 +66,7 @@ export interface AdminWikiPerson {
 export interface WikiPersonPayload {
   name: string
   name_aliases: string[]
-  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure'
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic'
   wikipedia_slug: string
   infobox_data: Record<string, unknown>
   hint_schedule: string[]
@@ -83,7 +83,7 @@ export interface WikipediaFetchPayload {
   photo_url: string | null
   wikipedia_url: string
   infobox_data: Record<string, unknown>
-  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure'
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic'
   hint_schedule: string[]
   parse_quality_score: number
   parse_warnings: string[]
@@ -466,11 +466,11 @@ function parseUsedDates(value: unknown): string[] {
 }
 
 function mapWikiPerson(raw: Record<string, unknown>): AdminWikiPerson {
-  const personTypeRaw = String(raw.person_type ?? 'politician')
-  const person_type: AdminWikiPerson['person_type'] =
-    personTypeRaw === 'sportsperson' || personTypeRaw === 'artist' || personTypeRaw === 'scientist' || personTypeRaw === 'entrepreneur' || personTypeRaw === 'writer' || personTypeRaw === 'historical_figure'
-      ? personTypeRaw
-      : 'politician'
+  const personTypeRaw = String(raw.person_type ?? 'generic')
+  const validTypes = ['politician', 'sportsperson', 'artist', 'scientist', 'entrepreneur', 'writer', 'historical_figure', 'generic']
+  const person_type: AdminWikiPerson['person_type'] = validTypes.includes(personTypeRaw)
+    ? personTypeRaw as AdminWikiPerson['person_type']
+    : 'generic'
   return {
     id: Number(raw.id),
     name: String(raw.name ?? ''),

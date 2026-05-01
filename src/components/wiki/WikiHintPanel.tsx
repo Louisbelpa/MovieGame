@@ -26,6 +26,7 @@ export function WikiHintPanel({ photoUrl, profile, hints, hintsAvailable, hintsR
             src={photoUrl}
             alt="Portrait flouté"
             className="w-full h-16 object-cover blur-md"
+            onError={(e) => { e.currentTarget.parentElement!.style.display = 'none' }}
           />
           <span className="absolute left-2 top-1.5 text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded bg-black/50 text-white">
             Photo floutée

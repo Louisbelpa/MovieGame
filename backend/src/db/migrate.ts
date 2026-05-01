@@ -229,6 +229,40 @@ const multiStatement: { name: string; sql: string }[] = [
     `,
   },
   {
+    name: 'add_generic_to_wiki_person_types',
+    sql: `
+      PRAGMA foreign_keys = OFF;
+      DROP TABLE IF EXISTS wiki_persons_v3;
+      CREATE TABLE wiki_persons_v3 (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        name            TEXT NOT NULL,
+        name_lower      TEXT NOT NULL GENERATED ALWAYS AS (lower(name)) STORED,
+        name_aliases    TEXT NOT NULL DEFAULT '[]',
+        person_type     TEXT NOT NULL DEFAULT 'generic' CHECK (person_type IN ('politician','sportsperson','artist','scientist','entrepreneur','writer','historical_figure','generic')),
+        wikipedia_slug  TEXT NOT NULL UNIQUE,
+        infobox_data    TEXT NOT NULL DEFAULT '{}',
+        hint_schedule   TEXT NOT NULL DEFAULT '[]',
+        photo_url       TEXT,
+        extract         TEXT,
+        wikipedia_url   TEXT,
+        difficulty      INTEGER NOT NULL DEFAULT 3 CHECK (difficulty BETWEEN 1 AND 5),
+        is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+      INSERT OR IGNORE INTO wiki_persons_v3
+        (id, name, name_aliases, person_type, wikipedia_slug, infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty, is_active, created_at, updated_at)
+        SELECT id, name, name_aliases, person_type, wikipedia_slug, infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty, is_active, created_at, updated_at
+        FROM wiki_persons;
+      DROP TABLE wiki_persons;
+      ALTER TABLE wiki_persons_v3 RENAME TO wiki_persons;
+      CREATE INDEX IF NOT EXISTS idx_wiki_persons_name_lower ON wiki_persons (name_lower);
+      CREATE INDEX IF NOT EXISTS idx_wiki_persons_person_type ON wiki_persons (person_type);
+      CREATE INDEX IF NOT EXISTS idx_wiki_persons_is_active ON wiki_persons (is_active);
+      PRAGMA foreign_keys = ON;
+    `,
+  },
+  {
     name: 'add_media_type_to_daily_challenges',
     // Recreates daily_challenges with a media_type column and UNIQUE(date,type)
     // so films and series can have independent planning per date.
@@ -289,6 +323,11 @@ for (const { name, sql } of multiStatement) {
       const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='wiki_persons'`).get() as { sql?: string } | undefined
       const sql = row?.sql ?? ''
       if (sql.includes("'artist'") && sql.includes("'historical_figure'")) continue
+    }
+    if (name === 'add_generic_to_wiki_person_types') {
+      const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='wiki_persons'`).get() as { sql?: string } | undefined
+      const sql = row?.sql ?? ''
+      if (sql.includes("'generic'")) continue
     }
     db.exec(sql)
     console.log(`  ✓ ${name}`)

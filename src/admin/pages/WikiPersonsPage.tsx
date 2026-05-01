@@ -52,6 +52,7 @@ function personTypeLabel(personType: PersonType): string {
     case 'entrepreneur': return 'Entrepreneur'
     case 'writer': return 'Ecrivain'
     case 'historical_figure': return 'Historique'
+    case 'generic': return 'Générique'
     default: return 'Profil'
   }
 }
@@ -62,7 +63,7 @@ type ModalState =
   | { type: 'delete'; person: AdminWikiPerson }
   | null
 
-type PersonType = 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure'
+type PersonType = 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic'
 
 interface WikiRoleFormRow {
   title: string
@@ -578,6 +579,7 @@ function WikiPersonForm({
             <option value="entrepreneur">Entrepreneur</option>
             <option value="writer">Ecrivain</option>
             <option value="historical_figure">Personnalite historique</option>
+            <option value="generic">Générique</option>
           </select>
         </div>
         <div>
