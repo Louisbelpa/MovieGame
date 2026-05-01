@@ -47,7 +47,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 const FUTURE_DAYS = 30
-const PAST_DAYS = 7
+const PAST_DAYS = import.meta.env.VITE_ALLOW_PAST_SCHEDULING === 'true' ? 90 : 7
 
 function getISODate(offsetDays: number): string {
   const d = new Date()
