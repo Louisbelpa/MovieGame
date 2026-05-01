@@ -45,6 +45,46 @@ export interface AdminSeries {
   original_language: string | null
 }
 
+export interface AdminWikiPerson {
+  id: number
+  name: string
+  name_aliases: string[]
+  person_type: 'politician' | 'sportsperson'
+  wikipedia_slug: string
+  infobox_data: Record<string, unknown>
+  hint_schedule: string[]
+  photo_url: string | null
+  extract: string | null
+  wikipedia_url: string | null
+  difficulty: number
+  is_active: boolean
+  used_dates: string[]
+}
+
+export interface WikiPersonPayload {
+  name: string
+  name_aliases: string[]
+  person_type: 'politician' | 'sportsperson'
+  wikipedia_slug: string
+  infobox_data: Record<string, unknown>
+  hint_schedule: string[]
+  photo_url: string | null
+  extract: string | null
+  wikipedia_url: string | null
+  difficulty: number
+  is_active: boolean
+}
+
+export interface WikipediaFetchPayload {
+  name: string
+  extract: string | null
+  photo_url: string | null
+  wikipedia_url: string
+  infobox_data: Record<string, unknown>
+  person_type: 'politician' | 'sportsperson'
+  hint_schedule: string[]
+}
+
 export interface SeriesPayload {
   title: string
   title_aliases: string[]
@@ -368,6 +408,102 @@ export async function deleteChangelogEntry(id: number): Promise<void> {
 export async function getSeries(): Promise<AdminSeries[]> {
   const res = await request<{ data: AdminSeries[] }>('/api/admin/series')
   return res.data
+}
+
+function parseJsonArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string')
+  if (typeof value !== 'string' || !value.trim()) return []
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((v): v is string => typeof v === 'string')
+  } catch {
+    return []
+  }
+}
+
+function parseJsonObject(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  if (typeof value !== 'string' || !value.trim()) return {}
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>
+    }
+    return {}
+  } catch {
+    return {}
+  }
+}
+
+function parseUsedDates(value: unknown): string[] {
+  if (typeof value !== 'string' || !value.trim()) return []
+  return value.split(',').map((v) => v.trim()).filter(Boolean)
+}
+
+function mapWikiPerson(raw: Record<string, unknown>): AdminWikiPerson {
+  return {
+    id: Number(raw.id),
+    name: String(raw.name ?? ''),
+    name_aliases: parseJsonArray(raw.name_aliases),
+    person_type: raw.person_type === 'sportsperson' ? 'sportsperson' : 'politician',
+    wikipedia_slug: String(raw.wikipedia_slug ?? ''),
+    infobox_data: parseJsonObject(raw.infobox_data),
+    hint_schedule: parseJsonArray(raw.hint_schedule),
+    photo_url: raw.photo_url ? String(raw.photo_url) : null,
+    extract: raw.extract ? String(raw.extract) : null,
+    wikipedia_url: raw.wikipedia_url ? String(raw.wikipedia_url) : null,
+    difficulty: Number(raw.difficulty ?? 3),
+    is_active: Number(raw.is_active ?? 1) === 1,
+    used_dates: parseUsedDates(raw.used_dates),
+  }
+}
+
+export async function getWikiPersons(opts: { page?: number; limit?: number; q?: string } = {}): Promise<{
+  data: AdminWikiPerson[]
+  total: number
+  page: number
+  limit: number
+}> {
+  const params = new URLSearchParams()
+  if (opts.page) params.set('page', String(opts.page))
+  if (opts.limit) params.set('limit', String(opts.limit))
+  if (opts.q) params.set('q', opts.q)
+  const qs = params.toString()
+  const res = await request<{ data: Record<string, unknown>[]; total: number; page: number; limit: number }>(
+    `/api/admin/wiki-persons${qs ? `?${qs}` : ''}`
+  )
+  return {
+    ...res,
+    data: res.data.map(mapWikiPerson),
+  }
+}
+
+export async function createWikiPerson(payload: WikiPersonPayload): Promise<{ id: number }> {
+  return request<{ id: number }>('/api/admin/wiki-persons', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateWikiPerson(id: number, payload: Partial<WikiPersonPayload>): Promise<void> {
+  await request<{ ok: boolean }>(`/api/admin/wiki-persons/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteWikiPerson(id: number): Promise<void> {
+  await request<{ ok: boolean }>(`/api/admin/wiki-persons/${id}`, { method: 'DELETE' })
+}
+
+export async function fetchWikipediaPerson(slug: string, lang = 'fr'): Promise<WikipediaFetchPayload> {
+  return request<WikipediaFetchPayload>('/api/admin/wiki-persons/fetch-wikipedia', {
+    method: 'POST',
+    body: JSON.stringify({ slug, lang }),
+  })
 }
 
 export async function createSeries(payload: SeriesPayload): Promise<AdminSeries> {
