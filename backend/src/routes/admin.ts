@@ -2919,7 +2919,7 @@ adminRouter.get(
 // ─── Wiki Persons CRUD ────────────────────────────────────────────────────────
 
 // GET /api/admin/wiki-persons
-adminRouter.get('/wiki-persons', adminAuth, adminLimiter, (req: Request, res: Response, next: NextFunction) => {
+adminRouter.get('/wiki-persons', (req: Request, res: Response, next: NextFunction) => {
   try {
     const page = Math.max(1, parseInt((req.query.page as string) ?? '1', 10))
     const limit = Math.min(100, parseInt((req.query.limit as string) ?? '50', 10))
@@ -2985,7 +2985,7 @@ function normalizeWikiHintSchedule(raw: unknown, personType: unknown): string {
 }
 
 // POST /api/admin/wiki-persons
-adminRouter.post('/wiki-persons', adminAuth, adminLimiter, (req: Request, res: Response, next: NextFunction) => {
+adminRouter.post('/wiki-persons', (req: Request, res: Response, next: NextFunction) => {
   try {
     const {
       name, name_aliases = '[]', person_type = 'politician',
@@ -3023,7 +3023,7 @@ adminRouter.post('/wiki-persons', adminAuth, adminLimiter, (req: Request, res: R
 })
 
 // PUT /api/admin/wiki-persons/:id
-adminRouter.put('/wiki-persons/:id', adminAuth, adminLimiter, (req: Request, res: Response, next: NextFunction) => {
+adminRouter.put('/wiki-persons/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id, 10)
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid wiki person id.' }); return }
@@ -3092,7 +3092,7 @@ adminRouter.put('/wiki-persons/:id', adminAuth, adminLimiter, (req: Request, res
 })
 
 // DELETE /api/admin/wiki-persons/:id
-adminRouter.delete('/wiki-persons/:id', adminAuth, adminLimiter, (req: Request, res: Response, next: NextFunction) => {
+adminRouter.delete('/wiki-persons/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id, 10)
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid wiki person id.' }); return }
@@ -3104,7 +3104,7 @@ adminRouter.delete('/wiki-persons/:id', adminAuth, adminLimiter, (req: Request, 
 })
 
 // POST /api/admin/wiki-persons/fetch-wikipedia
-adminRouter.post('/wiki-persons/fetch-wikipedia', adminAuth, adminLimiter, async (req: Request, res: Response, next: NextFunction) => {
+adminRouter.post('/wiki-persons/fetch-wikipedia', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { slug, lang = 'fr' } = req.body as { slug?: string; lang?: string }
     if (!slug) { res.status(400).json({ error: 'slug is required.' }); return }

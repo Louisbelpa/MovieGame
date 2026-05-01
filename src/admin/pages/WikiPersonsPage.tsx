@@ -253,6 +253,8 @@ function WikiPersonForm({
   const [loadingRandomWiki, setLoadingRandomWiki] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [parseScore, setParseScore] = useState<number | null>(null)
+  const [parseWarnings, setParseWarnings] = useState<string[]>([])
 
   useEffect(() => {
     const raw = initial?.infobox_data ?? {}
@@ -308,6 +310,8 @@ function WikiPersonForm({
     photo_url: string | null
     extract: string | null
     wikipedia_url: string
+    parse_quality_score: number
+    parse_warnings: string[]
   }) {
     setName(data.name)
     setPersonType(data.person_type)
@@ -315,6 +319,8 @@ function WikiPersonForm({
     setPhotoUrl(data.photo_url ?? '')
     setExtract(data.extract ?? '')
     setWikipediaUrl(data.wikipedia_url ?? '')
+    setParseScore(data.parse_quality_score)
+    setParseWarnings(data.parse_warnings)
 
     if (data.person_type === 'politician') {
       const p = parsePoliticianInfobox(data.infobox_data)
@@ -543,6 +549,23 @@ function WikiPersonForm({
           </div>
         </div>
       </div>
+
+      {parseScore !== null && (
+        <div className={`rounded-lg border px-3 py-2 text-sm ${
+          parseScore >= 80
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+            : parseScore >= 60
+              ? 'bg-amber-50 border-amber-200 text-amber-700'
+              : 'bg-red-50 border-red-200 text-red-700'
+        }`}>
+          Qualité parsing: <strong>{parseScore}/100</strong>
+          {parseWarnings.length > 0 && (
+            <div className="mt-1 text-xs">
+              {parseWarnings.join(' · ')}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid sm:grid-cols-3 gap-4">
         <div>

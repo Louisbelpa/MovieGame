@@ -85,6 +85,8 @@ export interface WikipediaFetchPayload {
   infobox_data: Record<string, unknown>
   person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure'
   hint_schedule: string[]
+  parse_quality_score: number
+  parse_warnings: string[]
 }
 
 export interface SeriesPayload {

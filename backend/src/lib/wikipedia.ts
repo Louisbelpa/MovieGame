@@ -65,6 +65,24 @@ export interface WikiFetchResult {
   infobox_data: WikiInfoboxData
   person_type: WikiPersonType
   hint_schedule: string[]
+  parse_quality_score: number
+  parse_warnings: string[]
+}
+
+interface WikidataFallback {
+  birth_year: number | null
+  nationality: string | null
+  occupations: string[]
+  notable_work: string | null
+  era: string | null
+}
+
+async function safeJson<T>(res: Response): Promise<T | null> {
+  try {
+    return await res.json() as T
+  } catch {
+    return null
+  }
 }
 
 /** Strip wikilinks: [[Target|Label]] → Label, [[Target]] → Target */
@@ -93,6 +111,16 @@ function stripLinks(s: string): string {
 function extractYear(s: string): number | null {
   const m = s.match(/\b(1[89]\d{2}|20\d{2})\b/)
   return m ? parseInt(m[1], 10) : null
+}
+
+function normalizeValue(s: string | null | undefined): string | null {
+  if (!s) return null
+  const normalized = s
+    .replace(/\s+/g, ' ')
+    .replace(/\s*([,/;:])\s*/g, '$1 ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+  return normalized || null
 }
 
 /** Detect person type from infobox template name */
@@ -232,6 +260,35 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
       .map((v) => stripLinks(v).trim())
       .filter(Boolean)
 
+  const extractClubsFromCareerRows = (): WikiClub[] => {
+    const rows: WikiClub[] = []
+    const lines = wikitext.split('\n')
+    for (const rawLine of lines) {
+      const line = rawLine.trim()
+      if (!line.startsWith('|') || !/\[\[[^\]]*\|\d{4}\]\]/.test(line)) continue
+      const m = line.match(/\[\[[^\]]*\|(?<start>\d{4})\]\](?:\s*-\s*\[\[[^\]]*(?:\|(?<end>\d{4}))?[^\]]*\]\])?\s*\|\s*(?<club>.+?)\s*\|\s*(?<stats>.+)$/)
+      if (!m?.groups) continue
+
+      const startYear = parseInt(m.groups.start, 10)
+      const endYear = m.groups.end ? parseInt(m.groups.end, 10) : null
+      const clubName = stripLinks(m.groups.club).replace(/''/g, '').trim()
+      if (!clubName || clubName.length < 2) continue
+
+      const statsClean = stripLinks(m.groups.stats).replace(/\{\{0\}\}/g, '').replace(/\s+/g, ' ').trim()
+      const appsMatch = statsClean.match(/\b(\d{1,4})\b/)
+      const goalsMatch = statsClean.match(/\((\d{1,4})\)/)
+
+      rows.push({
+        name: clubName,
+        start_year: Number.isFinite(startYear) ? startYear : null,
+        end_year: Number.isFinite(endYear as number) ? endYear : null,
+        appearances: appsMatch ? parseInt(appsMatch[1], 10) : null,
+        goals: goalsMatch ? parseInt(goalsMatch[1], 10) : null,
+      })
+    }
+    return rows
+  }
+
   // clubs section: | clubs = \n {{fb cl|Club}} \n ...
   const clubsBlock = wikitext.match(/\|\s*clubs\s*=\s*([\s\S]*?)(?=\n\s*\|(?![\s\S]*?\|\s*clubs))/)?.[1] ?? ''
   const yearsBlock = wikitext.match(/\|\s*(?:clubyears|years)\s*=\s*([\s\S]*?)(?=\n\s*\|)/i)?.[1] ?? ''
@@ -277,6 +334,9 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
       })
     }
   }
+
+  // FR tables fallback: career lines with years | club | stats.
+  clubs.push(...extractClubsFromCareerRows())
 
   // FR fallback: club1/année1/matchs1/buts1 keys are very common.
   const frClubRows = [...fields.entries()].filter(([k]) => /^club\d+$/i.test(k))
@@ -397,6 +457,143 @@ function parseGenericData(wikitext: string, domain: string): WikiGenericData {
   }
 }
 
+async function fetchWikidataEntityId(slug: string, lang: string): Promise<string | null> {
+  const url = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=pageprops&titles=${encodeURIComponent(slug)}&format=json&formatversion=2`
+  const res = await fetch(url, { headers: { 'User-Agent': 'MovieGame/1.0 (admin tool)' } })
+  if (!res.ok) return null
+  const json = await safeJson<{
+    query?: { pages?: Array<{ pageprops?: { wikibase_item?: string } }> }
+  }>(res)
+  if (!json) return null
+  return json.query?.pages?.[0]?.pageprops?.wikibase_item ?? null
+}
+
+async function fetchWikidataFallback(entityId: string, lang: string): Promise<WikidataFallback | null> {
+  const url = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${encodeURIComponent(entityId)}&props=labels|claims&languages=${encodeURIComponent(lang)}|en&format=json`
+  const res = await fetch(url, { headers: { 'User-Agent': 'MovieGame/1.0 (admin tool)' } })
+  if (!res.ok) return null
+  const json = await safeJson<{
+    entities?: Record<string, {
+      claims?: Record<string, Array<{ mainsnak?: { datavalue?: { value?: unknown } } }>>
+    }>
+  }>(res)
+  if (!json) return null
+  const entity = json.entities?.[entityId]
+  const claims = entity?.claims
+  if (!claims) return null
+
+  const readTimeYear = (pid: string): number | null => {
+    const time = claims[pid]?.[0]?.mainsnak?.datavalue?.value as { time?: string } | undefined
+    return time?.time ? extractYear(time.time) : null
+  }
+  const readEntityIds = (pid: string): string[] =>
+    (claims[pid] ?? [])
+      .map((c) => (c.mainsnak?.datavalue?.value as { id?: string } | undefined)?.id ?? null)
+      .filter((id): id is string => !!id)
+
+  const occupationIds = readEntityIds('P106')
+  const nationalityIds = readEntityIds('P27')
+  const notableWorkIds = readEntityIds('P800')
+  const birthYear = readTimeYear('P569')
+
+  const labelFor = async (ids: string[]): Promise<string[]> => {
+    if (ids.length === 0) return []
+    const idsChunk = ids.slice(0, 8).join('|')
+    const entitiesUrl = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${encodeURIComponent(idsChunk)}&props=labels&languages=${encodeURIComponent(lang)}|en&format=json`
+    const r = await fetch(entitiesUrl, { headers: { 'User-Agent': 'MovieGame/1.0 (admin tool)' } })
+    if (!r.ok) return []
+    const j = await safeJson<{
+      entities?: Record<string, { labels?: Record<string, { value: string }> }>
+    }>(r)
+    if (!j) return []
+    return ids
+      .map((id) => j.entities?.[id]?.labels?.[lang]?.value ?? j.entities?.[id]?.labels?.en?.value ?? null)
+      .filter((v): v is string => !!v)
+      .map((v) => normalizeValue(v) ?? '')
+      .filter(Boolean)
+  }
+
+  const [occupationLabels, nationalityLabels, notableWorkLabels] = await Promise.all([
+    labelFor(occupationIds),
+    labelFor(nationalityIds),
+    labelFor(notableWorkIds),
+  ])
+
+  return {
+    birth_year: birthYear,
+    nationality: normalizeValue(nationalityLabels[0] ?? null),
+    occupations: occupationLabels,
+    notable_work: normalizeValue(notableWorkLabels[0] ?? null),
+    era: null,
+  }
+}
+
+function inferTypeFromWikidataOccupations(occupations: string[]): WikiPersonType | null {
+  const lower = occupations.map((o) => o.toLowerCase())
+  if (lower.some((o) => /(football|athl|tennis|basket|sport|joueur|player|coureur|nageur|rugby)/.test(o))) return 'sportsperson'
+  if (lower.some((o) => /(singer|actor|actrice|acteur|artist|artiste|musician|musicien|rappeur|composer)/.test(o))) return 'artist'
+  if (lower.some((o) => /(scientist|scientifique|physicien|chimiste|mathématicien|mathematician|biologiste)/.test(o))) return 'scientist'
+  if (lower.some((o) => /(entrepreneur|business|investor|industriel|chef d'entreprise)/.test(o))) return 'entrepreneur'
+  if (lower.some((o) => /(writer|écrivain|author|auteur|poet|poète|romancier)/.test(o))) return 'writer'
+  if (lower.some((o) => /(politician|politique|ministre|président|député|sénateur|monarque|empereur|roi|reine)/.test(o))) return 'politician'
+  return null
+}
+
+function applyWikidataFallback(
+  personType: WikiPersonType,
+  infobox: WikiInfoboxData,
+  fallback: WikidataFallback | null
+): { personType: WikiPersonType; infobox: WikiInfoboxData } {
+  if (!fallback) return { personType, infobox }
+  const inferred = inferTypeFromWikidataOccupations(fallback.occupations)
+  const resolvedType = inferred ?? personType
+
+  if (resolvedType === 'politician') {
+    const p = infobox as Partial<WikiPoliticianData>
+    return {
+      personType: resolvedType,
+      infobox: {
+        roles: p.roles ?? [],
+        party: normalizeValue(p.party ?? null),
+        birth_year: p.birth_year ?? fallback.birth_year,
+        nationality: normalizeValue(p.nationality ?? fallback.nationality),
+      },
+    }
+  }
+  if (resolvedType === 'sportsperson') {
+    const s = infobox as Partial<WikiSportspersonData>
+    return {
+      personType: resolvedType,
+      infobox: {
+        sport: normalizeValue(s.sport ?? null),
+        position: normalizeValue(s.position ?? null),
+        clubs: s.clubs ?? [],
+        national_team: s.national_team ?? null,
+        birth_year: s.birth_year ?? fallback.birth_year,
+        nationality: normalizeValue(s.nationality ?? fallback.nationality),
+      },
+    }
+  }
+  const g = infobox as Partial<WikiGenericData>
+  const fallbackDomain = (() => {
+    if (resolvedType === 'artist') return 'Art'
+    if (resolvedType === 'scientist') return 'Science'
+    if (resolvedType === 'entrepreneur') return 'Entrepreneuriat'
+    if (resolvedType === 'writer') return 'Littérature'
+    return 'Histoire'
+  })()
+  return {
+    personType: resolvedType,
+    infobox: {
+      domain: normalizeValue(g.domain ?? fallbackDomain),
+      notable_work: normalizeValue(g.notable_work ?? fallback.notable_work),
+      era: normalizeValue(g.era ?? fallback.era),
+      birth_year: g.birth_year ?? fallback.birth_year,
+      nationality: normalizeValue(g.nationality ?? fallback.nationality),
+    },
+  }
+}
+
 function defaultHintSchedule(personType: WikiPersonType): string[] {
   if (personType === 'politician') {
     return ['birth_year', 'nationality', 'party', 'name_initials', 'name_length']
@@ -407,27 +604,66 @@ function defaultHintSchedule(personType: WikiPersonType): string[] {
   return ['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials']
 }
 
+function evaluateParseQuality(
+  personType: WikiPersonType,
+  infoboxData: WikiInfoboxData,
+  hasPhoto: boolean
+): { score: number; warnings: string[] } {
+  let score = 100
+  const warnings: string[] = []
+
+  if (!hasPhoto) {
+    score -= 10
+    warnings.push('Photo absente')
+  }
+
+  if (personType === 'politician') {
+    const p = infoboxData as WikiPoliticianData
+    if ((p.roles ?? []).length === 0) { score -= 40; warnings.push('Aucune fonction politique extraite') }
+    if (!p.birth_year) { score -= 20; warnings.push('Année de naissance manquante') }
+    if (!p.nationality) { score -= 15; warnings.push('Nationalité manquante') }
+    if (!p.party) { score -= 10; warnings.push('Parti manquant') }
+  } else if (personType === 'sportsperson') {
+    const s = infoboxData as WikiSportspersonData
+    if ((s.clubs ?? []).length === 0) { score -= 35; warnings.push('Aucun club extrait') }
+    if (!s.position) { score -= 15; warnings.push('Poste manquant') }
+    if (!s.birth_year) { score -= 20; warnings.push('Année de naissance manquante') }
+    if (!s.nationality) { score -= 15; warnings.push('Nationalité manquante') }
+  } else {
+    const g = infoboxData as WikiGenericData
+    if (!g.domain) { score -= 20; warnings.push('Domaine manquant') }
+    if (!g.notable_work) { score -= 20; warnings.push('Oeuvre/Fait notable manquant') }
+    if (!g.birth_year) { score -= 20; warnings.push('Année de naissance manquante') }
+    if (!g.nationality) { score -= 15; warnings.push('Nationalité manquante') }
+  }
+
+  return { score: Math.max(0, score), warnings }
+}
+
 export async function fetchWikipediaData(slug: string, lang = 'fr'): Promise<WikiFetchResult> {
   // 1. Summary (extract + thumbnail)
   const summaryUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(slug)}`
   const summaryRes = await fetch(summaryUrl, { headers: { 'User-Agent': 'MovieGame/1.0 (admin tool)' } })
   if (!summaryRes.ok) throw new Error(`Wikipedia summary fetch failed: ${summaryRes.status}`)
-  const summary = await summaryRes.json() as {
+  const summary = await safeJson<{
     title: string
     extract: string
     description?: string
     thumbnail?: { source: string }
     content_urls?: { desktop?: { page?: string } }
-  }
+  }>(summaryRes)
+  if (!summary) throw new Error('Wikipedia summary parse failed')
 
   // 2. Wikitext (infobox)
   const wikitextUrl = `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(slug)}&prop=wikitext&format=json&formatversion=2`
   const wikitextRes = await fetch(wikitextUrl, { headers: { 'User-Agent': 'MovieGame/1.0 (admin tool)' } })
-  const wikitextJson = await wikitextRes.json() as { parse?: { wikitext: string } }
+  if (!wikitextRes.ok) throw new Error(`Wikipedia wikitext fetch failed: ${wikitextRes.status}`)
+  const wikitextJson = await safeJson<{ parse?: { wikitext: string } }>(wikitextRes)
+  if (!wikitextJson) throw new Error('Wikipedia wikitext parse failed')
   const wikitext = wikitextJson.parse?.wikitext ?? ''
 
-  const personType = detectPersonTypeFromSummary(summary.description) ?? detectPersonType(wikitext)
-  const infobox_data = personType === 'politician'
+  let personType = detectPersonTypeFromSummary(summary.description) ?? detectPersonType(wikitext)
+  let infobox_data: WikiInfoboxData = personType === 'politician'
     ? parsePoliticianData(wikitext)
     : personType === 'sportsperson'
       ? parseSportspersonData(wikitext)
@@ -441,6 +677,21 @@ export async function fetchWikipediaData(slug: string, lang = 'fr'): Promise<Wik
               ? parseGenericData(wikitext, 'Littérature')
               : parseGenericData(wikitext, 'Histoire')
 
+  // 3. Fallback Wikidata for fragile/missing fields.
+  try {
+    const entityId = await fetchWikidataEntityId(slug, lang)
+    if (entityId) {
+      const wikidata = await fetchWikidataFallback(entityId, lang)
+      const resolved = applyWikidataFallback(personType, infobox_data, wikidata)
+      personType = resolved.personType
+      infobox_data = resolved.infobox
+    }
+  } catch {
+    // Keep infobox-based result when Wikidata is unavailable.
+  }
+
+  const quality = evaluateParseQuality(personType, infobox_data, !!summary.thumbnail?.source)
+
   return {
     name: summary.title,
     extract: summary.extract?.slice(0, 500) || null,
@@ -449,5 +700,7 @@ export async function fetchWikipediaData(slug: string, lang = 'fr'): Promise<Wik
     infobox_data,
     person_type: personType,
     hint_schedule: defaultHintSchedule(personType),
+    parse_quality_score: quality.score,
+    parse_warnings: quality.warnings,
   }
 }
