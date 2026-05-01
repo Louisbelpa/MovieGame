@@ -294,7 +294,10 @@ function getTodayUTC(): string {
 adminRouter.get(
   '/config',
   (_req: Request, res: Response) => {
-    res.json({ requiresUsername: !!(process.env.ADMIN_USERNAME ?? '') });
+    res.json({
+      requiresUsername: !!(process.env.ADMIN_USERNAME ?? ''),
+      allowPastScheduling: process.env.ALLOW_PAST_SCHEDULING === 'true',
+    });
   }
 );
 
