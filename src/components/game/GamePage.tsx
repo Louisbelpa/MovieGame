@@ -59,44 +59,52 @@ function DateNavBar({ directionRef }: { directionRef: React.MutableRefObject<'pr
   if (!challenge && !viewingDate) return null
 
   return (
-    <div className="flex items-center justify-between gap-2 py-1.5 px-1">
-      <button
-        onClick={goBack}
-        disabled={isLoading || !hasPrev}
-        className="p-1.5 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-        title={!hasPrev ? 'Pas de défi antérieur' : 'Défi précédent'}
-      >
-        <ChevronLeft size={18} />
-      </button>
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center justify-between gap-2 py-1.5 px-1">
+        <button
+          onClick={goBack}
+          disabled={isLoading || !hasPrev}
+          className="p-1.5 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+          title={!hasPrev ? 'Pas de défi antérieur' : 'Défi précédent'}
+        >
+          <ChevronLeft size={18} />
+        </button>
 
-      <div className="flex items-center gap-2 text-sm">
-        <Calendar size={13} className="text-film-text-dim" />
-        {isToday ? (
-          <span className="font-semibold text-film-gold">Aujourd'hui</span>
-        ) : (
-          <button
-            onClick={goToday}
-            className="text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
-            title="Retour à aujourd'hui"
-          >
-            {formatDateFr(currentDate)}
-          </button>
-        )}
-        {viewingDate && (
-          <span className="text-[10px] bg-film-surface border border-film-border px-1.5 py-0.5 rounded text-film-text-dim">
-            Ancien défi
-          </span>
-        )}
+        <div className="flex items-center gap-2 text-sm">
+          <Calendar size={13} className="text-film-text-dim" />
+          {isToday ? (
+            <span className="font-semibold text-film-gold">Aujourd'hui</span>
+          ) : (
+            <button
+              onClick={goToday}
+              className="text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
+              title="Retour à aujourd'hui"
+            >
+              {formatDateFr(currentDate)}
+            </button>
+          )}
+          {viewingDate && (
+            <span className="text-[10px] bg-film-surface border border-film-border px-1.5 py-0.5 rounded text-film-text-dim">
+              Ancien défi
+            </span>
+          )}
+        </div>
+
+        <button
+          onClick={goForward}
+          disabled={isToday || isLoading || !hasNext}
+          className="p-1.5 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+          title={isToday ? "C'est le défi du jour" : !hasNext ? 'Pas de défi suivant' : 'Défi suivant'}
+        >
+          <ChevronRight size={18} />
+        </button>
       </div>
 
-      <button
-        onClick={goForward}
-        disabled={isToday || isLoading || !hasNext}
-        className="p-1.5 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-        title={isToday ? "C'est le défi du jour" : !hasNext ? 'Pas de défi suivant' : 'Défi suivant'}
-      >
-        <ChevronRight size={18} />
-      </button>
+      {isToday && hasPrev && (
+        <p className="text-center text-[11px] text-film-text-dim/60 tracking-wide">
+          ← défis des jours précédents disponibles
+        </p>
+      )}
     </div>
   )
 }
