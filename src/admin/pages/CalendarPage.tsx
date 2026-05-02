@@ -96,7 +96,7 @@ export function CalendarPage() {
     })
   }, [])
 
-  const load = useCallback((rangeFrom: string, rangeTo: string, mt: 'film' | 'series') => {
+  const load = useCallback((rangeFrom: string, rangeTo: string, mt: 'film' | 'series' | 'wiki') => {
     setLoading(true)
     Promise.all([getChallenges({ from: rangeFrom, to: rangeTo, mediaType: mt }), getFilms(), getSeries(), getWikiPersons({ limit: 500 })])
       .then(([chs, fms, srs, wps]) => {
