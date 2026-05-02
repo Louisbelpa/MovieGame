@@ -119,6 +119,9 @@ async function fetchWithRetry(url: string, init: RequestInit = {}, maxAttempts =
 /** Strip wikilinks: [[Target|Label]] → Label, [[Target]] → Target */
 function stripLinks(s: string): string {
   return s
+    // Remove pure-decoration templates (flags, icons) — must come first
+    .replace(/\{\{(?:Drapeau|Flag|Flagicon|Country flag|Football country|Fb|Fball|Fbicon|Sport country|Country|Pays)[^}]*\}\}/gi, '')
+    .replace(/\{\{0\}\}/g, '')
     .replace(/\{\{lang\|[^|]+\|([^}]+)\}\}/gi, '$1')
     .replace(/\{\{ill\|([^|}]+)(?:\|[^}]*)?\}\}/gi, '$1')
     .replace(/\{\{([^{}]+)\}\}/g, (_m, inner: string) => {
@@ -137,6 +140,16 @@ function stripLinks(s: string): string {
     .replace(/&nbsp;/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim()
+}
+
+/** Extract a year range from raw wikitext like "1992-1995", "[[1992]]-[[1995]]", "2003–" */
+function extractYearRange(raw: string): { start: number | null; end: number | null } {
+  const years = raw.match(/\b(1[89]\d{2}|20\d{2})\b/g)
+  if (!years || years.length === 0) return { start: null, end: null }
+  return {
+    start: parseInt(years[0], 10),
+    end: years.length > 1 ? parseInt(years[1], 10) : null,
+  }
 }
 
 /** Extract year from strings like "2017", "14 mai 2017", "{{birth year|1977}}" */
@@ -369,26 +382,42 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
     const lines = wikitext.split('\n')
     for (const rawLine of lines) {
       const line = rawLine.trim()
-      if (!line.startsWith('|') || !/\[\[[^\]]*\|\d{4}\]\]/.test(line)) continue
-      const m = line.match(/\[\[[^\]]*\|(?<start>\d{4})\]\](?:\s*-\s*\[\[[^\]]*(?:\|(?<end>\d{4}))?[^\]]*\]\])?\s*\|\s*(?<club>.+?)\s*\|\s*(?<stats>.+)$/)
-      if (!m?.groups) continue
+      if (!line.startsWith('|')) continue
 
-      const startYear = parseInt(m.groups.start, 10)
-      const endYear = m.groups.end ? parseInt(m.groups.end, 10) : null
-      const clubName = stripLinks(m.groups.club).replace(/''/g, '').trim()
-      if (!clubName || clubName.length < 2) continue
+      // Pattern A: [[link|2002]]-[[link|2003]] | Club | stats (EN/intl format)
+      if (/\[\[[^\]]*\|\d{4}\]\]/.test(line)) {
+        const m = line.match(/\[\[[^\]]*\|(?<start>\d{4})\]\](?:\s*[-–]\s*\[\[[^\]]*(?:\|(?<end>\d{4}))?[^\]]*\]\])?\s*\|\s*(?<club>.+?)\s*\|\s*(?<stats>.+)$/)
+        if (m?.groups) {
+          const clubName = stripLinks(m.groups.club).replace(/''/g, '').trim()
+          if (clubName.length >= 2) {
+            const statsClean = stripLinks(m.groups.stats).replace(/\s+/g, ' ').trim()
+            rows.push({
+              name: clubName,
+              start_year: parseInt(m.groups.start, 10),
+              end_year: m.groups.end ? parseInt(m.groups.end, 10) : null,
+              appearances: statsClean.match(/\b(\d{1,4})\b/)?.[1] ? parseInt(statsClean.match(/\b(\d{1,4})\b/)![1], 10) : null,
+              goals: statsClean.match(/\((\d{1,4})\)/)?.[1] ? parseInt(statsClean.match(/\((\d{1,4})\)/)![1], 10) : null,
+            })
+          }
+          continue
+        }
+      }
 
-      const statsClean = stripLinks(m.groups.stats).replace(/\{\{0\}\}/g, '').replace(/\s+/g, ' ').trim()
-      const appsMatch = statsClean.match(/\b(\d{1,4})\b/)
-      const goalsMatch = statsClean.match(/\((\d{1,4})\)/)
-
-      rows.push({
-        name: clubName,
-        start_year: Number.isFinite(startYear) ? startYear : null,
-        end_year: Number.isFinite(endYear as number) ? endYear : null,
-        appearances: appsMatch ? parseInt(appsMatch[1], 10) : null,
-        goals: goalsMatch ? parseInt(goalsMatch[1], 10) : null,
-      })
+      // Pattern B: | 1992-1995 | [[Club]] | apps | (goals)  (FR Wikipedia career table rows)
+      const mFr = line.match(/^\|\s*((?:1[89]\d{2}|20\d{2})[\s\S]{0,20}?(?:1[89]\d{2}|20\d{2})?)\s*\|\s*([^|]{3,60}?)\s*\|\s*(\d{1,4})\s*\|\s*\(?(\d{1,4})\)?/)
+      if (mFr) {
+        const clubName = stripLinks(mFr[2]).replace(/''/g, '').trim()
+        if (clubName.length >= 2 && !/^\d+$/.test(clubName)) {
+          const { start, end } = extractYearRange(mFr[1])
+          rows.push({
+            name: clubName,
+            start_year: start,
+            end_year: end,
+            appearances: parseInt(mFr[3], 10),
+            goals: parseInt(mFr[4], 10),
+          })
+        }
+      }
     }
     return rows
   }
@@ -427,12 +456,11 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
       const clubName = singleClubValues[i]
       const yearsRaw = singleYearValues[i] ?? ''
       if (!clubName) continue
-      const yearRange = yearsRaw.match(/(\d{4})\s*[-–]\s*(\d{4}|\s*)/)
-      const singleYear = yearsRaw.match(/\b(1[89]\d{2}|20\d{2})\b/)
+      const { start, end } = extractYearRange(yearsRaw)
       clubs.push({
         name: clubName,
-        start_year: yearRange ? parseInt(yearRange[1], 10) : (singleYear ? parseInt(singleYear[1], 10) : null),
-        end_year: yearRange?.[2]?.trim() ? parseInt(yearRange[2], 10) : null,
+        start_year: start,
+        end_year: end,
         appearances: null,
         goals: null,
       })
@@ -454,15 +482,14 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
       const appsRaw = readInfoboxField(fields, [`matchs${idx}`, `apps${idx}`])
       const goalsRaw = readInfoboxField(fields, [`buts${idx}`, `goals${idx}`])
 
-      const yearRange = yearsRaw.match(/(\d{4})\s*[-–]\s*(\d{4}|\s*)/)
-      const singleYear = yearsRaw.match(/\b(1[89]\d{2}|20\d{2})\b/)
+      const { start, end } = extractYearRange(yearsRaw)
       const apps = parseInt(stripLinks(appsRaw).replace(/[^\d-]/g, ''), 10)
-      const goals = parseInt(stripLinks(goalsRaw).replace(/[^\d-]/g, ''), 10)
+      const goals = parseInt(stripLinks(goalsRaw).replace(/[^\d]/g, ''), 10)
 
       clubs.push({
         name: clubName,
-        start_year: yearRange ? parseInt(yearRange[1], 10) : (singleYear ? parseInt(singleYear[1], 10) : null),
-        end_year: yearRange?.[2]?.trim() ? parseInt(yearRange[2], 10) : null,
+        start_year: start,
+        end_year: end,
         appearances: Number.isFinite(apps) ? apps : null,
         goals: Number.isFinite(goals) ? goals : null,
       })
@@ -481,15 +508,14 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
       const appsRaw = readInfoboxField(fields, [`caps${idx}`, `apps${idx}`])
       const goalsRaw = readInfoboxField(fields, [`goals${idx}`])
 
-      const yearRange = yearsRaw.match(/(\d{4})\s*[-–]\s*(\d{4}|\s*)/)
-      const singleYear = yearsRaw.match(/\b(1[89]\d{2}|20\d{2})\b/)
+      const { start, end } = extractYearRange(yearsRaw)
       const apps = parseInt(stripLinks(appsRaw).replace(/[^\d-]/g, ''), 10)
-      const goals = parseInt(stripLinks(goalsRaw).replace(/[^\d-]/g, ''), 10)
+      const goals = parseInt(stripLinks(goalsRaw).replace(/[^\d]/g, ''), 10)
 
       clubs.push({
         name: clubName,
-        start_year: yearRange ? parseInt(yearRange[1], 10) : (singleYear ? parseInt(singleYear[1], 10) : null),
-        end_year: yearRange?.[2]?.trim() ? parseInt(yearRange[2], 10) : null,
+        start_year: start,
+        end_year: end,
         appearances: Number.isFinite(apps) ? apps : null,
         goals: Number.isFinite(goals) ? goals : null,
       })
@@ -506,17 +532,45 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
     dedupedClubs.push(club)
   }
 
-  // National team
-  const ntRaw = readInfoboxField(fields, ['nationalteam', 'nationalteam1', 'équipe nationale', 'equipe nationale', 'sélection nationale'])
-  const ntName = splitMultiValue(ntRaw)[0] ?? ''
-  const ntCaps = readInfoboxField(fields, ['nationalcaps', 'nationalcaps1', 'caps sélection', 'caps sélection nationale', 'sélections'])
-  const ntGoals = readInfoboxField(fields, ['nationalgoals', 'nationalgoals1', 'goals sélection', 'points sélection'])
-
-  const national_team = ntName && !ntName.toLowerCase().includes('trois colonnes') ? {
-    name: ntName,
-    caps: ntCaps ? parseInt(stripLinks(ntCaps).replace(/[^\d-]/g, '').trim(), 10) || null : null,
-    goals: ntGoals ? parseInt(stripLinks(ntGoals).replace(/[^\d-]/g, '').trim(), 10) || null : null,
-  } : null
+  // National team — look for the senior/main national team (highest numbered entry or explicit field)
+  // FR infobox: sélection1, sélection2, matchs-sélection1, buts-sélection1
+  // EN infobox: nationalteam1, nationalcaps1, nationalgoals1
+  const findNationalTeam = (): { name: string; caps: number | null; goals: number | null } | null => {
+    // Try numbered sélection fields (FR), pick the last/highest (most likely senior team)
+    const selKeys = [...fields.keys()].filter(k => /^sélection\d*$/.test(k) || /^selection\d*$/.test(k))
+    if (selKeys.length > 0) {
+      selKeys.sort((a, b) => {
+        const na = parseInt(a.replace(/\D/g, '') || '0', 10)
+        const nb = parseInt(b.replace(/\D/g, '') || '0', 10)
+        return nb - na
+      })
+      // Pick the senior national team (last alphabetically numbered, typically highest index)
+      for (const sk of selKeys) {
+        const name = stripLinks(fields.get(sk) ?? '').trim()
+        if (!name || name.toLowerCase().includes('moins') || name.toLowerCase().includes('-15') || name.toLowerCase().includes('-17') || name.toLowerCase().includes('-20') || name.toLowerCase().includes('-21') || name.toLowerCase().includes('-23')) continue
+        const idx = sk.replace(/\D/g, '')
+        const capsRaw = readInfoboxField(fields, [`matchs-sélection${idx}`, `caps-sélection${idx}`, `nationalcaps${idx}`, `sélections${idx}`])
+        const goalsRaw = readInfoboxField(fields, [`buts-sélection${idx}`, `goals-sélection${idx}`, `nationalgoals${idx}`])
+        return {
+          name,
+          caps: capsRaw ? parseInt(stripLinks(capsRaw).replace(/[^\d]/g, ''), 10) || null : null,
+          goals: goalsRaw ? parseInt(stripLinks(goalsRaw).replace(/[^\d]/g, ''), 10) || null : null,
+        }
+      }
+    }
+    // EN fallback
+    const ntRaw = readInfoboxField(fields, ['nationalteam', 'nationalteam1', 'équipe nationale', 'equipe nationale', 'sélection nationale'])
+    const ntName = splitMultiValue(ntRaw)[0] ?? ''
+    if (!ntName || ntName.toLowerCase().includes('trois colonnes')) return null
+    const ntCaps = readInfoboxField(fields, ['nationalcaps', 'nationalcaps1', 'caps sélection', 'sélections'])
+    const ntGoals = readInfoboxField(fields, ['nationalgoals', 'nationalgoals1', 'goals sélection'])
+    return {
+      name: ntName,
+      caps: ntCaps ? parseInt(stripLinks(ntCaps).replace(/[^\d]/g, '').trim(), 10) || null : null,
+      goals: ntGoals ? parseInt(stripLinks(ntGoals).replace(/[^\d]/g, '').trim(), 10) || null : null,
+    }
+  }
+  const national_team = findNationalTeam()
 
   const birthYear = extractYear(readInfoboxField(fields, ['birth_date', 'date de naissance', 'naissance']))
 
