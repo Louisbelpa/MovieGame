@@ -316,7 +316,7 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
             type="button"
             onClick={handleRandom}
             disabled={randomLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 bg-white rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 border border-indigo-200 bg-white rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
           >
             {randomLoading
               ? <Loader2 size={13} className="animate-spin" />

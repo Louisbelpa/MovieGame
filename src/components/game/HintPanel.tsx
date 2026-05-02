@@ -66,7 +66,7 @@ function LockedSlot() {
   return (
     <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-dashed border-film-border/40 opacity-40">
       <Lock size={14} className="text-film-text-dim shrink-0" aria-hidden />
-      <span className="text-xs text-film-text-dim">Indice verrouillé</span>
+      <span className="text-sm text-film-text-dim">Indice verrouillé</span>
     </div>
   )
 }

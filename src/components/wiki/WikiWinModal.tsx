@@ -79,13 +79,13 @@ export function WikiWinModal() {
 
         {result.wikipediaUrl && (
           <a href={result.wikipediaUrl} target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs text-film-text-dim hover:text-film-text transition-colors">
+            className="flex items-center gap-1.5 text-sm text-film-text-dim hover:text-film-text transition-colors">
             <ExternalLink size={12} />
             En savoir plus sur Wikipédia
           </a>
         )}
 
-        <p className="text-xs text-film-text-dim">
+        <p className="text-sm text-film-text-dim">
           Prochain défi à minuit heure de Paris
         </p>
       </div>

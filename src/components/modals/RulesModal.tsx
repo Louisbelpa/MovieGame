@@ -37,7 +37,7 @@ export function RulesModal() {
 
         {/* Hints order */}
         <div className="film-border rounded-lg p-3">
-          <p className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-2.5">
+          <p className="text-sm font-semibold text-film-text-dim uppercase tracking-wider mb-2.5">
             Ordre des indices
           </p>
           <div className="flex flex-col gap-2">
@@ -49,23 +49,23 @@ export function RulesModal() {
 
         {/* Attempt status indicators */}
         <div className="film-border rounded-lg p-3">
-          <p className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-2.5">
+          <p className="text-sm font-semibold text-film-text-dim uppercase tracking-wider mb-2.5">
             Signification des pastilles
           </p>
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="flex items-center gap-1.5 text-xs">
+            <span className="flex items-center gap-1.5 text-sm">
               <span className="w-5 h-5 rounded-full bg-film-green flex items-center justify-center text-film-black font-bold text-[10px]">✓</span>
               <span className="text-film-text">Correct</span>
             </span>
-            <span className="flex items-center gap-1.5 text-xs">
+            <span className="flex items-center gap-1.5 text-sm">
               <span className="w-5 h-5 rounded-full bg-film-red flex items-center justify-center text-white font-bold text-[10px]">✗</span>
               <span className="text-film-text">Incorrect</span>
             </span>
-            <span className="flex items-center gap-1.5 text-xs">
+            <span className="flex items-center gap-1.5 text-sm">
               <span className="w-5 h-5 rounded-full bg-film-border/60 flex items-center justify-center text-film-text-dim text-[10px]">→</span>
               <span className="text-film-text">Passé</span>
             </span>
-            <span className="flex items-center gap-1.5 text-xs">
+            <span className="flex items-center gap-1.5 text-sm">
               <span className="w-5 h-5 rounded-full border-2 border-dashed border-film-border/50 inline-block" />
               <span className="text-film-text-dim">Vide</span>
             </span>
@@ -91,7 +91,7 @@ export function RulesModal() {
           />
         </ul>
 
-        <p className="text-xs text-film-text-dim text-center">
+        <p className="text-sm text-film-text-dim text-center">
           Un nouveau film chaque jour à minuit (heure de Paris).<br/>
           Rejoue les anciens défis avec les flèches ◀ ▶.
         </p>
@@ -117,7 +117,7 @@ function HintPreview({
           <p className="text-xs text-film-text-dim">{label}</p>
           <p className="text-xs font-semibold text-film-text">{hint}</p>
         </div>
-        <span className="text-xs text-film-text-dim italic shrink-0">ex : {example}</span>
+        <span className="text-sm text-film-text-dim italic shrink-0">ex : {example}</span>
       </div>
     </div>
   )
@@ -133,7 +133,7 @@ function RuleItem({
       <span className="mt-0.5 shrink-0">{icon}</span>
       <div>
         <p className="font-semibold text-film-text">{title}</p>
-        <p className="text-film-text-dim text-xs">{description}</p>
+        <p className="text-film-text-dim text-sm">{description}</p>
       </div>
     </li>
   )

@@ -104,7 +104,7 @@ function MediaPicker({ films, seriesList, wikiPersons, mediaType, onSelect, onCa
             type="button"
             onClick={() => setTab('films')}
             className={[
-              'flex-1 flex items-center justify-center gap-1.5 py-1 text-xs font-medium rounded-md transition-colors',
+              'flex-1 flex items-center justify-center gap-1.5 py-1 text-sm font-medium rounded-md transition-colors',
               tab === 'films' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700',
             ].join(' ')}
           >
@@ -114,7 +114,7 @@ function MediaPicker({ films, seriesList, wikiPersons, mediaType, onSelect, onCa
             type="button"
             onClick={() => setTab('series')}
             className={[
-              'flex-1 flex items-center justify-center gap-1.5 py-1 text-xs font-medium rounded-md transition-colors',
+              'flex-1 flex items-center justify-center gap-1.5 py-1 text-sm font-medium rounded-md transition-colors',
               tab === 'series' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700',
             ].join(' ')}
           >
@@ -124,7 +124,7 @@ function MediaPicker({ films, seriesList, wikiPersons, mediaType, onSelect, onCa
             type="button"
             onClick={() => setTab('wiki')}
             className={[
-              'flex-1 flex items-center justify-center gap-1.5 py-1 text-xs font-medium rounded-md transition-colors',
+              'flex-1 flex items-center justify-center gap-1.5 py-1 text-sm font-medium rounded-md transition-colors',
               tab === 'wiki' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700',
             ].join(' ')}
           >
@@ -272,14 +272,14 @@ function MediaPicker({ films, seriesList, wikiPersons, mediaType, onSelect, onCa
       </div>
 
       <div className="flex justify-end gap-2 pt-1 border-t border-gray-100">
-        <button type="button" onClick={onCancel} className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+        <button type="button" onClick={onCancel} className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
           Annuler
         </button>
         <button
           type="button"
           disabled={selectedRef === null || loading}
           onClick={() => selectedRef !== null && onSelect(selectedRef)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
         >
           {loading && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
           Confirmer
@@ -352,7 +352,7 @@ export function ChallengeRow({
         {/* Date badge */}
         <span
           className={[
-            'text-xs font-semibold w-28 flex-shrink-0',
+            'text-sm font-semibold w-28 flex-shrink-0',
             today ? 'text-indigo-600' : 'text-gray-500',
           ].join(' ')}
         >
@@ -383,7 +383,7 @@ export function ChallengeRow({
             <span className="text-sm font-medium text-gray-800 truncate flex-1">
               {media.title}
               {'year' in media && typeof media.year === 'number' && (
-                <span className="ml-1.5 text-xs text-gray-400 font-normal">{media.year}</span>
+                <span className="ml-1.5 text-sm text-gray-400 font-normal">{media.year}</span>
               )}
               {isSeries && (
                 <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-purple-100 text-purple-700">
@@ -463,7 +463,7 @@ export function ChallengeRow({
               <button
                 onClick={() => setPicking((p) => !p)}
                 disabled={mutating}
-                className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors ml-auto flex-shrink-0 disabled:opacity-40"
+                className="flex items-center gap-1.5 px-3 py-1 text-sm font-medium text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors ml-auto flex-shrink-0 disabled:opacity-40"
               >
                 <Plus size={12} />
                 Planifier

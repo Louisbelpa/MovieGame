@@ -122,7 +122,7 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
           className="shrink-0 text-film-text-dim min-h-[44px] min-w-[44px] gap-1"
         >
           <SkipForward size={14} />
-          <span className="text-xs">Passer</span>
+          <span className="text-sm">Passer</span>
         </Button>
 
         <Button
@@ -137,7 +137,7 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
       </motion.div>
 
       {/* Attempts counter */}
-      <p className="mt-1.5 text-xs text-film-text-dim text-right">
+      <p className="mt-1.5 text-sm text-film-text-dim text-right">
         {attemptsLeft} tentative{attemptsLeft > 1 ? 's' : ''} restante{attemptsLeft > 1 ? 's' : ''}
       </p>
 

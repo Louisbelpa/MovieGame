@@ -187,7 +187,7 @@ export function LogsPage() {
               <tbody className="divide-y divide-gray-100">
                 {logs.map((log) => (
                   <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-gray-400 text-xs">{log.id}</td>
+                    <td className="px-4 py-3 text-gray-400 text-sm">{log.id}</td>
                     <td className="px-4 py-3"><Timestamp iso={log.created_at} /></td>
                     <td className="px-4 py-3"><ActionBadge action={log.action} /></td>
                     <td className="px-4 py-3"><Details action={log.action} details={log.details} /></td>
