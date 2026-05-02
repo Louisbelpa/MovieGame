@@ -19,6 +19,10 @@ export function HintPanel({ hints, hintsAvailable, hintsRevealed }: HintPanelPro
 
   return (
     <section aria-label="Indices" className="w-full">
+      <h3 className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-2">
+        Indices ({hintsRevealed}/{hintsAvailable})
+      </h3>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
         <AnimatePresence initial={false}>
           {hints.map((hint, i) => (

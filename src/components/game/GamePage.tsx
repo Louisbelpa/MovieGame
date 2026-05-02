@@ -10,6 +10,7 @@ import { ChevronLeft, ChevronRight, Calendar, Share2 } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { MovieImage } from './MovieImage'
 import { GuessInput } from './GuessInput'
+import { GuessList } from './GuessList'
 import { HintPanel } from './HintPanel'
 import { AttemptTracker } from './AttemptTracker'
 import { ModeTabs } from './ModeTabs'
@@ -268,6 +269,14 @@ export function GamePage() {
               hintsRevealed={hintsRevealed}
             />
           )}
+
+          {/* Guess history */}
+          <section>
+            <h3 className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-2">
+              Tentatives
+            </h3>
+            <GuessList guesses={guesses} maxAttempts={challenge.maxAttempts} />
+          </section>
 
         </motion.main>
       )}

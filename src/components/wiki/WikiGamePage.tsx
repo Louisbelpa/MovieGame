@@ -10,6 +10,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { WikiHintPanel } from './WikiHintPanel'
 import { WikiGuessInput } from './WikiGuessInput'
 import { AttemptTracker } from '@/components/game/AttemptTracker'
+import { GuessList } from '@/components/game/GuessList'
 import { Spinner } from '@/components/ui/Spinner'
 import {
   useWikiStore,
@@ -164,6 +165,14 @@ export function WikiGamePage() {
               />
             </section>
           )}
+
+          {/* Guess history */}
+          <section>
+            <h3 className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-2">
+              Tentatives
+            </h3>
+            <GuessList guesses={guesses} maxAttempts={challenge.maxAttempts} />
+          </section>
 
           {/* Game over recap */}
           {isGameOver && (
