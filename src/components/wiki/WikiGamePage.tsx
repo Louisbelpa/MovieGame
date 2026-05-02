@@ -93,6 +93,7 @@ export function WikiGamePage() {
   const status = useWikiStore((s) => s.status)
   const hintsRevealed = useWikiStore((s) => s.hintsRevealed)
   const viewingDate = useWikiStore((s) => s.viewingDate)
+  const isSubmitting = useWikiStore((s) => s.isSubmitting)
 
   const attemptsLeft = useWikiStore(selectWikiAttemptsLeft)
   const currentHints = useWikiStore(useShallow(selectWikiCurrentHints))
@@ -159,7 +160,7 @@ export function WikiGamePage() {
                 onSubmit={submitGuess}
                 onSkip={skipAttempt}
                 attemptsLeft={attemptsLeft}
-                disabled={isGameOver}
+                disabled={isGameOver || isSubmitting}
               />
             </section>
           )}
