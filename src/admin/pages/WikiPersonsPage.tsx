@@ -87,6 +87,21 @@ function parseAliasesInput(raw: string): string[] {
     .filter(Boolean)
 }
 
+const HINT_KEY_LABELS: Record<string, string> = {
+  birth_year: 'Année de naissance',
+  nationality: 'Nationalité',
+  party: 'Parti politique',
+  position: 'Poste',
+  domain: 'Domaine',
+  notable_work: 'Œuvre notable',
+  name_initials: 'Initiales du nom',
+  name_length: 'Longueur du nom',
+}
+
+function hintKeyLabel(key: string): string {
+  return HINT_KEY_LABELS[key] ?? key
+}
+
 function getAllowedHintKeys(personType: PersonType): string[] {
   if (personType === 'politician') {
     return ['birth_year', 'nationality', 'party', 'name_initials', 'name_length']
@@ -573,7 +588,7 @@ function WikiPersonForm({
                   })
                 }}
               />
-              {hintKey}
+              {hintKeyLabel(hintKey)}
             </label>
           ))}
         </div>
