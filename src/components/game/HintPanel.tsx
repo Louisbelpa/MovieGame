@@ -51,7 +51,7 @@ function HintCard({ hint, index }: { hint: HintPayload; index: number }) {
         <Icon size={14} />
       </span>
       <div className="min-w-0">
-        <p className="text-[10px] font-semibold text-film-text-dim uppercase tracking-wider">
+        <p className="text-xs font-semibold text-film-text-dim uppercase tracking-wider">
           {label}
         </p>
         <p className="text-sm text-film-text leading-snug mt-0.5 break-words">

@@ -16,17 +16,15 @@ export function ModeTabs() {
   const activeId = pathname.startsWith('/series') && FEATURES.enableSeries ? 'series' : 'films';
 
   return (
-    <nav className="mode-tabs" role="tablist" aria-label="Mode de jeu">
+    <nav className="mode-tabs" aria-label="Mode de jeu">
       {tabs.map(({ id, label, to, Icon, color }) => {
         const isActive = id === activeId;
-        // Préserve la query string (ex: ?date=...)
         const linkTo = search && !isActive ? to + search : to;
         return (
           <Link
             key={id}
             to={linkTo}
-            role="tab"
-            aria-selected={isActive}
+            aria-current={isActive ? 'page' : undefined}
             className={`mode-tab${isActive ? ' is-active' : ''}`}
             style={isActive ? { '--mode-color': color } as React.CSSProperties : undefined}
           >

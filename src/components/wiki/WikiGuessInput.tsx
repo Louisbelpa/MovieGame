@@ -77,7 +77,7 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
           autoComplete="off"
           enterKeyHint="search"
           spellCheck={false}
-          className="w-full bg-transparent text-film-text placeholder:text-film-text-dim text-sm outline-none min-w-0 py-2 text-base sm:text-sm"
+          className="w-full bg-transparent text-film-text placeholder:text-film-text-dim text-sm outline-none min-w-0 py-2 text-base sm:text-sm rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
         />
         {isLoading && <Loader2 size={14} className="text-film-text-dim animate-spin shrink-0" />}
         <div className="grid grid-cols-2 gap-2 sm:contents">

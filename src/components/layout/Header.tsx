@@ -43,16 +43,16 @@ export function Header() {
           <a
             href="/"
             aria-label="Choisir le jeu"
-            className="p-2 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
           >
-            <Home size={20} />
+            <Home size={20} aria-hidden />
           </a>
           <button
             onClick={() => openModal('rules')}
             aria-label="Règles du jeu"
-            className="p-2 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
           >
-            <HelpCircle size={20} />
+            <HelpCircle size={20} aria-hidden />
           </button>
         </div>
 
@@ -85,16 +85,16 @@ export function Header() {
           <button
             onClick={() => openModal('archive')}
             aria-label="Archives"
-            className="p-2 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
           >
-            <CalendarDays size={20} />
+            <CalendarDays size={20} aria-hidden />
           </button>
           <button
             onClick={() => openModal('stats')}
             aria-label="Mes statistiques"
-            className="p-2 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
           >
-            <BarChart2 size={20} />
+            <BarChart2 size={20} aria-hidden />
           </button>
         </div>
       </div>
