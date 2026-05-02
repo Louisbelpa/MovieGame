@@ -103,7 +103,7 @@ export function WikiArchiveModal() {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={closeModal}>
+    <Modal isOpen={isOpen} onClose={closeModal} ariaLabel="Archives des défis WikiGuessr">
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-2">
           <button onClick={() => setDisplayYM(prevMonth(displayYM))} disabled={!canPrev || loading}
@@ -113,7 +113,7 @@ export function WikiArchiveModal() {
           <div className="text-center min-w-0">
             <p className="font-title font-semibold text-film-text capitalize truncate">{monthLabel(displayYM)}</p>
             {!loading && total > 0 && (
-              <p className="text-[11px] text-film-text-dim">
+              <p className="text-xs text-film-text-dim">
                 {played}/{total} joué{played > 1 ? 's' : ''}
                 {played > 0 && ` · ${won} victoire${won > 1 ? 's' : ''}`}
               </p>
@@ -131,7 +131,7 @@ export function WikiArchiveModal() {
           <div>
             <div className="grid grid-cols-7 gap-1 mb-1">
               {DOW.map((d, i) => (
-                <div key={i} className="text-center text-[10px] text-film-text-dim font-medium py-1">{d}</div>
+                <div key={i} className="text-center text-xs text-film-text-dim font-medium py-1">{d}</div>
               ))}
             </div>
             <div className="grid grid-cols-7 gap-1">

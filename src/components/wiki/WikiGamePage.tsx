@@ -48,9 +48,10 @@ function DateNavBar({ directionRef }: { directionRef: React.MutableRefObject<'pr
     <div className="flex flex-col gap-0.5">
       <div className="flex items-center justify-between gap-2 py-1.5 px-1">
         <button onClick={goBack} disabled={isLoading || !hasPrev}
-          className="p-1.5 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+          aria-label={!hasPrev ? 'Pas de défi antérieur' : 'Défi précédent'}
+          className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
           title={!hasPrev ? 'Pas de défi antérieur' : 'Défi précédent'}>
-          <ChevronLeft size={18} />
+          <ChevronLeft size={20} aria-hidden />
         </button>
         <div className="flex items-center gap-2 text-sm">
           <Calendar size={13} className="text-film-text-dim" />
@@ -62,19 +63,20 @@ function DateNavBar({ directionRef }: { directionRef: React.MutableRefObject<'pr
             </button>
           )}
           {viewingDate && (
-            <span className="text-[10px] bg-film-surface border border-film-border px-1.5 py-0.5 rounded text-film-text-dim">
+            <span className="text-xs bg-film-surface border border-film-border px-1.5 py-0.5 rounded text-film-text-dim">
               Ancien défi
             </span>
           )}
         </div>
         <button onClick={goForward} disabled={isToday || isLoading || !hasNext}
-          className="p-1.5 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+          aria-label={isToday ? "C'est le défi du jour" : !hasNext ? 'Pas de défi suivant' : 'Défi suivant'}
+          className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
           title={isToday ? "C'est le défi du jour" : !hasNext ? 'Pas de défi suivant' : 'Défi suivant'}>
-          <ChevronRight size={18} />
+          <ChevronRight size={20} aria-hidden />
         </button>
       </div>
       {isToday && hasPrev && (
-        <p className="text-center text-[11px] text-film-text-dim/60 tracking-wide">
+        <p className="text-center text-xs text-film-text-dim tracking-wide">
           ← défis des jours précédents disponibles
         </p>
       )}
@@ -111,7 +113,8 @@ export function WikiGamePage() {
     <AnimatePresence mode="sync">
       {status === 'idle' && (
         <motion.div key={`loading-${dateKey}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }}
-          className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          className="flex flex-col items-center justify-center min-h-[60vh] gap-4"
+          role="status" aria-live="polite">
           <Spinner size="lg" />
           <p className="text-film-text-dim text-sm animate-pulse">Chargement du défi…</p>
         </motion.div>
@@ -133,6 +136,7 @@ export function WikiGamePage() {
           className="max-w-2xl mx-auto px-3 sm:px-4 py-3 sm:py-6 pb-24 sm:pb-6 flex flex-col gap-3 sm:gap-5"
           initial={{ opacity: 0, x: slideX }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -slideX }}
           transition={{ duration: 0.2, ease: 'easeInOut' }}>
+          <h1 className="sr-only">Défi du jour — devinez la personnalité</h1>
 
           <DateNavBar directionRef={directionRef} />
 
@@ -167,7 +171,7 @@ export function WikiGamePage() {
 
           {/* Game over recap */}
           {isGameOver && (
-            <div className={`flex items-center justify-between gap-2 py-2.5 px-4 rounded-lg text-sm font-semibold
+            <div role="status" aria-live="polite" className={`flex items-center justify-between gap-2 py-2.5 px-4 rounded-lg text-sm font-semibold
               ${status === 'won'
                 ? 'bg-film-green/10 border border-film-green/30 text-film-green'
                 : 'bg-film-red/10 border border-film-red/30 text-film-red'}`}>

@@ -15,16 +15,13 @@ export function WikiRulesModal() {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose}>
+    <Modal isOpen={isOpen} onClose={handleClose} title="Comment jouer ?">
       <div className="flex flex-col gap-5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-film-gold/15 border border-film-gold/30 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-full bg-film-gold/15 border border-film-gold/30 flex items-center justify-center shrink-0" aria-hidden>
             <BookOpen size={20} className="text-film-gold" />
           </div>
-          <div>
-            <h2 className="font-title text-lg font-semibold text-film-text">Comment jouer ?</h2>
-            <p className="text-xs text-film-text-dim">WikiGuessr — Devine la personnalité</p>
-          </div>
+          <p className="text-xs text-film-text-dim">WikiGuessr — Devine la personnalité</p>
         </div>
 
         <div className="flex flex-col gap-3 text-sm text-film-text">

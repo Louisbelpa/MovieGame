@@ -39,7 +39,7 @@ export function WinModal() {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={closeModal}>
+    <Modal isOpen={isOpen} onClose={closeModal} ariaLabel="Défi réussi">
       <div className="flex flex-col items-center gap-5 text-center">
         {/* Trophy animation */}
         <motion.div

@@ -120,7 +120,7 @@ export function ArchiveModal() {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={closeModal}>
+    <Modal isOpen={isOpen} onClose={closeModal} ariaLabel="Archives des défis">
       <div className="flex flex-col gap-4">
 
         {/* ── Month navigation ── */}
@@ -128,9 +128,10 @@ export function ArchiveModal() {
           <button
             onClick={() => setDisplayYM(prevMonth(displayYM))}
             disabled={!canPrev || loading}
-            className="p-1.5 rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer"
+            aria-label="Mois précédent"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
           >
-            <ChevronLeft size={18} />
+            <ChevronLeft size={20} aria-hidden />
           </button>
 
           <div className="text-center min-w-0">
@@ -138,7 +139,7 @@ export function ArchiveModal() {
               {monthLabel(displayYM)}
             </p>
             {!loading && total > 0 && (
-              <p className="text-[11px] text-film-text-dim">
+              <p className="text-xs text-film-text-dim">
                 {played}/{total} joué{played > 1 ? 's' : ''}
                 {played > 0 && ` · ${won} victoire${won > 1 ? 's' : ''}`}
               </p>
@@ -148,9 +149,10 @@ export function ArchiveModal() {
           <button
             onClick={() => setDisplayYM(nextMonth(displayYM))}
             disabled={!canNext || loading}
-            className="p-1.5 rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer"
+            aria-label="Mois suivant"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
           >
-            <ChevronRight size={18} />
+            <ChevronRight size={20} aria-hidden />
           </button>
         </div>
 
@@ -164,7 +166,7 @@ export function ArchiveModal() {
             {/* Day-of-week header */}
             <div className="grid grid-cols-7 gap-1 mb-1">
               {DOW.map((d, i) => (
-                <div key={i} className="text-center text-[10px] text-film-text-dim font-medium py-1">
+                <div key={i} className="text-center text-xs text-film-text-dim font-medium py-1">
                   {d}
                 </div>
               ))}
@@ -186,8 +188,9 @@ export function ArchiveModal() {
                     onClick={() => handleDay(date)}
                     disabled={s === 'none'}
                     title={s !== 'none' ? `Défi du ${date}` : undefined}
+                    aria-label={s !== 'none' ? `Défi du ${date}, ${s === 'won' ? 'gagné' : s === 'lost' ? 'perdu' : 'à jouer'}` : `${date} - aucun défi`}
                     className={[
-                      'aspect-square rounded-lg text-xs font-medium transition-all leading-none flex items-center justify-center',
+                      'aspect-square rounded-lg text-xs font-medium transition-all leading-none flex items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold',
                       s === 'none'   ? 'text-film-text-dim/20 cursor-default' : 'cursor-pointer',
                       s === 'won'    ? 'bg-film-green/20 text-film-green hover:bg-film-green/30 border border-film-green/30' : '',
                       s === 'lost'   ? 'bg-film-red/20 text-film-red hover:bg-film-red/30 border border-film-red/30' : '',
