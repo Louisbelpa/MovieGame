@@ -41,7 +41,7 @@ export function WikiHintPanel({ photoUrl, profile, hints, hintsAvailable, hintsR
       {(hints.length > 0 || lockedCount > 0) && (
         <div className="flex items-center gap-1.5 mt-1">
           <span className="text-sm font-semibold text-film-text-dim uppercase tracking-wider">Indices</span>
-          <span className="text-[10px] text-film-text-dim/60">{hintsRevealed}/{hintsAvailable}</span>
+          <span className="text-xs text-film-text-dim/60">{hintsRevealed}/{hintsAvailable}</span>
         </div>
       )}
 

@@ -114,7 +114,7 @@ function HintPreview({
       <span className="shrink-0">{icon}</span>
       <div className="flex-1 flex items-center justify-between gap-2">
         <div>
-          <p className="text-[10px] text-film-text-dim">{label}</p>
+          <p className="text-xs text-film-text-dim">{label}</p>
           <p className="text-sm font-semibold text-film-text">{hint}</p>
         </div>
         <span className="text-sm text-film-text-dim italic shrink-0">ex : {example}</span>

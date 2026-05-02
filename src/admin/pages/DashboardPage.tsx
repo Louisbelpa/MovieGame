@@ -295,7 +295,7 @@ function ChallengeCard({ challenge }: { challenge: AdminChallenge }) {
       )}
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-gray-900 truncate text-sm sm:text-base">{media?.title}</p>
-        <p className="text-sm sm:text-sm text-gray-500 truncate">{subtitle}</p>
+        <p className="text-sm text-gray-500 truncate">{subtitle}</p>
         <p className="text-sm text-gray-400 mt-0.5 truncate">{formatDate(challenge.date)}</p>
       </div>
       <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${

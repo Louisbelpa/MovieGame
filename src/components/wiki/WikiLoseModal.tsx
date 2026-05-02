@@ -42,7 +42,7 @@ export function WikiLoseModal() {
               className="w-full h-40 object-cover object-top" />
           )}
           <div className="p-3 text-left">
-            <p className="text-[10px] uppercase tracking-wider text-film-text-dim mb-1">Article Wikipédia</p>
+            <p className="text-xs uppercase tracking-wider text-film-text-dim mb-1">Article Wikipédia</p>
             <p className="font-title text-xl font-semibold text-film-text leading-tight">
               {result.name}
             </p>
@@ -51,7 +51,7 @@ export function WikiLoseModal() {
             </div>
             {result.extract && (
               <div className="mt-3 pt-2 border-t border-film-border/50">
-                <p className="text-[10px] uppercase tracking-wider text-film-text-dim mb-1">Résumé</p>
+                <p className="text-xs uppercase tracking-wider text-film-text-dim mb-1">Résumé</p>
                 <p className="text-sm text-film-text-dim line-clamp-4">{result.extract}</p>
               </div>
             )}
