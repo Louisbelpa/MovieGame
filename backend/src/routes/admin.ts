@@ -3133,11 +3133,6 @@ adminRouter.delete('/wiki-persons/:id', (req: Request, res: Response, next: Next
   } catch (err) { next(err) }
 })
 
-// In-memory slug pool to avoid hammering Wikidata on every click
-const slugPool: { slugs: string[]; lang: string; minFame: number; expiresAt: number } = {
-  slugs: [], lang: 'fr', minFame: 30, expiresAt: 0,
-}
-
 async function fetchSparqlSlugs(lang: string, minFame: number): Promise<string[]> {
   const sparql = `
     SELECT ?title WHERE {
@@ -3152,44 +3147,34 @@ async function fetchSparqlSlugs(lang: string, minFame: number): Promise<string[]
     LIMIT 100
   `
   const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(sparql)}&format=json`
-  const res = await fetch(url, {
+  const sparqlRes = await fetch(url, {
     headers: { 'Accept': 'application/sparql-results+json', 'User-Agent': 'MovieGame/1.0 (admin tool)' },
     signal: AbortSignal.timeout(30_000),
   })
-  if (!res.ok) throw new Error(`Wikidata SPARQL error: ${res.status}`)
-  const data = await res.json() as { results?: { bindings?: Array<{ title?: { value: string } }> } }
+  if (!sparqlRes.ok) throw new Error(`Wikidata SPARQL error: ${sparqlRes.status}`)
+  const data = await sparqlRes.json() as { results?: { bindings?: Array<{ title?: { value: string } }> } }
   return (data.results?.bindings ?? [])
     .map((b) => b.title?.value?.replace(/ /g, '_') ?? '')
     .filter(Boolean)
 }
 
 // GET /api/admin/wiki-persons/random?lang=fr&minFame=30
+// Returns a batch of slugs; the frontend manages the pool to avoid repeated SPARQL calls.
 adminRouter.get('/wiki-persons/random', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'fr'
     const minFame = Math.max(5, Math.min(100, parseInt(String(req.query.minFame ?? '30'), 10) || 30))
-    const now = Date.now()
-
-    // Refresh pool when empty, expired (30 min), or params changed
-    if (slugPool.slugs.length < 5 || slugPool.expiresAt < now || slugPool.lang !== lang || slugPool.minFame !== minFame) {
-      const slugs = await fetchSparqlSlugs(lang, minFame)
-      if (slugs.length === 0) {
-        res.status(404).json({ error: 'Aucun résultat Wikidata. Essaie de réduire minFame.' })
-        return
-      }
-      // Shuffle the pool
-      for (let i = slugs.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [slugs[i], slugs[j]] = [slugs[j], slugs[i]]
-      }
-      slugPool.slugs = slugs
-      slugPool.lang = lang
-      slugPool.minFame = minFame
-      slugPool.expiresAt = now + 30 * 60 * 1000
+    const slugs = await fetchSparqlSlugs(lang, minFame)
+    if (slugs.length === 0) {
+      res.status(404).json({ error: 'Aucun résultat Wikidata. Essaie de réduire minFame.' })
+      return
     }
-
-    const slug = slugPool.slugs.pop()!
-    res.json({ slug })
+    // Shuffle before sending
+    for (let i = slugs.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [slugs[i], slugs[j]] = [slugs[j], slugs[i]]
+    }
+    res.json({ slugs })
   } catch (err) {
     next(err)
   }

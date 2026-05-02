@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Plus, Search, X, WandSparkles, ExternalLink, Trash2, Pencil, Shuffle, History } from 'lucide-react'
 import {
   getWikiPersons,
@@ -6,7 +6,7 @@ import {
   updateWikiPerson,
   deleteWikiPerson,
   fetchWikipediaPerson,
-  fetchRandomWikiSlug,
+  fetchRandomWikiSlugs,
   type AdminWikiPerson,
   type WikiPersonPayload,
 } from '../api'
@@ -222,6 +222,7 @@ function WikiPersonForm({
   const [era, setEra] = useState('')
   const [loadingWiki, setLoadingWiki] = useState(false)
   const [loadingRandomWiki, setLoadingRandomWiki] = useState(false)
+  const slugPoolRef = useRef<string[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [parseScore, setParseScore] = useState<number | null>(null)
@@ -409,7 +410,11 @@ function WikiPersonForm({
     setLoadingRandomWiki(true)
     setError(null)
     try {
-      const { slug: randomSlug } = await fetchRandomWikiSlug('fr', 30)
+      if (slugPoolRef.current.length === 0) {
+        const { slugs } = await fetchRandomWikiSlugs('fr', 30)
+        slugPoolRef.current = slugs
+      }
+      const randomSlug = slugPoolRef.current.pop()!
       const data = await fetchWikipediaPerson(randomSlug, 'fr')
       setSlug(randomSlug)
       applyWikipediaData(data)
@@ -795,79 +800,93 @@ export function WikiPersonsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {persons.map((person) => (
-                  <tr key={person.id} className="hover:bg-gray-50 group">
-                    <td className="px-3 py-3 w-20">
-                      {person.photo_url ? (
-                        <img
-                          src={person.photo_url}
-                          alt={person.name}
-                          className="h-10 w-16 rounded-md object-cover object-top border border-gray-200"
-                          crossOrigin="anonymous"
-                          referrerPolicy="no-referrer"
-                          onError={(e) => { e.currentTarget.style.display = 'none' }}
-                        />
-                      ) : (
-                        <div className="h-10 w-16 rounded-md bg-gray-100 border border-gray-200" />
-                      )}
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="font-medium text-sm text-gray-900 truncate max-w-[170px] sm:max-w-[220px]">
-                          {person.name}
-                        </div>
-                        <div className="text-xs text-gray-400 flex items-center gap-1.5 min-w-0">
-                          <span className="truncate">{person.wikipedia_slug}</span>
-                          {person.wikipedia_url && <a href={person.wikipedia_url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-700 flex-shrink-0"><ExternalLink size={12} /></a>}
-                        </div>
-                        {(() => {
-                          const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
-                          const past = (person.used_dates ?? []).filter((d) => d <= today)
-                          const upcoming = (person.used_dates ?? []).filter((d) => d > today)
-                          return (
-                            <div className="flex flex-wrap gap-1 mt-0.5">
-                              {past.length > 0 && (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-emerald-100 text-emerald-700">
-                                  <History size={9} />Joué {past.length}×
-                                </span>
-                              )}
-                              {upcoming.length > 0 && (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-blue-100 text-blue-700">
-                                  Planifié
-                                </span>
+                {persons.map((person) => {
+                  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
+                  const past = (person.used_dates ?? []).filter((d) => d <= today)
+                  const upcoming = (person.used_dates ?? []).filter((d) => d > today)
+                  const Badges = () => (
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {past.length > 0 && <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-emerald-100 text-emerald-700"><History size={9} />Joué {past.length}×</span>}
+                      {upcoming.length > 0 && <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-blue-100 text-blue-700">Planifié</span>}
+                    </div>
+                  )
+                  return (
+                    <>
+                      {/* Mobile card */}
+                      <tr key={`m-${person.id}`} className="sm:hidden border-b border-gray-100 last:border-0">
+                        <td className="px-3 py-3" colSpan={10}>
+                          <div className="flex items-center gap-3">
+                            <div className="shrink-0">
+                              {person.photo_url ? (
+                                <img src={person.photo_url} alt={person.name}
+                                  className="h-10 w-14 rounded-md object-cover object-top border border-gray-200"
+                                  crossOrigin="anonymous" referrerPolicy="no-referrer"
+                                  onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                              ) : (
+                                <div className="h-10 w-14 rounded-md bg-gray-100 border border-gray-200" />
                               )}
                             </div>
-                          )
-                        })()}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 text-sm text-gray-600 hidden sm:table-cell">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        person.person_type === 'politician'
-                          ? 'bg-indigo-100 text-indigo-700'
-                          : person.person_type === 'sportsperson'
-                            ? 'bg-violet-100 text-violet-700'
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm text-gray-900 truncate">{person.name}</div>
+                              <div className="text-xs text-gray-400 flex items-center gap-1 min-w-0">
+                                <span className="truncate">{person.wikipedia_slug}</span>
+                                {person.wikipedia_url && <a href={person.wikipedia_url} target="_blank" rel="noreferrer" className="text-indigo-500 shrink-0"><ExternalLink size={11} /></a>}
+                              </div>
+                              <Badges />
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button onClick={() => setModal({ type: 'edit', person })} className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors"><Pencil size={14} /></button>
+                              <button onClick={() => setModal({ type: 'delete', person })} className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors"><Trash2 size={14} /></button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Desktop row */}
+                      <tr key={`d-${person.id}`} className="hidden sm:table-row hover:bg-gray-50 group">
+                        <td className="px-3 py-3 w-20">
+                          {person.photo_url ? (
+                            <img src={person.photo_url} alt={person.name}
+                              className="h-10 w-16 rounded-md object-cover object-top border border-gray-200"
+                              crossOrigin="anonymous" referrerPolicy="no-referrer"
+                              onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                          ) : (
+                            <div className="h-10 w-16 rounded-md bg-gray-100 border border-gray-200" />
+                          )}
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-col gap-0.5">
+                            <div className="font-medium text-sm text-gray-900 truncate max-w-[220px]">{person.name}</div>
+                            <div className="text-xs text-gray-400 flex items-center gap-1.5 min-w-0">
+                              <span className="truncate">{person.wikipedia_slug}</span>
+                              {person.wikipedia_url && <a href={person.wikipedia_url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-700 flex-shrink-0"><ExternalLink size={12} /></a>}
+                            </div>
+                            <Badges />
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 text-sm text-gray-600 hidden sm:table-cell">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            person.person_type === 'politician' ? 'bg-indigo-100 text-indigo-700'
+                            : person.person_type === 'sportsperson' ? 'bg-violet-100 text-violet-700'
                             : 'bg-slate-100 text-slate-700'
-                      }`}>
-                        {personTypeLabel(person.person_type)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-sm hidden md:table-cell">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        person.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {person.is_active ? 'Actif' : 'Inactif'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-sm text-gray-600 hidden lg:table-cell">{person.used_dates.length}</td>
-                    <td className="sticky right-0 bg-white group-hover:bg-gray-50 transition-colors px-3 py-3 w-24 border-l border-gray-100 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
-                      <div className="flex justify-end items-center gap-1 whitespace-nowrap">
-                        <button onClick={() => setModal({ type: 'edit', person })} className="p-2 sm:p-1.5 bg-indigo-50 text-indigo-600 sm:bg-transparent sm:text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Pencil size={14} /></button>
-                        <button onClick={() => setModal({ type: 'delete', person })} className="p-2 sm:p-1.5 bg-red-50 text-red-600 sm:bg-transparent sm:text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          }`}>{personTypeLabel(person.person_type)}</span>
+                        </td>
+                        <td className="px-3 py-3 text-sm hidden md:table-cell">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${person.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+                            {person.is_active ? 'Actif' : 'Inactif'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-sm text-gray-600 hidden lg:table-cell">{person.used_dates.length}</td>
+                        <td className="px-3 py-3 w-24">
+                          <div className="flex justify-end items-center gap-1">
+                            <button onClick={() => setModal({ type: 'edit', person })} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Pencil size={14} /></button>
+                            <button onClick={() => setModal({ type: 'delete', person })} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    </>
+                  )
+                })}
               </tbody>
             </table>
           </div>
