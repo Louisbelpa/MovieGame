@@ -230,7 +230,7 @@ export function Footer() {
           </div>
 
           {/* TMDB attribution */}
-          <div className="flex items-center justify-center gap-2 mb-2 text-xs text-film-text-dim/60">
+          <div className="flex items-center justify-center gap-2 mb-2 text-xs text-film-text-dim">
             <Film size={11} />
             <span>
               Ce produit utilise l'API TMDB mais n'est pas approuvé ou certifié par{' '}
@@ -239,7 +239,7 @@ export function Footer() {
           </div>
           {/* Wikipedia attribution */}
           {FEATURES.enableWiki && (
-            <div className="flex items-center justify-center gap-2 mb-3 text-xs text-film-text-dim/60">
+            <div className="flex items-center justify-center gap-2 mb-3 text-xs text-film-text-dim">
               <BookOpen size={11} />
               <span>
                 Mode WikiGuessr — données issues de{' '}
@@ -250,7 +250,7 @@ export function Footer() {
           )}
 
           {/* Copyright + version */}
-          <div className="flex items-center justify-center gap-3 text-xs text-film-text-dim/50">
+          <div className="flex items-center justify-center gap-3 text-xs text-film-text-dim">
             <p>© {new Date().getFullYear()} {BRAND_NAME}. Tous droits réservés.</p>
             <button
               onClick={() => setModal('changelog')}

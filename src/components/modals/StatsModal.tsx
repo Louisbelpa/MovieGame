@@ -53,7 +53,7 @@ function StatCell({
       <span className="text-2xl font-bold font-title text-gradient-gold">
         {value}
       </span>
-      <span className="text-[10px] text-film-text-dim uppercase tracking-wide leading-tight">
+      <span className="text-xs text-film-text-dim uppercase tracking-wide leading-tight">
         {label}
       </span>
     </div>

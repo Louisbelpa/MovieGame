@@ -25,7 +25,7 @@ export function WikiLoseModal() {
   })()
 
   return (
-    <Modal isOpen={isOpen} onClose={closeModal}>
+    <Modal isOpen={isOpen} onClose={closeModal} ariaLabel="Défi échoué">
       <div className="flex flex-col items-center gap-5 text-center">
         <div className="w-16 h-16 rounded-full bg-film-red/10 border border-film-red/30 flex items-center justify-center">
           <XCircle size={32} className="text-film-red" />
@@ -52,7 +52,7 @@ export function WikiLoseModal() {
             {result.extract && (
               <div className="mt-3 pt-2 border-t border-film-border/50">
                 <p className="text-xs uppercase tracking-wider text-film-text-dim mb-1">Résumé</p>
-                <p className="text-sm text-film-text-dim line-clamp-4">{result.extract}</p>
+                <p className="text-xs text-film-text-dim line-clamp-4">{result.extract}</p>
               </div>
             )}
           </div>

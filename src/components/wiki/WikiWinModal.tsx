@@ -29,7 +29,7 @@ export function WikiWinModal() {
   })()
 
   return (
-    <Modal isOpen={isOpen} onClose={closeModal}>
+    <Modal isOpen={isOpen} onClose={closeModal} ariaLabel="Défi réussi">
       <div className="flex flex-col items-center gap-5 text-center">
         <motion.div
           initial={{ scale: 0, rotate: -15 }}
@@ -64,7 +64,7 @@ export function WikiWinModal() {
             {result.extract && (
               <div className="mt-3 pt-2 border-t border-film-border/50">
                 <p className="text-xs uppercase tracking-wider text-film-text-dim mb-1">Résumé</p>
-                <p className="text-sm text-film-text-dim line-clamp-4">{result.extract}</p>
+                <p className="text-xs text-film-text-dim line-clamp-4">{result.extract}</p>
               </div>
             )}
           </div>

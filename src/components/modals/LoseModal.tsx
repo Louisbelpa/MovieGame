@@ -36,7 +36,7 @@ export function LoseModal() {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={closeModal}>
+    <Modal isOpen={isOpen} onClose={closeModal} ariaLabel="Défi échoué">
       <div className="flex flex-col items-center gap-5 text-center">
         {/* Icon */}
         <motion.div

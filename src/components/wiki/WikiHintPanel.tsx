@@ -30,7 +30,7 @@ export function WikiHintPanel({ photoUrl, profile, hints, hintsAvailable, hintsR
             referrerPolicy="no-referrer"
             onError={(e) => { e.currentTarget.parentElement!.style.display = 'none' }}
           />
-          <span className="absolute left-2 top-1.5 text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded bg-black/50 text-white">
+          <span className="absolute left-2 top-1.5 text-xs uppercase tracking-wider font-semibold px-2 py-0.5 rounded bg-black/70 text-white">
             Photo floutée
           </span>
         </div>
@@ -40,8 +40,8 @@ export function WikiHintPanel({ photoUrl, profile, hints, hintsAvailable, hintsR
 
       {(hints.length > 0 || lockedCount > 0) && (
         <div className="flex items-center gap-1.5 mt-1">
-          <span className="text-sm font-semibold text-film-text-dim uppercase tracking-wider">Indices</span>
-          <span className="text-xs text-film-text-dim/60">{hintsRevealed}/{hintsAvailable}</span>
+          <span className="text-xs font-semibold text-film-text-dim uppercase tracking-wider">Indices</span>
+          <span className="text-xs text-film-text-dim">{hintsRevealed}/{hintsAvailable}</span>
         </div>
       )}
 
@@ -52,7 +52,7 @@ export function WikiHintPanel({ photoUrl, profile, hints, hintsAvailable, hintsR
       </AnimatePresence>
 
       {lockedCount > 0 && (
-        <p className="text-sm text-film-text-dim/50 text-center py-1 flex items-center justify-center gap-1.5">
+        <p className="text-xs text-film-text-dim text-center py-1 flex items-center justify-center gap-1.5">
           <Lock size={11} className="shrink-0" />
           {lockedCount} indice{lockedCount > 1 ? 's' : ''} se déverrouille{lockedCount > 1 ? 'nt' : ''} avec les tentatives
         </p>
@@ -92,7 +92,7 @@ function VisibleProfile({ profile }: { profile: WikiVisibleProfile }) {
                   <span className="text-film-text-dim"> · {[r.years, r.country].filter(Boolean).join(' · ')}</span>
                 )}
                 {(r.predecessor || r.successor) && (
-                  <div className="text-film-text-dim/50 mt-0.5">
+                  <div className="text-film-text-dim mt-0.5">
                     {r.predecessor && `← ${r.predecessor}`}
                     {r.predecessor && r.successor && ' · '}
                     {r.successor && `${r.successor} →`}

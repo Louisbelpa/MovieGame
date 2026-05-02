@@ -36,7 +36,7 @@ function StatCell({ value, label }: { value: string | number; label: string }) {
   return (
     <div className="flex flex-col items-center gap-0.5">
       <span className="text-2xl font-bold font-title text-gradient-gold">{value}</span>
-      <span className="text-[10px] text-film-text-dim uppercase tracking-wide leading-tight">{label}</span>
+      <span className="text-xs text-film-text-dim uppercase tracking-wide leading-tight">{label}</span>
     </div>
   )
 }

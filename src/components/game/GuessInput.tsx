@@ -103,8 +103,9 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
           spellCheck={false}
           className={cn(
             'flex-1 bg-transparent text-film-text placeholder:text-film-text-dim',
-            'text-sm outline-none min-w-0 py-2',
-            'sm:text-sm text-base' // text-base (16px) sur mobile, text-sm sur sm+
+            'text-sm outline-none min-w-0 py-2 rounded',
+            'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold',
+            'sm:text-sm text-base'
           )}
         />
 
@@ -146,7 +147,7 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
           <motion.ul
             id={listboxId}
             role="listbox"
-            aria-label="Suggestions de films"
+            aria-label={gameType === 'series' ? 'Suggestions de séries' : 'Suggestions de films'}
             className={cn(
               'absolute z-20 top-full mt-1 w-full',
               'film-border rounded-xl overflow-hidden shadow-2xl',
