@@ -9,7 +9,6 @@ import { ChevronLeft, ChevronRight, Calendar, Share2 } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { WikiHintPanel } from './WikiHintPanel'
 import { WikiGuessInput } from './WikiGuessInput'
-import { GuessList } from '@/components/game/GuessList'
 import { AttemptTracker } from '@/components/game/AttemptTracker'
 import { Spinner } from '@/components/ui/Spinner'
 import {
@@ -191,8 +190,6 @@ export function WikiGamePage() {
             </div>
           )}
 
-          {/* Guess history */}
-          <GuessList guesses={guesses} maxAttempts={challenge.maxAttempts} />
         </motion.main>
       )}
     </AnimatePresence>
