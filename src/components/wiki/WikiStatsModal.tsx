@@ -22,7 +22,7 @@ export function WikiStatsModal() {
           <StatCell value={stats.maxStreak} label="Max série" />
         </div>
         <div>
-          <p className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-3">
+          <p className="text-sm font-semibold text-film-text-dim uppercase tracking-wider mb-3">
             Distribution des victoires
           </p>
           <DistributionChart distribution={stats.guessDistribution} maxAttempts={3} />
@@ -52,7 +52,7 @@ function DistributionChart({ distribution, maxAttempts }: { distribution: GameSt
         const pct = Math.round((count / maxVal) * 100)
         return (
           <div key={n} className="flex items-center gap-2 text-sm">
-            <span className="w-3 text-film-text-dim text-xs font-mono">{n}</span>
+            <span className="w-3 text-film-text-dim text-sm font-mono">{n}</span>
             <div className="flex-1 h-5 bg-film-gray rounded overflow-hidden">
               <motion.div
                 className="h-full bg-film-gold rounded"
@@ -61,7 +61,7 @@ function DistributionChart({ distribution, maxAttempts }: { distribution: GameSt
                 transition={{ duration: 0.5, delay: n * 0.06, ease: 'easeOut' }}
               />
             </div>
-            <span className="w-4 text-film-text-dim text-xs text-right">{count}</span>
+            <span className="w-4 text-film-text-dim text-sm text-right">{count}</span>
           </div>
         )
       })}

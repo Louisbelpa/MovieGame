@@ -52,7 +52,7 @@ export function WikiLoseModal() {
             {result.extract && (
               <div className="mt-3 pt-2 border-t border-film-border/50">
                 <p className="text-[10px] uppercase tracking-wider text-film-text-dim mb-1">Résumé</p>
-                <p className="text-xs text-film-text-dim line-clamp-4">{result.extract}</p>
+                <p className="text-sm text-film-text-dim line-clamp-4">{result.extract}</p>
               </div>
             )}
           </div>
@@ -65,13 +65,13 @@ export function WikiLoseModal() {
 
         {result.wikipediaUrl && (
           <a href={result.wikipediaUrl} target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs text-film-text-dim hover:text-film-text transition-colors">
+            className="flex items-center gap-1.5 text-sm text-film-text-dim hover:text-film-text transition-colors">
             <ExternalLink size={12} />
             En savoir plus sur Wikipédia
           </a>
         )}
 
-        <p className="text-xs text-film-text-dim">
+        <p className="text-sm text-film-text-dim">
           Prochain défi à minuit heure de Paris
         </p>
       </div>

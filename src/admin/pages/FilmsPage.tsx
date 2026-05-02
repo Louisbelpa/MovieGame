@@ -265,7 +265,7 @@ export function FilmsPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[400px]">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-100 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <tr className="bg-gray-50 border-b border-gray-100 text-left text-sm font-semibold text-gray-500 uppercase tracking-wider">
                   <th className="px-3 py-3 w-20"></th>
                   <th className="px-3 py-3">Titre</th>
                   <th className="px-3 py-3 hidden sm:table-cell">Année</th>

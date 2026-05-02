@@ -40,17 +40,17 @@ function ChangelogModal({ onClose }: { onClose: () => void }) {
     <Modal isOpen onClose={onClose} title="Notes de version">
       <div className="flex flex-col gap-5 text-sm text-film-text">
         {entries.length === 0 && (
-          <p className="text-film-text-dim text-xs text-center">Chargement…</p>
+          <p className="text-film-text-dim text-sm text-center">Chargement…</p>
         )}
         {entries.map((entry) => (
           <div key={entry.id}>
             <div className="flex items-center gap-2 mb-2">
               <span className="font-bold text-film-gold">v{entry.version}</span>
-              <span className="text-xs text-film-text-dim">{entry.release_date}</span>
+              <span className="text-sm text-film-text-dim">{entry.release_date}</span>
             </div>
             <ul className="flex flex-col gap-1">
               {entry.changes.map((change, i) => (
-                <li key={i} className="flex items-start gap-2 text-xs text-film-text-dim">
+                <li key={i} className="flex items-start gap-2 text-sm text-film-text-dim">
                   <span className="text-film-gold mt-0.5 shrink-0">·</span>
                   {change}
                 </li>
@@ -122,7 +122,7 @@ function FaqItem({ q, a }: { q: string; a: string }) {
   return (
     <div className="film-border rounded-lg p-3">
       <p className="font-semibold text-film-text mb-1">{q}</p>
-      <p className="text-film-text-dim text-xs leading-relaxed">{a}</p>
+      <p className="text-film-text-dim text-sm leading-relaxed">{a}</p>
     </div>
   )
 }
@@ -138,7 +138,7 @@ function PrivacyModal({ onClose }: { onClose: () => void }) {
 
         <section>
           <h3 className="font-semibold text-film-text mb-1">Données collectées</h3>
-          <ul className="list-disc list-inside space-y-1 text-xs">
+          <ul className="list-disc list-inside space-y-1 text-sm">
             <li>Un jeton de session anonyme (cookie HTTP-only) pour enregistrer votre progression quotidienne.</li>
             <li>Vos statistiques de jeu (victoires, séries, distribution), stockées uniquement dans votre navigateur (localStorage).</li>
             <li>Des statistiques agrégées anonymes côté serveur (taux de victoire global, sans identification personnelle).</li>
@@ -147,7 +147,7 @@ function PrivacyModal({ onClose }: { onClose: () => void }) {
 
         <section>
           <h3 className="font-semibold text-film-text mb-1">Ce que nous ne collectons pas</h3>
-          <ul className="list-disc list-inside space-y-1 text-xs">
+          <ul className="list-disc list-inside space-y-1 text-sm">
             <li>Aucune donnée personnelle (nom, email, adresse IP stockée durablement).</li>
             <li>Aucun suivi publicitaire ou analytique tiers.</li>
           </ul>
@@ -155,7 +155,7 @@ function PrivacyModal({ onClose }: { onClose: () => void }) {
 
         <section>
           <h3 className="font-semibold text-film-text mb-1">Cookies</h3>
-          <p className="text-xs">
+          <p className="text-sm">
             Un seul cookie est utilisé : un jeton de session signé et chiffré, strictement nécessaire au fonctionnement du jeu.
             Il expire après 24 heures.
           </p>
@@ -163,7 +163,7 @@ function PrivacyModal({ onClose }: { onClose: () => void }) {
 
         <section>
           <h3 className="font-semibold text-film-text mb-1">TMDB</h3>
-          <p className="text-xs">
+          <p className="text-sm">
             Les données des films et séries (affiches, synopsis, casting) sont fournies par{' '}
             <a href="https://www.themoviedb.org" target="_blank" rel="noopener noreferrer" className="underline hover:text-film-text">
               The Movie Database (TMDB)
@@ -175,7 +175,7 @@ function PrivacyModal({ onClose }: { onClose: () => void }) {
         {FEATURES.enableWiki && (
           <section>
             <h3 className="font-semibold text-film-text mb-1">Wikipedia / Wikidata</h3>
-            <p className="text-xs">
+            <p className="text-sm">
               Le mode WikiGuessr utilise des données issues de{' '}
               <a href="https://fr.wikipedia.org" target="_blank" rel="noopener noreferrer" className="underline hover:text-film-text">Wikipédia</a>
               {' '}et{' '}
@@ -187,7 +187,7 @@ function PrivacyModal({ onClose }: { onClose: () => void }) {
           </section>
         )}
 
-        <p className="text-xs italic">
+        <p className="text-sm italic">
           Dernière mise à jour : mai 2026
         </p>
       </div>
@@ -207,7 +207,7 @@ export function Footer() {
       <footer className="mt-auto border-t border-film-border/50 bg-film-black">
         <div className="max-w-2xl mx-auto px-4 py-5">
           {/* Links row */}
-          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-film-text-dim mb-4">
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-film-text-dim mb-4">
             <button
               onClick={() => setModal('faq')}
               className="hover:text-film-text transition-colors cursor-pointer"
@@ -230,7 +230,7 @@ export function Footer() {
           </div>
 
           {/* TMDB attribution */}
-          <div className="flex items-center justify-center gap-2 mb-2 text-[10px] text-film-text-dim/60">
+          <div className="flex items-center justify-center gap-2 mb-2 text-xs text-film-text-dim/60">
             <Film size={11} />
             <span>
               Ce produit utilise l'API TMDB mais n'est pas approuvé ou certifié par{' '}
@@ -239,7 +239,7 @@ export function Footer() {
           </div>
           {/* Wikipedia attribution */}
           {FEATURES.enableWiki && (
-            <div className="flex items-center justify-center gap-2 mb-3 text-[10px] text-film-text-dim/60">
+            <div className="flex items-center justify-center gap-2 mb-3 text-xs text-film-text-dim/60">
               <BookOpen size={11} />
               <span>
                 Mode WikiGuessr — données issues de{' '}
@@ -250,7 +250,7 @@ export function Footer() {
           )}
 
           {/* Copyright + version */}
-          <div className="flex items-center justify-center gap-3 text-[10px] text-film-text-dim/50">
+          <div className="flex items-center justify-center gap-3 text-xs text-film-text-dim/50">
             <p>© {new Date().getFullYear()} {BRAND_NAME}. Tous droits réservés.</p>
             <button
               onClick={() => setModal('changelog')}

@@ -160,12 +160,12 @@ export function WikiArchiveModal() {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-4 text-xs text-film-text-dim border-t border-film-border pt-3">
+        <div className="flex flex-wrap items-center gap-4 text-sm text-film-text-dim border-t border-film-border pt-3">
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-film-green/25 border border-film-green/40 inline-block" />Gagné</span>
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-film-red/25 border border-film-red/40 inline-block" />Perdu</span>
           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-film-gold/20 border border-film-gold/40 inline-block" />À jouer</span>
           {displayYM !== todayYM && (
-            <button onClick={() => setDisplayYM(todayYM)} className="ml-auto text-xs text-film-gold hover:underline cursor-pointer">Aujourd'hui</button>
+            <button onClick={() => setDisplayYM(todayYM)} className="ml-auto text-sm text-film-gold hover:underline cursor-pointer">Aujourd'hui</button>
           )}
         </div>
       </div>

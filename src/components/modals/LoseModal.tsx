@@ -72,7 +72,7 @@ export function LoseModal() {
               ))}
             </div>
             {result.synopsis && (
-              <p className="text-xs text-film-text-dim mt-2 line-clamp-3 text-left">
+              <p className="text-sm text-film-text-dim mt-2 line-clamp-3 text-left">
                 {result.synopsis}
               </p>
             )}
@@ -119,7 +119,7 @@ export function LoseModal() {
             href={tmdbUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs text-film-text-dim hover:text-film-text transition-colors"
+            className="flex items-center gap-1.5 text-sm text-film-text-dim hover:text-film-text transition-colors"
           >
             <ExternalLink size={12} />
             En savoir plus sur TMDB

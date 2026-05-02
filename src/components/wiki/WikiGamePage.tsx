@@ -152,7 +152,7 @@ export function WikiGamePage() {
             <section className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <AttemptTracker guesses={guesses} maxAttempts={challenge.maxAttempts} />
-                <span className="text-xs text-film-text-dim font-mono">
+                <span className="text-sm text-film-text-dim font-mono">
                   {guesses.length}/{challenge.maxAttempts}
                 </span>
               </div>
@@ -177,13 +177,13 @@ export function WikiGamePage() {
                   : 'Pas cette fois…'}
               </span>
               {result?.name && (
-                <span className="text-xs font-medium text-film-text-dim truncate max-w-[45%] text-center">
+                <span className="text-sm font-medium text-film-text-dim truncate max-w-[45%] text-center">
                   {result.name}
                 </span>
               )}
               <button
                 onClick={() => openModal(status === 'won' ? 'win' : 'lose')}
-                className="flex items-center gap-1.5 text-xs font-medium opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+                className="flex items-center gap-1.5 text-sm font-medium opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
                 title="Voir les détails du défi">
                 <Share2 size={13} />
                 Voir le résultat

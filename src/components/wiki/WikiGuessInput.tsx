@@ -84,7 +84,7 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
           <Button variant="ghost" size="sm" onClick={onSkip} disabled={disabled}
             title="Passer cette tentative" className="shrink-0 text-film-text-dim min-h-[44px] min-w-[44px] gap-1">
             <SkipForward size={14} />
-            <span className="text-xs">Passer</span>
+            <span className="text-sm">Passer</span>
           </Button>
           <Button variant="primary" size="sm"
             onClick={() => inputValue.trim() && handleSelect(inputValue.trim())}
@@ -95,7 +95,7 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
         </div>
       </motion.div>
 
-      <p className="mt-1.5 text-xs text-film-text-dim text-right">
+      <p className="mt-1.5 text-sm text-film-text-dim text-right">
         {attemptsLeft} tentative{attemptsLeft > 1 ? 's' : ''} restante{attemptsLeft > 1 ? 's' : ''}
       </p>
 
@@ -114,7 +114,7 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
                 onMouseDown={(e) => { e.preventDefault(); handleSelect(s.title) }}
                 onMouseEnter={() => setActiveIndex(i)}>
                 <span className="truncate">{s.title}</span>
-                <span className="ml-3 text-film-text-dim shrink-0 text-xs capitalize">{s.year}</span>
+                <span className="ml-3 text-film-text-dim shrink-0 text-sm capitalize">{s.year}</span>
               </li>
             ))}
           </motion.ul>

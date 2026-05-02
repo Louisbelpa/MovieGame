@@ -23,7 +23,7 @@ export function WikiRulesModal() {
           </div>
           <div>
             <h2 className="font-title text-lg font-semibold text-film-text">Comment jouer ?</h2>
-            <p className="text-xs text-film-text-dim">WikiGuessr — Devine la personnalité</p>
+            <p className="text-sm text-film-text-dim">WikiGuessr — Devine la personnalité</p>
           </div>
         </div>
 
@@ -35,7 +35,7 @@ export function WikiRulesModal() {
               <Briefcase size={16} className="text-film-gold mt-0.5 shrink-0" />
               <div>
                 <p className="font-medium">Pour les politiciens</p>
-                <p className="text-film-text-dim text-xs mt-0.5">Les fonctions s'affichent progressivement : d'abord les titres seuls, puis les dates, les pays, les prédécesseurs…</p>
+                <p className="text-film-text-dim text-sm mt-0.5">Les fonctions s'affichent progressivement : d'abord les titres seuls, puis les dates, les pays, les prédécesseurs…</p>
               </div>
             </div>
 
@@ -43,7 +43,7 @@ export function WikiRulesModal() {
               <Trophy size={16} className="text-film-gold mt-0.5 shrink-0" />
               <div>
                 <p className="font-medium">Pour les sportifs</p>
-                <p className="text-film-text-dim text-xs mt-0.5">La carrière se dévoile peu à peu : noms des clubs, années, statistiques, équipe nationale…</p>
+                <p className="text-film-text-dim text-sm mt-0.5">La carrière se dévoile peu à peu : noms des clubs, années, statistiques, équipe nationale…</p>
               </div>
             </div>
 
@@ -51,7 +51,7 @@ export function WikiRulesModal() {
               <Lock size={16} className="text-film-gold mt-0.5 shrink-0" />
               <div>
                 <p className="font-medium">Indices progressifs</p>
-                <p className="text-film-text-dim text-xs mt-0.5">Un nouvel indice se débloque à chaque mauvaise réponse. Moins vous utilisez d'indices, mieux c'est !</p>
+                <p className="text-film-text-dim text-sm mt-0.5">Un nouvel indice se débloque à chaque mauvaise réponse. Moins vous utilisez d'indices, mieux c'est !</p>
               </div>
             </div>
 
@@ -59,22 +59,22 @@ export function WikiRulesModal() {
               <CheckCircle2 size={16} className="text-film-gold mt-0.5 shrink-0" />
               <div>
                 <p className="font-medium">Vous avez 3 tentatives</p>
-                <p className="text-film-text-dim text-xs mt-0.5">Entrez le nom de la personnalité ou choisissez dans l'autocomplétion. Vous pouvez passer une tentative pour débloquer un indice.</p>
+                <p className="text-film-text-dim text-sm mt-0.5">Entrez le nom de la personnalité ou choisissez dans l'autocomplétion. Vous pouvez passer une tentative pour débloquer un indice.</p>
               </div>
             </div>
 
             <div className="p-3 rounded-lg film-border">
-              <p className="font-medium text-xs mb-2">Signification des pastilles</p>
+              <p className="font-medium text-sm mb-2">Signification des pastilles</p>
               <div className="flex items-center gap-3 flex-wrap">
-                <span className="flex items-center gap-1.5 text-xs">
+                <span className="flex items-center gap-1.5 text-sm">
                   <span className="w-5 h-5 rounded-full bg-film-green flex items-center justify-center text-film-black font-bold text-[10px]">✓</span>
                   <span className="text-film-text">Correct</span>
                 </span>
-                <span className="flex items-center gap-1.5 text-xs">
+                <span className="flex items-center gap-1.5 text-sm">
                   <span className="w-5 h-5 rounded-full bg-film-red flex items-center justify-center text-white font-bold text-[10px]">✗</span>
                   <span className="text-film-text">Incorrect</span>
                 </span>
-                <span className="flex items-center gap-1.5 text-xs">
+                <span className="flex items-center gap-1.5 text-sm">
                   <span className="w-5 h-5 rounded-full bg-film-border/60 flex items-center justify-center text-film-text-dim text-[10px]">→</span>
                   <span className="text-film-text">Passé</span>
                 </span>

@@ -40,7 +40,7 @@ export function WikiHintPanel({ photoUrl, profile, hints, hintsAvailable, hintsR
 
       {(hints.length > 0 || lockedCount > 0) && (
         <div className="flex items-center gap-1.5 mt-1">
-          <span className="text-xs font-semibold text-film-text-dim uppercase tracking-wider">Indices</span>
+          <span className="text-sm font-semibold text-film-text-dim uppercase tracking-wider">Indices</span>
           <span className="text-[10px] text-film-text-dim/60">{hintsRevealed}/{hintsAvailable}</span>
         </div>
       )}
@@ -52,7 +52,7 @@ export function WikiHintPanel({ photoUrl, profile, hints, hintsAvailable, hintsR
       </AnimatePresence>
 
       {lockedCount > 0 && (
-        <p className="text-xs text-film-text-dim/50 text-center py-1 flex items-center justify-center gap-1.5">
+        <p className="text-sm text-film-text-dim/50 text-center py-1 flex items-center justify-center gap-1.5">
           <Lock size={11} className="shrink-0" />
           {lockedCount} indice{lockedCount > 1 ? 's' : ''} se déverrouille{lockedCount > 1 ? 'nt' : ''} avec les tentatives
         </p>
@@ -68,7 +68,7 @@ function ProfileCard({ icon: Icon, label, children }: { icon: typeof Briefcase; 
     <div className="rounded-lg film-border overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-film-border/30">
         <Icon size={13} className="text-film-gold shrink-0" />
-        <span className="text-xs font-semibold text-film-text-dim uppercase tracking-wider">{label}</span>
+        <span className="text-sm font-semibold text-film-text-dim uppercase tracking-wider">{label}</span>
       </div>
       <div className="px-3 py-2">
         {children}
@@ -82,11 +82,11 @@ function VisibleProfile({ profile }: { profile: WikiVisibleProfile }) {
     return (
       <ProfileCard icon={Briefcase} label="Fonctions politiques">
         {profile.roles.length === 0 ? (
-          <p className="text-xs text-film-text-dim italic">Fonctions non renseignées.</p>
+          <p className="text-sm text-film-text-dim italic">Fonctions non renseignées.</p>
         ) : (
           <div className="space-y-2">
             {profile.roles.map((r, i) => (
-              <div key={i} className="text-xs leading-snug">
+              <div key={i} className="text-sm leading-snug">
                 <span className="text-film-text font-medium">{r.title}</span>
                 {(r.years || r.country) && (
                   <span className="text-film-text-dim"> · {[r.years, r.country].filter(Boolean).join(' · ')}</span>
@@ -109,7 +109,7 @@ function VisibleProfile({ profile }: { profile: WikiVisibleProfile }) {
   if (profile.type === 'generic') {
     return (
       <ProfileCard icon={Briefcase} label="Repères biographiques">
-        <div className="space-y-1 text-xs">
+        <div className="space-y-1 text-sm">
           {profile.domain && (
             <p><span className="text-film-text-dim">Domaine · </span><span className="text-film-text">{profile.domain}</span></p>
           )}
@@ -132,7 +132,7 @@ function VisibleProfile({ profile }: { profile: WikiVisibleProfile }) {
       {profile.clubs.length > 0 ? (
         <div className="space-y-1.5">
           {profile.clubs.map((c, i) => (
-            <div key={i} className="text-xs leading-snug">
+            <div key={i} className="text-sm leading-snug">
               <span className="text-film-text font-medium">{c.name}</span>
               <span className="text-film-text-dim">
                 {c.years ? ` · ${c.years}` : ''}
@@ -142,7 +142,7 @@ function VisibleProfile({ profile }: { profile: WikiVisibleProfile }) {
             </div>
           ))}
           {profile.nationalTeam && (
-            <div className="text-xs pt-1 border-t border-film-border/30 text-film-text-dim">
+            <div className="text-sm pt-1 border-t border-film-border/30 text-film-text-dim">
               {profile.nationalTeam.name}
               {profile.nationalTeam.caps != null ? ` · ${profile.nationalTeam.caps} sél.` : ''}
               {profile.nationalTeam.goals != null ? ` · ${profile.nationalTeam.goals} b.` : ''}
@@ -150,13 +150,13 @@ function VisibleProfile({ profile }: { profile: WikiVisibleProfile }) {
           )}
         </div>
       ) : profile.careerHighlights.length > 0 ? (
-        <div className="space-y-1 text-xs">
+        <div className="space-y-1 text-sm">
           {profile.careerHighlights.map((h, i) => (
             <p key={i}><span className="text-film-text-dim">{h.label} · </span><span className="text-film-text">{h.value}</span></p>
           ))}
         </div>
       ) : (
-        <p className="text-xs text-film-text-dim italic">Carrière en cours de consolidation.</p>
+        <p className="text-sm text-film-text-dim italic">Carrière en cours de consolidation.</p>
       )}
     </ProfileCard>
   )
@@ -203,8 +203,8 @@ function CompactHint({ label, value, icon: Icon }: { label: string; value: strin
   return (
     <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg film-border">
       <Icon size={13} className="text-film-gold shrink-0" />
-      <span className="text-xs text-film-text-dim flex-1 min-w-0">{label}</span>
-      <span className="text-xs text-film-text font-medium text-right">{value}</span>
+      <span className="text-sm text-film-text-dim flex-1 min-w-0">{label}</span>
+      <span className="text-sm text-film-text font-medium text-right">{value}</span>
     </div>
   )
 }

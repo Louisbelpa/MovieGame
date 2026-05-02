@@ -250,7 +250,7 @@ export function CalendarPage() {
             type="button"
             onClick={handleAutoSchedule}
             disabled={autoLoading || loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
           >
             {autoLoading
               ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -261,7 +261,7 @@ export function CalendarPage() {
           <button
             type="button"
             onClick={() => setShowPast((v) => !v)}
-            className="group flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
+            className="group flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
           >
             <ChevronDown
               size={13}
@@ -323,7 +323,7 @@ export function CalendarPage() {
                       ))}
                       <li className="flex items-center gap-3 px-4 py-2 bg-indigo-50 animate-slide-up">
                         <span className="flex-1 border-t border-indigo-200" />
-                        <span className="text-xs font-semibold text-indigo-500 uppercase tracking-wider">Aujourd'hui</span>
+                        <span className="text-sm font-semibold text-indigo-500 uppercase tracking-wider">Aujourd'hui</span>
                         <span className="flex-1 border-t border-indigo-200" />
                       </li>
                     </ul>

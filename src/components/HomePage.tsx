@@ -156,7 +156,7 @@ export function HomePage() {
         </div>
 
         <section className="max-w-3xl mx-auto">
-          <p className="text-xs font-semibold uppercase tracking-wider text-film-text-dim mb-3">Comment jouer</p>
+          <p className="text-sm font-semibold uppercase tracking-wider text-film-text-dim mb-3">Comment jouer</p>
           <div className="grid sm:grid-cols-3 gap-3">
             <HowToCard
               icon={<Eye size={15} className="text-film-gold" />}
@@ -196,7 +196,7 @@ function HowToCard({
         {icon}
         <p className="font-semibold text-film-text text-sm">{title}</p>
       </div>
-      <p className="text-film-text-dim text-xs sm:text-sm">{description}</p>
+      <p className="text-film-text-dim text-sm">{description}</p>
     </div>
   )
 }

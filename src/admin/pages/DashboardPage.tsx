@@ -82,28 +82,28 @@ export function DashboardPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:flex sm:gap-2">
               <button
                 onClick={() => navigate('/admin/films')}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+                className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
               >
                 <Film size={14} />
                 <span className="hidden sm:inline">Gérer les </span>Films
               </button>
               <button
                 onClick={() => navigate('/admin/series')}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 transition-colors"
+                className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 transition-colors"
               >
                 <Tv size={14} />
                 <span className="hidden sm:inline">Gérer les </span>Séries
               </button>
               <button
                 onClick={() => navigate('/admin/calendar')}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 <Calendar size={14} />
                 Planning
               </button>
               <button
                 onClick={() => navigate('/admin/wiki')}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-white bg-slate-700 rounded-lg hover:bg-slate-800 transition-colors"
+                className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-slate-700 rounded-lg hover:bg-slate-800 transition-colors"
               >
                 <Landmark size={14} />
                 Wikipedia
@@ -208,7 +208,7 @@ export function DashboardPage() {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{children}</p>
+  return <p className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">{children}</p>
 }
 
 function SectionHeader({ icon, label, color }: { icon: React.ReactNode; label: string; color: 'indigo' | 'violet' | 'slate' }) {
@@ -233,7 +233,7 @@ function RateBadge({ label, rate, color }: { label: string; rate: number | null;
   }[color]
   return (
     <div className={`flex flex-col items-center px-4 py-2 rounded-lg border ${cls} min-w-[80px]`}>
-      <span className="text-xs text-gray-500">{label}</span>
+      <span className="text-sm text-gray-500">{label}</span>
       <span className="text-2xl font-bold">{rate !== null ? `${rate} %` : '—'}</span>
     </div>
   )
@@ -247,11 +247,11 @@ function RateBar({ label, rate, color }: { label: string; rate: number | null; c
   }[color]
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs text-gray-500 w-10 flex-shrink-0">{label}</span>
+      <span className="text-sm text-gray-500 w-10 flex-shrink-0">{label}</span>
       <div className={`flex-1 h-2 rounded-full ${cls.track} overflow-hidden`}>
         <div className={`h-full rounded-full ${cls.bar} transition-all`} style={{ width: `${rate ?? 0}%` }} />
       </div>
-      <span className={`text-xs font-semibold ${cls.text} w-9 text-right flex-shrink-0`}>
+      <span className={`text-sm font-semibold ${cls.text} w-9 text-right flex-shrink-0`}>
         {rate !== null ? `${rate} %` : '—'}
       </span>
     </div>
@@ -266,9 +266,9 @@ function StatCard({ icon, label, value, bg, warn, sub }: {
     <div className="bg-white rounded-xl border border-gray-200 p-3 flex items-center gap-3">
       <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center flex-shrink-0`}>{icon}</div>
       <div className="min-w-0">
-        <p className="text-xs text-gray-500 truncate">{label}</p>
+        <p className="text-sm text-gray-500 truncate">{label}</p>
         <p className={`text-lg font-bold leading-tight ${warn ? 'text-red-600' : 'text-gray-900'}`}>{value}</p>
-        {sub && <p className="text-xs text-gray-400">{sub}</p>}
+        {sub && <p className="text-sm text-gray-400">{sub}</p>}
       </div>
     </div>
   )
@@ -295,8 +295,8 @@ function ChallengeCard({ challenge }: { challenge: AdminChallenge }) {
       )}
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-gray-900 truncate text-sm sm:text-base">{media?.title}</p>
-        <p className="text-xs sm:text-sm text-gray-500 truncate">{subtitle}</p>
-        <p className="text-xs text-gray-400 mt-0.5 truncate">{formatDate(challenge.date)}</p>
+        <p className="text-sm sm:text-sm text-gray-500 truncate">{subtitle}</p>
+        <p className="text-sm text-gray-400 mt-0.5 truncate">{formatDate(challenge.date)}</p>
       </div>
       <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
         isWiki ? 'bg-slate-100 text-slate-700' : isSeries ? 'bg-violet-100 text-violet-700' : 'bg-indigo-100 text-indigo-700'
@@ -312,7 +312,7 @@ function UpcomingList({ challenges }: { challenges: AdminChallenge[] }) {
     <div>
       <SectionLabel>7 prochains défis</SectionLabel>
       {challenges.length === 0 ? (
-        <p className="text-xs text-gray-400 italic">Aucun défi planifié.</p>
+        <p className="text-sm text-gray-400 italic">Aucun défi planifié.</p>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
           {challenges.map((ch) => {
@@ -328,9 +328,9 @@ function UpcomingList({ challenges }: { challenges: AdminChallenge[] }) {
                     {isWiki ? <Landmark size={11} className="text-gray-400" /> : isSeries ? <Tv size={11} className="text-gray-400" /> : <Clapperboard size={11} className="text-gray-400" />}
                   </div>
                 )}
-                <span className="text-xs text-gray-400 w-20 sm:w-24 flex-shrink-0">{formatDateShort(ch.date)}</span>
+                <span className="text-sm text-gray-400 w-20 sm:w-24 flex-shrink-0">{formatDateShort(ch.date)}</span>
                 <span className="text-sm text-gray-800 font-medium truncate">{media?.title}</span>
-                <span className="text-xs text-gray-400 ml-auto flex-shrink-0">
+                <span className="text-sm text-gray-400 ml-auto flex-shrink-0">
                   {isWiki ? wikiTypeLabel(ch.wiki?.person_type) : (ch.series?.year ?? ch.film?.year ?? '—')}
                 </span>
               </div>
