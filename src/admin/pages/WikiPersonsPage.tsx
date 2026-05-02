@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Plus, Search, X, WandSparkles, ExternalLink, Trash2, Pencil, Shuffle, History } from 'lucide-react'
 import {
   getWikiPersons,
@@ -12,6 +12,8 @@ import {
 } from '../api'
 import { AdminLayout } from '../components/AdminLayout'
 
+// Module-level pool — persists across modal open/close cycles
+const _wikiSlugPool: string[] = []
 
 function personTypeLabel(personType: PersonType): string {
   switch (personType) {
@@ -237,7 +239,6 @@ function WikiPersonForm({
   const [era, setEra] = useState('')
   const [loadingWiki, setLoadingWiki] = useState(false)
   const [loadingRandomWiki, setLoadingRandomWiki] = useState(false)
-  const slugPoolRef = useRef<string[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [parseScore, setParseScore] = useState<number | null>(null)
@@ -425,11 +426,11 @@ function WikiPersonForm({
     setLoadingRandomWiki(true)
     setError(null)
     try {
-      if (slugPoolRef.current.length === 0) {
+      if (_wikiSlugPool.length === 0) {
         const { slugs } = await fetchRandomWikiSlugs('fr', 30)
-        slugPoolRef.current = slugs
+        _wikiSlugPool.push(...slugs)
       }
-      const randomSlug = slugPoolRef.current.pop()!
+      const randomSlug = _wikiSlugPool.pop()!
       const data = await fetchWikipediaPerson(randomSlug, 'fr')
       setSlug(randomSlug)
       applyWikipediaData(data)
