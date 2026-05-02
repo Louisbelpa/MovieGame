@@ -15,6 +15,7 @@ import {
   deleteChallenge,
   updateFilm,
   updateSeries,
+  checkAdminConfig,
   type AdminChallenge,
   type AdminFilm,
   type AdminSeries,
@@ -49,7 +50,8 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 const FUTURE_DAYS = 30
-const PAST_DAYS = import.meta.env.VITE_ALLOW_PAST_SCHEDULING === 'true' ? 90 : 7
+const DEFAULT_pastDays = 7
+const STAGING_pastDays = 90
 
 function getISODate(offsetDays: number): string {
   const d = new Date()
@@ -70,6 +72,7 @@ export function CalendarPage() {
   const [wikiPersons, setWikiPersons] = useState<AdminWikiPerson[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [allowPast, setAllowPast] = useState(false)
   const [showPast, setShowPast] = useState(false)
   const [renderPast, setRenderPast] = useState(false)
   const [pastHeight, setPastHeight] = useState(0)
@@ -79,10 +82,21 @@ export function CalendarPage() {
   const [editingSeries, setEditingSeries] = useState<AdminSeries | null>(null)
   const pastContentRef = useRef<HTMLDivElement>(null)
 
-  const from = getISODate(-PAST_DAYS)
+  const pastDays = allowPast ? STAGING_pastDays : DEFAULT_pastDays
+  const from = getISODate(-pastDays)
   const to = getISODate(FUTURE_DAYS - 1)
 
-  const load = useCallback((rangeFrom: string, rangeTo: string, mt: 'film' | 'series' | 'wiki') => {
+  useEffect(() => {
+    checkAdminConfig().then((cfg) => {
+      if (cfg.allowPastScheduling) {
+        setAllowPast(true)
+        setShowPast(true)
+        setRenderPast(true)
+      }
+    })
+  }, [])
+
+  const load = useCallback((rangeFrom: string, rangeTo: string, mt: 'film' | 'series') => {
     setLoading(true)
     Promise.all([getChallenges({ from: rangeFrom, to: rangeTo, mediaType: mt }), getFilms(), getSeries(), getWikiPersons({ limit: 500 })])
       .then(([chs, fms, srs, wps]) => {
@@ -102,7 +116,7 @@ export function CalendarPage() {
   const byDate = Object.fromEntries(challenges.map((ch) => [ch.date, ch]))
 
   const todayStr = getISODate(0)
-  const pastDates = buildDateRange(-PAST_DAYS, -1).filter((d) => d < todayStr)
+  const pastDates = buildDateRange(-pastDays, -1).filter((d) => d < todayStr)
   const todayAndFuture = buildDateRange(0, FUTURE_DAYS - 1)
   const plannedCount = todayAndFuture.filter((d) => byDate[d]).length
 
@@ -254,7 +268,7 @@ export function CalendarPage() {
               className={`transition-transform duration-200 ${showPast ? 'rotate-180' : ''}`}
             />
             <span className="inline-block min-w-[110px] text-left">
-              {showPast ? 'Masquer le passé' : `${PAST_DAYS} j. passés`}
+              {showPast ? 'Masquer le passé' : `${pastDays} j. passés`}
             </span>
           </button>
         </div>
@@ -283,7 +297,9 @@ export function CalendarPage() {
               <li className="p-0 list-none">
                 <div
                   className="overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out"
-                  style={{ maxHeight: showPast ? `${pastHeight}px` : '0px', opacity: showPast ? 1 : 0 }}
+                  style={allowPast
+                    ? { maxHeight: showPast ? 'none' : '0px', opacity: showPast ? 1 : 0 }
+                    : { maxHeight: showPast ? `${pastHeight}px` : '0px', opacity: showPast ? 1 : 0 }}
                   onTransitionEnd={handlePastTransitionEnd}
                 >
                   <div ref={pastContentRef}>
@@ -302,6 +318,7 @@ export function CalendarPage() {
                           onDelete={handleDelete}
                           onEditMedia={handleEditMedia}
                           rowClassName="animate-slide-up"
+                          allowPast={allowPast}
                         />
                       ))}
                       <li className="flex items-center gap-3 px-4 py-2 bg-indigo-50 animate-slide-up">

@@ -20,6 +20,7 @@ interface ChallengeRowProps {
   onDelete: (challengeId: number) => Promise<void>
   onEditMedia?: (media: AdminFilm | AdminSeries | AdminWikiPerson, type: 'film' | 'series' | 'wiki') => void
   rowClassName?: string
+  allowPast?: boolean
 }
 
 function formatDateShort(iso: string) {
@@ -302,12 +303,13 @@ export function ChallengeRow({
   onDelete,
   onEditMedia,
   rowClassName,
+  allowPast = false,
 }: ChallengeRowProps) {
   const [picking, setPicking] = useState(false)
   const [mutating, setMutating] = useState(false)
 
   const today = isToday(date)
-  const past = import.meta.env.VITE_ALLOW_PAST_SCHEDULING === 'true' ? false : isPast(date)
+  const past = allowPast ? false : isPast(date)
 
   const media = challenge?.film ?? challenge?.series ?? challenge?.wiki ?? null
   const isSeries = !!(challenge?.series)
