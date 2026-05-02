@@ -45,6 +45,50 @@ export interface AdminSeries {
   original_language: string | null
 }
 
+export interface AdminWikiPerson {
+  id: number
+  name: string
+  title: string
+  name_aliases: string[]
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic'
+  wikipedia_slug: string
+  infobox_data: Record<string, unknown>
+  hint_schedule: string[]
+  image_url: string | null
+  photo_url: string | null
+  extract: string | null
+  wikipedia_url: string | null
+  difficulty: number
+  is_active: boolean
+  used_dates: string[]
+}
+
+export interface WikiPersonPayload {
+  name: string
+  name_aliases: string[]
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic'
+  wikipedia_slug: string
+  infobox_data: Record<string, unknown>
+  hint_schedule: string[]
+  photo_url: string | null
+  extract: string | null
+  wikipedia_url: string | null
+  difficulty: number
+  is_active: boolean
+}
+
+export interface WikipediaFetchPayload {
+  name: string
+  extract: string | null
+  photo_url: string | null
+  wikipedia_url: string
+  infobox_data: Record<string, unknown>
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic'
+  hint_schedule: string[]
+  parse_quality_score: number
+  parse_warnings: string[]
+}
+
 export interface SeriesPayload {
   title: string
   title_aliases: string[]
@@ -77,14 +121,17 @@ export interface AdminChallenge {
   date: string
   film: AdminFilm | null
   series: AdminSeries | null
-  mediaType: 'film' | 'series'
+  wiki: AdminWikiPerson | null
+  mediaType: 'film' | 'series' | 'wiki'
 }
 
 export interface AdminDashboard {
   today_film_challenge: AdminChallenge | null
   today_series_challenge: AdminChallenge | null
+  today_wiki_challenge: AdminChallenge | null
   upcoming_film_challenges: AdminChallenge[]
   upcoming_series_challenges: AdminChallenge[]
+  upcoming_wiki_challenges: AdminChallenge[]
   stats: {
     total_films: number
     unused_films: number
@@ -102,6 +149,14 @@ export interface AdminDashboard {
     today_series_wins: number
     today_series_rate: number | null
     series_success_rate: number | null
+    total_wiki_persons: number
+    unused_wiki_persons: number
+    total_wiki_challenges: number
+    unscheduled_wiki_next_30: number
+    today_wiki_games: number
+    today_wiki_wins: number
+    today_wiki_rate: number | null
+    wiki_success_rate: number | null
     success_rate: number | null
   }
 }
@@ -249,7 +304,7 @@ export async function uploadImage(file: File): Promise<string> {
 
 // ─── Calendar / Challenges ────────────────────────────────────────────────────
 
-export async function getChallenges(opts: { from?: string; to?: string; mediaType?: 'film' | 'series' } = {}): Promise<AdminChallenge[]> {
+export async function getChallenges(opts: { from?: string; to?: string; mediaType?: 'film' | 'series' | 'wiki' } = {}): Promise<AdminChallenge[]> {
   const params = new URLSearchParams()
   if (opts.from) params.set('from', opts.from)
   if (opts.to) params.set('to', opts.to)
@@ -262,11 +317,15 @@ export async function getChallenges(opts: { from?: string; to?: string; mediaTyp
 export type MediaRef =
   | { filmId: number; seriesId?: never }
   | { seriesId: number; filmId?: never }
+  | { wikiPersonId: number; filmId?: never; seriesId?: never }
 
 export async function scheduleChallenge(date: string, ref: MediaRef): Promise<AdminChallenge> {
-  const body = 'filmId' in ref && ref.filmId !== undefined
-    ? { date, film_id: ref.filmId }
-    : { date, series_id: (ref as { seriesId: number }).seriesId }
+  const body =
+    'filmId' in ref && ref.filmId !== undefined
+      ? { date, film_id: ref.filmId }
+      : 'seriesId' in ref && ref.seriesId !== undefined
+        ? { date, series_id: ref.seriesId }
+        : { date, wiki_person_id: (ref as { wikiPersonId: number }).wikiPersonId }
   return request<AdminChallenge>('/api/admin/challenges', {
     method: 'POST',
     body: JSON.stringify(body),
@@ -274,9 +333,12 @@ export async function scheduleChallenge(date: string, ref: MediaRef): Promise<Ad
 }
 
 export async function updateChallenge(id: number, ref: MediaRef): Promise<AdminChallenge> {
-  const body = 'filmId' in ref && ref.filmId !== undefined
-    ? { film_id: ref.filmId }
-    : { series_id: (ref as { seriesId: number }).seriesId }
+  const body =
+    'filmId' in ref && ref.filmId !== undefined
+      ? { film_id: ref.filmId }
+      : 'seriesId' in ref && ref.seriesId !== undefined
+        ? { series_id: ref.seriesId }
+        : { wiki_person_id: (ref as { wikiPersonId: number }).wikiPersonId }
   return request<AdminChallenge>(`/api/admin/challenges/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(body),
@@ -365,6 +427,114 @@ export async function deleteChangelogEntry(id: number): Promise<void> {
 export async function getSeries(): Promise<AdminSeries[]> {
   const res = await request<{ data: AdminSeries[] }>('/api/admin/series')
   return res.data
+}
+
+function parseJsonArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string')
+  if (typeof value !== 'string' || !value.trim()) return []
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((v): v is string => typeof v === 'string')
+  } catch {
+    return []
+  }
+}
+
+function parseJsonObject(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  if (typeof value !== 'string' || !value.trim()) return {}
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>
+    }
+    return {}
+  } catch {
+    return {}
+  }
+}
+
+function parseUsedDates(value: unknown): string[] {
+  if (Array.isArray(value)) return (value as unknown[]).map(String).filter(Boolean)
+  if (typeof value !== 'string' || !value.trim()) return []
+  return value.split(',').map((v) => v.trim()).filter(Boolean)
+}
+
+function mapWikiPerson(raw: Record<string, unknown>): AdminWikiPerson {
+  const personTypeRaw = String(raw.person_type ?? 'generic')
+  const validTypes = ['politician', 'sportsperson', 'artist', 'scientist', 'entrepreneur', 'writer', 'historical_figure', 'generic']
+  const person_type: AdminWikiPerson['person_type'] = validTypes.includes(personTypeRaw)
+    ? personTypeRaw as AdminWikiPerson['person_type']
+    : 'generic'
+  return {
+    id: Number(raw.id),
+    name: String(raw.name ?? ''),
+    title: String(raw.title ?? raw.name ?? ''),
+    name_aliases: parseJsonArray(raw.name_aliases ?? raw.title_aliases),
+    person_type,
+    wikipedia_slug: String(raw.wikipedia_slug ?? ''),
+    infobox_data: parseJsonObject(raw.infobox_data),
+    hint_schedule: parseJsonArray(raw.hint_schedule),
+    image_url: raw.image_url ? String(raw.image_url) : (raw.photo_url ? String(raw.photo_url) : null),
+    photo_url: raw.photo_url ? String(raw.photo_url) : null,
+    extract: raw.extract ? String(raw.extract) : null,
+    wikipedia_url: raw.wikipedia_url ? String(raw.wikipedia_url) : null,
+    difficulty: Number(raw.difficulty ?? 3),
+    is_active: Number(raw.is_active ?? 1) === 1,
+    used_dates: parseUsedDates(raw.used_dates),
+  }
+}
+
+export async function getWikiPersons(opts: { page?: number; limit?: number; q?: string } = {}): Promise<{
+  data: AdminWikiPerson[]
+  total: number
+  page: number
+  limit: number
+}> {
+  const params = new URLSearchParams()
+  if (opts.page) params.set('page', String(opts.page))
+  if (opts.limit) params.set('limit', String(opts.limit))
+  if (opts.q) params.set('q', opts.q)
+  const qs = params.toString()
+  const res = await request<{ data: Record<string, unknown>[]; total: number; page: number; limit: number }>(
+    `/api/admin/wiki-persons${qs ? `?${qs}` : ''}`
+  )
+  return {
+    ...res,
+    data: res.data.map(mapWikiPerson),
+  }
+}
+
+export async function createWikiPerson(payload: WikiPersonPayload): Promise<{ id: number }> {
+  return request<{ id: number }>('/api/admin/wiki-persons', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateWikiPerson(id: number, payload: Partial<WikiPersonPayload>): Promise<void> {
+  await request<{ ok: boolean }>(`/api/admin/wiki-persons/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteWikiPerson(id: number): Promise<void> {
+  await request<{ ok: boolean }>(`/api/admin/wiki-persons/${id}`, { method: 'DELETE' })
+}
+
+export async function fetchRandomWikiSlugs(lang = 'fr', minFame = 30): Promise<{ slugs: string[] }> {
+  return request<{ slugs: string[] }>(`/api/admin/wiki-persons/random?lang=${encodeURIComponent(lang)}&minFame=${minFame}`)
+}
+
+export async function fetchWikipediaPerson(slug: string, lang = 'fr'): Promise<WikipediaFetchPayload> {
+  return request<WikipediaFetchPayload>('/api/admin/wiki-persons/fetch-wikipedia', {
+    method: 'POST',
+    body: JSON.stringify({ slug, lang }),
+  })
 }
 
 export async function createSeries(payload: SeriesPayload): Promise<AdminSeries> {
@@ -553,14 +723,14 @@ export async function getAnalyticsOverview(): Promise<AnalyticsOverview> {
   return request<AnalyticsOverview>('/api/admin/analytics/overview')
 }
 
-export async function getAnalyticsOverviewByMedia(mediaType?: 'film' | 'series'): Promise<AnalyticsOverview> {
+export async function getAnalyticsOverviewByMedia(mediaType?: 'film' | 'series' | 'wiki'): Promise<AnalyticsOverview> {
   const params = new URLSearchParams()
   if (mediaType) params.set('mediaType', mediaType)
   const qs = params.toString()
   return request<AnalyticsOverview>(`/api/admin/analytics/overview${qs ? `?${qs}` : ''}`)
 }
 
-export async function getAnalyticsDaily(from: string, to: string, mediaType?: 'film' | 'series'): Promise<DailyAnalytics[]> {
+export async function getAnalyticsDaily(from: string, to: string, mediaType?: 'film' | 'series' | 'wiki'): Promise<DailyAnalytics[]> {
   const params = new URLSearchParams({ from, to })
   if (mediaType) params.set('mediaType', mediaType)
   return request<DailyAnalytics[]>(`/api/admin/analytics/daily?${params}`)
@@ -585,7 +755,7 @@ export async function getAnalyticsSeries(
 }
 
 export async function getAnalyticsChallenges(
-  mediaType: 'film' | 'series',
+  mediaType: 'film' | 'series' | 'wiki',
   sort?: 'win_rate' | 'sessions' | 'avg_hints'
 ): Promise<ChallengeAnalytics[]> {
   const params = new URLSearchParams({ mediaType })
@@ -606,7 +776,7 @@ export async function getReturningPlayers(days?: number): Promise<ReturningPlaye
   return request<ReturningPlayer[]>(`/api/admin/analytics/returning-players${qs ? `?${qs}` : ''}`)
 }
 
-export async function getReturningPlayersByMedia(days?: number, mediaType?: 'film' | 'series'): Promise<ReturningPlayer[]> {
+export async function getReturningPlayersByMedia(days?: number, mediaType?: 'film' | 'series' | 'wiki'): Promise<ReturningPlayer[]> {
   const params = new URLSearchParams()
   if (days !== undefined) params.set('days', String(days))
   if (mediaType) params.set('mediaType', mediaType)
@@ -614,21 +784,21 @@ export async function getReturningPlayersByMedia(days?: number, mediaType?: 'fil
   return request<ReturningPlayer[]>(`/api/admin/analytics/returning-players${qs ? `?${qs}` : ''}`)
 }
 
-export async function getHourlyDistribution(mediaType?: 'film' | 'series'): Promise<HourlyData[]> {
+export async function getHourlyDistribution(mediaType?: 'film' | 'series' | 'wiki'): Promise<HourlyData[]> {
   const params = new URLSearchParams()
   if (mediaType) params.set('mediaType', mediaType)
   const qs = params.toString()
   return request<HourlyData[]>(`/api/admin/analytics/hourly${qs ? `?${qs}` : ''}`)
 }
 
-export async function getAttemptsDistribution(mediaType?: 'film' | 'series'): Promise<Record<string, number>> {
+export async function getAttemptsDistribution(mediaType?: 'film' | 'series' | 'wiki'): Promise<Record<string, number>> {
   const params = new URLSearchParams()
   if (mediaType) params.set('mediaType', mediaType)
   const qs = params.toString()
   return request<Record<string, number>>(`/api/admin/analytics/attempts-distribution${qs ? `?${qs}` : ''}`)
 }
 
-export async function getHintsDistribution(mediaType?: 'film' | 'series'): Promise<Record<string, number>> {
+export async function getHintsDistribution(mediaType?: 'film' | 'series' | 'wiki'): Promise<Record<string, number>> {
   const params = new URLSearchParams()
   if (mediaType) params.set('mediaType', mediaType)
   const qs = params.toString()

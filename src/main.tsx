@@ -39,10 +39,27 @@ if (path.startsWith('/admin')) {
       )
     })
   }
+} else if (path.startsWith('/wiki')) {
+  if (!FEATURES.enableWiki) {
+    window.history.replaceState({}, '', '/films')
+    document.title = `${BRAND_NAME} — Devine le film du jour`
+    import('./App').then(({ default: App }) => {
+      createRoot(root).render(<StrictMode><BrowserRouter><App gameType="film" /></BrowserRouter></StrictMode>)
+    })
+  } else {
+    document.title = `${BRAND_NAME} — Devine la personnalité du jour`
+    import('./WikiApp').then(({ WikiApp }) => {
+      createRoot(root).render(<StrictMode><BrowserRouter><WikiApp /></BrowserRouter></StrictMode>)
+    })
+  }
 } else if (path === '/' || path === '') {
   document.title = FEATURES.enableSeries
-    ? `${BRAND_NAME} — Devine le film ou la série du jour`
-    : `${BRAND_NAME} — Devine le film du jour`
+    ? (FEATURES.enableWiki
+      ? `${BRAND_NAME} — Devine le film, la série ou la personnalité du jour`
+      : `${BRAND_NAME} — Devine le film ou la série du jour`)
+    : (FEATURES.enableWiki
+      ? `${BRAND_NAME} — Devine le film ou la personnalité du jour`
+      : `${BRAND_NAME} — Devine le film du jour`)
   import('./components/HomePage').then(({ HomePage }) => {
     createRoot(root).render(<StrictMode><HomePage /></StrictMode>)
   })

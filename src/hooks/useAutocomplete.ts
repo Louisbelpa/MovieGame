@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import type { SearchResultPayload } from '@/api/client'
 
 interface UseAutocompleteOptions {
   debounceMs?: number
@@ -7,21 +6,21 @@ interface UseAutocompleteOptions {
   limit?: number
 }
 
-interface UseAutocompleteReturn {
-  suggestions: SearchResultPayload[]
+interface UseAutocompleteReturn<T> {
+  suggestions: T[]
   isLoading: boolean
   error: string | null
   clear: () => void
 }
 
-export function useAutocomplete(
+export function useAutocomplete<T>(
   query: string,
-  searchFn: (q: string, limit?: number) => Promise<SearchResultPayload[]>,
+  searchFn: (q: string, limit?: number) => Promise<T[]>,
   options: UseAutocompleteOptions = {}
-): UseAutocompleteReturn {
+): UseAutocompleteReturn<T> {
   const { debounceMs = 220, minLength = 2, limit = 8 } = options
 
-  const [suggestions, setSuggestions] = useState<SearchResultPayload[]>([])
+  const [suggestions, setSuggestions] = useState<T[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)

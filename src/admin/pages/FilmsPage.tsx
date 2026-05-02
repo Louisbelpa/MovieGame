@@ -262,30 +262,32 @@ export function FilmsPage() {
             {search ? 'Aucun film trouvé pour cette recherche.' : 'Aucun film enregistré.'}
           </div>
         ) : (
-          <table className="w-full min-w-[400px]">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                <th className="px-3 py-3 w-20"></th>
-                <th className="px-3 py-3">Titre</th>
-                <th className="px-3 py-3 hidden sm:table-cell">Année</th>
-                <th className="px-3 py-3 hidden md:table-cell">Réalisateur</th>
-                <th className="px-3 py-3 hidden lg:table-cell">Statut</th>
-                <th className="px-3 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filtered.map((film) => (
-                <FilmRow
-                  key={film.id}
-                  film={film}
-                  onEdit={(f) => setModal({ type: 'edit', film: f })}
-                  onDelete={(f) => setModal({ type: 'delete', film: f })}
-                  onBackdrops={(f) => setModal({ type: 'backdrops', film: f })}
-                  onUpload={handleUpload}
-                />
-              ))}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[400px]">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-3 w-20"></th>
+                  <th className="px-3 py-3">Titre</th>
+                  <th className="px-3 py-3 hidden sm:table-cell">Année</th>
+                  <th className="px-3 py-3 hidden md:table-cell">Réalisateur</th>
+                  <th className="px-3 py-3 hidden lg:table-cell">Statut</th>
+                  <th className="sticky right-0 bg-gray-50 px-3 py-3 text-right whitespace-nowrap border-l border-gray-100">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filtered.map((film) => (
+                  <FilmRow
+                    key={film.id}
+                    film={film}
+                    onEdit={(f) => setModal({ type: 'edit', film: f })}
+                    onDelete={(f) => setModal({ type: 'delete', film: f })}
+                    onBackdrops={(f) => setModal({ type: 'backdrops', film: f })}
+                    onUpload={handleUpload}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
