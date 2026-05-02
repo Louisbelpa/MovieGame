@@ -58,7 +58,7 @@ export function WikiRulesModal() {
             <div className="flex items-start gap-3 p-3 rounded-lg film-border">
               <CheckCircle2 size={16} className="text-film-gold mt-0.5 shrink-0" />
               <div>
-                <p className="font-medium">Vous avez 3 tentatives</p>
+                <p className="font-medium">Vous avez 5 tentatives</p>
                 <p className="text-film-text-dim text-xs mt-0.5">Entrez le nom de la personnalité ou choisissez dans l'autocomplétion. Vous pouvez passer une tentative pour débloquer un indice.</p>
               </div>
             </div>

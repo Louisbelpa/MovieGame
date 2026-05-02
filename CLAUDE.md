@@ -79,7 +79,8 @@ npm run dev          # Express sur http://localhost:3001
 | `CORS_ORIGIN` | Origine frontend autorisée (défaut: `http://localhost:5173`) |
 | `TMDB_API_KEY` | Clé API TMDB (back office uniquement) |
 | `IMAGE_SOURCE` | `tmdb` ou `local` |
-| `MAX_ATTEMPTS` | Tentatives par défi films/séries (défaut: 5) ; wiki utilise aussi cette valeur (défaut: 3) |
+| `MAX_ATTEMPTS` | Tentatives par défi films/séries (défaut: 5) |
+| `WIKI_MAX_ATTEMPTS` | Tentatives par défi Wikipedia (défaut: 5) |
 
 ## Points techniques importants
 
@@ -119,7 +120,7 @@ Ordre d'affichage : année → réalisateur → acteur principal (1 seul, `cast.
 ## Mode Wikipedia (WikiGuessr)
 
 ### Concept
-Jeu quotidien séparé : l'utilisateur doit deviner une personnalité réelle à partir de sa carrière (fonctions politiques, clubs sportifs, biographie) et d'indices progressifs débloqués à chaque mauvaise réponse. **3 tentatives** par défaut.
+Jeu quotidien séparé : l'utilisateur doit deviner une personnalité réelle à partir de sa carrière (fonctions politiques, clubs sportifs, biographie) et d'indices progressifs débloqués à chaque mauvaise réponse. **5 tentatives** par défaut.
 
 ### Table DB `wiki_persons`
 ```sql

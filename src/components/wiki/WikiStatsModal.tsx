@@ -25,7 +25,7 @@ export function WikiStatsModal() {
           <p className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-3">
             Distribution des victoires
           </p>
-          <DistributionChart distribution={stats.guessDistribution} maxAttempts={3} />
+          <DistributionChart distribution={stats.guessDistribution} maxAttempts={5} />
         </div>
       </div>
     </Modal>

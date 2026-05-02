@@ -331,7 +331,7 @@ export const useWikiStore = create<WikiStore>((set, get) => ({
 // ─── Selectors ─────────────────────────────────────────────────────────────────
 
 export const selectWikiAttemptsLeft = (s: WikiStore) =>
-  (s.challenge?.maxAttempts ?? 3) - s.guesses.length
+  (s.challenge?.maxAttempts ?? 5) - s.guesses.length
 
 export const selectWikiCurrentHints = (s: WikiStore) =>
   s.challenge ? s.challenge.hints.slice(0, s.hintsRevealed) : []
