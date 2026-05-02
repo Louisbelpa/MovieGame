@@ -425,17 +425,31 @@ function WikiPersonForm({
   async function handleRandomWikipedia() {
     setLoadingRandomWiki(true)
     setError(null)
+    let lastError: unknown = null
     try {
-      if (_wikiSlugPool.length === 0) {
-        const { slugs } = await fetchRandomWikiSlugs('fr', 30)
-        _wikiSlugPool.push(...slugs)
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        if (_wikiSlugPool.length === 0) {
+          try {
+            const { slugs } = await fetchRandomWikiSlugs('fr', 30)
+            _wikiSlugPool.push(...slugs)
+          } catch (err) {
+            lastError = err
+            break
+          }
+          if (_wikiSlugPool.length === 0) break
+        }
+        const randomSlug = _wikiSlugPool.pop()!
+        try {
+          const data = await fetchWikipediaPerson(randomSlug, 'fr')
+          setSlug(randomSlug)
+          applyWikipediaData(data)
+          return
+        } catch (err) {
+          lastError = err
+        }
       }
-      const randomSlug = _wikiSlugPool.pop()!
-      const data = await fetchWikipediaPerson(randomSlug, 'fr')
-      setSlug(randomSlug)
-      applyWikipediaData(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur wikipedia aléatoire')
+      const msg = lastError instanceof Error ? lastError.message : 'Erreur wikipedia aléatoire'
+      setError(`${msg} — réessaie.`)
     } finally {
       setLoadingRandomWiki(false)
     }
