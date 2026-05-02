@@ -31,6 +31,7 @@ interface WikiStore {
   hasNext: boolean
   stats: GameStats
   ui: UIState
+  isSubmitting: boolean
 
   initGame: () => Promise<void>
   loadDate: (date: string) => Promise<void>
@@ -85,6 +86,7 @@ export const useWikiStore = create<WikiStore>((set, get) => ({
   hasNext: false,
   stats: loadStats('wiki'),
   ui: defaultUI(),
+  isSubmitting: false,
 
   // ── initGame ────────────────────────────────────────────────────────────────
 
@@ -193,10 +195,14 @@ export const useWikiStore = create<WikiStore>((set, get) => ({
   // ── submitGuess ─────────────────────────────────────────────────────────────
 
   submitGuess: async (guess: string) => {
-    const { challenge, guesses, stats } = get()
+    const { challenge, guesses, stats, isSubmitting, status } = get()
     if (!challenge || !guess.trim()) return
+    if (isSubmitting) return
+    if (status === 'won' || status === 'lost') return
+    if (guesses.length >= challenge.maxAttempts) return
 
     set(s => ({
+      isSubmitting: true,
       guesses: [...s.guesses, { value: guess, status: 'wrong', timestamp: Date.now() } as GuessEntry],
       ui: { ...s.ui, inputValue: '', isSearchOpen: false },
     }))
@@ -238,18 +244,33 @@ export const useWikiStore = create<WikiStore>((set, get) => ({
         setTimeout(() => get().openModal(res.outcome === 'won' ? 'win' : 'lose'), res.correct ? 1200 : 600)
       }
     } catch (err) {
+      const errStatus = (err as { status?: number }).status
       set({ guesses })
-      console.error('[wikiStore.submitGuess]', err)
+      if (errStatus === 409) {
+        const viewingDate = get().viewingDate
+        try {
+          if (viewingDate) await get().loadDate(viewingDate)
+          else await get().initGame()
+        } catch {}
+      } else {
+        console.error('[wikiStore.submitGuess]', err)
+      }
+    } finally {
+      set({ isSubmitting: false })
     }
   },
 
   // ── skipAttempt ─────────────────────────────────────────────────────────────
 
   skipAttempt: async () => {
-    const { challenge, guesses, stats } = get()
+    const { challenge, guesses, stats, isSubmitting, status } = get()
     if (!challenge) return
+    if (isSubmitting) return
+    if (status === 'won' || status === 'lost') return
+    if (guesses.length >= challenge.maxAttempts) return
 
     const updatedGuesses: GuessEntry[] = [...guesses, { value: '', status: 'skipped', timestamp: Date.now() } as GuessEntry]
+    set({ isSubmitting: true })
 
     try {
       const res = await postWikiGuess(challenge.challengeId, '')
@@ -277,7 +298,18 @@ export const useWikiStore = create<WikiStore>((set, get) => ({
         setTimeout(() => get().openModal('lose'), 600)
       }
     } catch (err) {
-      console.error('[wikiStore.skipAttempt]', err)
+      const errStatus = (err as { status?: number }).status
+      if (errStatus === 409) {
+        const viewingDate = get().viewingDate
+        try {
+          if (viewingDate) await get().loadDate(viewingDate)
+          else await get().initGame()
+        } catch {}
+      } else {
+        console.error('[wikiStore.skipAttempt]', err)
+      }
+    } finally {
+      set({ isSubmitting: false })
     }
   },
 
