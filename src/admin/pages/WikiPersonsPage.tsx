@@ -61,13 +61,40 @@ interface PoliticianInfoboxForm {
   nationality: string | null
 }
 
+interface CareerHighlightRow {
+  label: string
+  value: string
+}
+
 interface SportInfoboxForm {
   sport: string | null
   position: string | null
   clubs: WikiClubFormRow[]
+  career_highlights: CareerHighlightRow[]
   national_team: { name: string; caps: number | null; goals: number | null } | null
   birth_year: number | null
   nationality: string | null
+}
+
+function careerHighlightsToLines(highlights: CareerHighlightRow[]): string {
+  return highlights.map((h) => `${h.label || 'Faits'} | ${h.value}`).join('\n')
+}
+
+function parseCareerHighlightsLines(text: string): CareerHighlightRow[] {
+  return text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const idx = line.indexOf('|')
+      if (idx === -1) return { label: 'Faits marquants', value: line.trim() }
+      return {
+        label: line.slice(0, idx).trim() || 'Faits marquants',
+        value: line.slice(idx + 1).trim(),
+      }
+    })
+    .filter((h) => h.value.length > 0)
+    .slice(0, 8)
 }
 
 function toNullableString(v: string): string | null {
@@ -96,6 +123,7 @@ const HINT_KEY_LABELS: Record<string, string> = {
   position: 'Poste',
   domain: 'Domaine',
   notable_work: 'Œuvre notable',
+  company: 'Entreprise(s)',
   name_initials: 'Initiales du nom',
   name_length: 'Longueur du nom',
 }
@@ -104,14 +132,32 @@ function hintKeyLabel(key: string): string {
   return HINT_KEY_LABELS[key] ?? key
 }
 
-function getAllowedHintKeys(personType: PersonType): string[] {
+/** Clés sélectionnables dans le formulaire (incl. domain / œuvre si besoin manuel). */
+function getWikiHintKeysSelectable(personType: PersonType): string[] {
   if (personType === 'politician') {
     return ['birth_year', 'nationality', 'party', 'name_initials', 'name_length']
   }
   if (personType === 'sportsperson') {
     return ['birth_year', 'nationality', 'position', 'name_initials', 'name_length']
   }
+  if (personType === 'entrepreneur') {
+    return ['birth_year', 'nationality', 'domain', 'notable_work', 'company', 'name_initials', 'name_length']
+  }
   return ['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials', 'name_length']
+}
+
+/** Planning initial sans doublon avec le profil visible (domaine + œuvre déjà affichés). */
+function getDefaultWikiHintSchedule(personType: PersonType): string[] {
+  if (personType === 'politician') {
+    return ['birth_year', 'nationality', 'party', 'name_initials', 'name_length']
+  }
+  if (personType === 'sportsperson') {
+    return ['birth_year', 'nationality', 'position', 'name_initials', 'name_length']
+  }
+  if (personType === 'entrepreneur') {
+    return ['birth_year', 'nationality', 'company', 'name_initials', 'name_length']
+  }
+  return ['birth_year', 'nationality', 'name_initials', 'name_length']
 }
 
 function parseGenericInfobox(raw: Record<string, unknown>): {
@@ -120,6 +166,7 @@ function parseGenericInfobox(raw: Record<string, unknown>): {
   era: string | null
   birth_year: number | null
   nationality: string | null
+  company: string | null
 } {
   return {
     domain: typeof raw.domain === 'string' ? raw.domain : null,
@@ -127,6 +174,7 @@ function parseGenericInfobox(raw: Record<string, unknown>): {
     era: typeof raw.era === 'string' ? raw.era : null,
     birth_year: typeof raw.birth_year === 'number' ? raw.birth_year : null,
     nationality: typeof raw.nationality === 'string' ? raw.nationality : null,
+    company: typeof raw.company === 'string' ? raw.company : null,
   }
 }
 
@@ -173,10 +221,22 @@ function parseSportInfobox(raw: Record<string, unknown>): SportInfoboxForm {
     ? (raw.national_team as Record<string, unknown>)
     : null
 
+  const chRaw = Array.isArray(raw.career_highlights) ? raw.career_highlights : []
+  const career_highlights: CareerHighlightRow[] = chRaw
+    .map((item) => {
+      const h = item as Record<string, unknown>
+      return {
+        label: typeof h.label === 'string' ? h.label.trim() : '',
+        value: typeof h.value === 'string' ? h.value.trim() : '',
+      }
+    })
+    .filter((h) => h.value.length > 0)
+
   return {
     sport: typeof raw.sport === 'string' ? raw.sport : null,
     position: typeof raw.position === 'string' ? raw.position : null,
     clubs,
+    career_highlights,
     national_team: ntRaw
       ? {
           name: String(ntRaw.name ?? '').trim(),
@@ -218,7 +278,9 @@ function WikiPersonForm({
   const [slug, setSlug] = useState(initial?.wikipedia_slug ?? '')
   const [personType, setPersonType] = useState<PersonType>(initial?.person_type ?? 'politician')
   const [aliasesInput, setAliasesInput] = useState((initial?.name_aliases ?? []).join(', '))
-  const [selectedHints, setSelectedHints] = useState<string[]>(initial?.hint_schedule ?? getAllowedHintKeys(initial?.person_type ?? 'politician'))
+  const [selectedHints, setSelectedHints] = useState<string[]>(
+    initial?.hint_schedule ?? getDefaultWikiHintSchedule(initial?.person_type ?? 'politician'),
+  )
   const [photoUrl, setPhotoUrl] = useState(initial?.photo_url ?? '')
   const [extract, setExtract] = useState(initial?.extract ?? '')
   const [wikipediaUrl, setWikipediaUrl] = useState(initial?.wikipedia_url ?? '')
@@ -234,9 +296,12 @@ function WikiPersonForm({
   const [nationalTeamName, setNationalTeamName] = useState('')
   const [nationalTeamCaps, setNationalTeamCaps] = useState('')
   const [nationalTeamGoals, setNationalTeamGoals] = useState('')
+  const [careerHighlightsText, setCareerHighlightsText] = useState('')
   const [domain, setDomain] = useState('')
   const [notableWork, setNotableWork] = useState('')
+  const [company, setCompany] = useState('')
   const [era, setEra] = useState('')
+  const [wikiLang, setWikiLang] = useState<'fr' | 'en'>('fr')
   const [loadingWiki, setLoadingWiki] = useState(false)
   const [loadingRandomWiki, setLoadingRandomWiki] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -257,6 +322,11 @@ function WikiPersonForm({
           .map((r) => [r.title, r.start_year ?? '', r.end_year ?? '', r.country ?? ''].join(' | '))
           .join('\n')
       )
+      setCareerHighlightsText('')
+      setDomain('')
+      setNotableWork('')
+      setCompany('')
+      setEra('')
     } else if (currentType === 'sportsperson') {
       const s = parseSportInfobox(raw)
       setSport(s.sport ?? '')
@@ -271,22 +341,29 @@ function WikiPersonForm({
       setNationalTeamName(s.national_team?.name ?? '')
       setNationalTeamCaps(s.national_team?.caps != null ? String(s.national_team.caps) : '')
       setNationalTeamGoals(s.national_team?.goals != null ? String(s.national_team.goals) : '')
+      setCareerHighlightsText(careerHighlightsToLines(s.career_highlights))
+      setDomain('')
+      setNotableWork('')
+      setCompany('')
+      setEra('')
     } else {
       const g = parseGenericInfobox(raw)
       setBirthYear(g.birth_year != null ? String(g.birth_year) : '')
       setNationality(g.nationality ?? '')
       setDomain(g.domain ?? '')
       setNotableWork(g.notable_work ?? '')
+      setCompany(g.company ?? '')
       setEra(g.era ?? '')
+      setCareerHighlightsText('')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial?.id])
 
   useEffect(() => {
-    const allowed = getAllowedHintKeys(personType)
+    const allowed = getWikiHintKeysSelectable(personType)
     setSelectedHints((prev) => {
       const filtered = prev.filter((k) => allowed.includes(k))
-      return filtered.length > 0 ? filtered : allowed
+      return filtered.length > 0 ? filtered : getDefaultWikiHintSchedule(personType)
     })
   }, [personType])
 
@@ -303,7 +380,7 @@ function WikiPersonForm({
   }) {
     setName(data.name)
     setPersonType(data.person_type)
-    setSelectedHints(data.hint_schedule.length > 0 ? data.hint_schedule : getAllowedHintKeys(data.person_type))
+    setSelectedHints(data.hint_schedule.length > 0 ? data.hint_schedule : getDefaultWikiHintSchedule(data.person_type))
     setPhotoUrl(data.photo_url ?? '')
     setExtract(data.extract ?? '')
     setWikipediaUrl(data.wikipedia_url ?? '')
@@ -326,6 +403,11 @@ function WikiPersonForm({
       setNationalTeamName('')
       setNationalTeamCaps('')
       setNationalTeamGoals('')
+      setCareerHighlightsText('')
+      setDomain('')
+      setNotableWork('')
+      setCompany('')
+      setEra('')
       return
     }
 
@@ -343,10 +425,12 @@ function WikiPersonForm({
       setNationalTeamName(s.national_team?.name ?? '')
       setNationalTeamCaps(s.national_team?.caps != null ? String(s.national_team.caps) : '')
       setNationalTeamGoals(s.national_team?.goals != null ? String(s.national_team.goals) : '')
+      setCareerHighlightsText(careerHighlightsToLines(s.career_highlights))
       setParty('')
       setRolesText('')
       setDomain('')
       setNotableWork('')
+      setCompany('')
       setEra('')
       return
     }
@@ -356,6 +440,7 @@ function WikiPersonForm({
     setNationality(g.nationality ?? '')
     setDomain(g.domain ?? '')
     setNotableWork(g.notable_work ?? '')
+    setCompany(g.company ?? '')
     setEra(g.era ?? '')
     setParty('')
     setRolesText('')
@@ -365,6 +450,7 @@ function WikiPersonForm({
     setNationalTeamName('')
     setNationalTeamCaps('')
     setNationalTeamGoals('')
+    setCareerHighlightsText('')
   }
 
   function parseRolesInput(): WikiRoleFormRow[] {
@@ -407,16 +493,17 @@ function WikiPersonForm({
 
   async function handleFetchWikipedia() {
     if (!slug.trim()) {
-      setError('Le slug Wikipedia est requis pour l’auto-remplissage.')
+      setError('Saisis un nom (ex. Bruno Le Maire), un slug ou une URL Wikipédia, puis clique sur Remplir.')
       return
     }
     setLoadingWiki(true)
     setError(null)
     try {
-      const data = await fetchWikipediaPerson(slug.trim(), 'fr')
+      const data = await fetchWikipediaPerson(slug.trim(), wikiLang)
+      if (data.resolved_slug) setSlug(data.resolved_slug)
       applyWikipediaData(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur auto-remplissage Wikipedia')
+      setError(err instanceof Error ? err.message : 'Erreur import Wikipédia')
     } finally {
       setLoadingWiki(false)
     }
@@ -427,12 +514,12 @@ function WikiPersonForm({
     setError(null)
     try {
       if (_wikiSlugPool.length === 0) {
-        const { slugs } = await fetchRandomWikiSlugs('fr', 30)
+        const { slugs } = await fetchRandomWikiSlugs(wikiLang, 30)
         _wikiSlugPool.push(...slugs)
       }
       const randomSlug = _wikiSlugPool.pop()!
-      const data = await fetchWikipediaPerson(randomSlug, 'fr')
-      setSlug(randomSlug)
+      const data = await fetchWikipediaPerson(randomSlug, wikiLang)
+      setSlug(data.resolved_slug ?? randomSlug)
       applyWikipediaData(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur wikipedia aléatoire')
@@ -458,6 +545,7 @@ function WikiPersonForm({
             sport: toNullableString(sport),
             position: toNullableString(position),
             clubs: parseClubsInput(),
+            career_highlights: parseCareerHighlightsLines(careerHighlightsText),
             national_team: toNullableString(nationalTeamName)
               ? {
                   name: nationalTeamName.trim(),
@@ -474,6 +562,7 @@ function WikiPersonForm({
             era: toNullableString(era),
             birth_year: toNullableNumber(birthYear),
             nationality: toNullableString(nationality),
+            ...(personType === 'entrepreneur' ? { company: toNullableString(company) } : {}),
           }
 
       const payload: WikiPersonPayload = {
@@ -506,12 +595,33 @@ function WikiPersonForm({
           <input value={name} onChange={(e) => setName(e.target.value)} required className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Slug Wikipedia</label>
-          <div className="flex gap-2">
-            <input value={slug} onChange={(e) => setSlug(e.target.value)} required className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-            <button type="button" onClick={handleFetchWikipedia} disabled={loadingWiki || loadingRandomWiki} className="px-3 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 disabled:opacity-50 inline-flex items-center gap-1.5">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Wikipédia (nom, slug ou URL)</label>
+          <div className="flex flex-wrap gap-2 items-center">
+            <input
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+              required
+              placeholder="ex. Bruno Le Maire ou lien …/wiki/…"
+              className="min-w-[12rem] flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+            <select
+              value={wikiLang}
+              onChange={(e) => setWikiLang(e.target.value as 'fr' | 'en')}
+              className="rounded-lg border border-gray-300 px-2 py-2 text-sm bg-white"
+              title="Langue du wiki pour la recherche et l’import"
+            >
+              <option value="fr">FR</option>
+              <option value="en">EN</option>
+            </select>
+            <button
+              type="button"
+              onClick={handleFetchWikipedia}
+              disabled={loadingWiki || loadingRandomWiki}
+              title="Recherche la page (API Wikipédia) et remplit le formulaire"
+              className="px-3 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 disabled:opacity-50 inline-flex items-center gap-1.5"
+            >
               <WandSparkles size={14} />
-              {loadingWiki ? 'Chargement…' : 'Wiki'}
+              {loadingWiki ? 'Import…' : 'Remplir'}
             </button>
             {!initial && (
               <button
@@ -525,6 +635,9 @@ function WikiPersonForm({
               </button>
             )}
           </div>
+          <p className="mt-1 text-xs text-gray-500">
+            Tu peux coller une URL <span className="whitespace-nowrap">fr.wikipedia.org/wiki/…</span> : la langue est détectée automatiquement.
+          </p>
         </div>
       </div>
 
@@ -576,7 +689,7 @@ function WikiPersonForm({
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">Indices complémentaires utilisés</label>
         <div className="grid sm:grid-cols-2 gap-2">
-          {getAllowedHintKeys(personType).map((hintKey) => (
+          {getWikiHintKeysSelectable(personType).map((hintKey) => (
             <label key={hintKey} className="inline-flex items-center gap-2 text-sm text-gray-700">
               <input
                 type="checkbox"
@@ -640,6 +753,12 @@ function WikiPersonForm({
             </label>
             <textarea rows={6} value={clubsText} onChange={(e) => setClubsText(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono" />
           </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Faits marquants (tennis, etc.) — 1 ligne = libellé | valeur
+            </label>
+            <textarea rows={4} value={careerHighlightsText} onChange={(e) => setCareerHighlightsText(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono" placeholder={'Titres en simple | 22'} />
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Équipe nationale</label>
             <input value={nationalTeamName} onChange={(e) => setNationalTeamName(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
@@ -673,6 +792,18 @@ function WikiPersonForm({
             <label className="block text-sm font-medium text-gray-700 mb-1">Période</label>
             <input value={era} onChange={(e) => setEra(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
           </div>
+          {personType === 'entrepreneur' && (
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Entreprise(s)</label>
+              <textarea
+                rows={2}
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder="ex. Tesla · SpaceX · X"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+          )}
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Oeuvre / fait notable</label>
             <textarea rows={3} value={notableWork} onChange={(e) => setNotableWork(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
@@ -689,7 +820,6 @@ function WikiPersonForm({
               src={photoUrl}
               alt="Aperçu"
               className="mt-2 h-24 w-24 rounded-lg object-cover object-top border border-gray-200"
-              crossOrigin="anonymous"
               referrerPolicy="no-referrer"
               onError={(e) => { e.currentTarget.style.display = 'none' }}
             />
@@ -836,7 +966,7 @@ export function WikiPersonsPage() {
                               {person.photo_url ? (
                                 <img src={person.photo_url} alt={person.name}
                                   className="h-10 w-14 rounded-md object-cover object-top border border-gray-200"
-                                  crossOrigin="anonymous" referrerPolicy="no-referrer"
+                                  referrerPolicy="no-referrer"
                                   onError={(e) => { e.currentTarget.style.display = 'none' }} />
                               ) : (
                                 <div className="h-10 w-14 rounded-md bg-gray-100 border border-gray-200" />
@@ -864,7 +994,7 @@ export function WikiPersonsPage() {
                           {person.photo_url ? (
                             <img src={person.photo_url} alt={person.name}
                               className="h-10 w-16 rounded-md object-cover object-top border border-gray-200"
-                              crossOrigin="anonymous" referrerPolicy="no-referrer"
+                              referrerPolicy="no-referrer"
                               onError={(e) => { e.currentTarget.style.display = 'none' }} />
                           ) : (
                             <div className="h-10 w-16 rounded-md bg-gray-100 border border-gray-200" />

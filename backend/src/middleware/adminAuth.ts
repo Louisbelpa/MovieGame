@@ -3,32 +3,49 @@
  * Middleware that validates the admin_token signed cookie.
  *
  * Token generation:
- *   token = sha256(ADMIN_PASSWORD + COOKIE_SECRET)
+ *   token = random 32-byte hex string
  *
- * On login, the same hash is computed and stored in a signed cookie.
- * On subsequent requests, this middleware recomputes the expected hash and
- * compares it to what was sent. Because the cookie is signed by cookie-parser,
- * tampering is already detected before we even read signedCookies.
+ * Only a SHA-256 hash of the token is persisted in DB, with expiration and
+ * optional revocation timestamp. Cookie signatures still protect against
+ * tampering before we read signedCookies.
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
+import db from '../db/database.js';
 
 export const ADMIN_COOKIE = 'admin_token';
 
-/** Compute the expected admin token from env vars. */
+/** Generate a new admin token and persist only its hash. */
 export function computeAdminToken(): string {
-  const username = process.env.ADMIN_USERNAME ?? '';
-  const password = process.env.ADMIN_PASSWORD ?? '';
-  const secret = process.env.COOKIE_SECRET ?? 'dev_secret';
-  return createHash('sha256').update(username + password + secret).digest('hex');
+  const token = randomBytes(32).toString('hex');
+  const hash = createHash('sha256').update(token).digest('hex');
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  db.prepare(`INSERT INTO active_admin_tokens (token_hash, expires_at) VALUES (?, ?)`).run(hash, expiresAt);
+  return token;
 }
 
 export function adminAuth(req: Request, res: Response, next: NextFunction): void {
   const token = req.signedCookies?.[ADMIN_COOKIE] as string | undefined;
 
-  if (!token || token !== computeAdminToken()) {
+  if (!token) {
     res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  const hash = createHash('sha256').update(token).digest('hex');
+  const row = db
+    .prepare(
+      `SELECT id
+       FROM active_admin_tokens
+       WHERE token_hash = ?
+         AND revoked_at IS NULL
+         AND datetime(expires_at) > datetime('now')`
+    )
+    .get(hash);
+
+  if (!row) {
+    res.status(401).json({ error: 'Invalid or expired token' });
     return;
   }
 

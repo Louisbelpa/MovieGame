@@ -14,6 +14,11 @@
  *   Change IMAGE_SOURCE=local + image_url="/posters/foo.jpg" to self-host.
  */
 
+if (process.env.NODE_ENV === 'production') {
+  console.error('ERROR: Seed script must not run in production')
+  process.exit(1)
+}
+
 import 'dotenv/config';
 import db from '../src/db/database.js';
 

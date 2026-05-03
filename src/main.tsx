@@ -19,24 +19,12 @@ if (path.startsWith('/admin')) {
     window.history.replaceState({}, '', '/films')
     document.title = `${BRAND_NAME} — Devine le film du jour`
     import('./App').then(({ default: App }) => {
-      createRoot(root).render(
-        <StrictMode>
-          <BrowserRouter>
-            <App gameType="film" />
-          </BrowserRouter>
-        </StrictMode>
-      )
+      createRoot(root).render(<StrictMode><App /></StrictMode>)
     })
   } else {
     document.title = `${BRAND_NAME} — Devine la série du jour`
     import('./App').then(({ default: App }) => {
-      createRoot(root).render(
-        <StrictMode>
-          <BrowserRouter>
-            <App gameType="series" />
-          </BrowserRouter>
-        </StrictMode>
-      )
+      createRoot(root).render(<StrictMode><App /></StrictMode>)
     })
   }
 } else if (path.startsWith('/wiki')) {
@@ -44,12 +32,12 @@ if (path.startsWith('/admin')) {
     window.history.replaceState({}, '', '/films')
     document.title = `${BRAND_NAME} — Devine le film du jour`
     import('./App').then(({ default: App }) => {
-      createRoot(root).render(<StrictMode><BrowserRouter><App gameType="film" /></BrowserRouter></StrictMode>)
+      createRoot(root).render(<StrictMode><App /></StrictMode>)
     })
   } else {
     document.title = `${BRAND_NAME} — Devine la personnalité du jour`
-    import('./WikiApp').then(({ WikiApp }) => {
-      createRoot(root).render(<StrictMode><BrowserRouter><WikiApp /></BrowserRouter></StrictMode>)
+    import('./App').then(({ default: App }) => {
+      createRoot(root).render(<StrictMode><App /></StrictMode>)
     })
   }
 } else if (path === '/' || path === '') {
@@ -61,17 +49,17 @@ if (path.startsWith('/admin')) {
       ? `${BRAND_NAME} — Devine le film ou la personnalité du jour`
       : `${BRAND_NAME} — Devine le film du jour`)
   import('./components/HomePage').then(({ HomePage }) => {
-    createRoot(root).render(<StrictMode><HomePage /></StrictMode>)
+    createRoot(root).render(
+      <StrictMode>
+        <BrowserRouter>
+          <HomePage />
+        </BrowserRouter>
+      </StrictMode>,
+    )
   })
 } else {
   document.title = `${BRAND_NAME} — Devine le film du jour`
   import('./App').then(({ default: App }) => {
-    createRoot(root).render(
-      <StrictMode>
-        <BrowserRouter>
-          <App gameType="film" />
-        </BrowserRouter>
-      </StrictMode>
-    )
+    createRoot(root).render(<StrictMode><App /></StrictMode>)
   })
 }

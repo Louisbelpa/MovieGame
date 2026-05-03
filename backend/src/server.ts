@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';
+import cors from 'cors';
+import helmet from 'helmet';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -38,7 +40,7 @@ if (process.env.NODE_ENV === 'production') {
 
 const app = express();
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
-const CORS_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:5173';
+const allowedOrigins = (process.env.CORS_ORIGIN ?? '').split(',').map((origin) => origin.trim()).filter(Boolean);
 
 // Trust the first proxy (Railway, Render, etc.) so express-rate-limit can
 // read X-Forwarded-For correctly instead of throwing a ValidationError.
@@ -47,44 +49,30 @@ app.set('trust proxy', 1);
 // ─── Core middleware ──────────────────────────────────────────────────────────
 
 app.use(requestIdMiddleware);
-app.use(express.json());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      imgSrc: ["'self'", 'https://image.tmdb.org', 'https://upload.wikimedia.org', 'data:'],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+    },
+  },
+}));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ limit: '1mb', extended: true }));
 app.use(cookieParser(process.env.COOKIE_SECRET ?? 'dev_secret'));
 
-// Manual CORS (avoids adding the `cors` package for a single origin)
-app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
-  res.setHeader('Access-Control-Allow-Origin', CORS_ORIGIN);
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(204);
-    return;
-  }
-  next();
-});
-
-// ─── Security headers ─────────────────────────────────────────────────────────
-app.use((_req: express.Request, res: express.Response, next: express.NextFunction) => {
-  res.setHeader(
-    'Content-Security-Policy',
-    [
-      "default-src 'self'",
-      "script-src 'self'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https://image.tmdb.org",
-      "connect-src 'self'",
-      "font-src 'self'",
-      "frame-ancestors 'none'",
-    ].join('; ')
-  );
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  if (process.env.NODE_ENV === 'production') {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  }
-  next();
-});
+if (allowedOrigins.length === 0 && process.env.NODE_ENV === 'production') {
+  throw new Error('CORS_ORIGIN must be defined in production');
+}
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+    else callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
 
 // Attach / create anonymous session cookie on every request
 app.use(sessionMiddleware);
@@ -111,12 +99,7 @@ app.use('/api/admin', adminRouter);
 
 // Health-check (used by Railway/Render)
 app.get('/health', (_req: express.Request, res: express.Response) => {
-  try {
-    db.prepare('SELECT 1').get();
-    res.json({ status: 'ok', ts: new Date().toISOString() });
-  } catch {
-    res.status(503).json({ status: 'error', message: 'Database unavailable' });
-  }
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // SPA fallback – serve built index.html for all non-API routes (production)
@@ -136,7 +119,7 @@ app.use(errorHandler);
 
 app.listen(PORT, () => {
   logger.info(`MovieGame API running on http://localhost:${PORT}`);
-  logger.info({ nodeEnv: process.env.NODE_ENV ?? 'development', corsOrigin: CORS_ORIGIN, imageSource: process.env.IMAGE_SOURCE ?? 'tmdb' }, 'Server config');
+  logger.info({ nodeEnv: process.env.NODE_ENV ?? 'development', corsOrigins: allowedOrigins, imageSource: process.env.IMAGE_SOURCE ?? 'tmdb' }, 'Server config');
 });
 
 export default app;

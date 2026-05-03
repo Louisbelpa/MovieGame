@@ -16,6 +16,8 @@ interface WikiGuessInputProps {
 
 export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: WikiGuessInputProps) {
   const listboxId = useId()
+  const errorId = useId()
+  const announcementId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const [activeIndex, setActiveIndex] = useState(-1)
 
@@ -25,6 +27,12 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
 
   const { suggestions, isLoading } = useAutocomplete<WikiPersonSuggestion>(inputValue, searchWikiPersons, { debounceMs: 200 })
   const isOpen = suggestions.length > 0 && inputValue.length >= 2
+  const hasError = shakeTrigger > 0
+  const announcement = isLoading
+    ? 'Chargement des suggestions…'
+    : isOpen
+      ? `${suggestions.length} suggestion${suggestions.length > 1 ? 's' : ''} disponible${suggestions.length > 1 ? 's' : ''}.`
+      : ''
 
   const handleSelect = (title: string) => {
     setInputValue('')
@@ -54,7 +62,7 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
       <motion.div
         key={shakeTrigger}
         className={cn(
-          'grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] items-center gap-2 p-2 sm:p-1 sm:pl-3 rounded-xl film-border transition-all min-h-[52px]',
+          'guess-input-row flex items-center gap-2 p-1 pl-3 rounded-xl film-border transition-all min-h-[52px]',
           disabled && 'opacity-50'
         )}
         animate={shakeTrigger > 0 ? { x: [-8, 8, -5, 5, 0] } : {}}
@@ -65,6 +73,9 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
           ref={inputRef}
           type="text"
           role="combobox"
+          aria-label="Votre réponse, nom de personnalité"
+          aria-invalid={hasError}
+          aria-describedby={hasError ? errorId : announcementId}
           aria-autocomplete="list"
           aria-controls={listboxId}
           aria-expanded={isOpen}
@@ -72,28 +83,37 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
           value={inputValue}
           onChange={(e) => { setInputValue(e.target.value); setActiveIndex(-1) }}
           onKeyDown={handleKeyDown}
-          placeholder="Entrez un nom…"
+          placeholder="Nom de la personnalité…"
           disabled={disabled}
           autoComplete="off"
           enterKeyHint="search"
           spellCheck={false}
-          className="w-full bg-transparent text-film-text placeholder:text-film-text-dim text-sm outline-none min-w-0 py-2 text-base sm:text-sm rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+          className={cn(
+            'flex-1 bg-transparent text-film-text placeholder:text-film-text-dim',
+            'text-sm outline-none min-w-0 py-2 rounded',
+            'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold',
+            'sm:text-sm text-base'
+          )}
         />
         {isLoading && <Loader2 size={14} className="text-film-text-dim animate-spin shrink-0" />}
-        <div className="grid grid-cols-2 gap-2 sm:contents">
-          <Button variant="ghost" size="sm" onClick={onSkip} disabled={disabled}
-            title="Passer cette tentative" className="shrink-0 text-film-text-dim min-h-[44px] min-w-[44px] gap-1">
-            <SkipForward size={14} />
-            <span className="text-sm">Passer</span>
-          </Button>
-          <Button variant="primary" size="sm"
-            onClick={() => inputValue.trim() && handleSelect(inputValue.trim())}
-            disabled={disabled || !inputValue.trim()}
-            className="shrink-0 min-h-[44px] px-4">
-            Deviner
-          </Button>
-        </div>
+        <Button variant="ghost" size="sm" onClick={onSkip} disabled={disabled}
+          title="Passer cette tentative" className="shrink-0 text-film-text-dim min-h-[44px] min-w-[44px] gap-1">
+          <SkipForward size={14} />
+          <span className="text-sm">Passer</span>
+        </Button>
+        <Button variant="primary" size="sm"
+          onClick={() => inputValue.trim() && handleSelect(inputValue.trim())}
+          disabled={disabled || !inputValue.trim()}
+          className="shrink-0 min-h-[44px] px-4">
+          Deviner
+        </Button>
       </motion.div>
+      <p id={errorId} className="sr-only" role={hasError ? 'alert' : undefined}>
+        {hasError ? 'Réponse invalide, veuillez réessayer.' : ''}
+      </p>
+      <div id={announcementId} aria-live="polite" className="sr-only">
+        {announcement}
+      </div>
 
       <p className="mt-1.5 text-sm text-film-text-dim text-right">
         {attemptsLeft} tentative{attemptsLeft > 1 ? 's' : ''} restante{attemptsLeft > 1 ? 's' : ''}
@@ -102,7 +122,11 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
       <AnimatePresence>
         {isOpen && (
           <motion.ul id={listboxId} role="listbox" aria-label="Suggestions de personnalités"
-            className="absolute z-20 top-full mt-1 w-full film-border rounded-xl overflow-hidden shadow-2xl max-h-44 sm:max-h-60 overflow-y-auto"
+            className={cn(
+              'absolute z-20 top-full mt-1 w-full',
+              'film-border rounded-xl overflow-hidden shadow-2xl',
+              'max-h-60 overflow-y-auto'
+            )}
             initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.15 }}>
             {suggestions.map((s, i) => (

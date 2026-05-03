@@ -12,7 +12,6 @@ export function errorHandler(
   _next: NextFunction
 ): void {
   const status = err.status ?? 500;
-  const message = err.message ?? 'Internal server error';
 
   if (status >= 500) {
     logger.error(
@@ -21,8 +20,9 @@ export function errorHandler(
     );
   }
 
+  const isDev = process.env.NODE_ENV === 'development';
   res.status(status).json({
-    error: message,
-    ...(res.locals.requestId ? { requestId: res.locals.requestId as string } : {}),
+    error: isDev ? err.message : 'Une erreur est survenue',
+    ...(isDev && { stack: err.stack }),
   });
 }

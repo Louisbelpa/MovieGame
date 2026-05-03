@@ -167,3 +167,110 @@
 .btn-mode-primary:hover {
   filter: brightness(1.1);
 }
+
+/* Transitions de page */
+.page-transition-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.page-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms, transform 300ms;
+}
+
+/* Animation des guesses */
+.guess-row {
+  animation: slideIn 0.3s ease-out;
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Animation hint reveal */
+.hint-panel__hint {
+  animation: fadeIn 0.4s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Loading skeleton */
+.skeleton {
+  background: linear-gradient(90deg, var(--color-film-gray) 25%, var(--color-film-border) 50%, var(--color-film-gray) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+.skeleton-line {
+  height: 0.75rem;
+  border-radius: 0.375rem;
+  background: rgba(255, 255, 255, 0.12);
+}
+.skeleton-line + .skeleton-line {
+  margin-top: 0.5rem;
+}
+.skeleton--sm .skeleton-line:nth-child(1) { width: 70%; }
+.skeleton--sm .skeleton-line:nth-child(2) { width: 85%; }
+.skeleton--sm .skeleton-line:nth-child(3) { width: 60%; }
+.skeleton--md .skeleton-line:nth-child(1) { width: 75%; }
+.skeleton--md .skeleton-line:nth-child(2) { width: 90%; }
+.skeleton--md .skeleton-line:nth-child(3) { width: 65%; }
+.skeleton--lg .skeleton-line:nth-child(1) { width: 80%; }
+.skeleton--lg .skeleton-line:nth-child(2) { width: 95%; }
+.skeleton--lg .skeleton-line:nth-child(3) { width: 70%; }
+
+.spinner {
+  display: inline-block;
+  border-radius: 9999px;
+  border: 2px solid var(--color-film-border);
+  border-top-color: var(--color-film-gold);
+  animation: spin 0.8s linear infinite;
+}
+.spinner--sm { width: 1rem; height: 1rem; }
+.spinner--md { width: 1.5rem; height: 1.5rem; }
+.spinner--lg { width: 2.5rem; height: 2.5rem; }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .game-page {
+    padding: 0.5rem;
+  }
+  .header {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .guess-input {
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+  .modal-content {
+    width: 95vw;
+    max-height: 90vh;
+  }
+}
+
+/* Tablet */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .game-page {
+    padding: 1rem;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+}
+
+/* Desktop */
+@media (min-width: 1025px) {
+  .game-page {
+    padding: 2rem;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+}

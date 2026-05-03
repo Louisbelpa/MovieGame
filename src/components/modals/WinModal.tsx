@@ -1,47 +1,57 @@
-/**
- * modals/WinModal.tsx
- * Shown when the player guesses correctly.
- */
-
 import { motion } from 'framer-motion'
 import { Share2, Trophy, BarChart2, ExternalLink } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { getTodayParis, useGameStore } from '@/store/gameStore'
-import { loadStats } from '@/lib/storage'
-import { FEATURES } from '@/config/features'
 
-export function WinModal() {
-  const isOpen = useGameStore((s) => s.ui.isModalOpen && s.ui.modalType === 'win')
-  const closeModal = useGameStore((s) => s.closeModal)
-  const openModal = useGameStore((s) => s.openModal)
-  const shareResult = useGameStore((s) => s.shareResult)
-  const result = useGameStore((s) => s.result)
-  const guesses = useGameStore((s) => s.guesses)
-  const gameType = useGameStore((s) => s.gameType)
-  const viewingDate = useGameStore((s) => s.viewingDate)
-
-  if (!result) return null
-
-  const correctAttempt = guesses.findIndex((g) => g.status === 'correct') + 1
-  const maxAttempts = result.maxAttempts
-  const tmdbUrl = result.tmdbId
-    ? `https://www.themoviedb.org/${result.mediaType === 'series' ? 'tv' : 'movie'}/${result.tmdbId}`
-    : null
-  const otherType = gameType === 'film' ? 'series' : 'film'
-  const otherPlayedToday = loadStats(otherType).lastPlayedDate === getTodayParis()
-  const showOtherModeCta = FEATURES.enableSeries && !viewingDate && !otherPlayedToday
-
-  function goToOtherMode() {
-    closeModal()
-    window.location.href = otherType === 'series' ? '/series' : '/films'
+interface WinModalProps {
+  isOpen: boolean
+  onClose: () => void
+  mode: 'film' | 'series' | 'wiki'
+  result: {
+    name: string
+    year?: number
+    photoUrl?: string | null
+    extract?: string | null
+    genres?: string[]
+    director?: string
+    creator?: string
+    personType?: string
+    profile?: unknown
+    wikipediaUrl?: string | null
+    tmdbId?: number | null
   }
+  stats: {
+    attemptsUsed: number
+    maxAttempts: number
+    hintsRevealed: number
+  }
+  onShare: () => void
+  onOpenStats?: () => void
+  onPlayOtherMode?: () => void
+}
+
+export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onOpenStats, onPlayOtherMode }: WinModalProps) {
+  const isWiki = mode === 'wiki'
+  const modalTitleId = 'modal-title-win'
+  const modalDescId = 'modal-desc'
+  const tmdbUrl = !isWiki && result.tmdbId
+    ? `https://www.themoviedb.org/${mode === 'series' ? 'tv' : 'movie'}/${result.tmdbId}`
+    : null
+  const learnMoreUrl = isWiki ? (result.wikipediaUrl ?? null) : tmdbUrl
 
   return (
-    <Modal isOpen={isOpen} onClose={closeModal} ariaLabel="Défi réussi">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabelledBy={modalTitleId}
+      ariaDescribedBy={modalDescId}
+    >
       <div className="flex flex-col items-center gap-5 text-center">
-        {/* Trophy animation */}
+        <p id={modalDescId} className="sr-only">
+          Résumé de victoire et actions de partage.
+        </p>
+
         <motion.div
           initial={{ scale: 0, rotate: -15 }}
           animate={{ scale: 1, rotate: 0 }}
@@ -53,95 +63,85 @@ export function WinModal() {
 
         <div>
           <p className="text-film-text-dim text-sm mb-1">Bravo ! Vous avez trouvé en</p>
-          <p className="text-4xl font-title font-bold text-gradient-gold">
-            {correctAttempt}<span className="text-2xl">/{maxAttempts}</span>
+          <p id={modalTitleId} className="text-4xl font-title font-bold text-gradient-gold">
+            {stats.attemptsUsed}<span className="text-2xl">/{stats.maxAttempts}</span>
           </p>
         </div>
 
-        {/* Movie reveal */}
-        <div className="w-full film-border rounded-xl overflow-hidden">
-          <img
-            src={result.imageUrl}
-            alt={result.title}
-            className="w-full aspect-video object-cover"
-          />
+        <div className="w-full film-border rounded-xl overflow-hidden bg-film-black/40">
+          {result.photoUrl &&
+            (isWiki ? (
+              <div className="flex h-60 sm:h-72 md:h-80 w-full items-center justify-center bg-film-black/70">
+                <img
+                  src={result.photoUrl}
+                  alt={result.name}
+                  className="max-h-full max-w-full object-contain"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            ) : (
+              <img src={result.photoUrl} alt={result.name} className="w-full aspect-video object-cover" />
+            ))}
           <div className="p-3 text-left">
-            <p className="font-title text-lg font-semibold text-film-text leading-tight">
-              {result.title}
-            </p>
+            <p className="font-title text-lg font-semibold text-film-text leading-tight">{result.name}</p>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
-              <Badge variant="muted">{result.year}</Badge>
-              <Badge variant="muted">{result.director}</Badge>
-              {result.genres.slice(0, 2).map((g) => (
+              {!isWiki && result.year && <Badge variant="muted">{result.year}</Badge>}
+              {!isWiki && result.director && <Badge variant="muted">{result.director}</Badge>}
+              {!isWiki && result.genres?.slice(0, 2).map((g) => (
                 <Badge key={g} variant="gold">{g}</Badge>
               ))}
+              {isWiki && result.personType && <Badge variant="gold">{result.personType}</Badge>}
             </div>
-            {result.tagline && (
-              <p className="text-sm text-film-text-dim italic mt-2">"{result.tagline}"</p>
+            {result.extract && (
+              <p className="text-sm text-film-text-dim mt-2 line-clamp-4 text-left">
+                {result.extract}
+              </p>
             )}
           </div>
         </div>
 
-        {/* Actions */}
+        <div className="text-sm text-film-text-dim">
+          <p>Trouvé en {stats.attemptsUsed}/{stats.maxAttempts} essais</p>
+          <p>Indices utilisés: {stats.hintsRevealed}</p>
+          <p>Prochain défi dans <NextGameCountdown /></p>
+        </div>
+
         <div className="flex gap-2 w-full">
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={() => { closeModal(); openModal('stats') }}
-            className="flex-1"
-          >
-            <BarChart2 size={15} />
-            Stats
-          </Button>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={shareResult}
-            className="flex-1"
-          >
+          {onOpenStats && (
+            <Button onClick={onOpenStats} variant="secondary" size="md" className="flex-1">
+              <BarChart2 size={15} />
+              Stats
+            </Button>
+          )}
+          <Button onClick={onShare} variant="primary" size="md" className="flex-1">
             <Share2 size={15} />
             Partager
           </Button>
         </div>
-
-        {showOtherModeCta && (
-          <Button
-            variant="primary"
-            size="md"
-            onClick={goToOtherMode}
-            className="w-full !text-white hover:brightness-110 transition-[filter]"
-            style={{ backgroundColor: otherType === 'series' ? 'var(--sg-series)' : 'var(--sg-films)' }}
-          >
-            {otherType === 'series' ? 'Jouer la série du jour' : 'Jouer le film du jour'}
+        {onPlayOtherMode && (
+          <Button onClick={onPlayOtherMode} variant="secondary" size="md" className="w-full">
+            Essayer un autre mode
           </Button>
         )}
 
-        {/* Learn more */}
-        {tmdbUrl && (
+        {learnMoreUrl && (
           <a
-            href={tmdbUrl}
+            href={learnMoreUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-sm text-film-text-dim hover:text-film-text transition-colors"
           >
             <ExternalLink size={12} />
-            En savoir plus sur TMDB
+            {isWiki ? 'En savoir plus sur Wikipedia' : 'En savoir plus sur TMDB'}
           </a>
         )}
-
-        <p className="text-sm text-film-text-dim">
-          Prochain film dans <NextGameCountdown />
-        </p>
       </div>
     </Modal>
   )
 }
 
-/** Counts down to midnight in Europe/Paris timezone */
 function NextGameCountdown() {
   const now = new Date()
-
-  // Get current hour/minute/second in Paris
   const formatter = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/Paris',
     hour: 'numeric',
@@ -151,13 +151,11 @@ function NextGameCountdown() {
   })
   const parts = formatter.formatToParts(now)
   const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value ?? '0', 10)
-
   const h = get('hour')
   const m = get('minute')
   const s = get('second')
   const secondsUntilMidnight = (24 * 3600) - (h * 3600 + m * 60 + s)
   const hoursLeft = Math.floor(secondsUntilMidnight / 3600)
   const minsLeft = Math.floor((secondsUntilMidnight % 3600) / 60)
-
   return <strong className="text-film-text">{hoursLeft}h{minsLeft}</strong>
 }

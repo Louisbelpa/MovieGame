@@ -87,6 +87,10 @@ export interface WikipediaFetchPayload {
   hint_schedule: string[]
   parse_quality_score: number
   parse_warnings: string[]
+  /** Slug canonique après résolution (recherche / URL / redirections) */
+  resolved_slug?: string
+  resolved_lang?: string
+  canonical_wikipedia_slug?: string
 }
 
 export interface SeriesPayload {
@@ -530,10 +534,11 @@ export async function fetchRandomWikiSlugs(lang = 'fr', minFame = 30): Promise<{
   return request<{ slugs: string[] }>(`/api/admin/wiki-persons/random?lang=${encodeURIComponent(lang)}&minFame=${minFame}`)
 }
 
-export async function fetchWikipediaPerson(slug: string, lang = 'fr'): Promise<WikipediaFetchPayload> {
+/** `input` : nom affiché, titre, slug avec underscores ou URL complète Wikipédia */
+export async function fetchWikipediaPerson(input: string, lang = 'fr'): Promise<WikipediaFetchPayload> {
   return request<WikipediaFetchPayload>('/api/admin/wiki-persons/fetch-wikipedia', {
     method: 'POST',
-    body: JSON.stringify({ slug, lang }),
+    body: JSON.stringify({ input, lang }),
   })
 }
 

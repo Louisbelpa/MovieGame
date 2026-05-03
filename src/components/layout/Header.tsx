@@ -5,16 +5,18 @@
  */
 
 import { useRef } from 'react'
-import { useLocation } from 'react-router-dom'
-import { HelpCircle, BarChart2, Film, CalendarDays, Tv, Home, BookOpen } from 'lucide-react'
+import { HelpCircle, BarChart2, Film, CalendarDays, Tv, Home, Landmark } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useGameStore } from '@/store/gameStore'
 import { useWikiStore } from '@/store/wikiStore'
 import { BRAND_NAME } from '@/config/features'
 
-export function Header() {
-  const location = useLocation()
-  const isWiki = location.pathname.startsWith('/wiki')
+interface HeaderProps {
+  mode: 'film' | 'series' | 'wiki'
+}
+
+export function Header({ mode }: HeaderProps) {
+  const isWiki = mode === 'wiki'
 
   const gameOpenModal = useGameStore((s) => s.openModal)
   const wikiOpenModal = useWikiStore((s) => s.openModal)
@@ -30,8 +32,8 @@ export function Header() {
   const displayNumber = lastNumberRef.current
 
   const icon = isWiki
-    ? <BookOpen size={22} className="text-film-gold" aria-hidden />
-    : gameType === 'series'
+    ? <Landmark size={22} className="text-film-gold" aria-hidden />
+    : mode === 'series' || gameType === 'series'
       ? <Tv size={22} className="text-film-gold" aria-hidden />
       : <Film size={22} className="text-film-gold" aria-hidden />
 

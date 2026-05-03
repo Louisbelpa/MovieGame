@@ -31,7 +31,10 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import fs from 'fs';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
+import { fileTypeFromBuffer } from 'file-type';
 import db from '../db/database.js';
+import { normalizeCommonsPhotoUrl } from '../lib/commonsThumb.js';
 import { adminAuth, computeAdminToken, ADMIN_COOKIE } from '../middleware/adminAuth.js';
 import { adminLimiter, loginLimiter } from '../middleware/rateLimiter.js';
 import { logAuditEvent } from '../middleware/auditLog.js';
@@ -59,6 +62,12 @@ const upload = multer({
     if (allowed.includes(file.mimetype)) cb(null, true);
     else cb(new Error('Only JPEG, PNG and WebP images are allowed'));
   },
+});
+
+const strictAdminLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: 'Too many admin actions' },
 });
 
 export const adminRouter = Router();
@@ -210,6 +219,32 @@ function resolveAdminImageUrl(url: string): string {
   return `${TMDB_BASE_ADMIN}${url}`;
 }
 
+function maskTmdbApiKey(url: string): string {
+  return url.replace(/api_key=[^&]+/, 'api_key=***');
+}
+
+async function validateUploadedImageSignature(req: Request, _res: Response, next: NextFunction) {
+  try {
+    if (!req.file) {
+      next();
+      return;
+    }
+
+    const buffer = req.file.buffer ?? await fs.promises.readFile(req.file.path);
+    const type = await fileTypeFromBuffer(buffer);
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+
+    if (!type || !allowedMimes.includes(type.mime)) {
+      if (req.file.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      throw new Error('Invalid image format');
+    }
+
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
 function parseDateParam(raw: unknown): string | null {
   if (typeof raw !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
   return raw;
@@ -280,7 +315,8 @@ function formatWikiPerson(row: WikiPersonRow, usedDates?: string[]) {
     if (!row.photo_url) return null
     const v = row.photo_url.trim()
     if (!v) return null
-    return v.startsWith('//') ? `https:${v}` : v
+    const absolute = v.startsWith('//') ? `https:${v}` : v
+    return normalizeCommonsPhotoUrl(absolute) ?? absolute
   })()
   return {
     id: row.id,
@@ -428,7 +464,12 @@ adminRouter.post(
 
 adminRouter.post(
   '/logout',
-  (_req: Request, res: Response) => {
+  (req: Request, res: Response) => {
+    const token = req.signedCookies?.[ADMIN_COOKIE] as string | undefined;
+    if (token) {
+      const hash = crypto.createHash('sha256').update(token).digest('hex');
+      db.prepare(`UPDATE active_admin_tokens SET revoked_at = datetime('now') WHERE token_hash = ?`).run(hash);
+    }
     res.clearCookie(ADMIN_COOKIE, { httpOnly: true, sameSite: 'strict' });
     res.json({ ok: true });
   }
@@ -689,6 +730,7 @@ adminRouter.get(
 // POST /api/admin/films
 adminRouter.post(
   '/films',
+  strictAdminLimiter,
   (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = req.body as FilmBody;
@@ -764,6 +806,7 @@ adminRouter.post(
 // PUT /api/admin/films/:id
 adminRouter.put(
   '/films/:id',
+  strictAdminLimiter,
   (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = parseInt(req.params.id, 10);
@@ -830,6 +873,7 @@ adminRouter.put(
 // DELETE /api/admin/films/:id  (hard delete — blocked if film is scheduled)
 adminRouter.delete(
   '/films/:id',
+  strictAdminLimiter,
   (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = parseInt(req.params.id, 10);
@@ -947,6 +991,7 @@ adminRouter.patch(
 adminRouter.post(
   '/films/:id/image',
   upload.single('image'),
+  validateUploadedImageSignature,
   (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = parseInt(req.params.id, 10);
@@ -981,6 +1026,7 @@ adminRouter.post(
 adminRouter.post(
   '/upload',
   upload.single('image'),
+  validateUploadedImageSignature,
   (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) { res.status(400).json({ error: 'No image file received.' }); return; }
@@ -1141,6 +1187,7 @@ adminRouter.get(
 // POST /api/admin/challenges
 adminRouter.post(
   '/challenges',
+  strictAdminLimiter,
   (req: Request, res: Response, next: NextFunction) => {
     try {
       const { date, film_id, series_id, wiki_person_id } = req.body as { date?: string; film_id?: number; series_id?: number; wiki_person_id?: number };
@@ -1225,6 +1272,7 @@ adminRouter.post(
 // PUT /api/admin/challenges/:id
 adminRouter.put(
   '/challenges/:id',
+  strictAdminLimiter,
   (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = parseInt(req.params.id, 10);
@@ -1331,6 +1379,7 @@ adminRouter.patch(
 // DELETE /api/admin/challenges/:id
 adminRouter.delete(
   '/challenges/:id',
+  strictAdminLimiter,
   (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = parseInt(req.params.id, 10);
@@ -1404,10 +1453,11 @@ adminRouter.get(
       const url =
         `https://api.themoviedb.org/3/movie/${film.tmdb_id}/images` +
         `?api_key=${apiKey}&include_image_language=null`;
+      const safeUrl = maskTmdbApiKey(url);
 
       const tmdbRes = await fetch(url);
       if (!tmdbRes.ok) {
-        res.status(502).json({ error: `TMDB error: ${tmdbRes.status}` });
+        res.status(502).json({ error: `TMDB error: ${tmdbRes.status} (${safeUrl})` });
         return;
       }
 
@@ -1529,10 +1579,11 @@ adminRouter.get(
       const searchUrl =
         `https://api.themoviedb.org/3/search/movie` +
         `?api_key=${apiKey}&language=fr-FR&query=${encodeURIComponent(q)}&page=1`;
+      const safeUrl = maskTmdbApiKey(searchUrl);
 
       const tmdbRes = await fetch(searchUrl);
       if (!tmdbRes.ok) {
-        res.status(502).json({ error: `TMDB error: ${tmdbRes.status}` });
+        res.status(502).json({ error: `TMDB error: ${tmdbRes.status} (${safeUrl})` });
         return;
       }
 
@@ -1660,10 +1711,11 @@ adminRouter.get(
         `https://api.themoviedb.org/3/discover/movie` +
         `?api_key=${apiKey}&language=fr-FR&sort_by=vote_count.desc` +
         `&vote_count.gte=500&page=${page}`;
+      const safeUrl = maskTmdbApiKey(discoverUrl);
 
       const discoverRes = await fetch(discoverUrl);
       if (!discoverRes.ok) {
-        res.status(502).json({ error: `TMDB discover error: ${discoverRes.status}` });
+        res.status(502).json({ error: `TMDB discover error: ${discoverRes.status} (${safeUrl})` });
         return;
       }
       const discoverData = (await discoverRes.json()) as { results: { id: number }[] };
@@ -1748,13 +1800,14 @@ adminRouter.get(
       }
 
       const page = Math.floor(Math.random() * 30) + 1;
-      const discoverRes = await fetch(
+      const discoverUrl =
         `https://api.themoviedb.org/3/discover/tv` +
         `?api_key=${apiKey}&language=fr-FR&sort_by=vote_count.desc` +
-        `&vote_count.gte=200&page=${page}`
-      );
+        `&vote_count.gte=200&page=${page}`;
+      const safeUrl = maskTmdbApiKey(discoverUrl);
+      const discoverRes = await fetch(discoverUrl);
       if (!discoverRes.ok) {
-        res.status(502).json({ error: `TMDB discover error: ${discoverRes.status}` });
+        res.status(502).json({ error: `TMDB discover error: ${discoverRes.status} (${safeUrl})` });
         return;
       }
       const discoverData = (await discoverRes.json()) as { results: { id: number }[] };
@@ -1852,11 +1905,11 @@ adminRouter.get(
         return;
       }
 
-      const tmdbRes = await fetch(
-        `https://api.themoviedb.org/3/movie/${tmdbId}/images?api_key=${apiKey}&include_image_language=null`
-      );
+      const url = `https://api.themoviedb.org/3/movie/${tmdbId}/images?api_key=${apiKey}&include_image_language=null`;
+      const safeUrl = maskTmdbApiKey(url);
+      const tmdbRes = await fetch(url);
       if (!tmdbRes.ok) {
-        res.status(502).json({ error: `TMDB error: ${tmdbRes.status}` });
+        res.status(502).json({ error: `TMDB error: ${tmdbRes.status} (${safeUrl})` });
         return;
       }
 
@@ -2094,6 +2147,7 @@ adminRouter.get(
 // POST /api/admin/series
 adminRouter.post(
   '/series',
+  strictAdminLimiter,
   (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = req.body as SeriesBody;
@@ -2280,6 +2334,7 @@ adminRouter.get(
 // PATCH /api/admin/series/:id
 adminRouter.patch(
   '/series/:id',
+  strictAdminLimiter,
   (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = parseInt(req.params.id, 10);
@@ -2622,6 +2677,7 @@ adminRouter.get(
 // DELETE /api/admin/series/:id
 adminRouter.delete(
   '/series/:id',
+  strictAdminLimiter,
   (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = parseInt(req.params.id, 10);
@@ -2690,6 +2746,7 @@ adminRouter.get(
 adminRouter.post(
   '/series/:id/image',
   upload.single('image'),
+  validateUploadedImageSignature,
   (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = parseInt(req.params.id, 10);
@@ -2736,10 +2793,10 @@ adminRouter.get(
       const apiKey = process.env.TMDB_API_KEY;
       if (!apiKey) { res.status(400).json({ error: 'TMDB_API_KEY not configured' }); return; }
 
-      const tmdbRes = await fetch(
-        `https://api.themoviedb.org/3/tv/${series.tmdb_id}/images?api_key=${apiKey}&include_image_language=null`
-      );
-      if (!tmdbRes.ok) { res.status(502).json({ error: `TMDB error: ${tmdbRes.status}` }); return; }
+      const url = `https://api.themoviedb.org/3/tv/${series.tmdb_id}/images?api_key=${apiKey}&include_image_language=null`;
+      const safeUrl = maskTmdbApiKey(url);
+      const tmdbRes = await fetch(url);
+      if (!tmdbRes.ok) { res.status(502).json({ error: `TMDB error: ${tmdbRes.status} (${safeUrl})` }); return; }
 
       const data = (await tmdbRes.json()) as TmdbImagesResponse;
       const backdrops = (data.backdrops ?? [])
@@ -2776,9 +2833,10 @@ adminRouter.get(
       const searchUrl =
         `https://api.themoviedb.org/3/search/tv` +
         `?api_key=${apiKey}&language=fr-FR&query=${encodeURIComponent(q)}&page=1`;
+      const safeUrl = maskTmdbApiKey(searchUrl);
 
       const tmdbRes = await fetch(searchUrl);
-      if (!tmdbRes.ok) { res.status(502).json({ error: `TMDB error: ${tmdbRes.status}` }); return; }
+      if (!tmdbRes.ok) { res.status(502).json({ error: `TMDB error: ${tmdbRes.status} (${safeUrl})` }); return; }
 
       const data = (await tmdbRes.json()) as {
         results: {
@@ -2908,10 +2966,10 @@ adminRouter.get(
       const apiKey = process.env.TMDB_API_KEY;
       if (!apiKey) { res.status(400).json({ error: 'TMDB_API_KEY not configured' }); return; }
 
-      const tmdbRes = await fetch(
-        `https://api.themoviedb.org/3/tv/${tmdbId}/images?api_key=${apiKey}&include_image_language=null`
-      );
-      if (!tmdbRes.ok) { res.status(502).json({ error: `TMDB error: ${tmdbRes.status}` }); return; }
+      const url = `https://api.themoviedb.org/3/tv/${tmdbId}/images?api_key=${apiKey}&include_image_language=null`;
+      const safeUrl = maskTmdbApiKey(url);
+      const tmdbRes = await fetch(url);
+      if (!tmdbRes.ok) { res.status(502).json({ error: `TMDB error: ${tmdbRes.status} (${safeUrl})` }); return; }
 
       const data = (await tmdbRes.json()) as TmdbImagesResponse;
       const backdrops = (data.backdrops ?? [])
@@ -2972,16 +3030,21 @@ function normalizeWikiHintSchedule(raw: unknown, personType: unknown): string {
   const normalizedPersonType = String(personType ?? 'politician');
   const isSport = normalizedPersonType === 'sportsperson';
   const isPolitician = normalizedPersonType === 'politician';
+  const isEntrepreneur = normalizedPersonType === 'entrepreneur';
   const allowedByType = isPolitician
     ? new Set(['birth_year', 'nationality', 'party', 'name_initials', 'name_length'])
     : isSport
       ? new Set(['birth_year', 'nationality', 'position', 'name_initials', 'name_length'])
-      : new Set(['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials']);
+      : isEntrepreneur
+        ? new Set(['birth_year', 'nationality', 'domain', 'notable_work', 'company', 'name_initials', 'name_length'])
+        : new Set(['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials', 'name_length']);
   const fallback = isPolitician
     ? ['birth_year', 'nationality', 'party', 'name_initials', 'name_length']
     : isSport
       ? ['birth_year', 'nationality', 'position', 'name_initials', 'name_length']
-      : ['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials'];
+      : isEntrepreneur
+        ? ['birth_year', 'nationality', 'company', 'name_initials', 'name_length']
+        : ['birth_year', 'nationality', 'name_initials', 'name_length'];
 
   const parseCandidate = (value: unknown): string[] => {
     if (Array.isArray(value)) return value.filter((k): k is string => typeof k === 'string');
@@ -3001,7 +3064,7 @@ function normalizeWikiHintSchedule(raw: unknown, personType: unknown): string {
 }
 
 // POST /api/admin/wiki-persons
-adminRouter.post('/wiki-persons', (req: Request, res: Response, next: NextFunction) => {
+adminRouter.post('/wiki-persons', strictAdminLimiter, (req: Request, res: Response, next: NextFunction) => {
   try {
     const {
       name, name_aliases = '[]', person_type = 'politician',
@@ -3041,7 +3104,7 @@ adminRouter.post('/wiki-persons', (req: Request, res: Response, next: NextFuncti
 })
 
 // PUT /api/admin/wiki-persons/:id
-adminRouter.put('/wiki-persons/:id', (req: Request, res: Response, next: NextFunction) => {
+adminRouter.put('/wiki-persons/:id', strictAdminLimiter, (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id, 10)
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid wiki person id.' }); return }
@@ -3114,7 +3177,7 @@ adminRouter.put('/wiki-persons/:id', (req: Request, res: Response, next: NextFun
 })
 
 // DELETE /api/admin/wiki-persons/:id
-adminRouter.delete('/wiki-persons/:id', (req: Request, res: Response, next: NextFunction) => {
+adminRouter.delete('/wiki-persons/:id', strictAdminLimiter, (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id, 10)
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid wiki person id.' }); return }
@@ -3184,14 +3247,38 @@ adminRouter.get('/wiki-persons/random', async (req: Request, res: Response, next
 })
 
 // POST /api/admin/wiki-persons/fetch-wikipedia
+// Body: { input | q | slug: string, lang?: string } — nom libre, titre, slug ou URL Wikipédia
 adminRouter.post('/wiki-persons/fetch-wikipedia', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { slug, lang = 'fr' } = req.body as { slug?: string; lang?: string }
-    if (!slug) { res.status(400).json({ error: 'slug is required.' }); return }
-    const { fetchWikipediaData } = await import('../lib/wikipedia.js')
-    const data = await fetchWikipediaData(slug, lang)
-    res.json(data)
-  } catch (err) { next(err) }
+    const body = req.body as { slug?: string; input?: string; q?: string; lang?: string }
+    const langRaw = typeof body.lang === 'string' ? body.lang : 'fr'
+    const lang = /^[a-z]{2}$/i.test(langRaw) ? langRaw.toLowerCase() : 'fr'
+    const raw = [body.input, body.q, body.slug]
+      .find((x): x is string => typeof x === 'string' && x.trim().length > 0)
+      ?.trim()
+    if (!raw) {
+      res.status(400).json({ error: 'input, q ou slug est requis.' }); return
+    }
+    const { resolveWikipediaSlug, fetchWikipediaData } = await import('../lib/wikipedia.js')
+    const { slug: resolvedSlug, lang: resolvedLang } = await resolveWikipediaSlug(raw, lang)
+    const data = await fetchWikipediaData(resolvedSlug, resolvedLang)
+    res.json({
+      ...data,
+      resolved_slug: data.canonical_wikipedia_slug ?? resolvedSlug,
+      resolved_lang: resolvedLang,
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (
+      msg === 'Recherche vide.'
+      || msg.startsWith('Aucune page Wikipédia')
+      || msg.startsWith('Page Wikipédia introuvable')
+      || msg === 'URL Wikipédia invalide.'
+    ) {
+      res.status(400).json({ error: msg }); return
+    }
+    next(err)
+  }
 })
 
 // GET /api/admin/analytics/returning-players?days=30

@@ -6,8 +6,9 @@
 
 import db from '../db/database.js';
 import { normalise, isGuessCorrect } from '../lib/matching.js';
+import { escapeHtml } from '../lib/utils.js';
 
-const MAX_ATTEMPTS = parseInt(process.env.MAX_ATTEMPTS ?? '3', 10);
+const MAX_ATTEMPTS = parseInt(process.env.MAX_ATTEMPTS ?? '5', 10);
 const MAX_HINTS = 3;
 const VALID_HINTS = new Set(['year', 'director', 'creator', 'genres', 'cast', 'tagline', 'synopsis']);
 const IMAGE_SOURCE = process.env.IMAGE_SOURCE ?? 'tmdb';
@@ -87,6 +88,27 @@ export function resolveImageUrl(raw: string): string {
 /** Returns current date in Europe/Paris timezone as YYYY-MM-DD */
 function getTodayParis(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+}
+
+function hasAdjacentScheduledChallenge(
+  date: string,
+  direction: 'prev' | 'next',
+  mediaType: 'film' | 'series'
+): boolean {
+  const todayParis = getTodayParis();
+  const stmt =
+    direction === 'prev'
+      ? db.prepare<[string, string, string], { n: number }>(
+          `SELECT 1 AS n FROM daily_challenges
+           WHERE challenge_date < ? AND challenge_date <= ? AND media_type = ?
+           LIMIT 1`
+        )
+      : db.prepare<[string, string, string], { n: number }>(
+          `SELECT 1 AS n FROM daily_challenges
+           WHERE challenge_date > ? AND challenge_date <= ? AND media_type = ?
+           LIMIT 1`
+        );
+  return stmt.get(date, todayParis, mediaType) !== undefined;
 }
 
 // ─── Public service methods ───────────────────────────────────────────────────
@@ -220,13 +242,16 @@ export function buildChallengePayload(
   const resolvedImageUrl = resolveImageUrl(image_url);
   const today = getTodayParis();
   const isPastChallenge = challenge.challenge_date < today;
+  const mediaType = isSeries ? 'series' : 'film';
 
   return {
     challengeId: challenge.id,
     challengeNumber: challenge.challenge_number,
     date: challenge.challenge_date,
     isPastChallenge,
-    mediaType: isSeries ? 'series' : 'film',
+    mediaType,
+    hasPrevChallenge: hasAdjacentScheduledChallenge(challenge.challenge_date, 'prev', mediaType),
+    hasNextChallenge: hasAdjacentScheduledChallenge(challenge.challenge_date, 'next', mediaType),
     imageUrl: resolvedImageUrl,
     isGameOver,
     hintsAvailable: schedule.length,
@@ -292,7 +317,7 @@ export function processGuess(
 
   // Append attempt
   const newAttempt: AttemptEntry = {
-    guess: rawGuess,
+    guess: escapeHtml(rawGuess),
     correct,
     ts: new Date().toISOString(),
   };
@@ -448,6 +473,7 @@ export function getGlobalStats() {
 /** Autocomplete search for films – returns titles only, never exposes today's answer */
 export function searchFilms(query: string, limit = 10, excludeChallengeId?: number) {
   if (!query || query.trim().length < 2) return [];
+  const safeQuery = normalise(query).replace(/[%_]/g, '\\$&');
 
   const todayChallenge = (() => {
     try {
@@ -460,11 +486,15 @@ export function searchFilms(query: string, limit = 10, excludeChallengeId?: numb
   const rows = db
     .prepare<[string, number], { id: number; title: string; year: number }>(
       `SELECT id, title, year FROM films
-       WHERE title_lower LIKE ? AND is_active = 1
+       WHERE title_lower LIKE ? ESCAPE '\\' AND is_active = 1
+       AND NOT EXISTS (
+         SELECT 1 FROM daily_challenges dc
+         WHERE dc.film_id = films.id AND dc.challenge_date > date('now')
+       )
        ORDER BY title ASC
        LIMIT ?`
     )
-    .all(`%${normalise(query)}%`, limit + 1);
+    .all(`%${safeQuery}%`, limit + 1);
 
   const excludeIds = new Set<number>();
   if (todayChallenge?.film_id) excludeIds.add(todayChallenge.film_id);
@@ -480,6 +510,7 @@ export function searchFilms(query: string, limit = 10, excludeChallengeId?: numb
 /** Autocomplete search for series – returns titles only, never exposes today's answer */
 export function searchSeries(query: string, limit = 10, excludeChallengeId?: number) {
   if (!query || query.trim().length < 2) return [];
+  const safeQuery = normalise(query).replace(/[%_]/g, '\\$&');
 
   const todayChallenge = (() => {
     try {
@@ -492,11 +523,15 @@ export function searchSeries(query: string, limit = 10, excludeChallengeId?: num
   const rows = db
     .prepare<[string, number], { id: number; title: string; year: number }>(
       `SELECT id, title, year FROM series
-       WHERE title_lower LIKE ? AND is_active = 1
+       WHERE title_lower LIKE ? ESCAPE '\\' AND is_active = 1
+       AND NOT EXISTS (
+         SELECT 1 FROM daily_challenges dc
+         WHERE dc.series_id = series.id AND dc.challenge_date > date('now')
+       )
        ORDER BY title ASC
        LIMIT ?`
     )
-    .all(`%${normalise(query)}%`, limit + 1);
+    .all(`%${safeQuery}%`, limit + 1);
 
   const excludeIds = new Set<number>();
   if (todayChallenge?.series_id) excludeIds.add(todayChallenge.series_id);

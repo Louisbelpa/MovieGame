@@ -4,7 +4,8 @@
  */
 
 import { useState, useEffect } from 'react'
-import { ExternalLink, Film, BookOpen } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
+import { ExternalLink, Film, Landmark } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { BRAND_NAME, FEATURES } from '@/config/features'
 
@@ -201,6 +202,8 @@ type ModalType = 'faq' | 'privacy' | 'changelog' | null
 
 export function Footer() {
   const [modal, setModal] = useState<ModalType>(null)
+  const location = useLocation()
+  const isWikiPage = location.pathname.startsWith('/wiki')
 
   return (
     <>
@@ -238,9 +241,9 @@ export function Footer() {
             </span>
           </div>
           {/* Wikipedia attribution */}
-          {FEATURES.enableWiki && (
+          {FEATURES.enableWiki && isWikiPage && (
             <div className="flex items-center justify-center gap-2 mb-3 text-xs text-film-text-dim">
-              <BookOpen size={11} />
+              <Landmark size={11} />
               <span>
                 Mode WikiGuessr — données issues de{' '}
                 <a href="https://fr.wikipedia.org" target="_blank" rel="noopener noreferrer" className="underline hover:text-film-text-dim transition-colors">Wikipédia</a>

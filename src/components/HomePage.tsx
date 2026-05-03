@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Film, Tv, Sparkles, Eye, Keyboard, Lightbulb, Landmark, BookOpen } from 'lucide-react'
+import { Film, Tv, Sparkles, Eye, Keyboard, Lightbulb, Landmark } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Footer } from '@/components/layout/Footer'
@@ -53,7 +53,7 @@ export function HomePage() {
                   className="absolute inset-0 inline-flex items-center justify-center"
                   style={{ color: 'var(--film-gold, #f5c542)' }}
                 >
-                  {iconPhase === 'tv' ? <Tv size={20} /> : iconPhase === 'wiki' ? <BookOpen size={20} /> : <Film size={20} />}
+                  {iconPhase === 'tv' ? <Tv size={20} /> : iconPhase === 'wiki' ? <Landmark size={20} /> : <Film size={20} />}
                 </motion.span>
               </AnimatePresence>
             </span>

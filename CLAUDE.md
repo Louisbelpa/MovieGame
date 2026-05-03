@@ -76,10 +76,11 @@ npm run dev          # Express sur http://localhost:3001
 | `COOKIE_SECRET` | Secret de signature des cookies de session |
 | `ADMIN_PASSWORD` | Mot de passe back office |
 | `ADMIN_USERNAME` | Identifiant back office (optionnel — si vide, login par mdp seul) |
-| `CORS_ORIGIN` | Origine frontend autorisée (défaut: `http://localhost:5173`) |
+| `CORS_ORIGIN` | Origines frontend autorisées (CSV, ex: `https://app.com,https://www.app.com`) |
 | `TMDB_API_KEY` | Clé API TMDB (back office uniquement) |
 | `IMAGE_SOURCE` | `tmdb` ou `local` |
-| `MAX_ATTEMPTS` | Tentatives par défi films/séries (défaut: 5) ; wiki utilise aussi cette valeur (défaut: 3) |
+| `MAX_ATTEMPTS` | Tentatives par défi films/séries (défaut: 5) |
+| `WIKI_MAX_ATTEMPTS` | Tentatives par défi wiki (défaut: 5, optionnel) |
 
 ## Points techniques importants
 
@@ -92,8 +93,10 @@ new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date()
 — côté client dans `gameStore.ts` et `wikiStore.ts` (`getTodayParis()` exporté)
 
 ### Authentification admin
-Le token de session admin est un SHA-256 de `ADMIN_USERNAME + ADMIN_PASSWORD + COOKIE_SECRET`.
-Si `ADMIN_USERNAME` est vide, le login accepte n'importe quel username (rétrocompatibilité).
+- Le token de session admin est maintenant un token aléatoire 32 bytes (hex), hashé en SHA-256 en base.
+- Les sessions actives sont stockées dans `active_admin_tokens` avec `expires_at` et `revoked_at`.
+- Le logout révoque explicitement le token courant.
+- Si `ADMIN_USERNAME` est vide, le login accepte n'importe quel username (rétrocompatibilité).
 
 ### État du jeu (Zustand)
 - `viewingDate: string | null` — `null` = défi du jour, sinon date `YYYY-MM-DD`
@@ -113,6 +116,17 @@ Ordre d'affichage : année → réalisateur → acteur principal (1 seul, `cast.
 - Le back office utilise l'API TMDB pour la recherche et l'auto-remplissage de fiches film/série
 - Les images du jeu viennent de TMDB (`IMAGE_SOURCE=tmdb`) ou de fichiers locaux
 - Attribution TMDB obligatoire dans le footer
+
+### Durcissement backend
+- `helmet` gère les headers de sécurité (CSP incluse, images TMDB + Wikimedia autorisées).
+- CORS passe par le package `cors` avec whitelist basée sur `CORS_ORIGIN` (CSV).
+- Payloads limités: `express.json({ limit: '1mb' })` et `express.urlencoded({ limit: '1mb' })`.
+- `seed.ts` refuse de s'exécuter en production.
+
+### Sécurité des entrées utilisateur
+- Les guesses stockées dans `game_sessions.attempts` sont échappées via `escapeHtml()`.
+- Les endpoints de recherche échappent `%` et `_` en LIKE SQL.
+- Les autocomplétions excluent aussi le contenu planifié dans le futur (anti-leak planning).
 
 ---
 
@@ -142,6 +156,9 @@ Le service ajoute le préfixe au moment de construire le payload : `type: 'wiki_
 
 ### Parser Wikipedia (`backend/src/lib/wikipedia.ts`)
 - Appels : REST API summary → wikitext API → Wikidata SPARQL (fallback)
+- Résumé + wikitext récupérés en parallèle
+- Throttle global (1 req/s) pour limiter les rafales vers Wikipedia/Wikidata
+- Cache LRU en mémoire (TTL 1h, max 500 entrées)
 - Détection du type : Wikidata occupations > description Wikidata > template infobox wikitext > heuristiques champs
 - Fallback final : `'generic'` (pas `'politician'`)
 - **Photo** : `thumbnail.source` upscalé à 400px via `upscaleWikimediaThumb()` — l'`originalimage` (jusqu'à 50 Mo) est ignoré

@@ -22,6 +22,8 @@ interface GuessInputProps {
 
 export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessInputProps) {
   const listboxId = useId()
+  const errorId = useId()
+  const announcementId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const [activeIndex, setActiveIndex] = useState(-1)
 
@@ -33,6 +35,12 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
   const searchFn = gameType === 'series' ? searchSeries : searchMovies
   const { suggestions, isLoading } = useAutocomplete<SearchResultPayload>(inputValue, searchFn, { debounceMs: 200 })
   const isOpen = suggestions.length > 0 && inputValue.length >= 2
+  const hasError = shakeTrigger > 0
+  const announcement = isLoading
+    ? 'Chargement des suggestions…'
+    : isOpen
+      ? `${suggestions.length} suggestion${suggestions.length > 1 ? 's' : ''} disponible${suggestions.length > 1 ? 's' : ''}.`
+      : ''
 
   const handleSelect = (title: string) => {
     setInputValue('')
@@ -90,6 +98,9 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
           ref={inputRef}
           type="text"
           role="combobox"
+          aria-label={gameType === 'series' ? 'Votre réponse, titre de la série' : 'Votre réponse, titre du film'}
+          aria-invalid={hasError}
+          aria-describedby={hasError ? errorId : announcementId}
           aria-autocomplete="list"
           aria-controls={listboxId}
           aria-expanded={isOpen}
@@ -135,6 +146,12 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
           Deviner
         </Button>
       </motion.div>
+      <p id={errorId} className="sr-only" role={hasError ? 'alert' : undefined}>
+        {hasError ? 'Réponse invalide, veuillez réessayer.' : ''}
+      </p>
+      <div id={announcementId} aria-live="polite" className="sr-only">
+        {announcement}
+      </div>
 
       {/* Attempts counter */}
       <p className="mt-1.5 text-sm text-film-text-dim text-right">

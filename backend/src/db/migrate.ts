@@ -135,6 +135,20 @@ const incremental: { name: string; sql: string }[] = [
     name: 'seed_wiki_global_stats',
     sql: `INSERT OR IGNORE INTO wiki_global_stats (id) VALUES (1)`,
   },
+  {
+    name: 'create_active_admin_tokens',
+    sql: `CREATE TABLE IF NOT EXISTS active_admin_tokens (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      token_hash TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      expires_at TEXT NOT NULL,
+      revoked_at TEXT
+    )`,
+  },
+  {
+    name: 'create_active_admin_tokens_idx_hash',
+    sql: `CREATE INDEX IF NOT EXISTS idx_admin_tokens_hash ON active_admin_tokens (token_hash)`,
+  },
 ]
 
 // Multi-statement migrations that need db.exec() rather than db.prepare().run()

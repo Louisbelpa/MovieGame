@@ -8,6 +8,8 @@ import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { useGameStore, getTodayParis } from '@/store/gameStore'
 import { fetchChallengeDates } from '@/api/client'
+import { fetchWikiChallengeDates } from '@/api/wikiClient'
+import { useWikiStore } from '@/store/wikiStore'
 import { loadHistory, loadStats } from '@/lib/storage'
 
 type DayStatus = 'won' | 'lost' | 'available' | 'none'
@@ -52,12 +54,32 @@ function monthLabel(ym: string): string {
 
 const DOW = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
-export function ArchiveModal() {
-  const isOpen = useGameStore((s) => s.ui.isModalOpen && s.ui.modalType === 'archive')
-  const closeModal = useGameStore((s) => s.closeModal)
-  const loadDate = useGameStore((s) => s.loadDate)
-  const viewingDate = useGameStore((s) => s.viewingDate)
+type ArchiveMode = 'classic' | 'wiki'
+
+type ArchiveModalProps = {
+  mode?: ArchiveMode
+  challenges?: string[]
+}
+
+export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps) {
+  const modalTitleId = 'modal-title'
+  const modalDescId = 'modal-desc'
+  const gameUi = useGameStore((s) => s.ui)
+  const gameCloseModal = useGameStore((s) => s.closeModal)
+  const gameLoadDate = useGameStore((s) => s.loadDate)
+  const gameViewingDate = useGameStore((s) => s.viewingDate)
   const gameType = useGameStore((s) => s.gameType)
+
+  const wikiUi = useWikiStore((s) => s.ui)
+  const wikiCloseModal = useWikiStore((s) => s.closeModal)
+  const wikiLoadDate = useWikiStore((s) => s.loadDate)
+  const wikiViewingDate = useWikiStore((s) => s.viewingDate)
+
+  const isWiki = mode === 'wiki'
+  const isOpen = isWiki ? (wikiUi.isModalOpen && wikiUi.modalType === 'archive') : (gameUi.isModalOpen && gameUi.modalType === 'archive')
+  const closeModal = isWiki ? wikiCloseModal : gameCloseModal
+  const loadDate = isWiki ? wikiLoadDate : gameLoadDate
+  const viewingDate = isWiki ? wikiViewingDate : gameViewingDate
 
   const [challengeDates, setChallengeDates] = useState<Set<string>>(new Set())
   const [history, setHistory] = useState<Record<string, 'won' | 'lost'>>({})
@@ -71,13 +93,16 @@ export function ArchiveModal() {
     if (!isOpen) return
     setDisplayYM(todayYM)
     setLoading(true)
-    fetchChallengeDates(365, gameType)
+    const datesPromise = challenges
+      ? Promise.resolve({ dates: challenges })
+      : (isWiki ? fetchWikiChallengeDates(365) : fetchChallengeDates(365, gameType === 'series' ? 'series' : 'film'))
+    datesPromise
       .then(({ dates }) => {
         setChallengeDates(new Set(dates))
         // Historique local
-        let hist = loadHistory()
+        let hist = loadHistory(isWiki ? 'wiki' : undefined)
         // Toujours compléter le jour courant si lastPlayedDate correspond à aujourd'hui
-        const stats = loadStats()
+        const stats = loadStats(isWiki ? 'wiki' : undefined)
         if (stats.lastPlayedDate === today) {
           hist[today] = (stats.lastWonDate === today) ? 'won' : 'lost'
         }
@@ -90,7 +115,7 @@ export function ArchiveModal() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [isOpen, todayYM, gameType])
+  }, [challenges, gameType, isOpen, isWiki, today, todayYM])
 
   const activeDate = viewingDate ?? today
   const days = daysForMonth(displayYM, today)
@@ -120,8 +145,20 @@ export function ArchiveModal() {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={closeModal} ariaLabel="Archives des défis">
+    <Modal
+      isOpen={isOpen}
+      onClose={closeModal}
+      ariaLabel={isWiki ? 'Archives des défis WikiGuessr' : 'Archives des défis'}
+      ariaLabelledBy={modalTitleId}
+      ariaDescribedBy={modalDescId}
+    >
       <div className="flex flex-col gap-4">
+        <p id={modalTitleId} className="sr-only">
+          {isWiki ? 'Archives des défis WikiGuessr' : 'Archives des défis'}
+        </p>
+        <p id={modalDescId} className="sr-only">
+          Navigation par mois et sélection d’une date de défi.
+        </p>
 
         {/* ── Month navigation ── */}
         <div className="flex items-center justify-between gap-2">

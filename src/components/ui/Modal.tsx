@@ -17,6 +17,10 @@ interface ModalProps {
   title?: string
   /** Fallback accessible name if no visible title is rendered */
   ariaLabel?: string
+  /** Optional explicit label element id */
+  ariaLabelledBy?: string
+  /** Optional description element id */
+  ariaDescribedBy?: string
   children: React.ReactNode
   className?: string
   /** If true, clicking backdrop does not close */
@@ -31,6 +35,8 @@ export function Modal({
   onClose,
   title,
   ariaLabel,
+  ariaLabelledBy,
+  ariaDescribedBy,
   children,
   className,
   persistent = false,
@@ -101,7 +107,7 @@ export function Modal({
     return () => window.removeEventListener('keydown', handler)
   }, [isOpen, onClose, persistent])
 
-  const labelledBy = title ? titleId : undefined
+  const labelledBy = ariaLabelledBy ?? (title ? titleId : undefined)
   const fallbackLabel = !title ? (ariaLabel ?? 'Boîte de dialogue') : undefined
 
   return (
@@ -123,6 +129,7 @@ export function Modal({
             role="dialog"
             aria-modal="true"
             aria-labelledby={labelledBy}
+            aria-describedby={ariaDescribedBy}
             aria-label={fallbackLabel}
             tabIndex={-1}
             className={cn(

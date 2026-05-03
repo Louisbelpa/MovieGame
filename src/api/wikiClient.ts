@@ -3,6 +3,8 @@
  * Typed HTTP client for the Wikipedia guessing game endpoints.
  */
 
+import type { GlobalStatsPayload } from '@/api/client'
+
 const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -145,4 +147,8 @@ export function searchWikiPersons(query: string, limit = 8): Promise<WikiPersonS
   const params = new URLSearchParams({ q: query, limit: String(limit) })
   return request<{ results: WikiPersonSuggestion[] }>(`/api/wiki/search?${params}`)
     .then(r => r.results)
+}
+
+export function fetchWikiGlobalStats(): Promise<GlobalStatsPayload> {
+  return request<GlobalStatsPayload>('/api/wiki/stats')
 }
