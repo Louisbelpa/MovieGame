@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS daily_challenges (
   wiki_person_id   INTEGER REFERENCES wiki_persons(id) ON DELETE RESTRICT,
   challenge_number INTEGER NOT NULL,
   hint_schedule    TEXT NOT NULL DEFAULT '["year","director","cast"]',
+  is_active        INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
   UNIQUE (challenge_date, media_type)
 );

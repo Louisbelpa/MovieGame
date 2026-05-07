@@ -19,6 +19,11 @@ export default defineConfig({
       NODE_ENV: 'test',
       MAX_ATTEMPTS: '5',
       WIKI_MAX_ATTEMPTS: '3',
+      LOGIN_RATE_LIMIT_MAX: '1000',
+      ADMIN_RATE_LIMIT_MAX: '5000',
+      STRICT_ADMIN_RATE_LIMIT_MAX: '5000',
+      GUESS_RATE_LIMIT_MAX: '1000',
+      SEARCH_RATE_LIMIT_MAX: '1000',
     },
   },
 });

@@ -66,7 +66,7 @@ const upload = multer({
 
 const strictAdminLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 10,
+  max: parseInt(process.env.STRICT_ADMIN_RATE_LIMIT_MAX ?? '10', 10),
   message: { error: 'Too many admin actions' },
 });
 
