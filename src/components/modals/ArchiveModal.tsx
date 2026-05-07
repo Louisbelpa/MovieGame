@@ -21,15 +21,10 @@ function weekdayOffset(iso: string): number {
 }
 
 /** All ISO dates in a YYYY-MM that are ≤ today */
-function daysForMonth(ym: string, today: string): string[] {
+function daysForMonth(ym: string): string[] {
   const [y, m] = ym.split('-').map(Number)
   const count = new Date(y, m, 0).getDate()
-  const days: string[] = []
-  for (let d = 1; d <= count; d++) {
-    const iso = `${ym}-${String(d).padStart(2, '0')}`
-    if (iso <= today) days.push(iso)
-  }
-  return days
+  return Array.from({ length: count }, (_, i) => `${ym}-${String(i + 1).padStart(2, '0')}`)
 }
 
 function prevMonth(ym: string): string {
@@ -126,7 +121,7 @@ export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps
   }, [challenges, gameType, isOpen, isWiki, today, todayYM])
 
   const activeDate = viewingDate ?? today
-  const days = daysForMonth(displayYM, today)
+  const days = daysForMonth(displayYM)
 
   // Earliest month that has a challenge
   const earliestYM = challengeDates.size > 0
@@ -142,12 +137,13 @@ export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps
   }
 
   // Month stats
-  const played  = days.filter((d) => status(d) === 'won' || status(d) === 'lost').length
-  const won     = days.filter((d) => status(d) === 'won').length
-  const total   = days.filter((d) => status(d) !== 'none').length
+  const pastDays = days.filter((d) => d <= today)
+  const played  = pastDays.filter((d) => status(d) === 'won' || status(d) === 'lost').length
+  const won     = pastDays.filter((d) => status(d) === 'won').length
+  const total   = pastDays.filter((d) => status(d) !== 'none').length
 
   function handleDay(date: string) {
-    if (status(date) === 'none') return
+    if (date > today || status(date) === 'none') return
     closeModal()
     loadDate(date)
   }
@@ -226,21 +222,24 @@ export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps
                 const s = status(date)
                 const day = parseInt(date.slice(8), 10)
                 const isActive = date === activeDate
+                const isFuture = date > today
 
                 return (
                   <button
                     key={date}
                     onClick={() => handleDay(date)}
-                    disabled={s === 'none'}
-                    title={s !== 'none' ? `Défi du ${date}` : undefined}
-                    aria-label={s !== 'none' ? `Défi du ${date}, ${s === 'won' ? 'gagné' : s === 'lost' ? 'perdu' : 'à jouer'}` : `${date} - aucun défi`}
+                    disabled={s === 'none' || isFuture}
+                    title={isFuture ? undefined : s !== 'none' ? `Défi du ${date}` : undefined}
+                    aria-label={isFuture ? `${date} - pas encore disponible` : s !== 'none' ? `Défi du ${date}, ${s === 'won' ? 'gagné' : s === 'lost' ? 'perdu' : 'à jouer'}` : `${date} - aucun défi`}
                     className={[
                       'aspect-square rounded-lg text-xs font-medium transition-all leading-none flex items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold',
-                      s === 'none'   ? 'text-film-text-dim/20 cursor-default' : 'cursor-pointer',
-                      s === 'won'    ? 'bg-film-green/20 text-film-green hover:bg-film-green/30 border border-film-green/30' : '',
-                      s === 'lost'   ? 'bg-film-red/20 text-film-red hover:bg-film-red/30 border border-film-red/30' : '',
-                      s === 'available' ? 'bg-film-gold/15 text-film-gold hover:bg-film-gold/25 border border-film-gold/30' : '',
-                      isActive && s !== 'none' ? 'ring-2 ring-film-gold ring-offset-1 ring-offset-film-black' : '',
+                      isFuture      ? 'text-film-text-dim/20 cursor-default' : '',
+                      !isFuture && s === 'none'   ? 'text-film-text-dim/20 cursor-default' : '',
+                      !isFuture && s !== 'none'   ? 'cursor-pointer' : '',
+                      !isFuture && s === 'won'    ? 'bg-film-green/20 text-film-green hover:bg-film-green/30 border border-film-green/30' : '',
+                      !isFuture && s === 'lost'   ? 'bg-film-red/20 text-film-red hover:bg-film-red/30 border border-film-red/30' : '',
+                      !isFuture && s === 'available' ? 'bg-film-gold/15 text-film-gold hover:bg-film-gold/25 border border-film-gold/30' : '',
+                      isActive && s !== 'none' && !isFuture ? 'ring-2 ring-film-gold ring-offset-1 ring-offset-film-black' : '',
                     ].filter(Boolean).join(' ')}
                   >
                     {day}
