@@ -386,8 +386,23 @@ function formatChallenge(row: ChallengeRow) {
   };
 }
 
-function getTodayUTC(): string {
-  return new Date().toISOString().slice(0, 10);
+function getTodayParis(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+}
+
+const ALLOWED_IMAGE_ORIGINS = [
+  'https://image.tmdb.org',
+  'https://upload.wikimedia.org',
+  'https://media.themoviedb.org',
+]
+
+function isValidImageUrl(url: string): boolean {
+  if (url.startsWith('/')) return true
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'https:') return false
+    return ALLOWED_IMAGE_ORIGINS.some((o) => parsed.origin === o)
+  } catch { return false }
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -515,7 +530,7 @@ adminRouter.get(
   '/dashboard',
   (_req: Request, res: Response, next: NextFunction) => {
     try {
-      const today = getTodayUTC();
+      const today = getTodayParis();
 
       // Today's challenges (one per type)
       const todayFilmRow = db
@@ -557,95 +572,95 @@ adminRouter.get(
         )
         .all(today);
 
-      // Film stats
-      const totalFilms = (
-        db.prepare(`SELECT COUNT(*) as c FROM films WHERE is_active = 1`).get() as { c: number }
-      ).c;
-      const unusedFilms = (
-        db.prepare(`SELECT COUNT(*) as c FROM films f WHERE is_active = 1 AND NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.film_id = f.id)`).get() as { c: number }
-      ).c;
-      const totalFilmChallenges = (
-        db.prepare(`SELECT COUNT(*) as c FROM daily_challenges WHERE media_type = 'film'`).get() as { c: number }
-      ).c;
+      // Media library counts (3 queries → 1 each for films/series/wiki)
+      const filmCounts = db.prepare(`
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.film_id = f.id) THEN 1 ELSE 0 END) AS unused,
+          (SELECT COUNT(*) FROM daily_challenges WHERE media_type = 'film') AS challenges
+        FROM films f WHERE is_active = 1
+      `).get() as { total: number; unused: number; challenges: number };
+      const seriesCounts = db.prepare(`
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.series_id = s.id) THEN 1 ELSE 0 END) AS unused,
+          (SELECT COUNT(*) FROM daily_challenges WHERE media_type = 'series') AS challenges
+        FROM series s WHERE is_active = 1
+      `).get() as { total: number; unused: number; challenges: number };
+      const wikiCounts = db.prepare(`
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.wiki_person_id = wp.id) THEN 1 ELSE 0 END) AS unused,
+          (SELECT COUNT(*) FROM daily_challenges WHERE media_type = 'wiki') AS challenges
+        FROM wiki_persons wp WHERE is_active = 1
+      `).get() as { total: number; unused: number; challenges: number };
 
-      // Series stats
-      const totalSeries = (
-        db.prepare(`SELECT COUNT(*) as c FROM series WHERE is_active = 1`).get() as { c: number }
-      ).c;
-      const unusedSeries = (
-        db.prepare(`SELECT COUNT(*) as c FROM series s WHERE is_active = 1 AND NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.series_id = s.id)`).get() as { c: number }
-      ).c;
-      const totalSeriesChallenges = (
-        db.prepare(`SELECT COUNT(*) as c FROM daily_challenges WHERE media_type = 'series'`).get() as { c: number }
-      ).c;
-      const totalWikiPersons = (
-        db.prepare(`SELECT COUNT(*) as c FROM wiki_persons WHERE is_active = 1`).get() as { c: number }
-      ).c;
-      const unusedWikiPersons = (
-        db.prepare(`SELECT COUNT(*) as c FROM wiki_persons wp WHERE is_active = 1 AND NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.wiki_person_id = wp.id)`).get() as { c: number }
-      ).c;
-      const totalWikiChallenges = (
-        db.prepare(`SELECT COUNT(*) as c FROM daily_challenges WHERE media_type = 'wiki'`).get() as { c: number }
-      ).c;
+      const totalFilms = filmCounts.total; const unusedFilms = filmCounts.unused; const totalFilmChallenges = filmCounts.challenges;
+      const totalSeries = seriesCounts.total; const unusedSeries = seriesCounts.unused; const totalSeriesChallenges = seriesCounts.challenges;
+      const totalWikiPersons = wikiCounts.total; const unusedWikiPersons = wikiCounts.unused; const totalWikiChallenges = wikiCounts.challenges;
 
-      // Unscheduled days per type in next 30 days
+      // Unscheduled days per type in next 30 days (3 queries → 1)
       const next30 = Array.from({ length: 30 }, (_, i) => {
-        const d = new Date(); d.setUTCDate(d.getUTCDate() + i + 1);
-        return d.toISOString().slice(0, 10);
+        const d = new Date(); d.setDate(d.getDate() + i + 1);
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(d);
       });
       const lastDay = next30[next30.length - 1];
-      const scheduledFilmDates = new Set(
-        (db.prepare(`SELECT challenge_date FROM daily_challenges WHERE media_type = 'film' AND challenge_date > ? AND challenge_date <= ?`)
-          .all(today, lastDay) as { challenge_date: string }[]).map((r) => r.challenge_date)
-      );
-      const scheduledSeriesDates = new Set(
-        (db.prepare(`SELECT challenge_date FROM daily_challenges WHERE media_type = 'series' AND challenge_date > ? AND challenge_date <= ?`)
-          .all(today, lastDay) as { challenge_date: string }[]).map((r) => r.challenge_date)
-      );
-      const scheduledWikiDates = new Set(
-        (db.prepare(`SELECT challenge_date FROM daily_challenges WHERE media_type = 'wiki' AND challenge_date > ? AND challenge_date <= ?`)
-          .all(today, lastDay) as { challenge_date: string }[]).map((r) => r.challenge_date)
-      );
+      const scheduledDatesRows = db.prepare(`
+        SELECT challenge_date, media_type FROM daily_challenges
+        WHERE challenge_date > ? AND challenge_date <= ?
+      `).all(today, lastDay) as { challenge_date: string; media_type: string }[];
+      const scheduledFilmDates = new Set(scheduledDatesRows.filter(r => r.media_type === 'film').map(r => r.challenge_date));
+      const scheduledSeriesDates = new Set(scheduledDatesRows.filter(r => r.media_type === 'series').map(r => r.challenge_date));
+      const scheduledWikiDates = new Set(scheduledDatesRows.filter(r => r.media_type === 'wiki').map(r => r.challenge_date));
       const unscheduledFilmNext30 = next30.filter((d) => !scheduledFilmDates.has(d)).length;
       const unscheduledSeriesNext30 = next30.filter((d) => !scheduledSeriesDates.has(d)).length;
       const unscheduledWikiNext30 = next30.filter((d) => !scheduledWikiDates.has(d)).length;
 
-      // Per-type global success rates (computed live via JOIN — global_stats is mixed)
-      function getTypeSuccessRate(mediaType: 'film' | 'series' | 'wiki') {
-        const row = db.prepare<[string], { total: number; wins: number }>(
-          `SELECT COUNT(*) as total,
-                  SUM(CASE WHEN gs.outcome = 'won' THEN 1 ELSE 0 END) as wins
-           FROM game_sessions gs
-           JOIN daily_challenges dc ON dc.id = gs.challenge_id
-           WHERE gs.outcome IS NOT NULL AND dc.media_type = ?`
-        ).get(mediaType) as { total: number; wins: number } | undefined;
-        const total = row?.total ?? 0;
-        const wins = row?.wins ?? 0;
-        return { total, wins, rate: total > 0 ? Math.round((wins / total) * 100) : null };
+      // Global success rates grouped by media_type (3 queries → 1)
+      const successRows = db.prepare(`
+        SELECT dc.media_type,
+               COUNT(*) AS total,
+               SUM(CASE WHEN gs.outcome = 'won' THEN 1 ELSE 0 END) AS wins
+        FROM game_sessions gs
+        JOIN daily_challenges dc ON dc.id = gs.challenge_id
+        WHERE gs.outcome IS NOT NULL
+        GROUP BY dc.media_type
+      `).all() as { media_type: string; total: number; wins: number }[];
+      function rateFor(type: string) {
+        const r = successRows.find(x => x.media_type === type);
+        const t = r?.total ?? 0; const w = r?.wins ?? 0;
+        return { total: t, wins: w, rate: t > 0 ? Math.round((w / t) * 100) : null };
       }
-      const filmSuccessStats = getTypeSuccessRate('film');
-      const seriesSuccessStats = getTypeSuccessRate('series');
-      const wikiSuccessStats = getTypeSuccessRate('wiki');
+      const filmSuccessStats = rateFor('film');
+      const seriesSuccessStats = rateFor('series');
+      const wikiSuccessStats = rateFor('wiki');
       const successRate = (() => {
         const t = filmSuccessStats.total + seriesSuccessStats.total + wikiSuccessStats.total;
         const w = filmSuccessStats.wins + seriesSuccessStats.wins + wikiSuccessStats.wins;
         return t > 0 ? Math.round((w / t) * 100) : null;
       })();
 
-      // Today's game activity per type (with per-challenge success rate)
-      function getTodayActivity(row: ChallengeRow | undefined) {
+      // Today's activity per challenge (3 queries → 1)
+      const todayIds = [todayFilmRow?.id, todaySeriesRow?.id, todayWikiRow?.id].filter(Boolean) as number[];
+      const todayActivityRows = todayIds.length > 0
+        ? db.prepare(`
+            SELECT challenge_id,
+                   COUNT(*) AS total,
+                   SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) AS wins
+            FROM game_sessions
+            WHERE challenge_id IN (${todayIds.map(() => '?').join(',')}) AND outcome IS NOT NULL
+            GROUP BY challenge_id
+          `).all(...todayIds) as { challenge_id: number; total: number; wins: number }[]
+        : [];
+      function activityFor(row: ChallengeRow | undefined) {
         if (!row) return { games: 0, wins: 0, rate: null as number | null };
-        const s = db.prepare<[number], { total: number; wins: number }>(
-          `SELECT COUNT(*) as total, SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) as wins
-           FROM game_sessions WHERE challenge_id = ? AND outcome IS NOT NULL`
-        ).get(row.id) as { total: number; wins: number } | undefined;
-        const total = s?.total ?? 0;
-        const wins = s?.wins ?? 0;
-        return { games: total, wins, rate: total > 0 ? Math.round((wins / total) * 100) : null };
+        const r = todayActivityRows.find(x => x.challenge_id === row.id);
+        const t = r?.total ?? 0; const w = r?.wins ?? 0;
+        return { games: t, wins: w, rate: t > 0 ? Math.round((w / t) * 100) : null };
       }
-      const filmActivity = getTodayActivity(todayFilmRow);
-      const seriesActivity = getTodayActivity(todaySeriesRow);
-      const wikiActivity = getTodayActivity(todayWikiRow);
+      const filmActivity = activityFor(todayFilmRow);
+      const seriesActivity = activityFor(todaySeriesRow);
+      const wikiActivity = activityFor(todayWikiRow);
 
       res.json({
         today_film_challenge: todayFilmRow ? formatChallenge(todayFilmRow) : null,
@@ -762,6 +777,10 @@ adminRouter.post(
       }
       if (!body.image_url || typeof body.image_url !== 'string' || !body.image_url.trim()) {
         res.status(400).json({ error: 'Field "image_url" is required.' });
+        return;
+      }
+      if (!isValidImageUrl(body.image_url.trim())) {
+        res.status(400).json({ error: 'Field "image_url" must be a relative path or a trusted HTTPS URL (tmdb, wikimedia).' });
         return;
       }
       if (body.fame_level !== undefined && (typeof body.fame_level !== 'number' || body.fame_level < 1 || body.fame_level > 5)) {
@@ -1540,7 +1559,7 @@ adminRouter.get(
       };
 
       // Today's challenge stats
-      const today = getTodayUTC();
+      const today = getTodayParis();
       const todayChallenge = db
         .prepare<[string], ChallengeRow>(
           `SELECT dc.* FROM daily_challenges dc WHERE dc.challenge_date = ?`
@@ -2203,6 +2222,9 @@ adminRouter.post(
       }
       if (!body.image_url || typeof body.image_url !== 'string' || !body.image_url.trim()) {
         res.status(400).json({ error: 'Field "image_url" is required.' }); return;
+      }
+      if (!isValidImageUrl(body.image_url.trim())) {
+        res.status(400).json({ error: 'Field "image_url" must be a relative path or a trusted HTTPS URL (tmdb, wikimedia).' }); return;
       }
       if (body.fame_level !== undefined && (typeof body.fame_level !== 'number' || body.fame_level < 1 || body.fame_level > 5)) {
         res.status(400).json({ error: 'Field "fame_level" must be between 1 and 5.' }); return;

@@ -12,7 +12,9 @@
     "db:backfill-wiki": "tsx scripts/backfill-wiki-persons.ts",
     "db:reset": "node --input-type=module -e \"import{rmSync}from'fs';rmSync(process.env.DATABASE_PATH??'data/moviegame.db',{force:true})\" && npm run db:migrate && npm run db:seed",
     "fetch-backdrops": "tsx scripts/fetch-backdrops.ts",
-    "db:backfill-fame": "tsx scripts/backfill-fame.ts"
+    "db:backfill-fame": "tsx scripts/backfill-fame.ts",
+    "db:backup": "tsx scripts/backup.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@types/compression": "^1.8.1",
@@ -38,6 +40,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^20.11.0",
     "pino-pretty": "^13.0.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^2.1.9"
   }
 }

@@ -52,7 +52,15 @@ function monthLabel(ym: string): string {
   })
 }
 
-const DOW = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+const DOW = [
+  { short: 'L', full: 'Lundi' },
+  { short: 'M', full: 'Mardi' },
+  { short: 'M', full: 'Mercredi' },
+  { short: 'J', full: 'Jeudi' },
+  { short: 'V', full: 'Vendredi' },
+  { short: 'S', full: 'Samedi' },
+  { short: 'D', full: 'Dimanche' },
+]
 
 type ArchiveMode = 'classic' | 'wiki'
 
@@ -204,7 +212,7 @@ export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps
             <div className="grid grid-cols-7 gap-1 mb-1">
               {DOW.map((d, i) => (
                 <div key={i} className="text-center text-xs text-film-text-dim font-medium py-1">
-                  {d}
+                  <abbr title={d.full}>{d.short}</abbr>
                 </div>
               ))}
             </div>

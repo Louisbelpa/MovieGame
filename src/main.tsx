@@ -4,7 +4,11 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import { BRAND_NAME, FEATURES } from './config/features'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
+function wrap(el: React.ReactNode) {
+  return <StrictMode><ErrorBoundary>{el}</ErrorBoundary></StrictMode>
+}
 
 const root = document.getElementById('root')!
 const path = window.location.pathname
@@ -12,19 +16,19 @@ const path = window.location.pathname
 if (path.startsWith('/admin')) {
   document.title = `${BRAND_NAME} Admin`
   import('./admin/AdminApp').then(({ AdminApp }) => {
-    createRoot(root).render(<StrictMode><AdminApp /></StrictMode>)
+    createRoot(root).render(wrap(<AdminApp />))
   })
 } else if (path.startsWith('/series')) {
   if (!FEATURES.enableSeries) {
     window.history.replaceState({}, '', '/films')
     document.title = `${BRAND_NAME} — Devine le film du jour`
     import('./App').then(({ default: App }) => {
-      createRoot(root).render(<StrictMode><App /></StrictMode>)
+      createRoot(root).render(wrap(<App />))
     })
   } else {
     document.title = `${BRAND_NAME} — Devine la série du jour`
     import('./App').then(({ default: App }) => {
-      createRoot(root).render(<StrictMode><App /></StrictMode>)
+      createRoot(root).render(wrap(<App />))
     })
   }
 } else if (path.startsWith('/wiki')) {
@@ -32,12 +36,12 @@ if (path.startsWith('/admin')) {
     window.history.replaceState({}, '', '/films')
     document.title = `${BRAND_NAME} — Devine le film du jour`
     import('./App').then(({ default: App }) => {
-      createRoot(root).render(<StrictMode><App /></StrictMode>)
+      createRoot(root).render(wrap(<App />))
     })
   } else {
     document.title = `${BRAND_NAME} — Devine la personnalité du jour`
     import('./App').then(({ default: App }) => {
-      createRoot(root).render(<StrictMode><App /></StrictMode>)
+      createRoot(root).render(wrap(<App />))
     })
   }
 } else if (path === '/' || path === '') {
@@ -50,16 +54,16 @@ if (path.startsWith('/admin')) {
       : `${BRAND_NAME} — Devine le film du jour`)
   import('./components/HomePage').then(({ HomePage }) => {
     createRoot(root).render(
-      <StrictMode>
+      wrap(
         <BrowserRouter>
           <HomePage />
         </BrowserRouter>
-      </StrictMode>,
+      )
     )
   })
 } else {
-  document.title = `${BRAND_NAME} — Devine le film du jour`
+  document.title = `${BRAND_NAME} — Devise le film du jour`
   import('./App').then(({ default: App }) => {
-    createRoot(root).render(<StrictMode><App /></StrictMode>)
+    createRoot(root).render(wrap(<App />))
   })
 }

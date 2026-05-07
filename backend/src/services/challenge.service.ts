@@ -343,18 +343,20 @@ export function processGuess(
 
   const finishedAt = newOutcome ? new Date().toISOString() : null;
 
-  db.prepare(
-    `UPDATE game_sessions
-     SET attempts = ?, hints_revealed = ?, outcome = ?, finished_at = ?
-     WHERE session_token = ? AND challenge_id = ?`
-  ).run(
-    JSON.stringify(attempts),
-    newHintsRevealed,
-    newOutcome,
-    finishedAt,
-    sessionToken,
-    challengeId
-  );
+  db.transaction(() => {
+    db.prepare(
+      `UPDATE game_sessions
+       SET attempts = ?, hints_revealed = ?, outcome = ?, finished_at = ?
+       WHERE session_token = ? AND challenge_id = ?`
+    ).run(
+      JSON.stringify(attempts),
+      newHintsRevealed,
+      newOutcome,
+      finishedAt,
+      sessionToken,
+      challengeId
+    );
+  })();
 
   return {
     correct,

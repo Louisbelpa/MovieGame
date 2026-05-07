@@ -67,6 +67,10 @@ wikiChallengeRouter.post('/guess', guessLimiter, async (req: Request, res: Respo
       res.status(422).json({ error: 'Field "guess" must be a string.' })
       return
     }
+    if (guess.length > 300) {
+      res.status(422).json({ error: 'Field "guess" must be 300 characters or fewer.' })
+      return
+    }
 
     const challenge = bodyChallId && typeof bodyChallId === 'number'
       ? getWikiChallengeById(bodyChallId)

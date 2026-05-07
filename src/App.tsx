@@ -103,7 +103,7 @@ function GameLayout({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
   return (
     <div className="app min-h-dvh flex flex-col bg-film-black text-film-text" data-mode={mode}>
       <Header mode={mode} />
-      <main className="flex-1">
+      <main id="main-content" className="flex-1">
         <GamePage mode={mode} />
       </main>
       <Footer />
@@ -120,7 +120,18 @@ export default function App() {
         {FEATURES.enableSeries && <Route path="/series/*" element={<GameLayout mode="series" />} />}
         {FEATURES.enableWiki && <Route path="/wiki/*" element={<GameLayout mode="wiki" />} />}
         <Route path="/" element={<Navigate to="/films" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
+  )
+}
+
+function NotFound() {
+  return (
+    <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-film-black text-film-text px-4 text-center">
+      <p className="text-6xl font-title font-bold text-film-gold">404</p>
+      <p className="text-film-text-dim">Cette page n'existe pas.</p>
+      <a href="/films" className="text-sm text-film-gold hover:underline">Retour au jeu</a>
+    </div>
   )
 }

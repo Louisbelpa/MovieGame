@@ -499,18 +499,20 @@ export function processWikiGuess(
     nextHintUnlocked = true
   }
 
-  db.prepare(
-    `UPDATE game_sessions
-     SET attempts = ?, hints_revealed = ?, outcome = ?, finished_at = ?
-     WHERE session_token = ? AND challenge_id = ?`
-  ).run(
-    JSON.stringify(attempts),
-    newHintsRevealed,
-    newOutcome,
-    newOutcome ? new Date().toISOString() : null,
-    sessionToken,
-    challengeId
-  )
+  db.transaction(() => {
+    db.prepare(
+      `UPDATE game_sessions
+       SET attempts = ?, hints_revealed = ?, outcome = ?, finished_at = ?
+       WHERE session_token = ? AND challenge_id = ?`
+    ).run(
+      JSON.stringify(attempts),
+      newHintsRevealed,
+      newOutcome,
+      newOutcome ? new Date().toISOString() : null,
+      sessionToken,
+      challengeId
+    )
+  })()
 
   return { correct, outcome: newOutcome, attemptsLeft: MAX_ATTEMPTS - attempts.length, nextHintUnlocked }
 }
