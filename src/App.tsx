@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Header } from './components/layout/Header'
 import { Footer } from './components/layout/Footer'
 import { GamePage } from './components/game/GamePage'
-import { RulesModal } from './components/modals/RulesModal'
-import { ArchiveModal } from './components/modals/ArchiveModal'
-import { StatsModal } from './components/modals/StatsModal'
+
+const RulesModal = lazy(() => import('./components/modals/RulesModal').then((m) => ({ default: m.RulesModal })))
+const ArchiveModal = lazy(() => import('./components/modals/ArchiveModal').then((m) => ({ default: m.ArchiveModal })))
+const StatsModal = lazy(() => import('./components/modals/StatsModal').then((m) => ({ default: m.StatsModal })))
 import { FEATURES } from './config/features'
 import { useGameStore } from './store/gameStore'
 import { useWikiStore } from './store/wikiStore'
@@ -48,7 +49,7 @@ function GameModals({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
   }, [ui.isModalOpen, ui.modalType, mode, gameType])
 
   return (
-    <>
+    <Suspense>
       <RulesModal mode={mode === 'series' ? 'series' : 'film'} />
       <ArchiveModal mode="classic" />
       <StatsModal
@@ -58,7 +59,7 @@ function GameModals({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
         globalStats={globalStats}
         personalStats={personalStats}
       />
-    </>
+    </Suspense>
   )
 }
 
@@ -85,7 +86,7 @@ function WikiModals() {
   }, [ui.isModalOpen, ui.modalType])
 
   return (
-    <>
+    <Suspense>
       <RulesModal mode="wiki" />
       <ArchiveModal mode="wiki" />
       <StatsModal
@@ -95,7 +96,7 @@ function WikiModals() {
         globalStats={globalStats}
         personalStats={personalStats}
       />
-    </>
+    </Suspense>
   )
 }
 

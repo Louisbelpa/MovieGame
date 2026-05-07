@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import type { GameStats, GuessEntry, PersistedGameState } from '@/types'
+import type { GameStats, GuessEntry } from '@/types'
 import { BRAND_NAME, PUBLIC_SITE_URL } from '@/config/features'
 
 /** Merge Tailwind classes safely */
@@ -66,27 +66,27 @@ export function defaultStats(): GameStats {
     gamesWon: 0,
     currentStreak: 0,
     maxStreak: 0,
-    guessDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+    guessDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
   }
 }
 
 /** Update stats after a completed game */
 export function updateStats(
   prev: GameStats,
-  state: PersistedGameState,
-  todayId: string
+  state: { status: 'won' | 'lost'; guesses: Array<Pick<GuessEntry, 'status'>> },
+  challengeDate: string
 ): GameStats {
   const won = state.status === 'won'
   const attemptCount = state.guesses.filter(
     (g) => g.status !== 'skipped'
-  ).length as 1 | 2 | 3 | 4 | 5 | 6
+  ).length as 1 | 2 | 3 | 4 | 5
 
-  const yesterdayDate = new Date()
-  yesterdayDate.setDate(yesterdayDate.getDate() - 1)
-  const yesterdayId = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(yesterdayDate)
+  const challengeDateObj = new Date(challengeDate + 'T12:00:00Z')
+  challengeDateObj.setDate(challengeDateObj.getDate() - 1)
+  const yesterdayOfChallenge = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(challengeDateObj)
 
   const isStreak =
-    prev.lastWonDate === yesterdayId || prev.lastWonDate === todayId
+    prev.lastWonDate === yesterdayOfChallenge || prev.lastWonDate === challengeDate
 
   const newStreak = won ? (isStreak ? prev.currentStreak + 1 : 1) : 0
 
@@ -96,10 +96,10 @@ export function updateStats(
     currentStreak: newStreak,
     maxStreak: Math.max(prev.maxStreak, newStreak),
     guessDistribution: won
-      ? { ...prev.guessDistribution, [attemptCount]: prev.guessDistribution[attemptCount] + 1 }
+      ? { ...prev.guessDistribution, [attemptCount]: (prev.guessDistribution[attemptCount] ?? 0) + 1 }
       : prev.guessDistribution,
-    lastPlayedDate: todayId,
-    lastWonDate: won ? todayId : prev.lastWonDate,
+    lastPlayedDate: challengeDate,
+    lastWonDate: won ? challengeDate : prev.lastWonDate,
   }
 }
 

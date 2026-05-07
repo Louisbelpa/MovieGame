@@ -386,6 +386,81 @@ function formatChallenge(row: ChallengeRow) {
   };
 }
 
+/** Batch-format challenge rows — 2 queries per type instead of N×2 */
+function formatChallengesBatch(rows: ChallengeRow[]): ReturnType<typeof formatChallenge>[] {
+  if (rows.length === 0) return [];
+
+  const filmIds = [...new Set(rows.filter(r => r.film_id).map(r => r.film_id!))]
+  const seriesIds = [...new Set(rows.filter(r => r.series_id).map(r => r.series_id!))]
+  const wikiIds = [...new Set(rows.filter(r => r.wiki_person_id).map(r => r.wiki_person_id!))]
+
+  const filmMap = new Map<number, FilmRow>()
+  const seriesMap = new Map<number, SeriesRow>()
+  const wikiMap = new Map<number, WikiPersonRow>()
+
+  if (filmIds.length) {
+    db.prepare<number[], FilmRow>(`SELECT * FROM films WHERE id IN (${filmIds.map(() => '?').join(',')})`)
+      .all(...filmIds).forEach(f => filmMap.set(f.id, f))
+  }
+  if (seriesIds.length) {
+    db.prepare<number[], SeriesRow>(`SELECT * FROM series WHERE id IN (${seriesIds.map(() => '?').join(',')})`)
+      .all(...seriesIds).forEach(s => seriesMap.set(s.id, s))
+  }
+  if (wikiIds.length) {
+    db.prepare<number[], WikiPersonRow>(`SELECT * FROM wiki_persons WHERE id IN (${wikiIds.map(() => '?').join(',')})`)
+      .all(...wikiIds).forEach(w => wikiMap.set(w.id, w))
+  }
+
+  const allEntityIds = { film: filmIds, series: seriesIds, wiki: wikiIds }
+  const usedDatesMap: Record<string, string[]> = {}
+  if (allEntityIds.film.length) {
+    const filmDates = db.prepare<number[], { film_id: number; challenge_date: string }>(
+      `SELECT film_id, challenge_date FROM daily_challenges WHERE film_id IN (${allEntityIds.film.map(() => '?').join(',')}) ORDER BY challenge_date DESC`
+    ).all(...allEntityIds.film)
+    for (const r of filmDates) {
+      const k = `film:${r.film_id}`
+      ;(usedDatesMap[k] ??= []).push(r.challenge_date)
+    }
+  }
+  if (allEntityIds.series.length) {
+    const seriesDates = db.prepare<number[], { series_id: number; challenge_date: string }>(
+      `SELECT series_id, challenge_date FROM daily_challenges WHERE series_id IN (${allEntityIds.series.map(() => '?').join(',')}) ORDER BY challenge_date DESC`
+    ).all(...allEntityIds.series)
+    for (const r of seriesDates) {
+      const k = `series:${r.series_id}`
+      ;(usedDatesMap[k] ??= []).push(r.challenge_date)
+    }
+  }
+  if (allEntityIds.wiki.length) {
+    const wikiDates = db.prepare<number[], { wiki_person_id: number; challenge_date: string }>(
+      `SELECT wiki_person_id, challenge_date FROM daily_challenges WHERE wiki_person_id IN (${allEntityIds.wiki.map(() => '?').join(',')}) ORDER BY challenge_date DESC`
+    ).all(...allEntityIds.wiki)
+    for (const r of wikiDates) {
+      const k = `wiki:${r.wiki_person_id}`
+      ;(usedDatesMap[k] ??= []).push(r.challenge_date)
+    }
+  }
+
+  return rows.map(row => {
+    if (row.wiki_person_id) {
+      const person = wikiMap.get(row.wiki_person_id)!;
+      return { id: row.id, date: row.challenge_date, film: null, series: null,
+        wiki: formatWikiPerson(person, usedDatesMap[`wiki:${person.id}`] ?? []),
+        mediaType: 'wiki' as const }
+    }
+    if (row.series_id) {
+      const series = seriesMap.get(row.series_id)!;
+      return { id: row.id, date: row.challenge_date, film: null,
+        series: formatSeries(series, usedDatesMap[`series:${series.id}`] ?? []),
+        wiki: null, mediaType: 'series' as const }
+    }
+    const film = filmMap.get(row.film_id!)!;
+    return { id: row.id, date: row.challenge_date,
+      film: formatFilm(film, usedDatesMap[`film:${film.id}`] ?? []),
+      series: null, wiki: null, mediaType: 'film' as const }
+  })
+}
+
 function getTodayParis(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
 }
@@ -663,12 +738,12 @@ adminRouter.get(
       const wikiActivity = activityFor(todayWikiRow);
 
       res.json({
-        today_film_challenge: todayFilmRow ? formatChallenge(todayFilmRow) : null,
-        today_series_challenge: todaySeriesRow ? formatChallenge(todaySeriesRow) : null,
-        today_wiki_challenge: todayWikiRow ? formatChallenge(todayWikiRow) : null,
-        upcoming_film_challenges: upcomingFilmRows.map(formatChallenge),
-        upcoming_series_challenges: upcomingSeriesRows.map(formatChallenge),
-        upcoming_wiki_challenges: upcomingWikiRows.map(formatChallenge),
+        today_film_challenge: todayFilmRow ? formatChallengesBatch([todayFilmRow])[0] : null,
+        today_series_challenge: todaySeriesRow ? formatChallengesBatch([todaySeriesRow])[0] : null,
+        today_wiki_challenge: todayWikiRow ? formatChallengesBatch([todayWikiRow])[0] : null,
+        upcoming_film_challenges: formatChallengesBatch(upcomingFilmRows),
+        upcoming_series_challenges: formatChallengesBatch(upcomingSeriesRows),
+        upcoming_wiki_challenges: formatChallengesBatch(upcomingWikiRows),
         stats: {
           total_films: totalFilms,
           unused_films: unusedFilms,
@@ -1196,7 +1271,7 @@ adminRouter.get(
         .prepare<string[], ChallengeRow>(query)
         .all(...params);
 
-      res.json({ data: rows.map(formatChallenge) });
+      res.json({ data: formatChallengesBatch(rows) });
     } catch (err) {
       next(err);
     }
@@ -1581,7 +1656,7 @@ adminRouter.get(
 
         const total = sessionStats.total ?? 0;
         const wins = sessionStats.wins ?? 0;
-        const formatted = formatChallenge(todayChallenge);
+        const formatted = formatChallengesBatch([todayChallenge])[0];
         const title = formatted.film?.title ?? formatted.series?.title ?? '';
         const imageUrl = formatted.film?.image_url ?? formatted.series?.image_url ?? '';
 
@@ -2228,6 +2303,21 @@ adminRouter.post(
       }
       if (body.fame_level !== undefined && (typeof body.fame_level !== 'number' || body.fame_level < 1 || body.fame_level > 5)) {
         res.status(400).json({ error: 'Field "fame_level" must be between 1 and 5.' }); return;
+      }
+      if (body.genres !== undefined && !Array.isArray(body.genres)) {
+        res.status(400).json({ error: 'Field "genres" must be an array.' }); return;
+      }
+      if (body.cast_members !== undefined && !Array.isArray(body.cast_members)) {
+        res.status(400).json({ error: 'Field "cast_members" must be an array.' }); return;
+      }
+      if (body.title_aliases !== undefined && !Array.isArray(body.title_aliases)) {
+        res.status(400).json({ error: 'Field "title_aliases" must be an array.' }); return;
+      }
+      if (body.tagline !== undefined && body.tagline !== null && body.tagline.length > 500) {
+        res.status(400).json({ error: 'Field "tagline" must be 500 characters or fewer.' }); return;
+      }
+      if (body.synopsis !== undefined && body.synopsis !== null && body.synopsis.length > 2000) {
+        res.status(400).json({ error: 'Field "synopsis" must be 2000 characters or fewer.' }); return;
       }
 
       const result = db
