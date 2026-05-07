@@ -15,9 +15,11 @@
     "db:backfill-fame": "tsx scripts/backfill-fame.ts"
   },
   "dependencies": {
+    "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.19",
     "@types/multer": "^2.1.0",
     "better-sqlite3": "^11.0.0",
+    "compression": "^1.8.1",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.6",
     "dotenv": "^16.4.1",

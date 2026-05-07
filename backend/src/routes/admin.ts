@@ -1397,9 +1397,39 @@ adminRouter.delete(
         return;
       }
 
-      db.prepare(`DELETE FROM daily_challenges WHERE id = ?`).run(id);
-      logAuditEvent('challenge.delete', { id });
-      res.json({ ok: true, id });
+      db.prepare(`UPDATE daily_challenges SET is_active = 0 WHERE id = ?`).run(id);
+      logAuditEvent('challenge.deactivate', { id });
+      res.json({ ok: true, id, message: 'Challenge deactivated (soft-delete). Use /restore to reactivate.' });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /api/admin/challenges/:id/restore
+adminRouter.post(
+  '/challenges/:id/restore',
+  strictAdminLimiter,
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        res.status(400).json({ error: 'Invalid challenge id.' });
+        return;
+      }
+
+      const existing = db
+        .prepare(`SELECT id, is_active FROM daily_challenges WHERE id = ?`)
+        .get(id) as { id: number; is_active: number } | undefined;
+
+      if (!existing) {
+        res.status(404).json({ error: 'Challenge not found.' });
+        return;
+      }
+
+      db.prepare(`UPDATE daily_challenges SET is_active = 1 WHERE id = ?`).run(id);
+      logAuditEvent('challenge.restore', { id });
+      res.json({ ok: true, id, message: 'Challenge restored.' });
     } catch (err) {
       next(err);
     }

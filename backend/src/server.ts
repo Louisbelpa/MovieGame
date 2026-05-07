@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -49,6 +50,15 @@ app.set('trust proxy', 1);
 // ─── Core middleware ──────────────────────────────────────────────────────────
 
 app.use(requestIdMiddleware);
+// Compress all responses except already-compressed image formats
+app.use(compression({
+  level: 6,
+  filter: (req, res) => {
+    const ct = res.getHeader('Content-Type') as string | undefined;
+    if (ct && /image\/(jpeg|png|gif|webp|avif)/i.test(ct)) return false;
+    return compression.filter(req, res);
+  },
+}));
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -84,9 +94,23 @@ app.use('/api', createRateLimiter({
   windowMs: parseInt(process.env.API_RATE_LIMIT_WINDOW_MS ?? '60000', 10),
 }));
 
-// ─── Static files (uploaded images) ──────────────────────────────────────────
+// ─── Static files ─────────────────────────────────────────────────────────────
+// /assets/* are Vite-hashed → immutable, cache 1 year
+// index.html must never be cached (SPA entry point)
+// Everything else → 1 day
 
-app.use(express.static(path.join(__dirname, '../public')));
+app.use('/assets', express.static(path.join(__dirname, '../public/assets'), {
+  maxAge: '1y',
+  immutable: true,
+}));
+app.use(express.static(path.join(__dirname, '../public'), {
+  maxAge: '1d',
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('index.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  },
+}));
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
@@ -97,10 +121,14 @@ app.use('/api/series', seriesRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/admin', adminRouter);
 
-// Health-check (used by Railway/Render)
-app.get('/health', (_req: express.Request, res: express.Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// Health-check (used by Railway/Render) — rate-limited independently from /api
+app.get(
+  '/health',
+  createRateLimiter({ max: 10, windowMs: 60_000, message: { error: 'Too many health checks' } }),
+  (_req: express.Request, res: express.Response) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  }
+);
 
 // SPA fallback – serve built index.html for all non-API routes (production)
 const spaIndex = path.join(__dirname, '../public/index.html');
@@ -117,9 +145,39 @@ app.use(errorHandler);
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   logger.info(`MovieGame API running on http://localhost:${PORT}`);
   logger.info({ nodeEnv: process.env.NODE_ENV ?? 'development', corsOrigins: allowedOrigins, imageSource: process.env.IMAGE_SOURCE ?? 'tmdb' }, 'Server config');
+});
+
+// ─── Graceful shutdown ────────────────────────────────────────────────────────
+
+function shutdown(signal: string) {
+  logger.info(`${signal} received — shutting down gracefully`);
+  const forceExit = setTimeout(() => {
+    logger.error('Forced exit after 10s timeout');
+    process.exit(1);
+  }, 10_000);
+  forceExit.unref();
+
+  server.close(() => {
+    try { db.close(); } catch { /* already closed */ }
+    logger.info('Server closed cleanly');
+    process.exit(0);
+  });
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
+
+process.on('uncaughtException', (err) => {
+  logger.fatal({ err }, 'Uncaught exception');
+  shutdown('uncaughtException');
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.fatal({ reason }, 'Unhandled rejection');
+  shutdown('unhandledRejection');
 });
 
 export default app;
