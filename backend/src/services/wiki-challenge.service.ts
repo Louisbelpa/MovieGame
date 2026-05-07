@@ -442,77 +442,81 @@ export function processWikiGuess(
   challengeId: number,
   rawGuess: string
 ): { correct: boolean; outcome: 'won' | 'lost' | null; attemptsLeft: number; nextHintUnlocked: boolean } {
-  const session = getOrCreateWikiSession(sessionToken, challengeId)
-  if (session.outcome !== null) {
-    throw Object.assign(new Error('Game already finished'), { status: 409 })
-  }
+  return db.transaction(() => {
+    const session = getOrCreateWikiSession(sessionToken, challengeId)
+    if (session.outcome !== null) {
+      throw Object.assign(new Error('Game already finished'), { status: 409 })
+    }
 
-  const attempts: AttemptEntry[] = JSON.parse(session.attempts)
-  if (attempts.length >= MAX_ATTEMPTS) {
-    throw Object.assign(new Error('No attempts remaining'), { status: 409 })
-  }
+    const attempts: AttemptEntry[] = JSON.parse(session.attempts)
+    if (attempts.length >= MAX_ATTEMPTS) {
+      throw Object.assign(new Error('No attempts remaining'), { status: 409 })
+    }
 
-  const challenge = db
-    .prepare<[number], WikiChallengeRow>(`SELECT * FROM daily_challenges WHERE id = ?`)
-    .get(challengeId)!
+    const challenge = db
+      .prepare<[number], WikiChallengeRow>(`SELECT * FROM daily_challenges WHERE id = ?`)
+      .get(challengeId)
+    if (!challenge) throw Object.assign(new Error('Challenge not found'), { status: 404 })
 
-  const answerPerson = db
-    .prepare<[number], { name: string; name_aliases: string }>(
-      `SELECT name, name_aliases FROM wiki_persons WHERE id = ?`
+    const answerPerson = db
+      .prepare<[number], { name: string; name_aliases: string }>(
+        `SELECT name, name_aliases FROM wiki_persons WHERE id = ?`
+      )
+      .get(challenge.wiki_person_id)
+    if (!answerPerson) throw Object.assign(new Error('Person not found'), { status: 500 })
+
+    const aliases: string[] = JSON.parse(answerPerson.name_aliases)
+    const accepted = [answerPerson.name, ...aliases].map(normalise)
+    const correct = isGuessCorrect(rawGuess, accepted)
+
+    attempts.push({ guess: escapeHtml(rawGuess), correct, ts: new Date().toISOString() })
+
+    const hintPerson = db
+      .prepare<[number], Pick<WikiPersonRow, 'name' | 'person_type' | 'infobox_data'>>(
+        `SELECT name, person_type, infobox_data FROM wiki_persons WHERE id = ?`
+      )
+      .get(challenge.wiki_person_id)!
+    const personForHints: WikiPersonRow = {
+      id: challenge.wiki_person_id,
+      name: hintPerson.name,
+      name_aliases: '[]',
+      person_type: hintPerson.person_type,
+      infobox_data: hintPerson.infobox_data,
+      hint_schedule: challenge.hint_schedule,
+      photo_url: null,
+      extract: null,
+      wikipedia_url: null,
+      difficulty: 3,
+    }
+    const schedule = computeHintSchedule(personForHints, challenge.hint_schedule)
+    let newOutcome: 'won' | 'lost' | null = null
+    let newHintsRevealed = Math.min(session.hints_revealed, MAX_HINTS)
+    let nextHintUnlocked = false
+
+    if (correct) {
+      newOutcome = 'won'
+    } else if (attempts.length >= MAX_ATTEMPTS) {
+      newOutcome = 'lost'
+    } else if (newHintsRevealed < schedule.length) {
+      newHintsRevealed += 1
+      nextHintUnlocked = true
+    }
+
+    db.prepare(
+      `UPDATE game_sessions
+       SET attempts = ?, hints_revealed = ?, outcome = ?, finished_at = ?
+       WHERE session_token = ? AND challenge_id = ?`
+    ).run(
+      JSON.stringify(attempts),
+      newHintsRevealed,
+      newOutcome,
+      newOutcome ? new Date().toISOString() : null,
+      sessionToken,
+      challengeId
     )
-    .get(challenge.wiki_person_id)!
 
-  const aliases: string[] = JSON.parse(answerPerson.name_aliases)
-  const accepted = [answerPerson.name, ...aliases].map(normalise)
-  const correct = isGuessCorrect(rawGuess, accepted)
-
-  attempts.push({ guess: escapeHtml(rawGuess), correct, ts: new Date().toISOString() })
-
-  const hintPerson = db
-    .prepare<[number], Pick<WikiPersonRow, 'name' | 'person_type' | 'infobox_data'>>(
-      `SELECT name, person_type, infobox_data FROM wiki_persons WHERE id = ?`
-    )
-    .get(challenge.wiki_person_id)!
-  const personForHints: WikiPersonRow = {
-    id: challenge.wiki_person_id,
-    name: hintPerson.name,
-    name_aliases: '[]',
-    person_type: hintPerson.person_type,
-    infobox_data: hintPerson.infobox_data,
-    hint_schedule: challenge.hint_schedule,
-    photo_url: null,
-    extract: null,
-    wikipedia_url: null,
-    difficulty: 3,
-  }
-  const schedule = computeHintSchedule(personForHints, challenge.hint_schedule)
-  let newOutcome: 'won' | 'lost' | null = null
-  let newHintsRevealed = Math.min(session.hints_revealed, MAX_HINTS)
-  let nextHintUnlocked = false
-
-  if (correct) {
-    newOutcome = 'won'
-  } else if (attempts.length >= MAX_ATTEMPTS) {
-    newOutcome = 'lost'
-  } else if (newHintsRevealed < schedule.length) {
-    newHintsRevealed += 1
-    nextHintUnlocked = true
-  }
-
-  db.prepare(
-    `UPDATE game_sessions
-     SET attempts = ?, hints_revealed = ?, outcome = ?, finished_at = ?
-     WHERE session_token = ? AND challenge_id = ?`
-  ).run(
-    JSON.stringify(attempts),
-    newHintsRevealed,
-    newOutcome,
-    newOutcome ? new Date().toISOString() : null,
-    sessionToken,
-    challengeId
-  )
-
-  return { correct, outcome: newOutcome, attemptsLeft: MAX_ATTEMPTS - attempts.length, nextHintUnlocked }
+    return { correct, outcome: newOutcome, attemptsLeft: MAX_ATTEMPTS - attempts.length, nextHintUnlocked }
+  })()
 }
 
 export function getWikiResult(sessionToken: string, challengeId: number) {

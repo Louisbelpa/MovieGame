@@ -278,90 +278,86 @@ export function processGuess(
   attemptsLeft: number;
   nextHintUnlocked: boolean;
 } {
-  const session = getOrCreateSession(sessionToken, challengeId);
+  return db.transaction(() => {
+    const session = getOrCreateSession(sessionToken, challengeId);
 
-  // Guard: game already finished
-  if (session.outcome !== null) {
-    throw Object.assign(new Error('Game already finished'), { status: 409 });
-  }
-
-  const attempts: AttemptEntry[] = JSON.parse(session.attempts);
-
-  // Guard: max attempts already reached (shouldn't normally happen if client is correct)
-  if (attempts.length >= MAX_ATTEMPTS) {
-    throw Object.assign(new Error('No attempts remaining'), { status: 409 });
-  }
-
-  // Fetch challenge then film/series
-  const challenge = db
-    .prepare<[number], ChallengeRow>(`SELECT * FROM daily_challenges WHERE id = ?`)
-    .get(challengeId)!;
-
-  let mediaTitle: string;
-  let mediaAliases: string;
-
-  if (challenge.series_id !== null) {
-    const s = db.prepare<[number], { title: string; title_aliases: string }>(`SELECT title, title_aliases FROM series WHERE id = ?`).get(challenge.series_id)!;
-    mediaTitle = s.title;
-    mediaAliases = s.title_aliases;
-  } else {
-    const f = db.prepare<[number], { title: string; title_aliases: string }>(`SELECT title, title_aliases FROM films WHERE id = ?`).get(challenge.film_id!)!;
-    mediaTitle = f.title;
-    mediaAliases = f.title_aliases;
-  }
-
-  // Build accepted answers from title + aliases
-  const aliases: string[] = JSON.parse(mediaAliases);
-  const accepted = [mediaTitle, ...aliases].map(normalise);
-  const correct = isGuessCorrect(rawGuess, accepted);
-
-  // Append attempt
-  const newAttempt: AttemptEntry = {
-    guess: escapeHtml(rawGuess),
-    correct,
-    ts: new Date().toISOString(),
-  };
-  attempts.push(newAttempt);
-
-  // Determine new outcome
-  const schedule: string[] = (JSON.parse(challenge.hint_schedule) as string[]).filter(h => VALID_HINTS.has(h)).slice(0, MAX_HINTS);
-  let newOutcome: 'won' | 'lost' | null = null;
-  let newHintsRevealed = Math.min(session.hints_revealed, MAX_HINTS);
-  let nextHintUnlocked = false;
-
-  if (correct) {
-    newOutcome = 'won';
-  } else if (attempts.length >= MAX_ATTEMPTS) {
-    newOutcome = 'lost';
-  } else {
-    // Wrong guess: unlock the next hint automatically
-    if (newHintsRevealed < schedule.length) {
-      newHintsRevealed += 1;
-      nextHintUnlocked = true;
+    if (session.outcome !== null) {
+      throw Object.assign(new Error('Game already finished'), { status: 409 });
     }
-  }
 
-  const finishedAt = newOutcome ? new Date().toISOString() : null;
+    const attempts: AttemptEntry[] = JSON.parse(session.attempts);
 
-  db.prepare(
-    `UPDATE game_sessions
-     SET attempts = ?, hints_revealed = ?, outcome = ?, finished_at = ?
-     WHERE session_token = ? AND challenge_id = ?`
-  ).run(
-    JSON.stringify(attempts),
-    newHintsRevealed,
-    newOutcome,
-    finishedAt,
-    sessionToken,
-    challengeId
-  );
+    if (attempts.length >= MAX_ATTEMPTS) {
+      throw Object.assign(new Error('No attempts remaining'), { status: 409 });
+    }
 
-  return {
-    correct,
-    outcome: newOutcome,
-    attemptsLeft: MAX_ATTEMPTS - attempts.length,
-    nextHintUnlocked,
-  };
+    const challenge = db
+      .prepare<[number], ChallengeRow>(`SELECT * FROM daily_challenges WHERE id = ?`)
+      .get(challengeId);
+    if (!challenge) throw Object.assign(new Error('Challenge not found'), { status: 404 });
+
+    let mediaTitle: string;
+    let mediaAliases: string;
+
+    if (challenge.series_id !== null) {
+      const s = db.prepare<[number], { title: string; title_aliases: string }>(`SELECT title, title_aliases FROM series WHERE id = ?`).get(challenge.series_id);
+      if (!s) throw Object.assign(new Error('Series not found'), { status: 500 });
+      mediaTitle = s.title;
+      mediaAliases = s.title_aliases;
+    } else {
+      const f = db.prepare<[number], { title: string; title_aliases: string }>(`SELECT title, title_aliases FROM films WHERE id = ?`).get(challenge.film_id!);
+      if (!f) throw Object.assign(new Error('Film not found'), { status: 500 });
+      mediaTitle = f.title;
+      mediaAliases = f.title_aliases;
+    }
+
+    const aliases: string[] = JSON.parse(mediaAliases);
+    const accepted = [mediaTitle, ...aliases].map(normalise);
+    const correct = isGuessCorrect(rawGuess, accepted);
+
+    const newAttempt: AttemptEntry = {
+      guess: escapeHtml(rawGuess),
+      correct,
+      ts: new Date().toISOString(),
+    };
+    attempts.push(newAttempt);
+
+    const schedule: string[] = (JSON.parse(challenge.hint_schedule) as string[]).filter(h => VALID_HINTS.has(h)).slice(0, MAX_HINTS);
+    let newOutcome: 'won' | 'lost' | null = null;
+    let newHintsRevealed = Math.min(session.hints_revealed, MAX_HINTS);
+    let nextHintUnlocked = false;
+
+    if (correct) {
+      newOutcome = 'won';
+    } else if (attempts.length >= MAX_ATTEMPTS) {
+      newOutcome = 'lost';
+    } else {
+      if (newHintsRevealed < schedule.length) {
+        newHintsRevealed += 1;
+        nextHintUnlocked = true;
+      }
+    }
+
+    db.prepare(
+      `UPDATE game_sessions
+       SET attempts = ?, hints_revealed = ?, outcome = ?, finished_at = ?
+       WHERE session_token = ? AND challenge_id = ?`
+    ).run(
+      JSON.stringify(attempts),
+      newHintsRevealed,
+      newOutcome,
+      newOutcome ? new Date().toISOString() : null,
+      sessionToken,
+      challengeId
+    );
+
+    return {
+      correct,
+      outcome: newOutcome,
+      attemptsLeft: MAX_ATTEMPTS - attempts.length,
+      nextHintUnlocked,
+    };
+  })();
 }
 
 /**

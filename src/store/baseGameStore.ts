@@ -262,6 +262,7 @@ export function createBaseGameStore<
         set({
           ...mapPayloadToState(payload.challenge),
           isSubmitting: false,
+          ...(payload.correct === false && { shakeTrigger: (get().shakeTrigger ?? 0) + 1 }),
         })
       } catch (err) {
         set({

@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import compression from 'compression';
+import pinoHttp from 'pino-http';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -50,6 +51,12 @@ app.set('trust proxy', 1);
 // ─── Core middleware ──────────────────────────────────────────────────────────
 
 app.use(requestIdMiddleware);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+app.use(pinoHttp({
+  logger: logger as any,
+  autoLogging: { ignore: (req) => req.url === '/health' },
+  customLogLevel: (_req, res) => res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info',
+}));
 // Compress all responses except already-compressed image formats
 app.use(compression({
   level: 6,
@@ -126,7 +133,12 @@ app.get(
   '/health',
   createRateLimiter({ max: 10, windowMs: 60_000, message: { error: 'Too many health checks' } }),
   (_req: express.Request, res: express.Response) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    try {
+      db.prepare('SELECT 1').get();
+      res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    } catch {
+      res.status(503).json({ status: 'error', error: 'Database unavailable' });
+    }
   }
 );
 

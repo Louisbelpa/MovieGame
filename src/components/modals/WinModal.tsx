@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Share2, Trophy, BarChart2, ExternalLink } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
@@ -140,8 +141,7 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onOpen
   )
 }
 
-function NextGameCountdown() {
-  const now = new Date()
+function getSecondsUntilMidnightParis(): number {
   const formatter = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/Paris',
     hour: 'numeric',
@@ -149,13 +149,25 @@ function NextGameCountdown() {
     second: 'numeric',
     hour12: false,
   })
-  const parts = formatter.formatToParts(now)
+  const parts = formatter.formatToParts(new Date())
   const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value ?? '0', 10)
-  const h = get('hour')
-  const m = get('minute')
-  const s = get('second')
-  const secondsUntilMidnight = (24 * 3600) - (h * 3600 + m * 60 + s)
-  const hoursLeft = Math.floor(secondsUntilMidnight / 3600)
-  const minsLeft = Math.floor((secondsUntilMidnight % 3600) / 60)
-  return <strong className="text-film-text">{hoursLeft}h{minsLeft}</strong>
+  return 24 * 3600 - (get('hour') * 3600 + get('minute') * 60 + get('second'))
+}
+
+function NextGameCountdown() {
+  const [secs, setSecs] = useState(getSecondsUntilMidnightParis)
+
+  useEffect(() => {
+    const id = setInterval(() => setSecs(getSecondsUntilMidnightParis()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  const h = Math.floor(secs / 3600)
+  const m = Math.floor((secs % 3600) / 60)
+  const s = secs % 60
+  return (
+    <strong className="text-film-text tabular-nums">
+      {h}h{String(m).padStart(2, '0')}m{String(s).padStart(2, '0')}s
+    </strong>
+  )
 }
