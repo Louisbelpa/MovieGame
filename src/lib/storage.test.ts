@@ -7,7 +7,6 @@ import {
   loadGameState,
   saveGameState,
   clearGameState,
-  type GameHistory,
 } from './storage'
 import { defaultStats } from './utils'
 import type { GameStats, PersistedGameState } from '@/types'

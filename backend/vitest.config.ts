@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import path from 'path';
 
 export default defineConfig({
   test: {
@@ -9,7 +10,9 @@ export default defineConfig({
         singleFork: true,
       },
     },
-    setupFiles: ['./src/test/setup.ts'],
+    setupFiles: [path.resolve(__dirname, './src/test/setup.ts')],
+    include: ['src/**/*.test.ts'],
+    root: path.resolve(__dirname),
     testTimeout: 10000,
     env: {
       DATABASE_PATH: ':memory:',
