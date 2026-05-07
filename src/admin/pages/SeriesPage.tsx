@@ -19,6 +19,7 @@ import { AdminLayout } from '../components/AdminLayout'
 import { SeriesForm } from '../components/SeriesForm'
 import { SeriesRow } from '../components/SeriesRow'
 import { BackdropPicker } from '../components/BackdropPicker'
+import { Pagination } from '../components/Pagination'
 
 // ─── Simple modal wrapper ─────────────────────────────────────────────────────
 
@@ -113,23 +114,36 @@ export function SeriesPage() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [randomLoading, setRandomLoading] = useState(false)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [pages, setPages] = useState(1)
+  const [total, setTotal] = useState(0)
+  const LIMIT = 20
 
   function showSuccess(msg: string) {
     setSuccess(msg)
     setTimeout(() => setSuccess(null), 3000)
   }
 
-  const load = useCallback(() => {
+  const load = useCallback((p: number, q: string) => {
     setLoading(true)
-    getSeries()
-      .then(setSeriesList)
+    getSeries({ page: p, limit: LIMIT, q: q.trim() || undefined })
+      .then((res) => {
+        setSeriesList(res.data)
+        setPages(res.pages)
+        setTotal(res.total)
+      })
       .catch((err) => setError(err instanceof Error ? err.message : 'Erreur'))
       .finally(() => setLoading(false))
   }, [])
 
+  // Reset page when search changes, then load
   useEffect(() => {
-    load()
-  }, [load])
+    setPage(1)
+  }, [search])
+
+  useEffect(() => {
+    load(page, search)
+  }, [load, page, search])
 
   async function handleRandomSeries() {
     setRandomLoading(true)
@@ -146,14 +160,14 @@ export function SeriesPage() {
   async function handleCreate(payload: SeriesPayload) {
     await createSeries(payload)
     setModal(null)
-    load()
+    load(page, search)
   }
 
   async function handleEdit(payload: SeriesPayload) {
     if (modal?.type !== 'edit') return
     await updateSeries(modal.series.id, payload)
     setModal(null)
-    load()
+    load(page, search)
   }
 
   async function handleBackdropSelect(imageUrl: string) {
@@ -162,7 +176,7 @@ export function SeriesPage() {
     try {
       await updateSeries(seriesId, { image_url: imageUrl })
       setModal(null)
-      load()
+      load(page, search)
       showSuccess('Image mise à jour')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la mise à jour')
@@ -172,7 +186,7 @@ export function SeriesPage() {
   async function handleUpload(series: AdminSeries, file: File) {
     try {
       await uploadSeriesImage(series.id, file)
-      load()
+      load(page, search)
       showSuccess('Image uploadée')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur upload')
@@ -185,20 +199,13 @@ export function SeriesPage() {
     try {
       await deleteSeries(modal.series.id)
       setModal(null)
-      load()
+      load(page, search)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur')
     } finally {
       setDeleteLoading(false)
     }
   }
-
-  const filtered = seriesList.filter(
-    (s) =>
-      search.trim() === '' ||
-      s.title.toLowerCase().includes(search.toLowerCase()) ||
-      s.creator.toLowerCase().includes(search.toLowerCase())
-  )
 
   return (
     <AdminLayout>
@@ -255,7 +262,7 @@ export function SeriesPage() {
           <div className="flex items-center justify-center h-40">
             <span className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : seriesList.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-gray-400 text-sm">
             {search ? 'Aucune série trouvée pour cette recherche.' : 'Aucune série enregistrée.'}
           </div>
@@ -273,7 +280,7 @@ export function SeriesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filtered.map((series) => (
+                {seriesList.map((series) => (
                   <SeriesRow
                     key={series.id}
                     series={series}
@@ -289,10 +296,7 @@ export function SeriesPage() {
         )}
       </div>
 
-      <p className="mt-2 text-xs text-gray-400">
-        {filtered.length} série{filtered.length !== 1 ? 's' : ''}
-        {search && ` sur ${seriesList.length}`}
-      </p>
+      <Pagination page={page} pages={pages} total={total} limit={LIMIT} onPage={setPage} />
 
       {/* Modals */}
       {modal?.type === 'create' && (

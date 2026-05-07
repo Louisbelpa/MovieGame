@@ -43,14 +43,27 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'films' | 'series' | 'wiki'>('films')
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
     getDashboard()
-      .then(setData)
+      .then((d) => { setData(d); setLastUpdated(new Date()) })
       .catch((err) => setError(err instanceof Error ? err.message : 'Erreur'))
       .finally(() => setLoading(false))
   }, [])
+
+  // Live polling every 30s once first load completes
+  useEffect(() => {
+    if (!data) return
+    const id = setInterval(() => {
+      getDashboard()
+        .then((d) => { setData(d); setLastUpdated(new Date()) })
+        .catch(() => {})
+    }, 30_000)
+    return () => clearInterval(id)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data !== null])
 
   return (
     <AdminLayout>
@@ -66,6 +79,17 @@ export function DashboardPage() {
 
       {data && (
         <div className="space-y-4">
+
+          {/* ── Live indicator ── */}
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
+            <span className="text-xs font-medium text-green-600">Mise à jour en direct</span>
+            {lastUpdated && (
+              <span className="text-xs text-gray-400 ml-1">
+                · Actualisé à {lastUpdated.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+          </div>
 
           {/* ── Barre du haut ── */}
           <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">

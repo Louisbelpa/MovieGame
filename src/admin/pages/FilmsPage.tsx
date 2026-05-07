@@ -19,6 +19,7 @@ import { AdminLayout } from '../components/AdminLayout'
 import { FilmForm } from '../components/FilmForm'
 import { FilmRow } from '../components/FilmRow'
 import { BackdropPicker } from '../components/BackdropPicker'
+import { Pagination } from '../components/Pagination'
 
 // ─── Simple modal wrapper ─────────────────────────────────────────────────────
 
@@ -113,6 +114,10 @@ export function FilmsPage() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [randomLoading, setRandomLoading] = useState(false)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [pages, setPages] = useState(1)
+  const [total, setTotal] = useState(0)
+  const LIMIT = 20
 
   function showSuccess(msg: string) {
     setSuccess(msg)
@@ -132,29 +137,38 @@ export function FilmsPage() {
     }
   }
 
-  const load = useCallback(() => {
+  const load = useCallback((p: number, q: string) => {
     setLoading(true)
-    getFilms()
-      .then(setFilms)
+    getFilms({ page: p, limit: LIMIT, q: q.trim() || undefined })
+      .then((res) => {
+        setFilms(res.data)
+        setPages(res.pages)
+        setTotal(res.total)
+      })
       .catch((err) => setError(err instanceof Error ? err.message : 'Erreur'))
       .finally(() => setLoading(false))
   }, [])
 
+  // Reset page when search changes, then load
   useEffect(() => {
-    load()
-  }, [load])
+    setPage(1)
+  }, [search])
+
+  useEffect(() => {
+    load(page, search)
+  }, [load, page, search])
 
   async function handleCreate(payload: FilmPayload) {
     await createFilm(payload)
     setModal(null)
-    load()
+    load(page, search)
   }
 
   async function handleEdit(payload: FilmPayload) {
     if (modal?.type !== 'edit') return
     await updateFilm(modal.film.id, payload)
     setModal(null)
-    load()
+    load(page, search)
   }
 
   async function handleBackdropSelect(imageUrl: string) {
@@ -163,7 +177,7 @@ export function FilmsPage() {
     try {
       await updateFilm(filmId, { image_url: imageUrl })
       setModal(null)
-      load()
+      load(page, search)
       showSuccess('Image mise à jour')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la mise à jour')
@@ -173,7 +187,7 @@ export function FilmsPage() {
   async function handleUpload(film: AdminFilm, file: File) {
     try {
       await uploadFilmImage(film.id, file)
-      load()
+      load(page, search)
       showSuccess('Image uploadée')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur upload')
@@ -186,20 +200,13 @@ export function FilmsPage() {
     try {
       await deleteFilm(modal.film.id)
       setModal(null)
-      load()
+      load(page, search)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur')
     } finally {
       setDeleteLoading(false)
     }
   }
-
-  const filtered = films.filter(
-    (f) =>
-      search.trim() === '' ||
-      f.title.toLowerCase().includes(search.toLowerCase()) ||
-      f.director.toLowerCase().includes(search.toLowerCase())
-  )
 
   return (
     <AdminLayout>
@@ -257,7 +264,7 @@ export function FilmsPage() {
           <div className="flex items-center justify-center h-40">
             <span className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : films.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-gray-400 text-sm">
             {search ? 'Aucun film trouvé pour cette recherche.' : 'Aucun film enregistré.'}
           </div>
@@ -275,7 +282,7 @@ export function FilmsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filtered.map((film) => (
+                {films.map((film) => (
                   <FilmRow
                     key={film.id}
                     film={film}
@@ -291,10 +298,7 @@ export function FilmsPage() {
         )}
       </div>
 
-      <p className="mt-2 text-xs text-gray-400">
-        {filtered.length} film{filtered.length !== 1 ? 's' : ''}
-        {search && ` sur ${films.length}`}
-      </p>
+      <Pagination page={page} pages={pages} total={total} limit={LIMIT} onPage={setPage} />
 
       {/* Modals */}
       {modal?.type === 'create' && (

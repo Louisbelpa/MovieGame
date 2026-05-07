@@ -262,9 +262,28 @@ export async function getDashboard(): Promise<AdminDashboard> {
 
 // ─── Films ────────────────────────────────────────────────────────────────────
 
-export async function getFilms(): Promise<AdminFilm[]> {
-  const res = await request<{ data: AdminFilm[] }>('/api/admin/films')
-  return res.data
+export async function getFilms(opts: { page?: number; limit?: number; q?: string } = {}): Promise<{
+  data: AdminFilm[]
+  total: number
+  page: number
+  limit: number
+  pages: number
+}> {
+  const params = new URLSearchParams()
+  if (opts.page !== undefined) params.set('page', String(opts.page))
+  if (opts.limit !== undefined) params.set('limit', String(opts.limit))
+  if (opts.q !== undefined && opts.q !== '') params.set('q', opts.q)
+  const qs = params.toString()
+  const res = await request<{ data: AdminFilm[]; pagination: { total: number; page: number; limit: number; pages: number } }>(
+    `/api/admin/films${qs ? `?${qs}` : ''}`
+  )
+  return {
+    data: res.data,
+    total: res.pagination.total,
+    page: res.pagination.page,
+    limit: res.pagination.limit,
+    pages: res.pagination.pages,
+  }
 }
 
 export async function createFilm(payload: FilmPayload): Promise<AdminFilm> {
@@ -353,6 +372,13 @@ export async function deleteChallenge(id: number): Promise<void> {
   return request<void>(`/api/admin/challenges/${id}`, { method: 'DELETE' })
 }
 
+export async function rescheduleChallenge(id: number, date: string): Promise<AdminChallenge> {
+  return request<AdminChallenge>(`/api/admin/challenges/${id}/reschedule`, {
+    method: 'POST',
+    body: JSON.stringify({ date }),
+  })
+}
+
 // ─── TMDB ─────────────────────────────────────────────────────────────────────
 
 export interface TmdbBackdrop {
@@ -428,9 +454,28 @@ export async function deleteChangelogEntry(id: number): Promise<void> {
 
 // ─── Series ───────────────────────────────────────────────────────────────────
 
-export async function getSeries(): Promise<AdminSeries[]> {
-  const res = await request<{ data: AdminSeries[] }>('/api/admin/series')
-  return res.data
+export async function getSeries(opts: { page?: number; limit?: number; q?: string } = {}): Promise<{
+  data: AdminSeries[]
+  total: number
+  page: number
+  limit: number
+  pages: number
+}> {
+  const params = new URLSearchParams()
+  if (opts.page !== undefined) params.set('page', String(opts.page))
+  if (opts.limit !== undefined) params.set('limit', String(opts.limit))
+  if (opts.q !== undefined && opts.q !== '') params.set('q', opts.q)
+  const qs = params.toString()
+  const res = await request<{ data: AdminSeries[]; pagination: { total: number; page: number; limit: number; pages: number } }>(
+    `/api/admin/series${qs ? `?${qs}` : ''}`
+  )
+  return {
+    data: res.data,
+    total: res.pagination.total,
+    page: res.pagination.page,
+    limit: res.pagination.limit,
+    pages: res.pagination.pages,
+  }
 }
 
 function parseJsonArray(value: unknown): string[] {

@@ -1521,6 +1521,56 @@ adminRouter.delete(
   }
 );
 
+// POST /api/admin/challenges/:id/reschedule
+adminRouter.post(
+  '/challenges/:id/reschedule',
+  strictAdminLimiter,
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        res.status(400).json({ error: 'Invalid challenge id.' });
+        return;
+      }
+
+      const { date } = req.body as { date?: string };
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        res.status(400).json({ error: 'Invalid date format. Expected YYYY-MM-DD.' });
+        return;
+      }
+
+      const existing = db
+        .prepare(`SELECT id, media_type FROM daily_challenges WHERE id = ?`)
+        .get(id) as { id: number; media_type: string } | undefined;
+
+      if (!existing) {
+        res.status(404).json({ error: 'Challenge not found.' });
+        return;
+      }
+
+      const conflict = db
+        .prepare(`SELECT id FROM daily_challenges WHERE challenge_date = ? AND media_type = ? AND id != ? AND is_active = 1`)
+        .get(date, existing.media_type, id);
+
+      if (conflict) {
+        res.status(409).json({ error: 'A challenge already exists for this date and media type.' });
+        return;
+      }
+
+      db.prepare(`UPDATE daily_challenges SET challenge_date = ? WHERE id = ?`).run(date, id);
+      logAuditEvent('challenge.reschedule', { id, date });
+
+      const updated = db
+        .prepare(`SELECT * FROM daily_challenges WHERE id = ?`)
+        .get(id);
+
+      res.json(formatChallenge(updated as ChallengeRow));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // POST /api/admin/challenges/:id/restore
 adminRouter.post(
   '/challenges/:id/restore',
