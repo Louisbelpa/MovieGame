@@ -36,7 +36,7 @@ export function RulesModal({ mode }: { mode?: RulesMode }) {
   const rulesSeenKey = isWiki ? 'cineguess:rules_seen:wiki' : 'cineguess:rules_seen'
 
   function handleClose() {
-    localStorage.setItem(rulesSeenKey, '1')
+    try { localStorage.setItem(rulesSeenKey, '1') } catch { /* private browsing */ }
     closeModal()
     if (status === 'won') setTimeout(() => openModal('win'), 300)
     else if (status === 'lost') setTimeout(() => openModal('lose'), 300)

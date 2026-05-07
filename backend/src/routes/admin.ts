@@ -254,11 +254,11 @@ function formatFilm(row: FilmRow, usedDates?: string[]) {
   return {
     id: row.id,
     title: row.title,
-    title_aliases: JSON.parse(row.title_aliases) as string[],
+    title_aliases: (() => { try { return JSON.parse(row.title_aliases) as string[] } catch { return [] } })(),
     year: row.year,
     director: row.director,
-    genres: JSON.parse(row.genres) as string[],
-    cast_members: JSON.parse(row.cast_members) as string[],
+    genres: (() => { try { return JSON.parse(row.genres) as string[] } catch { return [] } })(),
+    cast_members: (() => { try { return JSON.parse(row.cast_members) as string[] } catch { return [] } })(),
     tagline: row.tagline,
     synopsis: row.synopsis,
     image_url: resolveAdminImageUrl(row.image_url),
@@ -783,6 +783,26 @@ adminRouter.post(
         res.status(400).json({ error: 'Field "image_url" must be a relative path or a trusted HTTPS URL (tmdb, wikimedia).' });
         return;
       }
+      if (body.title_aliases !== undefined && !Array.isArray(body.title_aliases)) {
+        res.status(400).json({ error: 'Field "title_aliases" must be an array.' });
+        return;
+      }
+      if (body.genres !== undefined && !Array.isArray(body.genres)) {
+        res.status(400).json({ error: 'Field "genres" must be an array.' });
+        return;
+      }
+      if (body.cast_members !== undefined && !Array.isArray(body.cast_members)) {
+        res.status(400).json({ error: 'Field "cast_members" must be an array.' });
+        return;
+      }
+      if (body.tagline !== undefined && body.tagline !== null && (typeof body.tagline !== 'string' || body.tagline.length > 2000)) {
+        res.status(400).json({ error: 'Field "tagline" must be a string of 2000 characters or fewer.' });
+        return;
+      }
+      if (body.synopsis !== undefined && body.synopsis !== null && (typeof body.synopsis !== 'string' || body.synopsis.length > 5000)) {
+        res.status(400).json({ error: 'Field "synopsis" must be a string of 5000 characters or fewer.' });
+        return;
+      }
       if (body.fame_level !== undefined && (typeof body.fame_level !== 'number' || body.fame_level < 1 || body.fame_level > 5)) {
         res.status(400).json({ error: 'Field "fame_level" must be between 1 and 5.' });
         return;
@@ -1136,6 +1156,7 @@ adminRouter.post(
         if (!title) { errors.push({ line: i + 2, error: 'Titre manquant' }); continue; }
         if (!year || isNaN(year)) { errors.push({ line: i + 2, error: 'Année invalide' }); continue; }
         if (!director) { errors.push({ line: i + 2, error: 'Réalisateur manquant' }); continue; }
+        if (image_url && !isValidImageUrl(image_url)) { errors.push({ line: i + 2, error: 'URL image non autorisée' }); continue; }
 
         try {
           const result = db.prepare(
@@ -3342,8 +3363,8 @@ adminRouter.get(
       const useDaysFilter = !isNaN(daysParam) && daysParam > 0;
       const mediaType = req.query.mediaType === 'series' ? 'series' : req.query.mediaType === 'film' ? 'film' : req.query.mediaType === 'wiki' ? 'wiki' : null;
       const joinClause = mediaType ? `JOIN daily_challenges dc ON dc.id = gs.challenge_id` : '';
-      const whereMedia = mediaType ? `dc.media_type = '${mediaType}'` : '';
-      const whereDays = useDaysFilter ? `gs.started_at >= date('now', '-' || ${daysParam} || ' days')` : '';
+      const whereMedia = mediaType ? `dc.media_type = ?` : '';
+      const whereDays = useDaysFilter ? `gs.started_at >= date('now', ?)` : '';
       const whereClause =
         whereMedia && whereDays
           ? `WHERE ${whereMedia} AND ${whereDays}`
@@ -3352,6 +3373,10 @@ adminRouter.get(
           : whereDays
           ? `WHERE ${whereDays}`
           : '';
+
+      const queryParams: (string | number)[] = []
+      if (mediaType) queryParams.push(mediaType)
+      if (useDaysFilter) queryParams.push(`-${daysParam} days`)
 
       const rows = db.prepare(`
         SELECT days_played, COUNT(*) AS player_count
@@ -3365,7 +3390,7 @@ adminRouter.get(
         )
         GROUP BY days_played
         ORDER BY days_played ASC
-      `).all() as { days_played: number; player_count: number }[];
+      `).all(...queryParams) as { days_played: number; player_count: number }[];
 
       res.json(rows);
     } catch (err) {

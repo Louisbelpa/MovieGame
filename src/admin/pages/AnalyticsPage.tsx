@@ -401,7 +401,7 @@ export function AnalyticsPage() {
           {distErr && <ErrorMsg msg={distErr} />}
           {!distErr && Object.keys(attempts).length === 0 && <p className="text-sm text-gray-400">Aucune donnée.</p>}
           <div className="space-y-2">
-            {(activeTab === 'wiki' ? [1, 2, 3] : [1, 2, 3, 4, 5, 6]).map((n) => (
+            {(activeTab === 'wiki' ? [1, 2, 3] : [1, 2, 3, 4, 5]).map((n) => (
               <HBar
                 key={n}
                 label={`${n} tentative${n > 1 ? 's' : ''}`}

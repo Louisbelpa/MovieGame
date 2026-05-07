@@ -25,7 +25,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ─── Production safety checks ─────────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
-  const missing = ['COOKIE_SECRET', 'ADMIN_PASSWORD', 'CORS_ORIGIN', 'BACKEND_URL'].filter(
+  const missing = ['COOKIE_SECRET', 'ADMIN_PASSWORD', 'CORS_ORIGIN'].filter(
     (v) => !process.env[v]
   );
   if (missing.length) {

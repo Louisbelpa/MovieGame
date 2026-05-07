@@ -139,7 +139,7 @@ export function LoseModal({ isOpen, onClose, mode, result, stats, onShare, onOpe
 
         {(result.wikipediaUrl || tmdbUrl) && (
           <a
-            href={result.wikipediaUrl ?? tmdbUrl ?? '#'}
+            href={(result.wikipediaUrl || tmdbUrl) as string}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-sm text-film-text-dim hover:text-film-text transition-colors"

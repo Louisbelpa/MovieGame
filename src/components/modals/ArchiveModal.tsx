@@ -148,6 +148,40 @@ export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps
     loadDate(date)
   }
 
+  const monthNav = (
+    <div className="flex items-center gap-3">
+      <button
+        onClick={() => setDisplayYM(prevMonth(displayYM))}
+        disabled={!canPrev || loading}
+        aria-label="Mois précédent"
+        className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+      >
+        <ChevronLeft size={20} aria-hidden />
+      </button>
+
+      <div className="text-center min-w-0">
+        <p className="font-title font-semibold text-film-text capitalize truncate">
+          {monthLabel(displayYM)}
+        </p>
+        {!loading && total > 0 && (
+          <p className="text-xs text-film-text-dim">
+            {played}/{total} joué{played > 1 ? 's' : ''}
+            {played > 0 && ` · ${won} victoire${won > 1 ? 's' : ''}`}
+          </p>
+        )}
+      </div>
+
+      <button
+        onClick={() => setDisplayYM(nextMonth(displayYM))}
+        disabled={!canNext || loading}
+        aria-label="Mois suivant"
+        className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+      >
+        <ChevronRight size={20} aria-hidden />
+      </button>
+    </div>
+  )
+
   return (
     <Modal
       isOpen={isOpen}
@@ -155,47 +189,15 @@ export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps
       ariaLabel={isWiki ? 'Archives des défis WikiGuessr' : 'Archives des défis'}
       ariaLabelledBy={modalTitleId}
       ariaDescribedBy={modalDescId}
+      headerContent={monthNav}
     >
       <div className="flex flex-col gap-4">
         <p id={modalTitleId} className="sr-only">
           {isWiki ? 'Archives des défis WikiGuessr' : 'Archives des défis'}
         </p>
         <p id={modalDescId} className="sr-only">
-          Navigation par mois et sélection d’une date de défi.
+          Navigation par mois et sélection d'une date de défi.
         </p>
-
-        {/* ── Month navigation ── */}
-        <div className="flex items-center justify-between gap-2">
-          <button
-            onClick={() => setDisplayYM(prevMonth(displayYM))}
-            disabled={!canPrev || loading}
-            aria-label="Mois précédent"
-            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
-          >
-            <ChevronLeft size={20} aria-hidden />
-          </button>
-
-          <div className="text-center min-w-0">
-            <p className="font-title font-semibold text-film-text capitalize truncate">
-              {monthLabel(displayYM)}
-            </p>
-            {!loading && total > 0 && (
-              <p className="text-xs text-film-text-dim">
-                {played}/{total} joué{played > 1 ? 's' : ''}
-                {played > 0 && ` · ${won} victoire${won > 1 ? 's' : ''}`}
-              </p>
-            )}
-          </div>
-
-          <button
-            onClick={() => setDisplayYM(nextMonth(displayYM))}
-            disabled={!canNext || loading}
-            aria-label="Mois suivant"
-            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
-          >
-            <ChevronRight size={20} aria-hidden />
-          </button>
-        </div>
 
         {/* ── Calendar ── */}
         {loading ? (

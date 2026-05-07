@@ -4,11 +4,27 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Footer } from '@/components/layout/Footer'
 import { FEATURES, BRAND_NAME } from '@/config/features'
+import {
+  NewModesAnnouncementModal,
+  NEW_MODES_ANNOUNCEMENT_STORAGE_KEY,
+  type NewModesAnnouncementVariant,
+} from '@/components/modals/NewModesAnnouncementModal'
 
 type IconPhase = 'film' | 'tv' | 'wiki'
 
 export function HomePage() {
   const [iconPhase, setIconPhase] = useState<IconPhase>('film')
+  const [announcementVariant, setAnnouncementVariant] = useState<NewModesAnnouncementVariant | null>(null)
+
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(NEW_MODES_ANNOUNCEMENT_STORAGE_KEY)) {
+        if (FEATURES.enableSeries && FEATURES.enableWiki) setAnnouncementVariant('both')
+        else if (FEATURES.enableSeries) setAnnouncementVariant('series')
+        else if (FEATURES.enableWiki) setAnnouncementVariant('wiki')
+      }
+    } catch {}
+  }, [])
 
   useEffect(() => {
     const modes: IconPhase[] = FEATURES.enableWiki
@@ -177,6 +193,14 @@ export function HomePage() {
         </section>
       </div>
       <Footer />
+
+      {announcementVariant && (
+        <NewModesAnnouncementModal
+          isOpen={true}
+          onClose={() => setAnnouncementVariant(null)}
+          variant={announcementVariant}
+        />
+      )}
     </div>
   )
 }

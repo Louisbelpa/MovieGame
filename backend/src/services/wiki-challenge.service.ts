@@ -354,8 +354,7 @@ export function getTodayWikiChallenge(): WikiChallengeRow {
   const row = db
     .prepare<[string], WikiChallengeRow>(
       `SELECT * FROM daily_challenges
-       WHERE challenge_date <= ? AND media_type = 'wiki'
-       ORDER BY challenge_date DESC LIMIT 1`
+       WHERE challenge_date = ? AND media_type = 'wiki'`
     )
     .get(today)
   if (!row) throw Object.assign(new Error('No wiki challenge scheduled'), { status: 404 })
@@ -579,7 +578,7 @@ export function searchWikiPersons(query: string, limit = 10) {
   return rows
     .filter(r => r.id !== excludeId)
     .slice(0, limit)
-    .map(r => ({ title: r.name, year: r.person_type }))
+    .map(r => ({ title: r.name, personType: r.person_type }))
 }
 
 export function getWikiGlobalStats() {
@@ -594,7 +593,10 @@ export function getWikiGlobalStats() {
     totalWins: stats.total_wins,
     totalLosses: stats.total_losses,
     winRate,
-    winsByAttempt: JSON.parse(stats.wins_by_attempt),
+    winsByAttempt: Object.fromEntries(
+      Object.entries(JSON.parse(stats.wins_by_attempt) as Record<string, number>)
+        .filter(([k]) => Number(k) <= MAX_ATTEMPTS)
+    ),
     lastUpdated: stats.last_updated,
   }
 }

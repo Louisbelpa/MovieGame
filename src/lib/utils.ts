@@ -10,7 +10,7 @@ export function cn(...inputs: ClassValue[]) {
 
 /** Returns today's date as YYYY-MM-DD (UTC) */
 export function getTodayId(): string {
-  return new Date().toISOString().slice(0, 10)
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
 }
 
 /** Normalise a movie title for comparison (lowercase, no accents, no punctuation) */

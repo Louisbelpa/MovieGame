@@ -4,6 +4,7 @@
  */
 
 import { useEffect } from 'react'
+import { MotionConfig } from 'framer-motion'
 import { WikiGamePage } from '@/components/wiki/WikiGamePage'
 import { RulesModal } from '@/components/modals/RulesModal'
 import { ArchiveModal } from '@/components/modals/ArchiveModal'
@@ -26,6 +27,7 @@ export function WikiApp() {
   }, [openModal])
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="min-h-screen flex flex-col bg-film-black text-film-text">
       <Header mode="wiki" />
       <main id="main-content" className="flex-1">
@@ -36,5 +38,6 @@ export function WikiApp() {
       <RulesModal mode="wiki" />
       <ArchiveModal mode="wiki" />
     </div>
+    </MotionConfig>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { MotionConfig } from 'framer-motion'
 import { Header } from './components/layout/Header'
 import { Footer } from './components/layout/Footer'
 import { GamePage } from './components/game/GamePage'
@@ -114,15 +115,17 @@ function GameLayout({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/films/*" element={<GameLayout mode="film" />} />
-        {FEATURES.enableSeries && <Route path="/series/*" element={<GameLayout mode="series" />} />}
-        {FEATURES.enableWiki && <Route path="/wiki/*" element={<GameLayout mode="wiki" />} />}
-        <Route path="/" element={<Navigate to="/films" replace />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
+    <MotionConfig reducedMotion="user">
+      <BrowserRouter>
+        <Routes>
+          <Route path="/films/*" element={<GameLayout mode="film" />} />
+          {FEATURES.enableSeries && <Route path="/series/*" element={<GameLayout mode="series" />} />}
+          {FEATURES.enableWiki && <Route path="/wiki/*" element={<GameLayout mode="wiki" />} />}
+          <Route path="/" element={<Navigate to="/films" replace />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </MotionConfig>
   )
 }
 

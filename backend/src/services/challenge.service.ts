@@ -118,8 +118,7 @@ export function getTodayChallenge(type: 'film' | 'series' = 'film'): ChallengeRo
   const today = getTodayParis();
   const row = db
     .prepare<[string, string], ChallengeRow>(
-      `SELECT * FROM daily_challenges WHERE challenge_date <= ? AND media_type = ?
-       ORDER BY challenge_date DESC LIMIT 1`
+      `SELECT * FROM daily_challenges WHERE challenge_date = ? AND media_type = ?`
     ).get(today, type);
   if (!row) throw Object.assign(new Error(`No ${type} challenge scheduled`), { status: 404 });
   return row;
@@ -301,7 +300,9 @@ export function processGuess(
       mediaTitle = s.title;
       mediaAliases = s.title_aliases;
     } else {
-      const f = db.prepare<[number], { title: string; title_aliases: string }>(`SELECT title, title_aliases FROM films WHERE id = ?`).get(challenge.film_id!);
+      const filmId = challenge.film_id
+      if (filmId === null) throw Object.assign(new Error('Challenge has no film'), { status: 500 })
+      const f = db.prepare<[number], { title: string; title_aliases: string }>(`SELECT title, title_aliases FROM films WHERE id = ?`).get(filmId);
       if (!f) throw Object.assign(new Error('Film not found'), { status: 500 });
       mediaTitle = f.title;
       mediaAliases = f.title_aliases;
@@ -457,7 +458,10 @@ export function getGlobalStats() {
     totalWins: stats.total_wins,
     totalLosses: stats.total_losses,
     winRate,
-    winsByAttempt: JSON.parse(stats.wins_by_attempt),
+    winsByAttempt: Object.fromEntries(
+      Object.entries(JSON.parse(stats.wins_by_attempt) as Record<string, number>)
+        .filter(([k]) => Number(k) <= MAX_ATTEMPTS)
+    ),
     lastUpdated: stats.last_updated,
   };
 }
