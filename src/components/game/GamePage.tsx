@@ -60,8 +60,12 @@ async function shareResult(mode: 'film' | 'series' | 'wiki', name: string, guess
     : `CinéGuessr: ${name} trouvé en ${solvedIn} tentative(s).`
 
   if (navigator.share) {
-    await navigator.share({ text })
-    return
+    try {
+      await navigator.share({ text })
+      return
+    } catch {
+      // AbortError (user cancelled) or NotAllowedError — fall through to clipboard
+    }
   }
   await navigator.clipboard.writeText(text)
 }

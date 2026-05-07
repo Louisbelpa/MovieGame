@@ -27,6 +27,11 @@ export function Header({ mode }: HeaderProps) {
   const gameType = useGameStore((s) => s.gameType)
 
   const lastNumberRef = useRef<number | null>(null)
+  const prevModeRef = useRef(mode)
+  if (prevModeRef.current !== mode) {
+    prevModeRef.current = mode
+    lastNumberRef.current = null
+  }
   if (!isWiki && gameChallenge?.challengeNumber) lastNumberRef.current = gameChallenge.challengeNumber
   if (isWiki && wikiChallenge?.challengeNumber) lastNumberRef.current = wikiChallenge.challengeNumber
   const displayNumber = lastNumberRef.current

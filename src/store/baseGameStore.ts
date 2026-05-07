@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { addToHistory, loadStats, saveStats } from '@/lib/storage'
+import { updateStats } from '@/lib/utils'
 
 type BaseOutcome = 'won' | 'lost' | null
 
@@ -268,11 +270,25 @@ export function createBaseGameStore<
           body: JSON.stringify({ challengeId, guess }),
         })
 
+        const newState = mapPayloadToState(payload.challenge)
         set({
-          ...mapPayloadToState(payload.challenge),
+          ...newState,
           isSubmitting: false,
           ...(payload.correct === false && { ui: { ...get().ui, shakeTrigger: get().ui.shakeTrigger + 1 } }),
         })
+
+        if (payload.challenge.isGameOver && viewingDate === null) {
+          const outcome = payload.challenge.outcome === 'won' ? 'won' : 'lost'
+          const challengeDate = payload.challenge.date
+          const type = config.mediaType as 'film' | 'series' | 'wiki'
+          addToHistory(challengeDate, outcome, type)
+          const prev = loadStats(type)
+          const mappedGuesses = payload.challenge.attempts.map((a) => ({
+            status: a.correct ? 'correct' as const : a.guess === '' ? 'skipped' as const : 'wrong' as const,
+          }))
+          const updated = updateStats(prev, { guesses: mappedGuesses, status: outcome }, challengeDate)
+          saveStats(updated, type)
+        }
       } catch (err) {
         set({
           error: err instanceof Error ? err.message : 'Error',
