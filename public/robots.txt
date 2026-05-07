@@ -1,5 +1,2 @@
 User-agent: *
 Disallow: /admin
-Allow: /
-
-Sitemap: https://cineguessr.fr/sitemap.xml

@@ -87,6 +87,10 @@ challengeRouter.post(
         res.status(422).json({ error: 'Field "guess" must be a string (use empty string to skip).' });
         return;
       }
+      if (guess.length > 300) {
+        res.status(422).json({ error: 'Field "guess" must be 300 characters or fewer.' });
+        return;
+      }
 
       const challenge = (bodyChallId && typeof bodyChallId === 'number')
         ? getChallengeById(bodyChallId)

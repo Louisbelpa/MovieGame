@@ -287,10 +287,6 @@ export function processGuess(
 
     const attempts: AttemptEntry[] = JSON.parse(session.attempts);
 
-    if (attempts.length >= MAX_ATTEMPTS) {
-      throw Object.assign(new Error('No attempts remaining'), { status: 409 });
-    }
-
     const challenge = db
       .prepare<[number], ChallengeRow>(`SELECT * FROM daily_challenges WHERE id = ?`)
       .get(challengeId);

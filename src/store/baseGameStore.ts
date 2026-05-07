@@ -29,6 +29,7 @@ interface BaseChallengePayloadLike {
 }
 
 interface BaseGuessResponse<TPayload> {
+  correct: boolean
   challenge: TPayload
   outcome: BaseOutcome
 }
@@ -179,16 +180,24 @@ export function createBaseGameStore<
         })
       } catch (err) {
         const statusCode = (err as Error & { status?: number }).status
-        const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
-        const nav = await probeAdjacentNavigation(todayParis)
-        set({
-          error: err instanceof Error ? err.message : 'Error',
-          isLoading: false,
-          isSubmitting: false,
-          status: statusCode === 404 ? 'not_found' : 'not_found',
-          hasPrev: nav.hasPrev,
-          hasNext: nav.hasNext,
-        })
+        if (statusCode === 404) {
+          const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
+          const nav = await probeAdjacentNavigation(todayParis)
+          set({
+            error: err instanceof Error ? err.message : 'Error',
+            isLoading: false,
+            isSubmitting: false,
+            status: 'not_found',
+            hasPrev: nav.hasPrev,
+            hasNext: nav.hasNext,
+          })
+        } else {
+          set({
+            error: err instanceof Error ? err.message : 'Error',
+            isLoading: false,
+            isSubmitting: false,
+          })
+        }
       }
     },
 
@@ -262,7 +271,7 @@ export function createBaseGameStore<
         set({
           ...mapPayloadToState(payload.challenge),
           isSubmitting: false,
-          ...(payload.correct === false && { shakeTrigger: (get().shakeTrigger ?? 0) + 1 }),
+          ...(payload.correct === false && { ui: { ...get().ui, shakeTrigger: get().ui.shakeTrigger + 1 } }),
         })
       } catch (err) {
         set({

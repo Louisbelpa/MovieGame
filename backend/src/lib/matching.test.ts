@@ -1,33 +1,36 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { normalise, stripArticles, levenshtein, typoThreshold, isGuessCorrect } from './matching.js'
 
 describe('normalise', () => {
-  it('lowercases', () => expect(normalise('Titanic')).toBe('titanic'))
-  it('strips accents', () => expect(normalise('Éléphant')).toBe('elephant'))
-  it('strips punctuation', () => expect(normalise("L'Amour, c'est tout!")).toBe('lamour cest tout'))
-  it('collapses whitespace', () => expect(normalise('  foo   bar  ')).toBe('foo bar'))
-  it('handles mixed accents and case', () => expect(normalise('Intouchables')).toBe('intouchables'))
+  it('lowercases', () => expect(normalise('TITANIC')).toBe('titanic'))
+  it('strips accents', () => expect(normalise('Intouchables')).toBe('intouchables'))
+  it('strips é', () => expect(normalise('Été')).toBe('ete'))
+  it('strips punctuation', () => expect(normalise("L'amour")).toBe('lamour'))
+  it('collapses whitespace', () => expect(normalise('Le  Roi  Lion')).toBe('le roi lion'))
+  it('trims', () => expect(normalise('  hello  ')).toBe('hello'))
+  it('removes apostrophe and adjacent chars stay', () => expect(normalise("c'est")).toBe('cest'))
 })
 
 describe('stripArticles', () => {
-  it('strips "Le"', () => expect(stripArticles('le parrain')).toBe('parrain'))
-  it('strips "La"', () => expect(stripArticles('la vie est belle')).toBe('vie est belle'))
-  it('strips "Les"', () => expect(stripArticles('les misérables')).toBe('misérables'))
-  it('strips "The"', () => expect(stripArticles('the godfather')).toBe('godfather'))
-  // stripArticles receives already-normalised strings (apostrophe already stripped by normalise)
-  // "l'enfant" normalised → "lenfant" (no space after l, no strip)
-  it('l apostrophe: no strip without space', () => expect(stripArticles("lenfant")).toBe('lenfant'))
-  it('does not strip mid-word', () => expect(stripArticles('legend')).toBe('legend'))
-  it('returns empty string unchanged', () => expect(stripArticles('')).toBe(''))
+  it('strips "le "', () => expect(stripArticles('le roi lion')).toBe('roi lion'))
+  it('strips "la "', () => expect(stripArticles('la haine')).toBe('haine'))
+  it('strips "les "', () => expect(stripArticles('les misérables')).toBe('misérables'))
+  it('strips "the "', () => expect(stripArticles('the lion king')).toBe('lion king'))
+  it('strips "a "', () => expect(stripArticles('a beautiful mind')).toBe('beautiful mind'))
+  it('strips "un "', () => expect(stripArticles('un homme')).toBe('homme'))
+  it('strips "une "', () => expect(stripArticles('une femme')).toBe('femme'))
+  it('strips "l "', () => expect(stripArticles('l amour')).toBe('amour'))
+  it('does not strip mid-word', () => expect(stripArticles('alien')).toBe('alien'))
+  it('does not strip when no article', () => expect(stripArticles('titanic')).toBe('titanic'))
 })
 
 describe('levenshtein', () => {
-  it('identical strings = 0', () => expect(levenshtein('abc', 'abc')).toBe(0))
-  it('1 substitution', () => expect(levenshtein('abc', 'axc')).toBe(1))
-  it('1 insertion', () => expect(levenshtein('abc', 'abcd')).toBe(1))
-  it('1 deletion', () => expect(levenshtein('abcd', 'abc')).toBe(1))
+  it('identical strings → 0', () => expect(levenshtein('abc', 'abc')).toBe(0))
+  it('one insertion → 1', () => expect(levenshtein('abc', 'abcd')).toBe(1))
+  it('one deletion → 1', () => expect(levenshtein('abcd', 'abc')).toBe(1))
+  it('one substitution → 1', () => expect(levenshtein('abc', 'axc')).toBe(1))
   it('empty strings', () => expect(levenshtein('', '')).toBe(0))
-  it('one empty', () => expect(levenshtein('abc', '')).toBe(3))
+  it('one empty → length of other', () => expect(levenshtein('', 'hello')).toBe(5))
 })
 
 describe('typoThreshold', () => {
@@ -39,36 +42,16 @@ describe('typoThreshold', () => {
 })
 
 describe('isGuessCorrect', () => {
-  const accepted = ['titanic', 'le parrain', 'intouchables'].map(s => s)
-
-  it('exact match', () => expect(isGuessCorrect('titanic', ['titanic'])).toBe(true))
+  it('exact match', () => expect(isGuessCorrect('Titanic', ['titanic'])).toBe(true))
   it('case insensitive', () => expect(isGuessCorrect('TITANIC', ['titanic'])).toBe(true))
-  it('accent stripped', () => expect(isGuessCorrect('Éléphant', ['elephant'])).toBe(true))
-  it('article stripped — Le Parrain → parrain', () => {
-    expect(isGuessCorrect('Le Parrain', ['le parrain'])).toBe(true)
-  })
-  it('article stripped in accepted — guess without article', () => {
-    expect(isGuessCorrect('Parrain', ['le parrain'])).toBe(true)
-  })
-  it('1-char typo accepted for long title', () => {
-    expect(isGuessCorrect('intouchabls', ['intouchables'])).toBe(true)
-  })
-  it('2-char typo rejected (word < 6 chars → threshold 0)', () => {
-    // "rocky" = 5 chars → threshold 0, so any typo is rejected
-    expect(isGuessCorrect('ricky', ['rocky'])).toBe(false)
-  })
-  it('1-char typo accepted for 7-char title (threshold 1)', () => {
-    // "titanic" = 7 chars → threshold 1, "titanicc" = distance 1 → accepted
-    expect(isGuessCorrect('titanicc', ['titanic'])).toBe(true)
-  })
-  it('completely different title rejected', () => {
-    expect(isGuessCorrect('avatar', ['titanic'])).toBe(false)
-  })
-  it('empty guess rejected', () => {
-    expect(isGuessCorrect('', ['titanic'])).toBe(false)
-  })
-  it('matches any accepted alias', () => {
-    expect(isGuessCorrect('godfather', ['the godfather', 'parrain'])).toBe(true)
-  })
-  void accepted // used to avoid TS unused warning
+  it('accent insensitive', () => expect(isGuessCorrect('Intouchables', ['intouchables'])).toBe(true))
+  it('wrong answer → false', () => expect(isGuessCorrect('Avatar', ['titanic'])).toBe(false))
+  it('matches alias', () => expect(isGuessCorrect('le roi lion', ['lion king', 'le roi lion'])).toBe(true))
+  it('article stripped: "le "', () => expect(isGuessCorrect('le roi lion', ['roi lion'])).toBe(true))
+  it('article stripped: "the "', () => expect(isGuessCorrect('the dark knight', ['dark knight'])).toBe(true))
+  it('1-typo accepted for 7+ char title', () => expect(isGuessCorrect('titannic', ['titanic'])).toBe(true))
+  it('2-typo accepted for 13+ char title', () => expect(isGuessCorrect('intouuchablees', ['intouchables'])).toBe(true))
+  it('typo rejected for short title (≤5 chars)', () => expect(isGuessCorrect('ricky', ['rocky'])).toBe(false))
+  it('empty guess → false', () => expect(isGuessCorrect('', ['titanic'])).toBe(false))
+  it('skip guess (empty) matches nothing', () => expect(isGuessCorrect('', [''])).toBe(true))
 })

@@ -6,8 +6,8 @@ import './index.css'
 import { BRAND_NAME, FEATURES } from './config/features'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
-function wrap(node: React.ReactNode) {
-  return <StrictMode><ErrorBoundary>{node}</ErrorBoundary></StrictMode>
+function wrap(el: React.ReactNode) {
+  return <StrictMode><ErrorBoundary>{el}</ErrorBoundary></StrictMode>
 }
 
 const root = document.getElementById('root')!
@@ -62,7 +62,7 @@ if (path.startsWith('/admin')) {
     )
   })
 } else {
-  document.title = `${BRAND_NAME} — Devine le film du jour`
+  document.title = `${BRAND_NAME} — Devise le film du jour`
   import('./App').then(({ default: App }) => {
     createRoot(root).render(wrap(<App />))
   })

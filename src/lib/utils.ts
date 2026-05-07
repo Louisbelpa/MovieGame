@@ -81,9 +81,9 @@ export function updateStats(
     (g) => g.status !== 'skipped'
   ).length as 1 | 2 | 3 | 4 | 5 | 6
 
-  const yesterday = new Date()
-  yesterday.setDate(yesterday.getDate() - 1)
-  const yesterdayId = yesterday.toISOString().slice(0, 10)
+  const yesterdayDate = new Date()
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+  const yesterdayId = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(yesterdayDate)
 
   const isStreak =
     prev.lastWonDate === yesterdayId || prev.lastWonDate === todayId

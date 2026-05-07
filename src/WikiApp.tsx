@@ -28,7 +28,7 @@ export function WikiApp() {
   return (
     <div className="min-h-screen flex flex-col bg-film-black text-film-text">
       <Header mode="wiki" />
-      <main className="flex-1">
+      <main id="main-content" className="flex-1">
         <WikiGamePage />
       </main>
       <Footer />
