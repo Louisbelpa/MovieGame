@@ -4,7 +4,7 @@
  */
 
 import type { ReactNode } from 'react'
-import { CheckCircle2, XCircle, SkipForward, Calendar, Clapperboard, User } from 'lucide-react'
+import { CheckCircle2, XCircle, SkipForward, Calendar, Clapperboard, User, Flag, Lightbulb } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { useGameStore } from '@/store/gameStore'
@@ -51,11 +51,72 @@ export function RulesModal({ mode }: { mode?: RulesMode }) {
         ariaDescribedBy={modalDescId}
       >
         <div className="flex flex-col gap-5 text-sm text-film-text">
-          <ul id={modalDescId} className="film-border rounded-lg p-3 flex flex-col gap-2.5">
-            <li className="text-film-text-dim leading-relaxed">• Devinez la personnalité du jour en 3 tentatives</li>
-            <li className="text-film-text-dim leading-relaxed">• Chaque mauvaise réponse débloque un nouvel indice</li>
-            <li className="text-film-text-dim leading-relaxed">• Politiciens, sportifs, artistes, scientifiques...</li>
+          <p id={modalDescId} className="text-film-text-dim leading-relaxed">
+            Une photo et un profil partiel d'une personnalité s'affichent.
+            <br />
+            Devinez qui c'est en{' '}
+            <strong className="text-film-gold">3 tentatives maximum</strong>.
+            À chaque mauvaise réponse, un nouvel indice se débloque.
+          </p>
+
+          <div className="film-border rounded-lg p-3">
+            <p className="text-sm font-semibold text-film-text-dim uppercase tracking-wider mb-2.5">
+              Ordre des indices
+            </p>
+            <div className="flex flex-col gap-2">
+              <HintPreview icon={<Calendar size={13} className="text-film-gold" />} label="1re mauvaise réponse" hint="Année de naissance" example="1955" />
+              <HintPreview icon={<Flag size={13} className="text-film-gold" />} label="2e mauvaise réponse" hint="Nationalité" example="Américain·e" />
+              <HintPreview icon={<Lightbulb size={13} className="text-film-gold" />} label="3e mauvaise réponse" hint="Oeuvre / Domaine / Initiales" example="Informatique" />
+            </div>
+          </div>
+
+          <div className="film-border rounded-lg p-3">
+            <p className="text-sm font-semibold text-film-text-dim uppercase tracking-wider mb-2.5">
+              Signification des pastilles
+            </p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="flex items-center gap-1.5 text-sm">
+                <span className="w-5 h-5 rounded-full bg-film-green flex items-center justify-center text-film-black font-bold text-[10px]">✓</span>
+                <span className="text-film-text">Correct</span>
+              </span>
+              <span className="flex items-center gap-1.5 text-sm">
+                <span className="w-5 h-5 rounded-full bg-film-red flex items-center justify-center text-white font-bold text-[10px]">✗</span>
+                <span className="text-film-text">Incorrect</span>
+              </span>
+              <span className="flex items-center gap-1.5 text-sm">
+                <span className="w-5 h-5 rounded-full bg-film-border/60 flex items-center justify-center text-film-text-dim text-[10px]">→</span>
+                <span className="text-film-text">Passé</span>
+              </span>
+              <span className="flex items-center gap-1.5 text-sm">
+                <span className="w-5 h-5 rounded-full border-2 border-dashed border-film-border/50 inline-block" />
+                <span className="text-film-text-dim">Vide</span>
+              </span>
+            </div>
+          </div>
+
+          <ul className="flex flex-col gap-2.5">
+            <RuleItem
+              icon={<CheckCircle2 size={16} className="text-film-green" />}
+              title="Bonne réponse"
+              description="La pastille verte s'allume — partie terminée !"
+            />
+            <RuleItem
+              icon={<XCircle size={16} className="text-film-red" />}
+              title="Mauvaise réponse"
+              description="Pastille rouge. Un nouvel indice se débloque."
+            />
+            <RuleItem
+              icon={<SkipForward size={16} className="text-film-text-dim" />}
+              title="Passer"
+              description="Utilise une tentative pour débloquer l'indice suivant sans proposer de nom."
+            />
           </ul>
+
+          <p className="text-sm text-film-text-dim text-center">
+            Une nouvelle personnalité chaque jour à minuit (heure de Paris).<br />
+            Rejoue les anciens défis avec les flèches ◀ ▶.
+          </p>
+
           <Button variant="primary" size="lg" onClick={handleClose} className="w-full">
             C'est parti !
           </Button>

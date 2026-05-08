@@ -3,7 +3,7 @@
  * Planning des défis : liste des 30 prochains jours + option pour voir le passé.
  */
 
-import { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { ChevronDown, Sparkles, Film, Tv, X, Landmark, LayoutList, LayoutGrid } from 'lucide-react'
 import {
   getChallenges,
@@ -363,9 +363,9 @@ export function CalendarPage() {
           ) : (
             <ul className="divide-y divide-gray-100">
               {monthDates.map((date, i) => (
-                <>
+                <React.Fragment key={date}>
                   {isCurrentMonth && date === todayISO && i > 0 && (
-                    <li key={`divider-${date}`} className="flex items-center gap-3 px-4 py-2 bg-indigo-50">
+                    <li className="flex items-center gap-3 px-4 py-2 bg-indigo-50">
                       <span className="flex-1 border-t border-indigo-200" />
                       <span className="text-sm font-semibold text-indigo-500 uppercase tracking-wider">Aujourd'hui</span>
                       <span className="flex-1 border-t border-indigo-200" />
@@ -385,7 +385,7 @@ export function CalendarPage() {
                     onEditMedia={handleEditMedia}
                     allowPast={allowPast}
                   />
-                </>
+                </React.Fragment>
               ))}
             </ul>
           )}

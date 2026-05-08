@@ -465,6 +465,14 @@ function getTodayParis(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
 }
 
+function renumberChallenges(mediaType: 'film' | 'series' | 'wiki'): void {
+  const rows = db.prepare<[string], { id: number }>(
+    'SELECT id FROM daily_challenges WHERE media_type = ? AND is_active = 1 ORDER BY challenge_date ASC'
+  ).all(mediaType);
+  const update = db.prepare('UPDATE daily_challenges SET challenge_number = ? WHERE id = ?');
+  db.transaction(() => { rows.forEach((r, i) => update.run(i + 1, r.id)); })();
+}
+
 const ALLOWED_IMAGE_ORIGINS = [
   'https://image.tmdb.org',
   'https://upload.wikimedia.org',
@@ -610,17 +618,17 @@ adminRouter.get(
       // Today's challenges (one per type)
       const todayFilmRow = db
         .prepare<[string], ChallengeRow>(
-          `SELECT dc.* FROM daily_challenges dc WHERE dc.challenge_date = ? AND dc.media_type = 'film'`
+          `SELECT dc.* FROM daily_challenges dc WHERE dc.challenge_date = ? AND dc.media_type = 'film' AND dc.is_active = 1`
         )
         .get(today);
       const todaySeriesRow = db
         .prepare<[string], ChallengeRow>(
-          `SELECT dc.* FROM daily_challenges dc WHERE dc.challenge_date = ? AND dc.media_type = 'series'`
+          `SELECT dc.* FROM daily_challenges dc WHERE dc.challenge_date = ? AND dc.media_type = 'series' AND dc.is_active = 1`
         )
         .get(today);
       const todayWikiRow = db
         .prepare<[string], ChallengeRow>(
-          `SELECT dc.* FROM daily_challenges dc WHERE dc.challenge_date = ? AND dc.media_type = 'wiki'`
+          `SELECT dc.* FROM daily_challenges dc WHERE dc.challenge_date = ? AND dc.media_type = 'wiki' AND dc.is_active = 1`
         )
         .get(today);
 
@@ -628,21 +636,21 @@ adminRouter.get(
       const upcomingFilmRows = db
         .prepare<[string], ChallengeRow>(
           `SELECT dc.* FROM daily_challenges dc
-           WHERE dc.challenge_date > ? AND dc.media_type = 'film'
+           WHERE dc.challenge_date > ? AND dc.media_type = 'film' AND dc.is_active = 1
            ORDER BY dc.challenge_date ASC LIMIT 7`
         )
         .all(today);
       const upcomingSeriesRows = db
         .prepare<[string], ChallengeRow>(
           `SELECT dc.* FROM daily_challenges dc
-           WHERE dc.challenge_date > ? AND dc.media_type = 'series'
+           WHERE dc.challenge_date > ? AND dc.media_type = 'series' AND dc.is_active = 1
            ORDER BY dc.challenge_date ASC LIMIT 7`
         )
         .all(today);
       const upcomingWikiRows = db
         .prepare<[string], ChallengeRow>(
           `SELECT dc.* FROM daily_challenges dc
-           WHERE dc.challenge_date > ? AND dc.media_type = 'wiki'
+           WHERE dc.challenge_date > ? AND dc.media_type = 'wiki' AND dc.is_active = 1
            ORDER BY dc.challenge_date ASC LIMIT 7`
         )
         .all(today);
@@ -652,21 +660,21 @@ adminRouter.get(
         SELECT
           COUNT(*) AS total,
           SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.film_id = f.id) THEN 1 ELSE 0 END) AS unused,
-          (SELECT COUNT(*) FROM daily_challenges WHERE media_type = 'film') AS challenges
+          (SELECT COUNT(*) FROM daily_challenges WHERE media_type = 'film' AND is_active = 1) AS challenges
         FROM films f WHERE is_active = 1
       `).get() as { total: number; unused: number; challenges: number };
       const seriesCounts = db.prepare(`
         SELECT
           COUNT(*) AS total,
           SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.series_id = s.id) THEN 1 ELSE 0 END) AS unused,
-          (SELECT COUNT(*) FROM daily_challenges WHERE media_type = 'series') AS challenges
+          (SELECT COUNT(*) FROM daily_challenges WHERE media_type = 'series' AND is_active = 1) AS challenges
         FROM series s WHERE is_active = 1
       `).get() as { total: number; unused: number; challenges: number };
       const wikiCounts = db.prepare(`
         SELECT
           COUNT(*) AS total,
           SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.wiki_person_id = wp.id) THEN 1 ELSE 0 END) AS unused,
-          (SELECT COUNT(*) FROM daily_challenges WHERE media_type = 'wiki') AS challenges
+          (SELECT COUNT(*) FROM daily_challenges WHERE media_type = 'wiki' AND is_active = 1) AS challenges
         FROM wiki_persons wp WHERE is_active = 1
       `).get() as { total: number; unused: number; challenges: number };
 
@@ -1005,20 +1013,22 @@ adminRouter.delete(
         return;
       }
 
-      // Block deletion if film is referenced in any scheduled challenge
+      // Block deletion only if film has future active challenges
+      const todayForFilm = getTodayParis();
       const scheduled = db
-        .prepare<[number], { count: number }>(
-          `SELECT COUNT(*) as count FROM daily_challenges WHERE film_id = ?`
+        .prepare<[number, string], { count: number }>(
+          `SELECT COUNT(*) as count FROM daily_challenges WHERE film_id = ? AND challenge_date >= ? AND is_active = 1`
         )
-        .get(id);
+        .get(id, todayForFilm);
 
       if (scheduled && scheduled.count > 0) {
         res.status(409).json({
-          error: `Ce film est planifié sur ${scheduled.count} date(s). Retirez-le du planning avant de le supprimer.`,
+          error: `Ce film est planifié sur ${scheduled.count} date(s) à venir. Retirez-le du planning avant de le supprimer.`,
         });
         return;
       }
 
+      db.prepare(`UPDATE daily_challenges SET film_id = NULL WHERE film_id = ?`).run(id);
       db.prepare(`DELETE FROM films WHERE id = ?`).run(id);
 
       logAuditEvent('film.delete', { id });
@@ -1268,7 +1278,7 @@ adminRouter.get(
             : null;
       let query = `SELECT dc.* FROM daily_challenges dc`;
       const params: string[] = [];
-      const conditions: string[] = [];
+      const conditions: string[] = ['dc.is_active = 1'];
 
       if (from && to) {
         conditions.push(`dc.challenge_date BETWEEN ? AND ?`);
@@ -1338,9 +1348,9 @@ adminRouter.post(
 
       const mediaType = hasFilm ? 'film' : hasSeries ? 'series' : 'wiki';
 
-      // Check for existing challenge of same type on that date
+      // Check for existing active challenge of same type on that date
       const existing = db
-        .prepare(`SELECT id FROM daily_challenges WHERE challenge_date = ? AND media_type = ?`)
+        .prepare(`SELECT id FROM daily_challenges WHERE challenge_date = ? AND media_type = ? AND is_active = 1`)
         .get(date, mediaType);
 
       if (existing) {
@@ -1348,10 +1358,13 @@ adminRouter.post(
         return;
       }
 
-      // Challenge number is per media_type
+      // Remove any soft-deleted row for this slot to satisfy the UNIQUE constraint
+      db.prepare(`DELETE FROM daily_challenges WHERE challenge_date = ? AND media_type = ? AND is_active = 0`).run(date, mediaType);
+
+      // Challenge number = rank by challenge_date among active challenges of same type
       const maxNum = (
         db
-          .prepare(`SELECT COALESCE(MAX(challenge_number), 0) AS max_num FROM daily_challenges WHERE media_type = ?`)
+          .prepare(`SELECT COALESCE(MAX(challenge_number), 0) AS max_num FROM daily_challenges WHERE media_type = ? AND is_active = 1`)
           .get(mediaType) as { max_num: number }
       ).max_num;
 
@@ -1371,6 +1384,8 @@ adminRouter.post(
            VALUES (?, ?, ?, ?, ?, ?, ?)`
         )
         .run(date, mediaType, hasFilm ? film_id : null, hasSeries ? series_id : null, hasWiki ? wiki_person_id : null, maxNum + 1, hintSchedule);
+
+      renumberChallenges(mediaType as 'film' | 'series' | 'wiki');
 
       const created = db
         .prepare<[number], ChallengeRow>(`SELECT dc.* FROM daily_challenges dc WHERE dc.id = ?`)
@@ -1512,9 +1527,11 @@ adminRouter.delete(
         return;
       }
 
+      const row = db.prepare<[number], { media_type: string }>(`SELECT media_type FROM daily_challenges WHERE id = ?`).get(id)!;
       db.prepare(`UPDATE daily_challenges SET is_active = 0 WHERE id = ?`).run(id);
+      renumberChallenges(row.media_type as 'film' | 'series' | 'wiki');
       logAuditEvent('challenge.deactivate', { id });
-      res.json({ ok: true, id, message: 'Challenge deactivated (soft-delete). Use /restore to reactivate.' });
+      res.json({ ok: true, id });
     } catch (err) {
       next(err);
     }
@@ -2901,19 +2918,22 @@ adminRouter.delete(
         .get(id);
       if (!existing) { res.status(404).json({ error: 'Series not found.' }); return; }
 
+      const today = getTodayParis();
       const scheduled = db
-        .prepare<[number], { count: number }>(
-          `SELECT COUNT(*) as count FROM daily_challenges WHERE series_id = ?`
+        .prepare<[number, string], { count: number }>(
+          `SELECT COUNT(*) as count FROM daily_challenges WHERE series_id = ? AND challenge_date >= ? AND is_active = 1`
         )
-        .get(id);
+        .get(id, today);
 
       if (scheduled && scheduled.count > 0) {
         res.status(409).json({
-          error: `Cette série est planifiée sur ${scheduled.count} date(s). Retirez-la du planning avant de la supprimer.`,
+          error: `Cette série est planifiée sur ${scheduled.count} date(s) à venir. Retirez-la du planning avant de la supprimer.`,
         });
         return;
       }
 
+      // Nullify all challenge references to satisfy FK constraint before deleting
+      db.prepare(`UPDATE daily_challenges SET series_id = NULL WHERE series_id = ?`).run(id);
       db.prepare(`DELETE FROM series WHERE id = ?`).run(id);
       logAuditEvent('series.delete', { id });
       res.json({ ok: true, id });
@@ -3396,15 +3416,17 @@ adminRouter.delete('/wiki-persons/:id', strictAdminLimiter, (req: Request, res: 
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid wiki person id.' }); return }
     const existing = db.prepare<[number], Pick<WikiPersonRow, 'id'>>(`SELECT id FROM wiki_persons WHERE id = ?`).get(id)
     if (!existing) { res.status(404).json({ error: 'Wiki person not found.' }); return }
+    const todayForWiki = getTodayParis();
     const scheduled = db
-      .prepare<[number], { count: number }>(`SELECT COUNT(*) as count FROM daily_challenges WHERE wiki_person_id = ?`)
-      .get(id)
+      .prepare<[number, string], { count: number }>(`SELECT COUNT(*) as count FROM daily_challenges WHERE wiki_person_id = ? AND challenge_date >= ? AND is_active = 1`)
+      .get(id, todayForWiki)
     if (scheduled && scheduled.count > 0) {
       res.status(409).json({
-        error: `Cette personnalité est planifiée sur ${scheduled.count} date(s). Retire-la du planning avant suppression.`,
+        error: `Cette personnalité est planifiée sur ${scheduled.count} date(s) à venir. Retire-la du planning avant suppression.`,
       })
       return
     }
+    db.prepare(`UPDATE daily_challenges SET wiki_person_id = NULL WHERE wiki_person_id = ?`).run(id)
     const deleteRes = db.prepare(`DELETE FROM wiki_persons WHERE id = ?`).run(id)
     if (deleteRes.changes === 0) { res.status(404).json({ error: 'Wiki person not found.' }); return }
     logAuditEvent('wiki_person_deleted', { id })

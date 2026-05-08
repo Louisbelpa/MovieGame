@@ -105,7 +105,7 @@ function GameLayout({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
   return (
     <div className="app min-h-dvh flex flex-col bg-film-black text-film-text" data-mode={mode}>
       <Header mode={mode} />
-      <main id="main-content" className="flex-1">
+      <main id="main-content" className={`flex-1${mode === 'wiki' ? ' pb-10 sm:pb-14' : ''}`}>
         <GamePage mode={mode} />
       </main>
       <Footer />

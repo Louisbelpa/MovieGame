@@ -12,10 +12,10 @@ export function WikiChallengeImage({ imageUrl, isRevealed, className }: WikiChal
   return (
     <div
       className={cn(
-        'relative w-full overflow-hidden rounded-xl bg-film-gray motion-safe:transition-[aspect-ratio,max-height] duration-500 ease-out',
+        'relative w-full overflow-hidden rounded-xl bg-film-black motion-safe:transition-[max-height] duration-500 ease-out',
         isRevealed
-          ? 'h-auto aspect-[3/4] max-h-[min(62vh,580px)] sm:max-h-[min(68vh,680px)]'
-          : 'h-[148px] aspect-auto max-h-none sm:h-auto sm:aspect-[5/6] sm:max-h-[min(44vh,480px)]',
+          ? 'max-h-[45vh] sm:max-h-[52vh]'
+          : 'h-[130px] sm:h-[160px]',
         className
       )}
       style={{
@@ -30,7 +30,8 @@ export function WikiChallengeImage({ imageUrl, isRevealed, className }: WikiChal
             src={imageUrl}
             alt={isRevealed ? 'Portrait de la personnalité à deviner' : 'Ambiance visuelle (indice non exploitable)'}
             className={cn(
-              'w-full h-full object-cover object-[center_15%]',
+              'w-full h-full',
+          isRevealed ? 'object-contain object-center' : 'object-cover object-center',
               'scale-[1.12] motion-safe:transition-[filter,transform] duration-500 ease-out',
               isRevealed
                 ? 'blur-0 grayscale-0 brightness-100 contrast-100 scale-100'

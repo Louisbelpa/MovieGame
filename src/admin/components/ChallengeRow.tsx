@@ -431,29 +431,27 @@ export function ChallengeRow({
                 </button>
               )}
               {!past && (
-                <>
-                  <button
-                    onClick={() => setPicking((p) => !p)}
-                    title="Changer le contenu"
-                    disabled={mutating}
-                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-40"
-                  >
-                    <RefreshCw size={15} />
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    title="Supprimer"
-                    disabled={mutating}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"
-                  >
-                    {mutating ? (
-                      <span className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin block" />
-                    ) : (
-                      <Trash2 size={15} />
-                    )}
-                  </button>
-                </>
+                <button
+                  onClick={() => setPicking((p) => !p)}
+                  title="Changer le contenu"
+                  disabled={mutating}
+                  className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-40"
+                >
+                  <RefreshCw size={15} />
+                </button>
               )}
+              <button
+                onClick={handleDelete}
+                title="Supprimer"
+                disabled={mutating}
+                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"
+              >
+                {mutating ? (
+                  <span className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin block" />
+                ) : (
+                  <Trash2 size={15} />
+                )}
+              </button>
             </div>
           </>
         ) : (

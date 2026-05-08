@@ -15,8 +15,12 @@ import { fetchResult } from '@/api/client'
 import { fetchWikiResult } from '@/api/wikiClient'
 import type { HintPayload } from '@/api/client'
 import type { WikiChallengePayload, WikiHintPayload, WikiVisibleProfile } from '@/api/wikiClient'
-import { useGameStore } from '@/store/gameStore'
+import type { GuessEntry } from '@/types'
+import { useGameStore, getTodayParis } from '@/store/gameStore'
 import { useWikiStore } from '@/store/wikiStore'
+import { loadHistory } from '@/lib/storage'
+import { buildShareText } from '@/lib/utils'
+import { FEATURES } from '@/config/features'
 
 interface GamePageProps {
   mode: 'film' | 'series' | 'wiki'
@@ -25,6 +29,8 @@ interface GamePageProps {
 type SharedChallenge = {
   challengeId?: number
   id?: number
+  date?: string
+  challengeNumber?: number
   title?: string
   name?: string
   photoUrl?: string | null
@@ -52,12 +58,14 @@ function isWikiChallenge(challenge: SharedChallenge): challenge is SharedChallen
   return 'profile' in challenge
 }
 
-async function shareResult(mode: 'film' | 'series' | 'wiki', name: string, guesses: Array<{ correct: boolean }>) {
-  const attemptIndex = guesses.findIndex((guess) => guess.correct)
-  const solvedIn = attemptIndex >= 0 ? attemptIndex + 1 : guesses.length
-  const text = mode === 'wiki'
-    ? `WikiGuessr: ${name} trouvé en ${solvedIn} tentative(s).`
-    : `CinéGuessr: ${name} trouvé en ${solvedIn} tentative(s).`
+async function shareResult(
+  challengeId: string,
+  guesses: Array<{ status: 'correct' | 'wrong' | 'skipped' }>,
+  maxAttempts: number,
+  challengeNumber?: number,
+) {
+  const won = guesses.some((g) => g.status === 'correct')
+  const text = buildShareText(challengeId, guesses as GuessEntry[], won, maxAttempts, challengeNumber)
 
   if (navigator.share) {
     try {
@@ -281,7 +289,7 @@ export function GamePage({ mode }: GamePageProps) {
               <span className="inline-flex min-h-[44px] min-w-[44px]" aria-hidden />
             )}
           </div>
-          {!isWiki && <ModeTabs />}
+          <ModeTabs />
         </div>
 
         <div className="flex flex-col items-center justify-center min-h-[50vh] gap-2 text-center">
@@ -393,7 +401,7 @@ export function GamePage({ mode }: GamePageProps) {
             ← défis des jours précédents disponibles
           </p>
         )}
-        {!isWiki && <ModeTabs />}
+        <ModeTabs />
       </div>
       {!isWiki && (
         <MovieImage
@@ -504,6 +512,16 @@ export function GamePage({ mode }: GamePageProps) {
         />
       )}
 
+      {(() => {
+        const today = getTodayParis()
+        const allModes = [
+          { type: 'film' as const, path: '/films', enabled: true },
+          { type: 'series' as const, path: '/series', enabled: FEATURES.enableSeries },
+          { type: 'wiki' as const, path: '/wiki', enabled: FEATURES.enableWiki },
+        ]
+        const unplayedModes = allModes.filter(m => m.enabled && m.type !== mode && !loadHistory(m.type)[today])
+        return (
+          <>
       {status === 'won' && (
         <WinModal
           isOpen={ui.isModalOpen && ui.modalType === 'win'}
@@ -522,8 +540,9 @@ export function GamePage({ mode }: GamePageProps) {
             tmdbId: resultDetails?.tmdbId ?? null,
           }}
           stats={{ attemptsUsed: guesses.length, maxAttempts: challenge.maxAttempts, hintsRevealed }}
-          onShare={() => { void shareResult(mode, resolvedAnswerName ?? modalResultName, guesses) }}
+          onShare={() => { void shareResult(challenge.date ?? getTodayParis(), guessesForTracker, challenge.maxAttempts, challenge.challengeNumber) }}
           onOpenStats={() => openModal('stats')}
+          unplayedModes={unplayedModes}
         />
       )}
 
@@ -544,10 +563,14 @@ export function GamePage({ mode }: GamePageProps) {
             wikipediaUrl: resultDetails?.wikipediaUrl ?? (isWikiChallenge(challenge) ? challenge.wikipediaUrl ?? null : null),
           }}
           stats={{ attemptsUsed: guesses.length, maxAttempts: challenge.maxAttempts, hintsRevealed }}
-          onShare={() => { void shareResult(mode, resolvedAnswerName ?? modalResultName, guesses) }}
+          onShare={() => { void shareResult(challenge.date ?? getTodayParis(), guessesForTracker, challenge.maxAttempts, challenge.challengeNumber) }}
           onOpenStats={() => openModal('stats')}
+          unplayedModes={unplayedModes}
         />
       )}
+          </>
+        )
+      })()}
     </main>
   )
 }

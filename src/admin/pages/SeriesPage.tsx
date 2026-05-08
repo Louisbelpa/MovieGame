@@ -60,19 +60,24 @@ function ConfirmDeleteModal({
   onConfirm,
   onCancel,
   loading,
+  error,
 }: {
   series: AdminSeries
   onConfirm: () => void
   onCancel: () => void
   loading: boolean
+  error?: string | null
 }) {
   return (
     <Modal title="Supprimer la série" onClose={onCancel}>
-      <p className="text-sm text-gray-600 mb-6">
+      <p className="text-sm text-gray-600 mb-4">
         Êtes-vous sûr de vouloir supprimer{' '}
         <strong className="text-gray-900">« {series.title} »</strong> ? Cette
         action est irréversible.
       </p>
+      {error && (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">{error}</p>
+      )}
       <div className="flex justify-end gap-3">
         <button
           onClick={onCancel}
@@ -109,6 +114,7 @@ export function SeriesPage() {
   const [seriesList, setSeriesList] = useState<AdminSeries[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [modal, setModal] = useState<ModalState>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -196,12 +202,13 @@ export function SeriesPage() {
   async function handleDelete() {
     if (modal?.type !== 'delete') return
     setDeleteLoading(true)
+    setDeleteError(null)
     try {
       await deleteSeries(modal.series.id)
       setModal(null)
       load(page, search)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur')
+      setDeleteError(err instanceof Error ? err.message : 'Erreur')
     } finally {
       setDeleteLoading(false)
     }
@@ -285,7 +292,7 @@ export function SeriesPage() {
                     key={series.id}
                     series={series}
                     onEdit={(s) => setModal({ type: 'edit', series: s })}
-                    onDelete={(s) => setModal({ type: 'delete', series: s })}
+                    onDelete={(s) => { setDeleteError(null); setModal({ type: 'delete', series: s }) }}
                     onBackdrops={(s) => setModal({ type: 'backdrops', series: s })}
                     onUpload={handleUpload}
                   />
@@ -323,8 +330,9 @@ export function SeriesPage() {
         <ConfirmDeleteModal
           series={modal.series}
           onConfirm={handleDelete}
-          onCancel={() => setModal(null)}
+          onCancel={() => { setModal(null); setDeleteError(null) }}
           loading={deleteLoading}
+          error={deleteError}
         />
       )}
 

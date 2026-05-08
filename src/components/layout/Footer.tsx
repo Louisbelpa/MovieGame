@@ -233,13 +233,15 @@ export function Footer() {
           </div>
 
           {/* TMDB attribution */}
-          <div className="flex items-center justify-center gap-2 mb-2 text-xs text-film-text-dim">
-            <Film size={11} />
-            <span>
-              Ce produit utilise l'API TMDB mais n'est pas approuvé ou certifié par{' '}
-              <a href="https://www.themoviedb.org" target="_blank" rel="noopener noreferrer" className="underline hover:text-film-text-dim transition-colors">TMDB</a>.
-            </span>
-          </div>
+          {!isWikiPage && (
+            <div className="flex items-center justify-center gap-2 mb-2 text-xs text-film-text-dim">
+              <Film size={11} />
+              <span>
+                Ce produit utilise l'API TMDB mais n'est pas approuvé ou certifié par{' '}
+                <a href="https://www.themoviedb.org" target="_blank" rel="noopener noreferrer" className="underline hover:text-film-text-dim transition-colors">TMDB</a>.
+              </span>
+            </div>
+          )}
           {/* Wikipedia attribution */}
           {FEATURES.enableWiki && isWikiPage && (
             <div className="flex items-center justify-center gap-2 mb-3 text-xs text-film-text-dim">

@@ -280,7 +280,7 @@ export function createBaseGameStore<
         if (payload.challenge.isGameOver && viewingDate === null) {
           const outcome = payload.challenge.outcome === 'won' ? 'won' : 'lost'
           const challengeDate = payload.challenge.date
-          const type = config.mediaType as 'film' | 'series' | 'wiki'
+          const type = get().gameType
           addToHistory(challengeDate, outcome, type)
           const prev = loadStats(type)
           const mappedGuesses = payload.challenge.attempts.map((a) => ({

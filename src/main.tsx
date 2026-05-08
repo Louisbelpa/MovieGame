@@ -16,6 +16,29 @@ function setMeta(title: string, description: string) {
   if (el) el.setAttribute('content', description)
 }
 
+const hostname = window.location.hostname
+if (hostname === 'cineguessr.fr' || hostname === 'www.cineguessr.fr') {
+  const keys = ['cineguess:stats:film', 'cineguess:history:film', 'cineguess:rules_seen']
+  const data: Record<string, string> = {}
+  keys.forEach(k => { const v = localStorage.getItem(k); if (v) data[k] = v })
+  const encoded = btoa(JSON.stringify(data))
+  window.location.replace(`https://guesstoday.fr/?migrate=${encoded}`)
+} else {
+  const params = new URLSearchParams(window.location.search)
+  const migrationData = params.get('migrate')
+  if (migrationData) {
+    try {
+      const data = JSON.parse(atob(migrationData)) as Record<string, string>
+      Object.entries(data).forEach(([key, value]) => {
+        if (!localStorage.getItem(key)) localStorage.setItem(key, value)
+      })
+    } catch {}
+    params.delete('migrate')
+    const clean = [window.location.pathname, params.toString()].filter(Boolean).join('?')
+    window.history.replaceState({}, '', clean)
+  }
+}
+
 const root = document.getElementById('root')!
 const path = window.location.pathname
 

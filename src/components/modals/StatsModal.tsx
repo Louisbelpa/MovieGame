@@ -51,7 +51,7 @@ export function StatsModal({
 
         <div>
           <p className="text-sm font-semibold text-film-text-dim uppercase tracking-wider mb-3">
-            Distribution des victoires
+            Résultats de la communauté
           </p>
           <DistributionChart distribution={globalStats.winsByAttempt} />
         </div>

@@ -118,7 +118,7 @@ export function getTodayChallenge(type: 'film' | 'series' = 'film'): ChallengeRo
   const today = getTodayParis();
   const row = db
     .prepare<[string, string], ChallengeRow>(
-      `SELECT * FROM daily_challenges WHERE challenge_date = ? AND media_type = ?`
+      `SELECT * FROM daily_challenges WHERE challenge_date = ? AND media_type = ? AND is_active = 1`
     ).get(today, type);
   if (!row) throw Object.assign(new Error(`No ${type} challenge scheduled`), { status: 404 });
   return row;
@@ -137,7 +137,7 @@ export function getChallengeById(id: number): ChallengeRow {
 export function getChallengeByDate(date: string, type: 'film' | 'series' = 'film'): ChallengeRow {
   const row = db
     .prepare<[string, string], ChallengeRow>(
-      `SELECT * FROM daily_challenges WHERE challenge_date = ? AND media_type = ?`
+      `SELECT * FROM daily_challenges WHERE challenge_date = ? AND media_type = ? AND is_active = 1`
     ).get(date, type);
   if (!row) throw Object.assign(new Error(`No ${type} challenge for ${date}`), { status: 404 });
   return row;

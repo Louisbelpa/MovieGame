@@ -12,8 +12,8 @@ export default defineConfig(({ mode }) => {
   const siteUrl = enableSeries ? 'https://guesstoday.fr' : 'https://cineguessr.fr'
   const brandName = enableSeries ? 'GuessToday' : 'CinéGuessr'
   const siteDesc = enableSeries
-    ? 'Devine le film, la série ou la personnalité mystère du jour. Un nouveau défi chaque jour.'
-    : 'Devine le film mystère du jour. Un nouveau défi cinéma chaque jour.'
+    ? 'GuessToday : devine chaque jour un film, une série ou une personnalité mystère. Jeu quotidien gratuit, style Wordle.'
+    : 'CinéGuessr : devine le film mystère du jour grâce aux indices. Jeu quotidien gratuit, style Wordle cinéma.'
 
   return {
   define: {
@@ -39,9 +39,10 @@ export default defineConfig(({ mode }) => {
         if (enableSeriesFeature) routes.push('/series')
         if (enableWiki) routes.push('/wiki')
 
+        const today = new Date().toISOString().slice(0, 10)
         const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${routes.map(r => `  <url>\n    <loc>${siteUrl}${r}</loc>\n    <changefreq>daily</changefreq>\n    <priority>${r === '/films' ? '1.0' : '0.9'}</priority>\n  </url>`).join('\n')}
+${routes.map(r => `  <url>\n    <loc>${siteUrl}${r}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>${r === '/films' ? '1.0' : '0.9'}</priority>\n  </url>`).join('\n')}
 </urlset>\n`
 
         const robots = `User-agent: *\nDisallow: /admin\nDisallow: /api/\n\nSitemap: ${siteUrl}/sitemap.xml\n`
