@@ -31,7 +31,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export function createApp(): express.Application {
   const app = express();
 
-  const allowedOrigins = (process.env.CORS_ORIGIN ?? '').split(',').map(o => o.trim()).filter(Boolean);
+  const allowedOrigins = (process.env.CORS_ORIGIN ?? '')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean)
+    .map(o => o.startsWith('http') ? o : `https://${o}`);
 
   app.set('trust proxy', 1);
   app.use(requestIdMiddleware);
@@ -62,6 +66,15 @@ export function createApp(): express.Application {
   app.use(express.urlencoded({ limit: '1mb', extended: true }));
   app.use(cookieParser(process.env.COOKIE_SECRET ?? 'dev_secret'));
 
+  // Static files before CORS — same-origin assets don't need CORS headers
+  app.use('/assets', express.static(path.join(__dirname, '../public/assets'), { maxAge: '1y', immutable: true }));
+  app.use(express.static(path.join(__dirname, '../public'), {
+    maxAge: '1d',
+    setHeaders(res, filePath) {
+      if (filePath.endsWith('index.html')) res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    },
+  }));
+
   app.use(cors({
     origin: (origin, callback) => {
       if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) callback(null, true);
@@ -74,14 +87,6 @@ export function createApp(): express.Application {
   app.use('/api', createRateLimiter({
     max: parseInt(process.env.API_RATE_LIMIT_MAX ?? '600', 10),
     windowMs: parseInt(process.env.API_RATE_LIMIT_WINDOW_MS ?? '60000', 10),
-  }));
-
-  app.use('/assets', express.static(path.join(__dirname, '../public/assets'), { maxAge: '1y', immutable: true }));
-  app.use(express.static(path.join(__dirname, '../public'), {
-    maxAge: '1d',
-    setHeaders(res, filePath) {
-      if (filePath.endsWith('index.html')) res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    },
   }));
 
   app.use('/api/challenge', challengeRouter);
