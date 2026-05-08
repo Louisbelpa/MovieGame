@@ -19,6 +19,22 @@ const schema = fs.readFileSync(schemaPath, 'utf-8');
 console.log('Running migrations…');
 db.exec(schema);
 
+// ─── Schema migrations tracking table ────────────────────────────────────────
+db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT NOT NULL UNIQUE,
+  applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+)`);
+
+function isApplied(name: string): boolean {
+  const row = db.prepare(`SELECT 1 FROM schema_migrations WHERE name = ?`).get(name);
+  return row != null;
+}
+
+function markApplied(name: string) {
+  db.prepare(`INSERT OR IGNORE INTO schema_migrations (name) VALUES (?)`).run(name);
+}
+
 // Incremental migrations — safe to re-run (guarded by try/catch)
 const incremental: { name: string; sql: string }[] = [
   {
@@ -88,10 +104,247 @@ const incremental: { name: string; sql: string }[] = [
     name: 'create_daily_challenges_idx_series_id',
     sql: `CREATE INDEX IF NOT EXISTS idx_daily_challenges_series_id ON daily_challenges (series_id)`,
   },
+  {
+    name: 'create_wiki_persons',
+    sql: `CREATE TABLE IF NOT EXISTS wiki_persons (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      name            TEXT NOT NULL,
+      name_lower      TEXT NOT NULL GENERATED ALWAYS AS (lower(name)) STORED,
+      name_aliases    TEXT NOT NULL DEFAULT '[]',
+      person_type     TEXT NOT NULL DEFAULT 'politician' CHECK (person_type IN ('politician','sportsperson','artist','scientist','entrepreneur','writer','historical_figure')),
+      wikipedia_slug  TEXT NOT NULL UNIQUE,
+      infobox_data    TEXT NOT NULL DEFAULT '{}',
+      hint_schedule   TEXT NOT NULL DEFAULT '[]',
+      photo_url       TEXT,
+      extract         TEXT,
+      wikipedia_url   TEXT,
+      difficulty      INTEGER NOT NULL DEFAULT 3 CHECK (difficulty BETWEEN 1 AND 5),
+      is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+      created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    )`,
+  },
+  {
+    name: 'create_wiki_persons_idx_name_lower',
+    sql: `CREATE INDEX IF NOT EXISTS idx_wiki_persons_name_lower ON wiki_persons (name_lower)`,
+  },
+  {
+    name: 'create_wiki_persons_idx_person_type',
+    sql: `CREATE INDEX IF NOT EXISTS idx_wiki_persons_person_type ON wiki_persons (person_type)`,
+  },
+  {
+    name: 'create_wiki_persons_idx_is_active',
+    sql: `CREATE INDEX IF NOT EXISTS idx_wiki_persons_is_active ON wiki_persons (is_active)`,
+  },
+  {
+    name: 'create_wiki_global_stats',
+    sql: `CREATE TABLE IF NOT EXISTS wiki_global_stats (
+      id            INTEGER PRIMARY KEY CHECK (id = 1),
+      total_games   INTEGER NOT NULL DEFAULT 0,
+      total_wins    INTEGER NOT NULL DEFAULT 0,
+      total_losses  INTEGER NOT NULL DEFAULT 0,
+      wins_by_attempt TEXT NOT NULL DEFAULT '{"1":0,"2":0,"3":0,"4":0,"5":0}',
+      last_updated  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    )`,
+  },
+  {
+    name: 'seed_wiki_global_stats',
+    sql: `INSERT OR IGNORE INTO wiki_global_stats (id) VALUES (1)`,
+  },
+  {
+    name: 'create_active_admin_tokens',
+    sql: `CREATE TABLE IF NOT EXISTS active_admin_tokens (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      token_hash TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      expires_at TEXT NOT NULL,
+      revoked_at TEXT
+    )`,
+  },
+  {
+    name: 'create_active_admin_tokens_idx_hash',
+    sql: `CREATE INDEX IF NOT EXISTS idx_admin_tokens_hash ON active_admin_tokens (token_hash)`,
+  },
+  {
+    name: 'add_is_active_to_daily_challenges',
+    sql: `ALTER TABLE daily_challenges ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))`,
+  },
+  {
+    name: 'create_daily_challenges_idx_is_active',
+    sql: `CREATE INDEX IF NOT EXISTS idx_daily_challenges_is_active ON daily_challenges (is_active)`,
+  },
+  {
+    name: 'create_sparql_cache',
+    sql: `CREATE TABLE IF NOT EXISTS sparql_cache (
+      key        TEXT NOT NULL PRIMARY KEY,
+      slugs_json TEXT NOT NULL,
+      expires_at INTEGER NOT NULL
+    )`,
+  },
+  {
+    name: 'create_wiki_prefetch_pool',
+    sql: `CREATE TABLE IF NOT EXISTS wiki_prefetch_pool (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      lang          TEXT NOT NULL,
+      min_fame      INTEGER NOT NULL,
+      source_slug   TEXT NOT NULL,
+      resolved_slug TEXT,
+      status        TEXT NOT NULL DEFAULT 'processing' CHECK (status IN ('processing','ready','failed')),
+      payload_json  TEXT,
+      error_message TEXT,
+      expires_at    INTEGER NOT NULL,
+      created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      UNIQUE(lang, min_fame, source_slug)
+    )`,
+  },
+  {
+    name: 'create_wiki_prefetch_pool_idx_status',
+    sql: `CREATE INDEX IF NOT EXISTS idx_wiki_prefetch_pool_status ON wiki_prefetch_pool (lang, min_fame, status, expires_at)`,
+  },
+  {
+    name: 'create_wiki_prefetch_pool_idx_updated_at',
+    sql: `CREATE INDEX IF NOT EXISTS idx_wiki_prefetch_pool_updated_at ON wiki_prefetch_pool (updated_at)`,
+  },
+  {
+    name: 'create_app_settings',
+    sql: `CREATE TABLE IF NOT EXISTS app_settings (
+      key        TEXT NOT NULL PRIMARY KEY,
+      value      TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    )`,
+  },
+  {
+    name: 'seed_wiki_prefetch_enabled',
+    sql: `INSERT OR IGNORE INTO app_settings (key, value) VALUES ('wiki_prefetch_enabled', '1')`,
+  },
 ]
 
 // Multi-statement migrations that need db.exec() rather than db.prepare().run()
 const multiStatement: { name: string; sql: string }[] = [
+  {
+    name: 'expand_wiki_person_type_values',
+    sql: `
+      PRAGMA foreign_keys = OFF;
+      DROP TABLE IF EXISTS wiki_persons_v2;
+      CREATE TABLE wiki_persons_v2 (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        name            TEXT NOT NULL,
+        name_lower      TEXT NOT NULL GENERATED ALWAYS AS (lower(name)) STORED,
+        name_aliases    TEXT NOT NULL DEFAULT '[]',
+        person_type     TEXT NOT NULL DEFAULT 'politician' CHECK (person_type IN ('politician','sportsperson','artist','scientist','entrepreneur','writer','historical_figure')),
+        wikipedia_slug  TEXT NOT NULL UNIQUE,
+        infobox_data    TEXT NOT NULL DEFAULT '{}',
+        hint_schedule   TEXT NOT NULL DEFAULT '[]',
+        photo_url       TEXT,
+        extract         TEXT,
+        wikipedia_url   TEXT,
+        difficulty      INTEGER NOT NULL DEFAULT 3 CHECK (difficulty BETWEEN 1 AND 5),
+        is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+      INSERT OR IGNORE INTO wiki_persons_v2
+        (id, name, name_aliases, person_type, wikipedia_slug, infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty, is_active, created_at, updated_at)
+        SELECT id, name, name_aliases, person_type, wikipedia_slug, infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty, is_active, created_at, updated_at
+        FROM wiki_persons;
+      DROP TABLE wiki_persons;
+      ALTER TABLE wiki_persons_v2 RENAME TO wiki_persons;
+      CREATE INDEX IF NOT EXISTS idx_wiki_persons_name_lower ON wiki_persons (name_lower);
+      CREATE INDEX IF NOT EXISTS idx_wiki_persons_person_type ON wiki_persons (person_type);
+      CREATE INDEX IF NOT EXISTS idx_wiki_persons_is_active ON wiki_persons (is_active);
+      PRAGMA foreign_keys = ON;
+    `,
+  },
+  {
+    name: 'add_wiki_person_id_to_daily_challenges',
+    sql: `
+      PRAGMA foreign_keys = OFF;
+      DROP TABLE IF EXISTS daily_challenges_v3;
+      CREATE TABLE daily_challenges_v3 (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        challenge_date   TEXT NOT NULL,
+        media_type       TEXT NOT NULL DEFAULT 'film' CHECK (media_type IN ('film','series','wiki')),
+        film_id          INTEGER REFERENCES films(id) ON DELETE RESTRICT,
+        series_id        INTEGER REFERENCES series(id) ON DELETE RESTRICT,
+        wiki_person_id   INTEGER REFERENCES wiki_persons(id) ON DELETE RESTRICT,
+        challenge_number INTEGER NOT NULL,
+        hint_schedule    TEXT NOT NULL DEFAULT '["year","director","cast"]',
+        created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+        UNIQUE (challenge_date, media_type)
+      );
+      INSERT OR IGNORE INTO daily_challenges_v3
+        (id, challenge_date, media_type, film_id, series_id, wiki_person_id, challenge_number, hint_schedule, created_at)
+        SELECT id, challenge_date, media_type, film_id, series_id, NULL, challenge_number, hint_schedule, created_at
+        FROM daily_challenges;
+      DROP TABLE daily_challenges;
+      ALTER TABLE daily_challenges_v3 RENAME TO daily_challenges;
+      CREATE INDEX IF NOT EXISTS idx_daily_challenges_date          ON daily_challenges (challenge_date);
+      CREATE INDEX IF NOT EXISTS idx_daily_challenges_film_id       ON daily_challenges (film_id);
+      CREATE INDEX IF NOT EXISTS idx_daily_challenges_series_id     ON daily_challenges (series_id);
+      CREATE INDEX IF NOT EXISTS idx_daily_challenges_wiki_person_id ON daily_challenges (wiki_person_id);
+      CREATE INDEX IF NOT EXISTS idx_daily_challenges_media_type    ON daily_challenges (media_type);
+      PRAGMA foreign_keys = ON;
+    `,
+  },
+  {
+    name: 'create_trg_wiki_session_finished',
+    sql: `
+      CREATE TRIGGER IF NOT EXISTS trg_wiki_session_finished
+      AFTER UPDATE OF outcome ON game_sessions
+      WHEN NEW.outcome IS NOT NULL AND OLD.outcome IS NULL
+        AND EXISTS (
+          SELECT 1 FROM daily_challenges dc
+          WHERE dc.id = NEW.challenge_id AND dc.media_type = 'wiki'
+        )
+      BEGIN
+        UPDATE wiki_global_stats SET
+          total_games     = total_games + 1,
+          total_wins      = total_wins  + (CASE WHEN NEW.outcome = 'won' THEN 1 ELSE 0 END),
+          total_losses    = total_losses + (CASE WHEN NEW.outcome = 'lost' THEN 1 ELSE 0 END),
+          wins_by_attempt = CASE WHEN NEW.outcome = 'won' THEN
+            json_set(wins_by_attempt, '$.' || CAST(json_array_length(NEW.attempts) AS TEXT),
+              COALESCE(json_extract(wins_by_attempt, '$.' || CAST(json_array_length(NEW.attempts) AS TEXT)), 0) + 1)
+          ELSE wins_by_attempt END,
+          last_updated    = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+        WHERE id = 1;
+      END
+    `,
+  },
+  {
+    name: 'add_generic_to_wiki_person_types',
+    sql: `
+      PRAGMA foreign_keys = OFF;
+      DROP TABLE IF EXISTS wiki_persons_v3;
+      CREATE TABLE wiki_persons_v3 (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        name            TEXT NOT NULL,
+        name_lower      TEXT NOT NULL GENERATED ALWAYS AS (lower(name)) STORED,
+        name_aliases    TEXT NOT NULL DEFAULT '[]',
+        person_type     TEXT NOT NULL DEFAULT 'generic' CHECK (person_type IN ('politician','sportsperson','artist','scientist','entrepreneur','writer','historical_figure','generic')),
+        wikipedia_slug  TEXT NOT NULL UNIQUE,
+        infobox_data    TEXT NOT NULL DEFAULT '{}',
+        hint_schedule   TEXT NOT NULL DEFAULT '[]',
+        photo_url       TEXT,
+        extract         TEXT,
+        wikipedia_url   TEXT,
+        difficulty      INTEGER NOT NULL DEFAULT 3 CHECK (difficulty BETWEEN 1 AND 5),
+        is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+      INSERT OR IGNORE INTO wiki_persons_v3
+        (id, name, name_aliases, person_type, wikipedia_slug, infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty, is_active, created_at, updated_at)
+        SELECT id, name, name_aliases, person_type, wikipedia_slug, infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty, is_active, created_at, updated_at
+        FROM wiki_persons;
+      DROP TABLE wiki_persons;
+      ALTER TABLE wiki_persons_v3 RENAME TO wiki_persons;
+      CREATE INDEX IF NOT EXISTS idx_wiki_persons_name_lower ON wiki_persons (name_lower);
+      CREATE INDEX IF NOT EXISTS idx_wiki_persons_person_type ON wiki_persons (person_type);
+      CREATE INDEX IF NOT EXISTS idx_wiki_persons_is_active ON wiki_persons (is_active);
+      PRAGMA foreign_keys = ON;
+    `,
+  },
   {
     name: 'add_media_type_to_daily_challenges',
     // Recreates daily_challenges with a media_type column and UNIQUE(date,type)
@@ -127,26 +380,60 @@ const multiStatement: { name: string; sql: string }[] = [
   },
 ]
 
+// ─── Incremental migrations (single-statement, idempotent) ───────────────────
+
 for (const { name, sql } of incremental) {
+  if (isApplied(name)) {
+    console.log(`  – ${name} (already applied)`)
+    continue
+  }
   try {
     db.prepare(sql).run()
+    markApplied(name)
     console.log(`  ✓ ${name}`)
   } catch {
-    // column already exists — ignore
+    // column/index already exists on a DB that predates schema_migrations — mark as applied
+    markApplied(name)
   }
 }
 
+// ─── Multi-statement migrations (wrapped in transactions) ────────────────────
+
 for (const { name, sql } of multiStatement) {
+  if (isApplied(name)) {
+    console.log(`  – ${name} (already applied)`)
+    continue
+  }
+
+  // Legacy idempotency guards for DBs that predate schema_migrations tracking
+  const cols = db.prepare(`PRAGMA table_info(daily_challenges)`).all() as { name: string }[]
+  if (name === 'add_media_type_to_daily_challenges' && cols.some((c) => c.name === 'media_type')) {
+    markApplied(name); continue
+  }
+  if (name === 'add_wiki_person_id_to_daily_challenges' && cols.some((c) => c.name === 'wiki_person_id')) {
+    markApplied(name); continue
+  }
+  if (name === 'create_trg_wiki_session_finished') {
+    const triggers = db.prepare(`SELECT name FROM sqlite_master WHERE type='trigger' AND name='trg_wiki_session_finished'`).all()
+    if (triggers.length > 0) { markApplied(name); continue }
+  }
+  if (name === 'expand_wiki_person_type_values') {
+    const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='wiki_persons'`).get() as { sql?: string } | undefined
+    const tableSql = row?.sql ?? ''
+    if (tableSql.includes("'artist'") && tableSql.includes("'historical_figure'")) { markApplied(name); continue }
+  }
+  if (name === 'add_generic_to_wiki_person_types') {
+    const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='wiki_persons'`).get() as { sql?: string } | undefined
+    const tableSql = row?.sql ?? ''
+    if (tableSql.includes("'generic'")) { markApplied(name); continue }
+  }
+
   try {
-    // Only run if media_type column doesn't exist yet
-    const cols = db.prepare(`PRAGMA table_info(daily_challenges)`).all() as { name: string }[]
-    if (cols.some((c) => c.name === 'media_type')) {
-      continue
-    }
-    db.exec(sql)
+    db.transaction(() => { db.exec(sql) })()
+    markApplied(name)
     console.log(`  ✓ ${name}`)
   } catch (err) {
-    console.error(`  ✗ ${name}:`, err)
+    console.error(`  ✗ ${name} — rolled back:`, err)
   }
 }
 

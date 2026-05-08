@@ -24,13 +24,12 @@ export function MovieImage({ imageUrl, attempt, className }: MovieImageProps) {
         border: '1px solid var(--mode-ring)',
         boxShadow: '0 0 0 4px var(--mode-soft)',
       }}
-      aria-label={`Image du film, tentative ${attempt}`}
     >
       {imageUrl ? (
         <motion.img
           key={imageUrl}
           src={imageUrl}
-          alt="Extrait du film à deviner"
+          alt={`Extrait du film à deviner, tentative ${attempt}`}
           className="w-full h-full object-cover"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -38,7 +37,7 @@ export function MovieImage({ imageUrl, attempt, className }: MovieImageProps) {
           draggable={false}
         />
       ) : (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3" role="img" aria-label="Image du film masquée">
           <FilmStripIcon />
           <p className="text-film-text-dim text-sm">Image révélée à la fin</p>
         </div>

@@ -8,6 +8,8 @@ import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { useGameStore, getTodayParis } from '@/store/gameStore'
 import { fetchChallengeDates } from '@/api/client'
+import { fetchWikiChallengeDates } from '@/api/wikiClient'
+import { useWikiStore } from '@/store/wikiStore'
 import { loadHistory, loadStats } from '@/lib/storage'
 
 type DayStatus = 'won' | 'lost' | 'available' | 'none'
@@ -19,15 +21,10 @@ function weekdayOffset(iso: string): number {
 }
 
 /** All ISO dates in a YYYY-MM that are ≤ today */
-function daysForMonth(ym: string, today: string): string[] {
+function daysForMonth(ym: string): string[] {
   const [y, m] = ym.split('-').map(Number)
   const count = new Date(y, m, 0).getDate()
-  const days: string[] = []
-  for (let d = 1; d <= count; d++) {
-    const iso = `${ym}-${String(d).padStart(2, '0')}`
-    if (iso <= today) days.push(iso)
-  }
-  return days
+  return Array.from({ length: count }, (_, i) => `${ym}-${String(i + 1).padStart(2, '0')}`)
 }
 
 function prevMonth(ym: string): string {
@@ -50,14 +47,42 @@ function monthLabel(ym: string): string {
   })
 }
 
-const DOW = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+const DOW = [
+  { short: 'L', full: 'Lundi' },
+  { short: 'M', full: 'Mardi' },
+  { short: 'M', full: 'Mercredi' },
+  { short: 'J', full: 'Jeudi' },
+  { short: 'V', full: 'Vendredi' },
+  { short: 'S', full: 'Samedi' },
+  { short: 'D', full: 'Dimanche' },
+]
 
-export function ArchiveModal() {
-  const isOpen = useGameStore((s) => s.ui.isModalOpen && s.ui.modalType === 'archive')
-  const closeModal = useGameStore((s) => s.closeModal)
-  const loadDate = useGameStore((s) => s.loadDate)
-  const viewingDate = useGameStore((s) => s.viewingDate)
+type ArchiveMode = 'classic' | 'wiki'
+
+type ArchiveModalProps = {
+  mode?: ArchiveMode
+  challenges?: string[]
+}
+
+export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps) {
+  const modalTitleId = 'modal-title'
+  const modalDescId = 'modal-desc'
+  const gameUi = useGameStore((s) => s.ui)
+  const gameCloseModal = useGameStore((s) => s.closeModal)
+  const gameLoadDate = useGameStore((s) => s.loadDate)
+  const gameViewingDate = useGameStore((s) => s.viewingDate)
   const gameType = useGameStore((s) => s.gameType)
+
+  const wikiUi = useWikiStore((s) => s.ui)
+  const wikiCloseModal = useWikiStore((s) => s.closeModal)
+  const wikiLoadDate = useWikiStore((s) => s.loadDate)
+  const wikiViewingDate = useWikiStore((s) => s.viewingDate)
+
+  const isWiki = mode === 'wiki'
+  const isOpen = isWiki ? (wikiUi.isModalOpen && wikiUi.modalType === 'archive') : (gameUi.isModalOpen && gameUi.modalType === 'archive')
+  const closeModal = isWiki ? wikiCloseModal : gameCloseModal
+  const loadDate = isWiki ? wikiLoadDate : gameLoadDate
+  const viewingDate = isWiki ? wikiViewingDate : gameViewingDate
 
   const [challengeDates, setChallengeDates] = useState<Set<string>>(new Set())
   const [history, setHistory] = useState<Record<string, 'won' | 'lost'>>({})
@@ -71,13 +96,16 @@ export function ArchiveModal() {
     if (!isOpen) return
     setDisplayYM(todayYM)
     setLoading(true)
-    fetchChallengeDates(365, gameType)
+    const datesPromise = challenges
+      ? Promise.resolve({ dates: challenges })
+      : (isWiki ? fetchWikiChallengeDates(365) : fetchChallengeDates(365, gameType === 'series' ? 'series' : 'film'))
+    datesPromise
       .then(({ dates }) => {
         setChallengeDates(new Set(dates))
         // Historique local
-        let hist = loadHistory()
+        let hist = loadHistory(isWiki ? 'wiki' : undefined)
         // Toujours compléter le jour courant si lastPlayedDate correspond à aujourd'hui
-        const stats = loadStats()
+        const stats = loadStats(isWiki ? 'wiki' : undefined)
         if (stats.lastPlayedDate === today) {
           hist[today] = (stats.lastWonDate === today) ? 'won' : 'lost'
         }
@@ -90,10 +118,10 @@ export function ArchiveModal() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [isOpen, todayYM, gameType])
+  }, [challenges, gameType, isOpen, isWiki, today, todayYM])
 
   const activeDate = viewingDate ?? today
-  const days = daysForMonth(displayYM, today)
+  const days = daysForMonth(displayYM)
 
   // Earliest month that has a challenge
   const earliestYM = challengeDates.size > 0
@@ -109,50 +137,67 @@ export function ArchiveModal() {
   }
 
   // Month stats
-  const played  = days.filter((d) => status(d) === 'won' || status(d) === 'lost').length
-  const won     = days.filter((d) => status(d) === 'won').length
-  const total   = days.filter((d) => status(d) !== 'none').length
+  const pastDays = days.filter((d) => d <= today)
+  const played  = pastDays.filter((d) => status(d) === 'won' || status(d) === 'lost').length
+  const won     = pastDays.filter((d) => status(d) === 'won').length
+  const total   = pastDays.filter((d) => status(d) !== 'none').length
 
   function handleDay(date: string) {
-    if (status(date) === 'none') return
+    if (date > today || status(date) === 'none') return
     closeModal()
     loadDate(date)
   }
 
+  const monthNav = (
+    <div className="flex items-center gap-3">
+      <button
+        onClick={() => setDisplayYM(prevMonth(displayYM))}
+        disabled={!canPrev || loading}
+        aria-label="Mois précédent"
+        className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+      >
+        <ChevronLeft size={20} aria-hidden />
+      </button>
+
+      <div className="text-center min-w-0">
+        <p className="font-title font-semibold text-film-text capitalize truncate">
+          {monthLabel(displayYM)}
+        </p>
+        {!loading && total > 0 && (
+          <p className="text-xs text-film-text-dim">
+            {played}/{total} joué{played > 1 ? 's' : ''}
+            {played > 0 && ` · ${won} victoire${won > 1 ? 's' : ''}`}
+          </p>
+        )}
+      </div>
+
+      <button
+        onClick={() => setDisplayYM(nextMonth(displayYM))}
+        disabled={!canNext || loading}
+        aria-label="Mois suivant"
+        className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+      >
+        <ChevronRight size={20} aria-hidden />
+      </button>
+    </div>
+  )
+
   return (
-    <Modal isOpen={isOpen} onClose={closeModal}>
+    <Modal
+      isOpen={isOpen}
+      onClose={closeModal}
+      ariaLabel={isWiki ? 'Archives des défis WikiGuessr' : 'Archives des défis'}
+      ariaLabelledBy={modalTitleId}
+      ariaDescribedBy={modalDescId}
+      headerContent={monthNav}
+    >
       <div className="flex flex-col gap-4">
-
-        {/* ── Month navigation ── */}
-        <div className="flex items-center justify-between gap-2">
-          <button
-            onClick={() => setDisplayYM(prevMonth(displayYM))}
-            disabled={!canPrev || loading}
-            className="p-1.5 rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer"
-          >
-            <ChevronLeft size={18} />
-          </button>
-
-          <div className="text-center min-w-0">
-            <p className="font-title font-semibold text-film-text capitalize truncate">
-              {monthLabel(displayYM)}
-            </p>
-            {!loading && total > 0 && (
-              <p className="text-[11px] text-film-text-dim">
-                {played}/{total} joué{played > 1 ? 's' : ''}
-                {played > 0 && ` · ${won} victoire${won > 1 ? 's' : ''}`}
-              </p>
-            )}
-          </div>
-
-          <button
-            onClick={() => setDisplayYM(nextMonth(displayYM))}
-            disabled={!canNext || loading}
-            className="p-1.5 rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer"
-          >
-            <ChevronRight size={18} />
-          </button>
-        </div>
+        <p id={modalTitleId} className="sr-only">
+          {isWiki ? 'Archives des défis WikiGuessr' : 'Archives des défis'}
+        </p>
+        <p id={modalDescId} className="sr-only">
+          Navigation par mois et sélection d'une date de défi.
+        </p>
 
         {/* ── Calendar ── */}
         {loading ? (
@@ -164,8 +209,8 @@ export function ArchiveModal() {
             {/* Day-of-week header */}
             <div className="grid grid-cols-7 gap-1 mb-1">
               {DOW.map((d, i) => (
-                <div key={i} className="text-center text-[10px] text-film-text-dim font-medium py-1">
-                  {d}
+                <div key={i} className="text-center text-xs text-film-text-dim font-medium py-1">
+                  <abbr title={d.full}>{d.short}</abbr>
                 </div>
               ))}
             </div>
@@ -179,20 +224,24 @@ export function ArchiveModal() {
                 const s = status(date)
                 const day = parseInt(date.slice(8), 10)
                 const isActive = date === activeDate
+                const isFuture = date > today
 
                 return (
                   <button
                     key={date}
                     onClick={() => handleDay(date)}
-                    disabled={s === 'none'}
-                    title={s !== 'none' ? `Défi du ${date}` : undefined}
+                    disabled={s === 'none' || isFuture}
+                    title={isFuture ? undefined : s !== 'none' ? `Défi du ${date}` : undefined}
+                    aria-label={isFuture ? `${date} - pas encore disponible` : s !== 'none' ? `Défi du ${date}, ${s === 'won' ? 'gagné' : s === 'lost' ? 'perdu' : 'à jouer'}` : `${date} - aucun défi`}
                     className={[
-                      'aspect-square rounded-lg text-xs font-medium transition-all leading-none flex items-center justify-center',
-                      s === 'none'   ? 'text-film-text-dim/20 cursor-default' : 'cursor-pointer',
-                      s === 'won'    ? 'bg-film-green/20 text-film-green hover:bg-film-green/30 border border-film-green/30' : '',
-                      s === 'lost'   ? 'bg-film-red/20 text-film-red hover:bg-film-red/30 border border-film-red/30' : '',
-                      s === 'available' ? 'bg-film-gold/15 text-film-gold hover:bg-film-gold/25 border border-film-gold/30' : '',
-                      isActive && s !== 'none' ? 'ring-2 ring-film-gold ring-offset-1 ring-offset-film-black' : '',
+                      'aspect-square rounded-lg text-xs font-medium transition-all leading-none flex items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold',
+                      isFuture      ? 'text-film-text-dim/20 cursor-default' : '',
+                      !isFuture && s === 'none'   ? 'text-film-text-dim/20 cursor-default' : '',
+                      !isFuture && s !== 'none'   ? 'cursor-pointer' : '',
+                      !isFuture && s === 'won'    ? 'bg-film-green/20 text-film-green hover:bg-film-green/30 border border-film-green/30' : '',
+                      !isFuture && s === 'lost'   ? 'bg-film-red/20 text-film-red hover:bg-film-red/30 border border-film-red/30' : '',
+                      !isFuture && s === 'available' ? 'bg-film-gold/15 text-film-gold hover:bg-film-gold/25 border border-film-gold/30' : '',
+                      isActive && s !== 'none' && !isFuture ? 'ring-2 ring-film-gold ring-offset-1 ring-offset-film-black' : '',
                     ].filter(Boolean).join(' ')}
                   >
                     {day}
@@ -204,7 +253,7 @@ export function ArchiveModal() {
         )}
 
         {/* ── Legend ── */}
-        <div className="flex flex-wrap items-center gap-4 text-xs text-film-text-dim border-t border-film-border pt-3">
+        <div className="flex flex-wrap items-center gap-4 text-sm text-film-text-dim border-t border-film-border pt-3">
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded bg-film-green/25 border border-film-green/40 inline-block" />
             Gagné
@@ -220,7 +269,7 @@ export function ArchiveModal() {
           {displayYM !== todayYM && (
             <button
               onClick={() => setDisplayYM(todayYM)}
-              className="ml-auto text-xs text-film-gold hover:underline cursor-pointer"
+              className="ml-auto text-sm text-film-gold hover:underline cursor-pointer"
             >
               Aujourd'hui
             </button>

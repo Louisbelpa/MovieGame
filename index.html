@@ -2,29 +2,56 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CinéGuessr — Devine le film du jour</title>
-    <meta name="description" content="Devine le film mystère du jour. Un nouveau défi cinéma chaque jour." />
+
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
+
+    <!-- Canonical -->
+    <link rel="canonical" href="%SITE_URL%" />
+
+    <!-- Primary -->
+    <title>%BRAND_NAME% — Devine le défi du jour</title>
+    <meta name="description" content="%SITE_DESC%" />
+    <meta name="robots" content="index, follow" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://cineguessr.fr" />
-    <meta property="og:site_name" content="CinéGuessr" />
-    <meta property="og:title" content="CinéGuessr — Devine le film du jour" />
-    <meta property="og:description" content="Devine le film mystère du jour. Un nouveau défi cinéma chaque jour." />
-    <meta property="og:image" content="https://cineguessr.fr/og-image.png" />
+    <meta property="og:url" content="%SITE_URL%" />
+    <meta property="og:site_name" content="%BRAND_NAME%" />
+    <meta property="og:title" content="%BRAND_NAME% — Devine le défi du jour" />
+    <meta property="og:description" content="%SITE_DESC%" />
+    <meta property="og:image" content="%SITE_URL%/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:locale" content="fr_FR" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="CinéGuessr — Devine le film du jour" />
-    <meta name="twitter:description" content="Devine le film mystère du jour. Un nouveau défi cinéma chaque jour." />
-    <meta name="twitter:image" content="https://cineguessr.fr/og-image.png" />
+    <meta name="twitter:title" content="%BRAND_NAME% — Devine le défi du jour" />
+    <meta name="twitter:description" content="%SITE_DESC%" />
+    <meta name="twitter:image" content="%SITE_URL%/og-image.png" />
+
+    <!-- Structured data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "%BRAND_NAME%",
+      "url": "%SITE_URL%",
+      "description": "%SITE_DESC%",
+      "applicationCategory": "GameApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "fr-FR",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" }
+    }
+    </script>
   </head>
   <body>
+    <a href="#main-content" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap" class="focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-film-gold focus:text-film-black focus:rounded focus:font-semibold">Passer au contenu</a>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

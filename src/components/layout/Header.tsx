@@ -1,23 +1,46 @@
 /**
  * layout/Header.tsx
  * Top app bar with logo, challenge number, and icon buttons.
+ * Detects /wiki route and uses wikiStore for modal actions.
  */
 
 import { useRef } from 'react'
-import { HelpCircle, BarChart2, Film, CalendarDays, Tv, Home } from 'lucide-react'
+import { HelpCircle, BarChart2, Film, CalendarDays, Tv, Home, Landmark } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useGameStore } from '@/store/gameStore'
+import { useWikiStore } from '@/store/wikiStore'
 import { BRAND_NAME } from '@/config/features'
 
-export function Header() {
-  const openModal = useGameStore((s) => s.openModal)
-  const challenge = useGameStore((s) => s.challenge)
+interface HeaderProps {
+  mode: 'film' | 'series' | 'wiki'
+}
+
+export function Header({ mode }: HeaderProps) {
+  const isWiki = mode === 'wiki'
+
+  const gameOpenModal = useGameStore((s) => s.openModal)
+  const wikiOpenModal = useWikiStore((s) => s.openModal)
+  const openModal = isWiki ? wikiOpenModal : gameOpenModal
+
+  const gameChallenge = useGameStore((s) => s.challenge)
+  const wikiChallenge = useWikiStore((s) => s.challenge)
   const gameType = useGameStore((s) => s.gameType)
 
-  // Keep last known number so header doesn't flash during loading transitions
   const lastNumberRef = useRef<number | null>(null)
-  if (challenge?.challengeNumber) lastNumberRef.current = challenge.challengeNumber
+  const prevModeRef = useRef(mode)
+  if (prevModeRef.current !== mode) {
+    prevModeRef.current = mode
+    lastNumberRef.current = null
+  }
+  if (!isWiki && gameChallenge?.challengeNumber) lastNumberRef.current = gameChallenge.challengeNumber
+  if (isWiki && wikiChallenge?.challengeNumber) lastNumberRef.current = wikiChallenge.challengeNumber
   const displayNumber = lastNumberRef.current
+
+  const icon = isWiki
+    ? <Landmark size={22} className="text-film-gold" aria-hidden />
+    : mode === 'series' || gameType === 'series'
+      ? <Tv size={22} className="text-film-gold" aria-hidden />
+      : <Film size={22} className="text-film-gold" aria-hidden />
 
   return (
     <header className="sticky top-0 z-30 w-full border-b border-film-border bg-film-black/90 backdrop-blur-md">
@@ -27,22 +50,22 @@ export function Header() {
           <a
             href="/"
             aria-label="Choisir le jeu"
-            className="p-2 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
           >
-            <Home size={20} />
+            <Home size={20} aria-hidden />
           </a>
           <button
             onClick={() => openModal('rules')}
             aria-label="Règles du jeu"
-            className="p-2 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
           >
-            <HelpCircle size={20} />
+            <HelpCircle size={20} aria-hidden />
           </button>
         </div>
 
         {/* Center: logo */}
         <div className="flex items-center gap-2">
-          {gameType === 'series' ? <Tv size={22} className="text-film-gold" aria-hidden /> : <Film size={22} className="text-film-gold" aria-hidden />}
+          {icon}
           <span className="font-title text-xl font-bold text-gradient-gold tracking-tight">
             {BRAND_NAME}
           </span>
@@ -69,16 +92,16 @@ export function Header() {
           <button
             onClick={() => openModal('archive')}
             aria-label="Archives"
-            className="p-2 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
           >
-            <CalendarDays size={20} />
+            <CalendarDays size={20} aria-hidden />
           </button>
           <button
             onClick={() => openModal('stats')}
             aria-label="Mes statistiques"
-            className="p-2 rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
           >
-            <BarChart2 size={20} />
+            <BarChart2 size={20} aria-hidden />
           </button>
         </div>
       </div>

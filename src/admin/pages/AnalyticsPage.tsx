@@ -47,7 +47,7 @@ function subtractDays(days: number): string {
 
 function Stars({ level }: { level: number }) {
   return (
-    <span className="text-amber-400 text-xs">
+    <span className="text-amber-400 text-sm">
       {'★'.repeat(Math.min(level, 5))}
       <span className="text-gray-300">{'★'.repeat(Math.max(0, 5 - level))}</span>
     </span>
@@ -93,7 +93,7 @@ function TimelineChart({ data }: { data: DailyAnalytics[] }) {
 
   return (
     <div>
-      <div className="flex gap-4 text-xs text-gray-500 mb-2">
+      <div className="flex gap-4 text-sm text-gray-500 mb-2">
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-indigo-500" />Parties</span>
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-emerald-500" />Taux victoire %</span>
       </div>
@@ -131,11 +131,11 @@ function HBar({ label, value, max, color }: { label: string; value: number; max:
   const pct = max > 0 ? Math.round((value / max) * 100) : 0
   return (
     <div className="flex items-center gap-3 text-sm">
-      <span className="w-28 text-gray-600 text-xs shrink-0">{label}</span>
+      <span className="w-28 text-gray-600 text-sm shrink-0">{label}</span>
       <div className="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
         <div className="h-4 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
-      <span className="w-10 text-right text-gray-700 font-medium text-xs">{value}</span>
+      <span className="w-10 text-right text-gray-700 font-medium text-sm">{value}</span>
     </div>
   )
 }
@@ -213,7 +213,7 @@ function WrongGuessesPanel({
           <ol className="space-y-1.5">
             {guesses.map((g, i) => (
               <li key={g.guess} className="flex items-center gap-2 text-sm">
-                <span className="text-gray-400 w-4 text-xs">{i + 1}.</span>
+                <span className="text-gray-400 w-4 text-sm">{i + 1}.</span>
                 <span className="flex-1 text-gray-800">{g.guess}</span>
                 <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">{g.count}×</span>
               </li>
@@ -227,15 +227,17 @@ function WrongGuessesPanel({
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-type Period = '7' | '30' | '90' | 'all'
+type Period = '7' | '30' | '90' | 'all' | 'custom'
 type AnalyticsSort = 'win_rate' | 'sessions' | 'avg_hints'
-type MediaTab = 'film' | 'series'
+type MediaTab = 'film' | 'series' | 'wiki'
 
 export function AnalyticsPage() {
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
   const [overviewErr, setOverviewErr] = useState<string | null>(null)
 
   const [period, setPeriod] = useState<Period>('30')
+  const [customFrom, setCustomFrom] = useState(subtractDays(30))
+  const [customTo, setCustomTo] = useState(todayISO())
   const [daily, setDaily] = useState<DailyAnalytics[]>([])
   const [dailyErr, setDailyErr] = useState<string | null>(null)
   const [dailyLoading, setDailyLoading] = useState(false)
@@ -278,13 +280,13 @@ export function AnalyticsPage() {
   const loadDaily = useCallback((p: Period) => {
     setDailyLoading(true)
     setDailyErr(null)
-    const to = todayISO()
-    const from = p === 'all' ? '2000-01-01' : subtractDays(Number(p))
+    const to = p === 'custom' ? customTo : todayISO()
+    const from = p === 'all' ? '2000-01-01' : p === 'custom' ? customFrom : subtractDays(Number(p))
     getAnalyticsDaily(from, to, activeTab)
       .then(setDaily)
       .catch((e: unknown) => setDailyErr(e instanceof Error ? e.message : 'Erreur'))
       .finally(() => setDailyLoading(false))
-  }, [activeTab])
+  }, [activeTab, customFrom, customTo])
 
   useEffect(() => { loadDaily(period) }, [period, loadDaily])
 
@@ -319,20 +321,21 @@ export function AnalyticsPage() {
 
         {/* ── Section 1 : Type de jeu ──────────────────────────────────────── */}
         <section>
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Type de jeu</h2>
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Type de jeu</h2>
           <SegmentedToggle
             value={activeTab}
-            onChange={setActiveTab}
+            onChange={(v) => setActiveTab(v as MediaTab)}
             options={[
               { id: 'film', label: 'Films' },
               { id: 'series', label: 'Séries' },
+              { id: 'wiki', label: 'Wikipedia' },
             ]}
           />
         </section>
 
         {/* ── Section 2 : KPIs ─────────────────────────────────────────────── */}
         <section>
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Vue d'ensemble</h2>
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Vue d'ensemble</h2>
           {overviewErr && <ErrorMsg msg={overviewErr} />}
           {!overview && !overviewErr && <Spinner />}
           {overview && (
@@ -349,9 +352,9 @@ export function AnalyticsPage() {
 
         {/* ── Section 3 : Sélecteur de période ────────────────────────────── */}
         <section>
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Période</h2>
-          <div className="flex gap-2 flex-wrap">
-            {(['7', '30', '90', 'all'] as Period[]).map((p) => (
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Période</h2>
+          <div className="flex gap-2 flex-wrap items-center">
+            {(['7', '30', '90', 'all', 'custom'] as Period[]).map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
@@ -362,10 +365,26 @@ export function AnalyticsPage() {
                     : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50',
                 ].join(' ')}
               >
-                {p === 'all' ? 'Tout' : `${p}j`}
+                {p === 'all' ? 'Tout' : p === 'custom' ? 'Dates' : `${p}j`}
               </button>
             ))}
           </div>
+          {period === 'custom' && (
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
+              <label className="text-xs text-gray-500">Du</label>
+              <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
+                max={customTo}
+                className="border border-gray-200 rounded-lg px-2 py-1 text-sm" />
+              <label className="text-xs text-gray-500">au</label>
+              <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
+                min={customFrom} max={todayISO()}
+                className="border border-gray-200 rounded-lg px-2 py-1 text-sm" />
+              <button onClick={() => loadDaily('custom')}
+                className="px-3 py-1.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                Appliquer
+              </button>
+            </div>
+          )}
         </section>
 
         {/* ── Section 4 : Timeline ─────────────────────────────────────────── */}
@@ -382,7 +401,7 @@ export function AnalyticsPage() {
           {distErr && <ErrorMsg msg={distErr} />}
           {!distErr && Object.keys(attempts).length === 0 && <p className="text-sm text-gray-400">Aucune donnée.</p>}
           <div className="space-y-2">
-            {[1, 2, 3, 4, 5, 6].map((n) => (
+            {(activeTab === 'wiki' ? [1, 2, 3] : [1, 2, 3, 4, 5]).map((n) => (
               <HBar
                 key={n}
                 label={`${n} tentative${n > 1 ? 's' : ''}`}
@@ -430,9 +449,9 @@ export function AnalyticsPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-gray-500 border-b border-gray-100 bg-gray-50">
+                  <tr className="text-left text-sm text-gray-500 border-b border-gray-100 bg-gray-50">
                     <th className="px-4 py-2.5 font-medium">Date</th>
-                    <th className="px-4 py-2.5 font-medium">{activeTab === 'film' ? 'Film' : 'Série'}</th>
+                    <th className="px-4 py-2.5 font-medium">{activeTab === 'film' ? 'Film' : activeTab === 'series' ? 'Série' : 'Personnalité'}</th>
                     <th className="px-4 py-2.5 font-medium">Fame</th>
                     <th
                       className="px-4 py-2.5 font-medium cursor-pointer hover:text-indigo-600 select-none"
@@ -462,16 +481,16 @@ export function AnalyticsPage() {
                       className="hover:bg-indigo-50 cursor-pointer transition-colors"
                       onClick={() => setSelectedChallenge(item)}
                     >
-                      <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">{formatDate(item.challenge_date)}</td>
+                      <td className="px-4 py-2.5 text-gray-500 text-sm whitespace-nowrap">{formatDate(item.challenge_date)}</td>
                       <td className="px-4 py-2.5 font-medium text-gray-800 max-w-[160px] truncate">
                         {item.title}
-                        <span className="ml-1 text-xs text-gray-400">{item.year}</span>
+                        <span className="ml-1 text-sm text-gray-400">{item.year}</span>
                       </td>
                       <td className="px-4 py-2.5"><Stars level={item.fame_level} /></td>
                       <td className="px-4 py-2.5 text-gray-700">{item.sessions}</td>
                       <td className="px-4 py-2.5">
                         <span className={[
-                          'text-xs font-semibold px-1.5 py-0.5 rounded',
+                          'text-sm font-semibold px-1.5 py-0.5 rounded',
                           item.win_rate >= 60 ? 'bg-emerald-50 text-emerald-700' :
                           item.win_rate >= 40 ? 'bg-amber-50 text-amber-700' :
                           'bg-red-50 text-red-700',
@@ -486,7 +505,7 @@ export function AnalyticsPage() {
                   {challenges.length === 0 && (
                     <tr>
                       <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-400">
-                        {activeTab === 'film' ? 'Aucun film trouvé.' : 'Aucune série trouvée.'}
+                        {activeTab === 'film' ? 'Aucun film trouvé.' : activeTab === 'series' ? 'Aucune série trouvée.' : 'Aucune personnalité trouvée.'}
                       </td>
                     </tr>
                   )}
@@ -503,7 +522,7 @@ export function AnalyticsPage() {
           {returning.length > 0 && (
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
+                <tr className="text-left text-sm text-gray-500 border-b border-gray-100">
                   <th className="pb-2 font-medium">Jours joués</th>
                   <th className="pb-2 font-medium text-right">Joueurs</th>
                 </tr>

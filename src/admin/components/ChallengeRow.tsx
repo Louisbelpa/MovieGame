@@ -5,19 +5,20 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { RefreshCw, Trash2, Plus, Clapperboard, Tv, ChevronDown, AlertTriangle, History, Pencil } from 'lucide-react'
-import type { AdminChallenge, AdminFilm, AdminSeries, MediaRef } from '../api'
+import { RefreshCw, Trash2, Plus, Clapperboard, Tv, ChevronDown, AlertTriangle, History, Pencil, Landmark } from 'lucide-react'
+import type { AdminChallenge, AdminFilm, AdminSeries, AdminWikiPerson, MediaRef } from '../api'
 
 interface ChallengeRowProps {
   date: string
   challenge: AdminChallenge | null
   films: AdminFilm[]
   seriesList: AdminSeries[]
-  mediaType?: 'film' | 'series'
+  wikiPersons: AdminWikiPerson[]
+  mediaType?: 'film' | 'series' | 'wiki'
   onSchedule: (date: string, ref: MediaRef) => Promise<void>
   onUpdate: (challengeId: number, ref: MediaRef) => Promise<void>
   onDelete: (challengeId: number) => Promise<void>
-  onEditMedia?: (media: AdminFilm | AdminSeries, type: 'film' | 'series') => void
+  onEditMedia?: (media: AdminFilm | AdminSeries | AdminWikiPerson, type: 'film' | 'series' | 'wiki') => void
   rowClassName?: string
   allowPast?: boolean
 }
@@ -40,19 +41,20 @@ function isPast(iso: string) {
 
 // ─── Media picker (films + series in tabs) ────────────────────────────────────
 
-type TabType = 'films' | 'series'
+type TabType = 'films' | 'series' | 'wiki'
 
 interface MediaPickerProps {
   films: AdminFilm[]
   seriesList: AdminSeries[]
-  mediaType?: 'film' | 'series'
+  wikiPersons: AdminWikiPerson[]
+  mediaType?: 'film' | 'series' | 'wiki'
   onSelect: (ref: MediaRef) => void
   onCancel: () => void
   loading: boolean
 }
 
-function MediaPicker({ films, seriesList, mediaType, onSelect, onCancel, loading }: MediaPickerProps) {
-  const [tab, setTab] = useState<TabType>(mediaType === 'series' ? 'series' : 'films')
+function MediaPicker({ films, seriesList, wikiPersons, mediaType, onSelect, onCancel, loading }: MediaPickerProps) {
+  const [tab, setTab] = useState<TabType>(mediaType === 'series' ? 'series' : mediaType === 'wiki' ? 'wiki' : 'films')
   const [search, setSearch] = useState('')
   const [selectedRef, setSelectedRef] = useState<MediaRef | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -79,10 +81,17 @@ function MediaPicker({ films, seriesList, mediaType, onSelect, onCancel, loading
     s.creator.toLowerCase().includes(search.toLowerCase())
   )
 
+  const filteredWiki = wikiPersons.filter((p) =>
+    search.trim() === '' ||
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.person_type.toLowerCase().includes(search.toLowerCase())
+  )
+
   function isRefSelected(ref: MediaRef) {
     if (!selectedRef) return false
     if ('filmId' in ref && 'filmId' in selectedRef) return ref.filmId === selectedRef.filmId
     if ('seriesId' in ref && 'seriesId' in selectedRef) return (ref as { seriesId: number }).seriesId === (selectedRef as { seriesId: number }).seriesId
+    if ('wikiPersonId' in ref && 'wikiPersonId' in selectedRef) return (ref as { wikiPersonId: number }).wikiPersonId === (selectedRef as { wikiPersonId: number }).wikiPersonId
     return false
   }
 
@@ -95,7 +104,7 @@ function MediaPicker({ films, seriesList, mediaType, onSelect, onCancel, loading
             type="button"
             onClick={() => setTab('films')}
             className={[
-              'flex-1 flex items-center justify-center gap-1.5 py-1 text-xs font-medium rounded-md transition-colors',
+              'flex-1 flex items-center justify-center gap-1.5 py-1 text-sm font-medium rounded-md transition-colors',
               tab === 'films' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700',
             ].join(' ')}
           >
@@ -105,11 +114,21 @@ function MediaPicker({ films, seriesList, mediaType, onSelect, onCancel, loading
             type="button"
             onClick={() => setTab('series')}
             className={[
-              'flex-1 flex items-center justify-center gap-1.5 py-1 text-xs font-medium rounded-md transition-colors',
+              'flex-1 flex items-center justify-center gap-1.5 py-1 text-sm font-medium rounded-md transition-colors',
               tab === 'series' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700',
             ].join(' ')}
           >
             <Tv size={11} /> Séries
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('wiki')}
+            className={[
+              'flex-1 flex items-center justify-center gap-1.5 py-1 text-sm font-medium rounded-md transition-colors',
+              tab === 'wiki' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700',
+            ].join(' ')}
+          >
+            <Landmark size={11} /> Wiki
           </button>
         </div>
       )}
@@ -119,7 +138,7 @@ function MediaPicker({ films, seriesList, mediaType, onSelect, onCancel, loading
         type="text"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder={tab === 'films' ? 'Rechercher un film...' : 'Rechercher une série...'}
+        placeholder={tab === 'films' ? 'Rechercher un film...' : tab === 'series' ? 'Rechercher une série...' : 'Rechercher une personnalité...'}
         className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
       />
 
@@ -199,17 +218,68 @@ function MediaPicker({ films, seriesList, mediaType, onSelect, onCancel, loading
             })
           )
         )}
+        {tab === 'wiki' && (
+          filteredWiki.length === 0 ? (
+            <p className="text-xs text-gray-400 py-2 text-center">Aucun résultat</p>
+          ) : (
+            filteredWiki.map((p) => {
+              const ref: MediaRef = { wikiPersonId: p.id }
+              const upcomingDates = (p.used_dates ?? []).filter((d) => d >= todayStr)
+              const isDuplicate = upcomingDates.length > 0
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setSelectedRef(ref)}
+                  className={[
+                    'w-full flex items-center gap-2 px-2 py-1.5 text-left text-sm rounded-lg transition-colors',
+                    isRefSelected(ref) ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50 text-gray-800',
+                  ].join(' ')}
+                >
+                  {p.photo_url ? (
+                    <img src={p.photo_url} alt="" className="w-8 h-5 object-cover rounded border border-gray-100 flex-shrink-0" />
+                  ) : (
+                    <div className="w-8 h-5 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
+                      <Landmark size={10} className="text-gray-400" />
+                    </div>
+                  )}
+                  <span className="truncate flex-1">{p.name}</span>
+                  {isDuplicate && (
+                    <span title={`Déjà planifié le ${upcomingDates[0]}`} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-amber-100 text-amber-700 flex-shrink-0">
+                      <AlertTriangle size={9} /> Doublon
+                    </span>
+                  )}
+                  <span className="text-xs text-gray-400 flex-shrink-0">
+                    {p.person_type === 'politician'
+                      ? 'Politique'
+                      : p.person_type === 'sportsperson'
+                        ? 'Sport'
+                        : p.person_type === 'artist'
+                          ? 'Art'
+                          : p.person_type === 'scientist'
+                            ? 'Science'
+                            : p.person_type === 'entrepreneur'
+                              ? 'Business'
+                              : p.person_type === 'writer'
+                                ? 'Litterature'
+                                : 'Histoire'}
+                  </span>
+                </button>
+              )
+            })
+          )
+        )}
       </div>
 
       <div className="flex justify-end gap-2 pt-1 border-t border-gray-100">
-        <button type="button" onClick={onCancel} className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+        <button type="button" onClick={onCancel} className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
           Annuler
         </button>
         <button
           type="button"
           disabled={selectedRef === null || loading}
           onClick={() => selectedRef !== null && onSelect(selectedRef)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
         >
           {loading && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
           Confirmer
@@ -226,6 +296,7 @@ export function ChallengeRow({
   challenge,
   films,
   seriesList,
+  wikiPersons,
   mediaType,
   onSchedule,
   onUpdate,
@@ -240,8 +311,9 @@ export function ChallengeRow({
   const today = isToday(date)
   const past = allowPast ? false : isPast(date)
 
-  const media = challenge?.film ?? challenge?.series ?? null
+  const media = challenge?.film ?? challenge?.series ?? challenge?.wiki ?? null
   const isSeries = !!(challenge?.series)
+  const isWiki = !!(challenge?.wiki)
 
   async function handleSelect(ref: MediaRef) {
     setMutating(true)
@@ -280,7 +352,7 @@ export function ChallengeRow({
         {/* Date badge */}
         <span
           className={[
-            'text-xs font-semibold w-28 flex-shrink-0',
+            'text-sm font-semibold w-28 flex-shrink-0',
             today ? 'text-indigo-600' : 'text-gray-500',
           ].join(' ')}
         >
@@ -298,7 +370,9 @@ export function ChallengeRow({
               />
             ) : (
               <div className="w-10 h-7 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
-                {isSeries
+                {isWiki
+                  ? <Landmark size={12} className="text-gray-400" />
+                  : isSeries
                   ? <Tv size={12} className="text-gray-400" />
                   : <Clapperboard size={12} className="text-gray-400" />
                 }
@@ -308,10 +382,17 @@ export function ChallengeRow({
             {/* Title + media type badge */}
             <span className="text-sm font-medium text-gray-800 truncate flex-1">
               {media.title}
-              <span className="ml-1.5 text-xs text-gray-400 font-normal">{media.year}</span>
+              {'year' in media && typeof media.year === 'number' && (
+                <span className="ml-1.5 text-sm text-gray-400 font-normal">{media.year}</span>
+              )}
               {isSeries && (
                 <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-purple-100 text-purple-700">
                   <Tv size={9} /> Série
+                </span>
+              )}
+              {isWiki && (
+                <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-violet-100 text-violet-700">
+                  <Landmark size={9} /> Wiki
                 </span>
               )}
             </span>
@@ -342,7 +423,7 @@ export function ChallengeRow({
             <div className="flex items-center gap-1 ml-auto flex-shrink-0">
               {onEditMedia && (
                 <button
-                  onClick={() => onEditMedia(media, isSeries ? 'series' : 'film')}
+                  onClick={() => onEditMedia(media, isWiki ? 'wiki' : isSeries ? 'series' : 'film')}
                   title="Modifier la fiche"
                   className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                 >
@@ -350,29 +431,27 @@ export function ChallengeRow({
                 </button>
               )}
               {!past && (
-                <>
-                  <button
-                    onClick={() => setPicking((p) => !p)}
-                    title="Changer le contenu"
-                    disabled={mutating}
-                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-40"
-                  >
-                    <RefreshCw size={15} />
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    title="Supprimer"
-                    disabled={mutating}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"
-                  >
-                    {mutating ? (
-                      <span className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin block" />
-                    ) : (
-                      <Trash2 size={15} />
-                    )}
-                  </button>
-                </>
+                <button
+                  onClick={() => setPicking((p) => !p)}
+                  title="Changer le contenu"
+                  disabled={mutating}
+                  className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-40"
+                >
+                  <RefreshCw size={15} />
+                </button>
               )}
+              <button
+                onClick={handleDelete}
+                title="Supprimer"
+                disabled={mutating}
+                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"
+              >
+                {mutating ? (
+                  <span className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin block" />
+                ) : (
+                  <Trash2 size={15} />
+                )}
+              </button>
             </div>
           </>
         ) : (
@@ -382,7 +461,7 @@ export function ChallengeRow({
               <button
                 onClick={() => setPicking((p) => !p)}
                 disabled={mutating}
-                className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors ml-auto flex-shrink-0 disabled:opacity-40"
+                className="flex items-center gap-1.5 px-3 py-1 text-sm font-medium text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors ml-auto flex-shrink-0 disabled:opacity-40"
               >
                 <Plus size={12} />
                 Planifier
@@ -399,6 +478,7 @@ export function ChallengeRow({
           <MediaPicker
             films={films}
             seriesList={seriesList}
+            wikiPersons={wikiPersons}
             mediaType={mediaType}
             onSelect={handleSelect}
             onCancel={() => setPicking(false)}

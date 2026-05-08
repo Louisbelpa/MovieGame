@@ -19,6 +19,7 @@ import { AdminLayout } from '../components/AdminLayout'
 import { SeriesForm } from '../components/SeriesForm'
 import { SeriesRow } from '../components/SeriesRow'
 import { BackdropPicker } from '../components/BackdropPicker'
+import { Pagination } from '../components/Pagination'
 
 // ─── Simple modal wrapper ─────────────────────────────────────────────────────
 
@@ -59,19 +60,24 @@ function ConfirmDeleteModal({
   onConfirm,
   onCancel,
   loading,
+  error,
 }: {
   series: AdminSeries
   onConfirm: () => void
   onCancel: () => void
   loading: boolean
+  error?: string | null
 }) {
   return (
     <Modal title="Supprimer la série" onClose={onCancel}>
-      <p className="text-sm text-gray-600 mb-6">
+      <p className="text-sm text-gray-600 mb-4">
         Êtes-vous sûr de vouloir supprimer{' '}
         <strong className="text-gray-900">« {series.title} »</strong> ? Cette
         action est irréversible.
       </p>
+      {error && (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">{error}</p>
+      )}
       <div className="flex justify-end gap-3">
         <button
           onClick={onCancel}
@@ -108,28 +114,42 @@ export function SeriesPage() {
   const [seriesList, setSeriesList] = useState<AdminSeries[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [modal, setModal] = useState<ModalState>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [randomLoading, setRandomLoading] = useState(false)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [pages, setPages] = useState(1)
+  const [total, setTotal] = useState(0)
+  const LIMIT = 20
 
   function showSuccess(msg: string) {
     setSuccess(msg)
     setTimeout(() => setSuccess(null), 3000)
   }
 
-  const load = useCallback(() => {
+  const load = useCallback((p: number, q: string) => {
     setLoading(true)
-    getSeries()
-      .then(setSeriesList)
+    getSeries({ page: p, limit: LIMIT, q: q.trim() || undefined })
+      .then((res) => {
+        setSeriesList(res.data)
+        setPages(res.pages)
+        setTotal(res.total)
+      })
       .catch((err) => setError(err instanceof Error ? err.message : 'Erreur'))
       .finally(() => setLoading(false))
   }, [])
 
+  // Reset page when search changes, then load
   useEffect(() => {
-    load()
-  }, [load])
+    setPage(1)
+  }, [search])
+
+  useEffect(() => {
+    load(page, search)
+  }, [load, page, search])
 
   async function handleRandomSeries() {
     setRandomLoading(true)
@@ -146,14 +166,14 @@ export function SeriesPage() {
   async function handleCreate(payload: SeriesPayload) {
     await createSeries(payload)
     setModal(null)
-    load()
+    load(page, search)
   }
 
   async function handleEdit(payload: SeriesPayload) {
     if (modal?.type !== 'edit') return
     await updateSeries(modal.series.id, payload)
     setModal(null)
-    load()
+    load(page, search)
   }
 
   async function handleBackdropSelect(imageUrl: string) {
@@ -162,7 +182,7 @@ export function SeriesPage() {
     try {
       await updateSeries(seriesId, { image_url: imageUrl })
       setModal(null)
-      load()
+      load(page, search)
       showSuccess('Image mise à jour')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la mise à jour')
@@ -172,7 +192,7 @@ export function SeriesPage() {
   async function handleUpload(series: AdminSeries, file: File) {
     try {
       await uploadSeriesImage(series.id, file)
-      load()
+      load(page, search)
       showSuccess('Image uploadée')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur upload')
@@ -182,23 +202,17 @@ export function SeriesPage() {
   async function handleDelete() {
     if (modal?.type !== 'delete') return
     setDeleteLoading(true)
+    setDeleteError(null)
     try {
       await deleteSeries(modal.series.id)
       setModal(null)
-      load()
+      load(page, search)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur')
+      setDeleteError(err instanceof Error ? err.message : 'Erreur')
     } finally {
       setDeleteLoading(false)
     }
   }
-
-  const filtered = seriesList.filter(
-    (s) =>
-      search.trim() === '' ||
-      s.title.toLowerCase().includes(search.toLowerCase()) ||
-      s.creator.toLowerCase().includes(search.toLowerCase())
-  )
 
   return (
     <AdminLayout>
@@ -255,42 +269,41 @@ export function SeriesPage() {
           <div className="flex items-center justify-center h-40">
             <span className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : seriesList.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-gray-400 text-sm">
             {search ? 'Aucune série trouvée pour cette recherche.' : 'Aucune série enregistrée.'}
           </div>
         ) : (
-          <table className="w-full min-w-[400px]">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                <th className="px-3 py-3 w-20"></th>
-                <th className="px-3 py-3">Titre</th>
-                <th className="px-3 py-3 hidden sm:table-cell">Année</th>
-                <th className="px-3 py-3 hidden md:table-cell">Créateur</th>
-                <th className="px-3 py-3 hidden lg:table-cell">Statut</th>
-                <th className="px-3 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filtered.map((series) => (
-                <SeriesRow
-                  key={series.id}
-                  series={series}
-                  onEdit={(s) => setModal({ type: 'edit', series: s })}
-                  onDelete={(s) => setModal({ type: 'delete', series: s })}
-                  onBackdrops={(s) => setModal({ type: 'backdrops', series: s })}
-                  onUpload={handleUpload}
-                />
-              ))}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[400px]">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100 text-left text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-3 w-20"></th>
+                  <th className="px-3 py-3">Titre</th>
+                  <th className="px-3 py-3 hidden sm:table-cell">Année</th>
+                  <th className="px-3 py-3 hidden md:table-cell">Créateur</th>
+                  <th className="px-3 py-3 hidden lg:table-cell">Statut</th>
+                  <th className="sticky right-0 bg-gray-50 px-3 py-3 text-right whitespace-nowrap border-l border-gray-100">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {seriesList.map((series) => (
+                  <SeriesRow
+                    key={series.id}
+                    series={series}
+                    onEdit={(s) => setModal({ type: 'edit', series: s })}
+                    onDelete={(s) => { setDeleteError(null); setModal({ type: 'delete', series: s }) }}
+                    onBackdrops={(s) => setModal({ type: 'backdrops', series: s })}
+                    onUpload={handleUpload}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
-      <p className="mt-2 text-xs text-gray-400">
-        {filtered.length} série{filtered.length !== 1 ? 's' : ''}
-        {search && ` sur ${seriesList.length}`}
-      </p>
+      <Pagination page={page} pages={pages} total={total} limit={LIMIT} onPage={setPage} />
 
       {/* Modals */}
       {modal?.type === 'create' && (
@@ -317,8 +330,9 @@ export function SeriesPage() {
         <ConfirmDeleteModal
           series={modal.series}
           onConfirm={handleDelete}
-          onCancel={() => setModal(null)}
+          onCancel={() => { setModal(null); setDeleteError(null) }}
           loading={deleteLoading}
+          error={deleteError}
         />
       )}
 

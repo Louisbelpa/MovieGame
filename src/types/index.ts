@@ -13,7 +13,7 @@ export type HintType =
   | 'synopsis'
   | 'country'
 
-export type MediaType = 'film' | 'series'
+export type MediaType = 'film' | 'series' | 'wiki'
 
 // ─── API response shapes ─────────────────────────────────────────────────────
 
@@ -87,8 +87,8 @@ export interface GameStats {
   gamesWon: number
   currentStreak: number
   maxStreak: number
-  /** Distribution of wins by attempt number (index = attempt count 1-6) */
-  guessDistribution: Record<1 | 2 | 3 | 4 | 5 | 6, number>
+  /** Distribution of wins by attempt number (index = attempt count 1-5) */
+  guessDistribution: Record<1 | 2 | 3 | 4 | 5, number>
   lastPlayedDate?: string
   lastWonDate?: string
 }

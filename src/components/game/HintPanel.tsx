@@ -19,10 +19,6 @@ export function HintPanel({ hints, hintsAvailable, hintsRevealed }: HintPanelPro
 
   return (
     <section aria-label="Indices" className="w-full">
-      <h3 className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-2">
-        Indices ({hintsRevealed}/{hintsAvailable})
-      </h3>
-
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
         <AnimatePresence initial={false}>
           {hints.map((hint, i) => (
@@ -55,7 +51,7 @@ function HintCard({ hint, index }: { hint: HintPayload; index: number }) {
         <Icon size={14} />
       </span>
       <div className="min-w-0">
-        <p className="text-[10px] font-semibold text-film-text-dim uppercase tracking-wider">
+        <p className="text-xs font-semibold text-film-text-dim uppercase tracking-wider">
           {label}
         </p>
         <p className="text-sm text-film-text leading-snug mt-0.5 break-words">
@@ -70,7 +66,7 @@ function LockedSlot() {
   return (
     <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-dashed border-film-border/40 opacity-40">
       <Lock size={14} className="text-film-text-dim shrink-0" aria-hidden />
-      <span className="text-xs text-film-text-dim">Indice verrouillé</span>
+      <span className="text-sm text-film-text-dim">Indice verrouillé</span>
     </div>
   )
 }
