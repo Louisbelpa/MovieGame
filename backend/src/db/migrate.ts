@@ -206,6 +206,18 @@ const incremental: { name: string; sql: string }[] = [
     name: 'create_wiki_prefetch_pool_idx_updated_at',
     sql: `CREATE INDEX IF NOT EXISTS idx_wiki_prefetch_pool_updated_at ON wiki_prefetch_pool (updated_at)`,
   },
+  {
+    name: 'create_app_settings',
+    sql: `CREATE TABLE IF NOT EXISTS app_settings (
+      key        TEXT NOT NULL PRIMARY KEY,
+      value      TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    )`,
+  },
+  {
+    name: 'seed_wiki_prefetch_enabled',
+    sql: `INSERT OR IGNORE INTO app_settings (key, value) VALUES ('wiki_prefetch_enabled', '1')`,
+  },
 ]
 
 // Multi-statement migrations that need db.exec() rather than db.prepare().run()

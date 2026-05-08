@@ -95,6 +95,16 @@ export interface WikipediaFetchPayload {
   suggested_difficulty?: number
 }
 
+export interface WikiPrefetchPoolEntry {
+  id: number
+  source_slug: string
+  resolved_slug: string | null
+  status: 'ready' | 'processing' | 'failed'
+  error_message: string | null
+  expires_at: number
+  updated_at: string
+}
+
 export interface SeriesPayload {
   title: string
   title_aliases: string[]
@@ -585,6 +595,27 @@ export async function fetchRandomPrefetchedWikipediaPerson(lang = 'fr', minFame 
   return request<WikipediaFetchPayload>(
     `/api/admin/wiki-persons/random-prefetched?lang=${encodeURIComponent(lang)}&minFame=${minFame}`
   )
+}
+
+export async function getWikiPrefetchPool(
+  lang = 'fr',
+  minFame = 30,
+  limit = 100
+): Promise<{ lang: string; minFame: number; stats: { processing: number; ready: number; failed: number; total: number }; entries: WikiPrefetchPoolEntry[] }> {
+  return request<{ lang: string; minFame: number; stats: { processing: number; ready: number; failed: number; total: number }; entries: WikiPrefetchPoolEntry[] }>(
+    `/api/admin/wiki-persons/prefetch-pool?lang=${encodeURIComponent(lang)}&minFame=${minFame}&limit=${limit}`
+  )
+}
+
+export async function getWikiPrefetchSettings(): Promise<{ enabled: boolean }> {
+  return request<{ enabled: boolean }>('/api/admin/wiki-prefetch/settings')
+}
+
+export async function setWikiPrefetchSettings(enabled: boolean): Promise<{ ok: boolean; enabled: boolean }> {
+  return request<{ ok: boolean; enabled: boolean }>('/api/admin/wiki-prefetch/settings', {
+    method: 'PUT',
+    body: JSON.stringify({ enabled }),
+  })
 }
 
 /** `input` : nom affiché, titre, slug avec underscores ou URL complète Wikipédia */

@@ -5,6 +5,7 @@
  */
 
 import { LRUCache } from 'lru-cache'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { commonsFilenameToUploadThumbUrl } from './commonsThumb.js'
 
 export interface WikiRole {
@@ -113,12 +114,26 @@ const WIKIDATA_MIN_INTERVAL = 200 // serialized Wikidata calls (~300 req/min max
 const OPTIONAL_ENRICH_TIMEOUT_MS = 8_000
 
 type ThrottleState = {
-  queue: Promise<void>
+  queue: Array<{
+    priority: 'high' | 'normal'
+    task: () => Promise<unknown>
+    resolve: (value: unknown) => void
+    reject: (reason?: unknown) => void
+  }>
+  running: boolean
   nextAllowedAt: number
 }
 
-const wikiThrottle: ThrottleState = { queue: Promise.resolve(), nextAllowedAt: 0 }
-const wikidataThrottle: ThrottleState = { queue: Promise.resolve(), nextAllowedAt: 0 }
+const wikiThrottle: ThrottleState = { queue: [], running: false, nextAllowedAt: 0 }
+const wikidataThrottle: ThrottleState = { queue: [], running: false, nextAllowedAt: 0 }
+const wikiPriorityCtx = new AsyncLocalStorage<{ priority: 'high' | 'normal' }>()
+
+export async function runWithWikiFetchPriority<T>(
+  priority: 'high' | 'normal',
+  fn: () => Promise<T>
+): Promise<T> {
+  return wikiPriorityCtx.run({ priority }, fn)
+}
 
 async function safeJson<T>(res: Response): Promise<T | null> {
   try {
@@ -161,22 +176,41 @@ async function runThrottled<T>(
   minIntervalMs: number,
   task: () => Promise<T>
 ): Promise<T> {
-  let releaseQueue!: () => void
-  const myTurn = new Promise<void>((resolve) => {
-    releaseQueue = resolve
-  })
-  const previous = state.queue
-  state.queue = previous.then(() => myTurn)
+  const priority = wikiPriorityCtx.getStore()?.priority ?? 'normal'
+  return new Promise<T>((resolve, reject) => {
+    state.queue.push({
+      priority,
+      task: task as () => Promise<unknown>,
+      resolve: resolve as (value: unknown) => void,
+      reject,
+    })
 
-  await previous
-  try {
-    const waitMs = state.nextAllowedAt - Date.now()
-    if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
-    state.nextAllowedAt = Date.now() + minIntervalMs
-    return await task()
-  } finally {
-    releaseQueue()
-  }
+    if (state.running) return
+    state.running = true
+
+    const drain = async () => {
+      try {
+        while (state.queue.length > 0) {
+          const highIdx = state.queue.findIndex((item) => item.priority === 'high')
+          const idx = highIdx >= 0 ? highIdx : 0
+          const item = state.queue.splice(idx, 1)[0]
+          const waitMs = state.nextAllowedAt - Date.now()
+          if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs))
+          state.nextAllowedAt = Date.now() + minIntervalMs
+          try {
+            const value = await item.task()
+            item.resolve(value)
+          } catch (err) {
+            item.reject(err)
+          }
+        }
+      } finally {
+        state.running = false
+      }
+    }
+
+    void drain()
+  })
 }
 
 async function withSoftTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -1423,6 +1457,10 @@ async function fetchPageviewsAvg(slug: string, lang: string): Promise<number> {
 }
 
 function computeSuggestedDifficulty(sitelinks: number, avgPageviews: number): number {
+  // If enrichment signals are missing (timeouts/rate limits), keep neutral difficulty
+  // instead of incorrectly marking well-known people as very hard.
+  if (sitelinks <= 0 && avgPageviews <= 0) return 3
+
   const slScore = sitelinks > 0 ? Math.min(100, (Math.log(sitelinks + 1) / Math.log(201)) * 100) : 0
   const pvScore = avgPageviews > 0 ? Math.min(100, (Math.log(avgPageviews + 1) / Math.log(5_000_001)) * 100) : 0
   const score = sitelinks > 0 && avgPageviews > 0
@@ -1435,7 +1473,11 @@ function computeSuggestedDifficulty(sitelinks: number, avgPageviews: number): nu
   return 5
 }
 
-export async function fetchWikipediaData(slug: string, lang = 'fr'): Promise<WikiFetchResult> {
+export async function fetchWikipediaData(
+  slug: string,
+  lang = 'fr',
+  options?: { bypassCache?: boolean }
+): Promise<WikiFetchResult> {
   let meta = await fetchPageMeta(slug, lang)
   if (!meta) {
     const q = slug.trim().replace(/_/g, ' ').trim()
@@ -1449,8 +1491,10 @@ export async function fetchWikipediaData(slug: string, lang = 'fr'): Promise<Wik
   }
   const { displayTitle, slugUnderscore, entityId: resolvedEntityId } = meta
   const cacheKey = `${lang}:${slugUnderscore}`
-  const cached = wikiCache.get(cacheKey)
-  if (cached) return cached
+  if (!options?.bypassCache) {
+    const cached = wikiCache.get(cacheKey)
+    if (cached) return cached
+  }
 
   const titleForApis = encodeURIComponent(displayTitle)
   const summaryUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${titleForApis}`
