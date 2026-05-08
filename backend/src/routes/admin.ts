@@ -3803,9 +3803,16 @@ adminRouter.get('/wiki-persons/prefetch-pool', (req: Request, res: Response, nex
 })
 
 // Keep a warm pool in background for instant "random person" picks in admin.
-void ensureWikiPrefetchPool(PREFETCH_DEFAULT_LANG, PREFETCH_DEFAULT_MIN_FAME)
+const scheduleWikiPrefetchWarmup = () => {
+  void ensureWikiPrefetchPool(PREFETCH_DEFAULT_LANG, PREFETCH_DEFAULT_MIN_FAME).catch((err) => {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[wiki-prefetch] warmup failed:', msg)
+  })
+}
+
+scheduleWikiPrefetchWarmup()
 setInterval(() => {
-  void ensureWikiPrefetchPool(PREFETCH_DEFAULT_LANG, PREFETCH_DEFAULT_MIN_FAME)
+  scheduleWikiPrefetchWarmup()
 }, PREFETCH_REFRESH_INTERVAL_MS)
 
 // POST /api/admin/wiki-persons/fetch-wikipedia
