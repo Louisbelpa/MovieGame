@@ -581,6 +581,12 @@ export async function fetchRandomWikiSlugs(lang = 'fr', minFame = 30): Promise<{
   return request<{ slugs: string[] }>(`/api/admin/wiki-persons/random?lang=${encodeURIComponent(lang)}&minFame=${minFame}`)
 }
 
+export async function fetchRandomPrefetchedWikipediaPerson(lang = 'fr', minFame = 30): Promise<WikipediaFetchPayload> {
+  return request<WikipediaFetchPayload>(
+    `/api/admin/wiki-persons/random-prefetched?lang=${encodeURIComponent(lang)}&minFame=${minFame}`
+  )
+}
+
 /** `input` : nom affiché, titre, slug avec underscores ou URL complète Wikipédia */
 export async function fetchWikipediaPerson(input: string, lang = 'fr'): Promise<WikipediaFetchPayload> {
   const res = await fetch(`${BASE_URL}/api/admin/wiki-persons/fetch-wikipedia`, {

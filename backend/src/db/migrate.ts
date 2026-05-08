@@ -181,6 +181,31 @@ const incremental: { name: string; sql: string }[] = [
       expires_at INTEGER NOT NULL
     )`,
   },
+  {
+    name: 'create_wiki_prefetch_pool',
+    sql: `CREATE TABLE IF NOT EXISTS wiki_prefetch_pool (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      lang          TEXT NOT NULL,
+      min_fame      INTEGER NOT NULL,
+      source_slug   TEXT NOT NULL,
+      resolved_slug TEXT,
+      status        TEXT NOT NULL DEFAULT 'processing' CHECK (status IN ('processing','ready','failed')),
+      payload_json  TEXT,
+      error_message TEXT,
+      expires_at    INTEGER NOT NULL,
+      created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      UNIQUE(lang, min_fame, source_slug)
+    )`,
+  },
+  {
+    name: 'create_wiki_prefetch_pool_idx_status',
+    sql: `CREATE INDEX IF NOT EXISTS idx_wiki_prefetch_pool_status ON wiki_prefetch_pool (lang, min_fame, status, expires_at)`,
+  },
+  {
+    name: 'create_wiki_prefetch_pool_idx_updated_at',
+    sql: `CREATE INDEX IF NOT EXISTS idx_wiki_prefetch_pool_updated_at ON wiki_prefetch_pool (updated_at)`,
+  },
 ]
 
 // Multi-statement migrations that need db.exec() rather than db.prepare().run()

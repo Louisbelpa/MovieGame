@@ -3473,6 +3473,143 @@ const inFlightWikipediaFetches = new Map<
   string,
   Promise<{ data: Record<string, unknown>; resolvedSlug: string; resolvedLang: string }>
 >()
+const prefetchWorkers = new Set<string>()
+const PREFETCH_DEFAULT_LANG = 'fr'
+const PREFETCH_DEFAULT_MIN_FAME = 30
+const PREFETCH_TARGET_READY = 24
+const PREFETCH_MAX_FETCH_PER_RUN = 8
+const PREFETCH_READY_TTL_MS = 1000 * 60 * 60 * 24 * 2 // 48h
+const PREFETCH_FAILED_TTL_MS = 1000 * 60 * 30 // 30min
+const PREFETCH_REFRESH_INTERVAL_MS = 45_000
+
+interface WikiPrefetchRow {
+  id: number
+  source_slug: string
+  payload_json: string | null
+  expires_at: number
+}
+
+function prefetchKey(lang: string, minFame: number): string {
+  return `${lang}:${minFame}`
+}
+
+function sanitizeLang(raw: unknown): string {
+  return typeof raw === 'string' && /^[a-z]{2}$/i.test(raw) ? raw.toLowerCase() : 'fr'
+}
+
+function sanitizeMinFame(raw: unknown): number {
+  return Math.max(5, Math.min(100, parseInt(String(raw ?? PREFETCH_DEFAULT_MIN_FAME), 10) || PREFETCH_DEFAULT_MIN_FAME))
+}
+
+async function ensureWikiPrefetchPool(lang: string, minFame: number): Promise<void> {
+  const key = prefetchKey(lang, minFame)
+  if (prefetchWorkers.has(key)) return
+  prefetchWorkers.add(key)
+
+  try {
+    const now = Date.now()
+    db.prepare(`DELETE FROM wiki_prefetch_pool WHERE expires_at <= ?`).run(now)
+    const readyCountRow = db.prepare<[string, number, number], { count: number }>(
+      `SELECT COUNT(*) AS count
+       FROM wiki_prefetch_pool
+       WHERE lang = ? AND min_fame = ? AND status = 'ready' AND expires_at > ?`
+    ).get(lang, minFame, now)
+    const readyCount = readyCountRow?.count ?? 0
+    const missing = Math.max(0, PREFETCH_TARGET_READY - readyCount)
+    if (missing <= 0) return
+
+    const toFetch = Math.min(PREFETCH_MAX_FETCH_PER_RUN, missing)
+    const slugs = await fetchSparqlSlugs(lang, minFame)
+    if (slugs.length === 0) return
+    const shuffled = [...slugs]
+    for (let i = shuffled.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+
+    const busyRows = db.prepare<[string, number, number], { source_slug: string }>(
+      `SELECT source_slug FROM wiki_prefetch_pool
+       WHERE lang = ? AND min_fame = ? AND status IN ('processing', 'ready') AND expires_at > ?`
+    ).all(lang, minFame, now)
+    const skip = new Set(busyRows.map((r) => r.source_slug))
+    const candidates = shuffled.filter((slug) => !skip.has(slug)).slice(0, toFetch)
+    if (candidates.length === 0) return
+
+    const { fetchWikipediaData } = await import('../lib/wikipedia.js')
+    const withTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+      let timer: NodeJS.Timeout | null = null
+      try {
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('Timeout prefetch')), ms)
+        })
+        return await Promise.race([promise, timeoutPromise])
+      } finally {
+        if (timer) clearTimeout(timer)
+      }
+    }
+
+    for (const slug of candidates) {
+      const startedAt = Date.now()
+      db.prepare<[string, number, string, number], void>(
+        `INSERT OR REPLACE INTO wiki_prefetch_pool
+         (lang, min_fame, source_slug, status, expires_at, updated_at)
+         VALUES (?, ?, ?, 'processing', ?, strftime('%Y-%m-%dT%H:%M:%SZ','now'))`
+      ).run(lang, minFame, slug, startedAt + PREFETCH_FAILED_TTL_MS)
+
+      try {
+        const data = await withTimeout(fetchWikipediaData(slug, lang), 25_000)
+        db.prepare<[string, string, number, string, number, string], void>(
+          `UPDATE wiki_prefetch_pool
+           SET status = 'ready',
+               resolved_slug = ?,
+               payload_json = ?,
+               error_message = NULL,
+               expires_at = ?,
+               updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+           WHERE lang = ? AND min_fame = ? AND source_slug = ?`
+        ).run(
+          data.canonical_wikipedia_slug ?? slug,
+          JSON.stringify(data),
+          Date.now() + PREFETCH_READY_TTL_MS,
+          lang,
+          minFame,
+          slug
+        )
+      } catch (err) {
+        const message = err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300)
+        db.prepare<[string, number, string, number, string], void>(
+          `UPDATE wiki_prefetch_pool
+           SET status = 'failed',
+               payload_json = NULL,
+               error_message = ?,
+               expires_at = ?,
+               updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+           WHERE lang = ? AND min_fame = ? AND source_slug = ?`
+        ).run(message, Date.now() + PREFETCH_FAILED_TTL_MS, lang, minFame, slug)
+      }
+    }
+  } finally {
+    prefetchWorkers.delete(key)
+  }
+}
+
+function takePrefetchedWikipediaPayload(lang: string, minFame: number): Record<string, unknown> | null {
+  const now = Date.now()
+  const row = db.prepare<[string, number, number], WikiPrefetchRow>(
+    `SELECT id, source_slug, payload_json, expires_at
+     FROM wiki_prefetch_pool
+     WHERE lang = ? AND min_fame = ? AND status = 'ready' AND expires_at > ?
+     ORDER BY updated_at ASC
+     LIMIT 1`
+  ).get(lang, minFame, now)
+  if (!row?.payload_json) return null
+  db.prepare<[number], void>(`DELETE FROM wiki_prefetch_pool WHERE id = ?`).run(row.id)
+  try {
+    return JSON.parse(row.payload_json) as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
 
 // GET /api/admin/wiki-persons/random?lang=fr&minFame=30
 // Returns a batch of slugs; the frontend manages the pool to avoid repeated SPARQL calls.
@@ -3495,6 +3632,41 @@ adminRouter.get('/wiki-persons/random', async (req: Request, res: Response, next
     next(err)
   }
 })
+
+// GET /api/admin/wiki-persons/random-prefetched?lang=fr&minFame=30
+// Returns a pre-resolved random Wikipedia payload from local pool for fast UX.
+adminRouter.get('/wiki-persons/random-prefetched', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const lang = sanitizeLang(req.query.lang)
+    const minFame = sanitizeMinFame(req.query.minFame)
+
+    const ready = takePrefetchedWikipediaPayload(lang, minFame)
+    if (ready) {
+      void ensureWikiPrefetchPool(lang, minFame)
+      res.json({ ...ready, source: 'prefetch_pool' })
+      return
+    }
+
+    // Best effort warm-up; return gracefully if nothing is ready yet.
+    await ensureWikiPrefetchPool(lang, minFame)
+    const afterWarm = takePrefetchedWikipediaPayload(lang, minFame)
+    if (afterWarm) {
+      void ensureWikiPrefetchPool(lang, minFame)
+      res.json({ ...afterWarm, source: 'prefetch_pool' })
+      return
+    }
+
+    res.status(404).json({ error: 'Pool vide, nouvelle génération en cours. Réessaie dans quelques secondes.' })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Keep a warm pool in background for instant "random person" picks in admin.
+void ensureWikiPrefetchPool(PREFETCH_DEFAULT_LANG, PREFETCH_DEFAULT_MIN_FAME)
+setInterval(() => {
+  void ensureWikiPrefetchPool(PREFETCH_DEFAULT_LANG, PREFETCH_DEFAULT_MIN_FAME)
+}, PREFETCH_REFRESH_INTERVAL_MS)
 
 // POST /api/admin/wiki-persons/fetch-wikipedia
 // Body: { input | q | slug: string, lang?: string } — nom libre, titre, slug ou URL Wikipédia

@@ -6,6 +6,7 @@ import {
   updateWikiPerson,
   deleteWikiPerson,
   fetchWikipediaPerson,
+  fetchRandomPrefetchedWikipediaPerson,
   fetchRandomWikiSlugs,
   type AdminWikiPerson,
   type WikiPersonPayload,
@@ -530,6 +531,15 @@ function WikiPersonForm({
     setLoadingRandomWiki(true)
     setError(null)
     try {
+      try {
+        const prefetched = await fetchRandomPrefetchedWikipediaPerson(wikiLang, 30)
+        setSlug(prefetched.resolved_slug ?? prefetched.canonical_wikipedia_slug ?? '')
+        applyWikipediaData(prefetched)
+        return
+      } catch {
+        // Fallback to direct flow when pool is empty/unavailable.
+      }
+
       if (_wikiSlugPool.length === 0) {
         const { slugs } = await fetchRandomWikiSlugs(wikiLang, 30)
         _wikiSlugPool.push(...slugs)
