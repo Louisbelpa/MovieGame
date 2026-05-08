@@ -173,6 +173,14 @@ const incremental: { name: string; sql: string }[] = [
     name: 'create_daily_challenges_idx_is_active',
     sql: `CREATE INDEX IF NOT EXISTS idx_daily_challenges_is_active ON daily_challenges (is_active)`,
   },
+  {
+    name: 'create_sparql_cache',
+    sql: `CREATE TABLE IF NOT EXISTS sparql_cache (
+      key        TEXT NOT NULL PRIMARY KEY,
+      slugs_json TEXT NOT NULL,
+      expires_at INTEGER NOT NULL
+    )`,
+  },
 ]
 
 // Multi-statement migrations that need db.exec() rather than db.prepare().run()

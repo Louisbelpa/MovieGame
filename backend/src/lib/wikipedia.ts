@@ -76,6 +76,8 @@ export interface WikiFetchResult {
   parse_warnings: string[]
   /** Titre page avec underscores (redirections résolues) — préférer pour `wikipedia_slug`. */
   canonical_wikipedia_slug: string
+  /** Difficulté suggérée automatiquement (1=facile … 5=difficile) basée sur sitelinks + pageviews. */
+  suggested_difficulty: number
 }
 
 interface WikidataP39Role {
@@ -96,17 +98,27 @@ interface WikidataFallback {
   fields_of_work: string[]
   p39_roles: WikidataP39Role[]
   photo_url: string | null
+  sitelinks_count: number
 }
 
 const USER_AGENT = 'MovieGame/1.0 (admin tool)'
 const RETRY_STATUS = new Set([408, 425, 429, 500, 502, 503, 504])
-const REQUEST_TIMEOUT_MS = 15_000
+const REQUEST_TIMEOUT_MS = 4_000
 const wikiCache = new LRUCache<string, WikiFetchResult>({
   max: 500,
   ttl: 1000 * 60 * 60, // 1 heure
 })
-let lastWikiCall = 0
-const WIKI_MIN_INTERVAL = 1000 // 1s
+const WIKI_MIN_INTERVAL = 800 // serialized Wikipedia calls (~75 req/min max)
+const WIKIDATA_MIN_INTERVAL = 200 // serialized Wikidata calls (~300 req/min max)
+const OPTIONAL_ENRICH_TIMEOUT_MS = 8_000
+
+type ThrottleState = {
+  queue: Promise<void>
+  nextAllowedAt: number
+}
+
+const wikiThrottle: ThrottleState = { queue: Promise.resolve(), nextAllowedAt: 0 }
+const wikidataThrottle: ThrottleState = { queue: Promise.resolve(), nextAllowedAt: 0 }
 
 async function safeJson<T>(res: Response): Promise<T | null> {
   try {
@@ -116,7 +128,7 @@ async function safeJson<T>(res: Response): Promise<T | null> {
   }
 }
 
-async function fetchWithRetry(url: string, init: RequestInit = {}, maxAttempts = 4): Promise<Response> {
+async function fetchWithRetry(url: string, init: RequestInit = {}, maxAttempts = 2): Promise<Response> {
   let lastError: Error | null = null
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
@@ -144,12 +156,59 @@ async function fetchWithRetry(url: string, init: RequestInit = {}, maxAttempts =
   throw (lastError ?? new Error(`Network request failed for ${url}`))
 }
 
+async function runThrottled<T>(
+  state: ThrottleState,
+  minIntervalMs: number,
+  task: () => Promise<T>
+): Promise<T> {
+  let releaseQueue!: () => void
+  const myTurn = new Promise<void>((resolve) => {
+    releaseQueue = resolve
+  })
+  const previous = state.queue
+  state.queue = previous.then(() => myTurn)
+
+  await previous
+  try {
+    const waitMs = state.nextAllowedAt - Date.now()
+    if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
+    state.nextAllowedAt = Date.now() + minIntervalMs
+    return await task()
+  } finally {
+    releaseQueue()
+  }
+}
+
+async function withSoftTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: NodeJS.Timeout | null = null
+  try {
+    const timeoutPromise = new Promise<T>((resolve) => {
+      timer = setTimeout(() => resolve(fallback), ms)
+    })
+    return await Promise.race([promise, timeoutPromise])
+  } catch {
+    return fallback
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+/** Wikidata calls — light throttle (100ms) to avoid burst rate-limiting. */
 async function throttledFetch(url: string, init?: RequestInit): Promise<Response> {
-  const now = Date.now()
-  const wait = lastWikiCall + WIKI_MIN_INTERVAL - now
-  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
-  lastWikiCall = Date.now()
-  return fetchWithRetry(url, init)
+  return runThrottled(
+    wikiThrottle,
+    WIKI_MIN_INTERVAL,
+    () => fetchWithRetry(url, init, 2)
+  )
+}
+
+/** Wikidata calls — serialized throttle to avoid burst rate-limiting. */
+async function wikidataFetch(url: string): Promise<Response> {
+  return runThrottled(
+    wikidataThrottle,
+    WIKIDATA_MIN_INTERVAL,
+    () => fetchWithRetry(url, {}, 2)
+  )
 }
 
 /** Strip wikilinks: [[Target|Label]] → Label, [[Target]] → Target */
@@ -905,30 +964,40 @@ function parseGenericData(wikitext: string, domain: string): WikiGenericData {
   }
 }
 
-async function fetchWikidataEntityId(slug: string, lang: string): Promise<string | null> {
-  const url = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=pageprops&titles=${encodeURIComponent(slug)}&format=json&formatversion=2`
+/** Single Wikipedia API call: resolves redirects, gets canonical title + Wikidata entity ID. */
+async function fetchPageMeta(slug: string, lang: string): Promise<{ displayTitle: string; slugUnderscore: string; entityId: string | null } | null> {
+  const titleQuery = slug.trim().replace(/_/g, ' ')
+  const url = `https://${lang}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(titleQuery)}&redirects=1&prop=pageprops&format=json&formatversion=2`
   const res = await throttledFetch(url)
   if (!res.ok) return null
   const json = await safeJson<{
-    query?: { pages?: Array<{ pageprops?: { wikibase_item?: string } }> }
+    query?: { pages?: Array<{ missing?: boolean; title?: string; pageprops?: { wikibase_item?: string } }> }
   }>(res)
-  if (!json) return null
-  return json.query?.pages?.[0]?.pageprops?.wikibase_item ?? null
+  const page = json?.query?.pages?.[0]
+  if (!page?.title || 'missing' in page) return null
+  const title = page.title.trim()
+  return {
+    displayTitle: title,
+    slugUnderscore: title.replace(/\s+/g, '_'),
+    entityId: page.pageprops?.wikibase_item ?? null,
+  }
 }
 
 async function fetchWikidataFallback(entityId: string, lang: string): Promise<WikidataFallback | null> {
-  const url = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${encodeURIComponent(entityId)}&props=labels|claims&languages=${encodeURIComponent(lang)}|en&format=json`
-  const res = await throttledFetch(url)
+  const url = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${encodeURIComponent(entityId)}&props=labels|claims|sitelinks&languages=${encodeURIComponent(lang)}|en&format=json`
+  const res = await wikidataFetch(url)
   if (!res.ok) return null
   const json = await safeJson<{
     entities?: Record<string, {
       claims?: Record<string, Array<{ mainsnak?: { datavalue?: { value?: unknown } } }>>
+      sitelinks?: Record<string, unknown>
     }>
   }>(res)
   if (!json) return null
   const entity = json.entities?.[entityId]
   const claims = entity?.claims
   if (!claims) return null
+  const sitelinks_count = Object.keys(entity?.sitelinks ?? {}).length
 
   const readTimeYear = (pid: string): number | null => {
     const time = claims[pid]?.[0]?.mainsnak?.datavalue?.value as { time?: string } | undefined
@@ -982,44 +1051,43 @@ async function fetchWikidataFallback(entityId: string, lang: string): Promise<Wi
 
   const p39Claims = readP39Claims()
 
-  const labelFor = async (ids: string[]): Promise<string[]> => {
-    if (ids.length === 0) return []
-    const idsChunk = ids.slice(0, 8).join('|')
-    const entitiesUrl = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${encodeURIComponent(idsChunk)}&props=labels&languages=${encodeURIComponent(lang)}|en&format=json`
-    const r = await throttledFetch(entitiesUrl)
-    if (!r.ok) return []
-    const j = await safeJson<{
-      entities?: Record<string, { labels?: Record<string, { value: string }> }>
-    }>(r)
-    if (!j) return []
-    return ids
-      .map((id) => j.entities?.[id]?.labels?.[lang]?.value ?? j.entities?.[id]?.labels?.en?.value ?? null)
-      .filter((v): v is string => !!v)
-      .map((v) => normalizeValue(v) ?? '')
-      .filter(Boolean)
+  // Batch all label lookups into 1-2 Wikidata requests (50 IDs/request max)
+  // instead of 7 separate calls — major reduction in API usage
+  const p39PositionIds = p39Claims.map((c) => c.positionId)
+  const allIds = [
+    ...occupationIds, ...nationalityIds, ...notableWorkIds,
+    ...languageIds, ...fieldIds, ...p39PositionIds, ...employerIds,
+  ]
+  const uniqueIds = [...new Set(allIds)]
+
+  const labelsMap: Record<string, string> = {}
+  for (let i = 0; i < uniqueIds.length; i += 50) {
+    const chunk = uniqueIds.slice(i, i + 50)
+    try {
+      const url = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${encodeURIComponent(chunk.join('|'))}&props=labels&languages=${encodeURIComponent(lang)}|en&format=json`
+      const r = await wikidataFetch(url)
+      if (r.ok) {
+        const j = await safeJson<{ entities?: Record<string, { labels?: Record<string, { value: string }> }> }>(r)
+        for (const [id, entity] of Object.entries(j?.entities ?? {})) {
+          const label = entity.labels?.[lang]?.value ?? entity.labels?.en?.value
+          if (label) labelsMap[id] = normalizeValue(label) ?? label
+        }
+      }
+    } catch { /* non-critical */ }
   }
 
-  const labelForMany = async (ids: string[]): Promise<string[]> => {
-    const chunks: string[][] = []
-    for (let i = 0; i < ids.length; i += 8) chunks.push(ids.slice(i, i + 8))
-    const parts = await Promise.all(chunks.map((c) => labelFor(c)))
-    return parts.flat()
-  }
+  const resolve = (ids: string[]) => ids.map((id) => labelsMap[id]).filter((v): v is string => Boolean(v))
 
-  const [occupationLabels, nationalityLabels, notableWorkLabels, languageLabels, fieldLabels, p39Labels, employerLabels] =
-    await Promise.all([
-      labelFor(occupationIds),
-      labelFor(nationalityIds),
-      labelForMany(notableWorkIds),
-      labelFor(languageIds),
-      labelFor(fieldIds),
-      labelForMany(p39Claims.map((c) => c.positionId)),
-      labelForMany(employerIds),
-    ])
+  const occupationLabels = resolve(occupationIds)
+  const nationalityLabels = resolve(nationalityIds)
+  const notableWorkLabels = resolve(notableWorkIds)
+  const languageLabels = resolve(languageIds)
+  const fieldLabels = resolve(fieldIds)
+  const employerLabels = resolve(employerIds)
 
   const p39_roles: WikidataP39Role[] = p39Claims
-    .map((c, i) => ({
-      title: p39Labels[i] ?? '',
+    .map((c) => ({
+      title: labelsMap[c.positionId] ?? '',
       start_year: c.start_year,
       end_year: c.end_year,
     }))
@@ -1037,6 +1105,7 @@ async function fetchWikidataFallback(entityId: string, lang: string): Promise<Wi
     fields_of_work: fieldLabels,
     p39_roles,
     photo_url: photoUrl,
+    sitelinks_count,
   }
 }
 
@@ -1244,10 +1313,13 @@ async function tryWikipediaDirectTitle(trimmed: string, lang: string): Promise<s
   const titleQuery = trimmed.replace(/_/g, ' ')
   const url = `https://${lang}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(titleQuery)}&redirects=1&format=json`
   const res = await throttledFetch(url)
+  if (res.status === 429) throw new Error('Wikipedia rate limit atteint. Attends quelques secondes et réessaye.')
   if (!res.ok) return null
   const json = await safeJson<{
     query?: { pages?: Record<string, { missing?: boolean; title?: string }> }
+    error?: { code?: string; info?: string }
   }>(res)
+  if (json?.error?.code === 'ratelimited') throw new Error('Wikipedia rate limit atteint. Attends quelques secondes et réessaye.')
   const pages = json?.query?.pages
   if (!pages) return null
   const page = Object.values(pages)[0]
@@ -1302,30 +1374,21 @@ export async function resolveWikipediaSlug(input: string, defaultLang: string): 
   const lang = /^[a-z]{2}$/i.test(defaultLang) ? defaultLang.toLowerCase() : 'fr'
 
   const direct = await tryWikipediaDirectTitle(trimmed, lang)
-  if (direct) {
-    return { slug: direct, lang }
+  if (direct) return { slug: direct, lang }
+
+  // Try title-case variant: "tim cook" → "Tim Cook" (covers mis-cased proper nouns)
+  const titleCased = trimmed.replace(/\b\w/g, (c) => c.toUpperCase())
+  if (titleCased !== trimmed) {
+    const directCased = await tryWikipediaDirectTitle(titleCased, lang)
+    if (directCased) return { slug: directCased, lang }
   }
 
   const searched = await searchWikipediaTitle(trimmed, lang)
-  if (searched) {
-    return { slug: searched, lang }
-  }
+  if (searched) return { slug: searched, lang }
 
-  throw new Error(`Aucune page Wikipédia trouvée pour « ${trimmed} » (${lang}).`)
+  throw new Error(`Aucune page Wikipédia trouvée pour « ${trimmed} » (${lang}). Essaie en anglais (EN) ou colle directement l'URL Wikipedia.`)
 }
 
-/** Titre canonique après redirections — le REST summary exige surtout des espaces, pas des underscores bruts. */
-async function resolveCanonicalPageTitle(slug: string, lang: string): Promise<{ displayTitle: string; slugUnderscore: string } | null> {
-  const titleQuery = slug.trim().replace(/_/g, ' ')
-  const url = `https://${lang}.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(titleQuery)}&redirects=1&format=json&formatversion=2`
-  const res = await throttledFetch(url)
-  if (!res.ok) return null
-  const json = await safeJson<{ query?: { pages?: Array<{ missing?: boolean; title?: string }> } }>(res)
-  const page = json?.query?.pages?.[0]
-  if (!page?.title || page.missing) return null
-  const title = page.title.trim()
-  return { displayTitle: title, slugUnderscore: title.replace(/\s+/g, '_') }
-}
 
 async function fetchLeadExtractViaQuery(displayTitle: string, lang: string): Promise<{ title: string; extract: string } | null> {
   const url = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&titles=${encodeURIComponent(displayTitle)}&exintro=1&explaintext=1&redirects=1&format=json&formatversion=2`
@@ -1339,19 +1402,52 @@ async function fetchLeadExtractViaQuery(displayTitle: string, lang: string): Pro
   return { title: page.title ?? displayTitle, extract }
 }
 
+async function fetchPageviewsAvg(slug: string, lang: string): Promise<number> {
+  const now = new Date()
+  const end = new Date(now.getFullYear(), now.getMonth(), 1)
+  const start = new Date(now.getFullYear(), now.getMonth() - 3, 1)
+  const fmt = (d: Date) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}01`
+  const url = `https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/${lang}.wikipedia.org/all-access/all-agents/${encodeURIComponent(slug)}/monthly/${fmt(start)}/${fmt(end)}`
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(4_000),
+      headers: { 'User-Agent': USER_AGENT },
+    })
+    if (!res.ok) return 0
+    const json = await safeJson<{ items?: Array<{ views: number }> }>(res)
+    if (!json?.items?.length) return 0
+    return Math.round(json.items.reduce((s, i) => s + i.views, 0) / json.items.length)
+  } catch {
+    return 0
+  }
+}
+
+function computeSuggestedDifficulty(sitelinks: number, avgPageviews: number): number {
+  const slScore = sitelinks > 0 ? Math.min(100, (Math.log(sitelinks + 1) / Math.log(201)) * 100) : 0
+  const pvScore = avgPageviews > 0 ? Math.min(100, (Math.log(avgPageviews + 1) / Math.log(5_000_001)) * 100) : 0
+  const score = sitelinks > 0 && avgPageviews > 0
+    ? slScore * 0.6 + pvScore * 0.4
+    : Math.max(slScore, pvScore)
+  if (score >= 80) return 1
+  if (score >= 60) return 2
+  if (score >= 40) return 3
+  if (score >= 20) return 4
+  return 5
+}
+
 export async function fetchWikipediaData(slug: string, lang = 'fr'): Promise<WikiFetchResult> {
-  let canonical = await resolveCanonicalPageTitle(slug, lang)
-  if (!canonical) {
+  let meta = await fetchPageMeta(slug, lang)
+  if (!meta) {
     const q = slug.trim().replace(/_/g, ' ').trim()
     const searched = q.length > 0 ? await searchWikipediaTitle(q, lang) : null
     if (searched) {
-      canonical = await resolveCanonicalPageTitle(searched, lang)
+      meta = await fetchPageMeta(searched, lang)
     }
   }
-  if (!canonical) {
+  if (!meta) {
     throw new Error(`Page Wikipédia introuvable (${lang}) : « ${slug.trim()} ». Vérifie la langue (FR/EN) ou le titre exact.`)
   }
-  const { displayTitle, slugUnderscore } = canonical
+  const { displayTitle, slugUnderscore, entityId: resolvedEntityId } = meta
   const cacheKey = `${lang}:${slugUnderscore}`
   const cached = wikiCache.get(cacheKey)
   if (cached) return cached
@@ -1430,9 +1526,14 @@ export async function fetchWikipediaData(slug: string, lang = 'fr'): Promise<Wik
   }
 
   let wikidata: WikidataFallback | null = null
+  let avgPageviews = 0
   try {
-    const entityId = await fetchWikidataEntityId(slugUnderscore, lang)
-    if (entityId) wikidata = await fetchWikidataFallback(entityId, lang)
+    if (resolvedEntityId) {
+      ;[wikidata, avgPageviews] = await Promise.all([
+        withSoftTimeout(fetchWikidataFallback(resolvedEntityId, lang), OPTIONAL_ENRICH_TIMEOUT_MS, null),
+        withSoftTimeout(fetchPageviewsAvg(slugUnderscore, lang), OPTIONAL_ENRICH_TIMEOUT_MS, 0),
+      ])
+    }
   } catch {
     wikidata = null
   }
@@ -1481,6 +1582,8 @@ export async function fetchWikipediaData(slug: string, lang = 'fr'): Promise<Wik
     summaryContentUrls?.desktop?.page
     ?? `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(displayTitle.replace(/ /g, '_'))}`
 
+  const suggested_difficulty = computeSuggestedDifficulty(wikidata?.sitelinks_count ?? 0, avgPageviews)
+
   const result: WikiFetchResult = {
     name: summaryTitle,
     extract: summaryExtract.slice(0, 500) || null,
@@ -1492,6 +1595,7 @@ export async function fetchWikipediaData(slug: string, lang = 'fr'): Promise<Wik
     parse_quality_score: quality.score,
     parse_warnings: quality.warnings,
     canonical_wikipedia_slug: slugUnderscore,
+    suggested_difficulty,
   }
   wikiCache.set(cacheKey, result)
   return result

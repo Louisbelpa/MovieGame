@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Plus, Search, X, WandSparkles, ExternalLink, Trash2, Pencil, Shuffle, History } from 'lucide-react'
 import {
   getWikiPersons,
@@ -30,7 +30,7 @@ function personTypeLabel(personType: PersonType): string {
 }
 
 type ModalState =
-  | { type: 'create' }
+  | { type: 'create'; autoRandom?: boolean }
   | { type: 'edit'; person: AdminWikiPerson }
   | { type: 'delete'; person: AdminWikiPerson }
   | null
@@ -267,10 +267,12 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 function WikiPersonForm({
   initial,
+  autoRandom,
   onSubmit,
   onCancel,
 }: {
   initial?: AdminWikiPerson
+  autoRandom?: boolean
   onSubmit: (payload: WikiPersonPayload) => Promise<void>
   onCancel: () => void
 }) {
@@ -304,6 +306,7 @@ function WikiPersonForm({
   const [wikiLang, setWikiLang] = useState<'fr' | 'en'>('fr')
   const [loadingWiki, setLoadingWiki] = useState(false)
   const [loadingRandomWiki, setLoadingRandomWiki] = useState(false)
+  const autoRandomFired = useRef(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [parseScore, setParseScore] = useState<number | null>(null)
@@ -359,13 +362,23 @@ function WikiPersonForm({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial?.id])
 
+  // Pre-warm the slug pool in background when the form opens (no initial = create mode)
   useEffect(() => {
-    const allowed = getWikiHintKeysSelectable(personType)
-    setSelectedHints((prev) => {
-      const filtered = prev.filter((k) => allowed.includes(k))
-      return filtered.length > 0 ? filtered : getDefaultWikiHintSchedule(personType)
-    })
-  }, [personType])
+    if (!initial && _wikiSlugPool.length === 0) {
+      fetchRandomWikiSlugs('fr', 30).then(({ slugs }) => _wikiSlugPool.push(...slugs)).catch(() => {})
+    }
+  }, [initial])
+
+  // Auto-trigger random fetch when opened via the page-level "Au hasard" button
+  // Guard against React StrictMode double-invocation
+  useEffect(() => {
+    if (autoRandom && !autoRandomFired.current) {
+      autoRandomFired.current = true
+      handleRandomWikipedia()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
 
   function applyWikipediaData(data: {
     name: string
@@ -377,7 +390,9 @@ function WikiPersonForm({
     wikipedia_url: string
     parse_quality_score: number
     parse_warnings: string[]
+    suggested_difficulty?: number
   }) {
+    if (data.suggested_difficulty != null) setDifficulty(data.suggested_difficulty)
     setName(data.name)
     setPersonType(data.person_type)
     setSelectedHints(data.hint_schedule.length > 0 ? data.hint_schedule : getDefaultWikiHintSchedule(data.person_type))
@@ -492,6 +507,7 @@ function WikiPersonForm({
   }
 
   async function handleFetchWikipedia() {
+    if (loadingWiki || loadingRandomWiki) return
     if (!slug.trim()) {
       setError('Saisis un nom (ex. Bruno Le Maire), un slug ou une URL Wikipédia, puis clique sur Remplir.')
       return
@@ -510,6 +526,7 @@ function WikiPersonForm({
   }
 
   async function handleRandomWikipedia() {
+    if (loadingWiki || loadingRandomWiki) return
     setLoadingRandomWiki(true)
     setError(null)
     try {
@@ -517,10 +534,21 @@ function WikiPersonForm({
         const { slugs } = await fetchRandomWikiSlugs(wikiLang, 30)
         _wikiSlugPool.push(...slugs)
       }
-      const randomSlug = _wikiSlugPool.pop()!
-      const data = await fetchWikipediaPerson(randomSlug, wikiLang)
-      setSlug(data.resolved_slug ?? randomSlug)
-      applyWikipediaData(data)
+      // Try slugs until one succeeds (skip slow/broken ones)
+      let lastErr: Error | null = null
+      for (let attempt = 0; attempt < 5 && _wikiSlugPool.length > 0; attempt++) {
+        const randomSlug = _wikiSlugPool.pop()!
+        setSlug(randomSlug) // show slug immediately so user knows who is being fetched
+        try {
+          const data = await fetchWikipediaPerson(randomSlug, wikiLang)
+          setSlug(data.resolved_slug ?? randomSlug)
+          applyWikipediaData(data)
+          return
+        } catch (err) {
+          lastErr = err instanceof Error ? err : new Error(String(err))
+        }
+      }
+      throw lastErr ?? new Error('Aucun résultat disponible')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur wikipedia aléatoire')
     } finally {
@@ -608,11 +636,22 @@ function WikiPersonForm({
               value={wikiLang}
               onChange={(e) => setWikiLang(e.target.value as 'fr' | 'en')}
               className="rounded-lg border border-gray-300 px-2 py-2 text-sm bg-white"
-              title="Langue du wiki pour la recherche et l’import"
+              title="Langue du wiki pour la recherche et l'import"
             >
               <option value="fr">FR</option>
               <option value="en">EN</option>
             </select>
+            {slug.trim() && (
+              <a
+                href={'https://' + wikiLang + '.wikipedia.org/wiki/' + encodeURIComponent(slug.trim().split(/\s+/).join('_'))}
+                target="_blank"
+                rel="noreferrer"
+                title="Ouvrir la page Wikipedia"
+                className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+              >
+                <ExternalLink size={14} />
+              </a>
+            )}
             <button
               type="button"
               onClick={handleFetchWikipedia}
@@ -641,6 +680,13 @@ function WikiPersonForm({
         </div>
       </div>
 
+      {error && (
+        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-start gap-2">
+          <span className="shrink-0 mt-0.5">⚠</span>
+          <span>{error}</span>
+        </div>
+      )}
+
       {parseScore !== null && (
         <div className={`rounded-lg border px-3 py-2 text-sm ${
           parseScore >= 80
@@ -661,7 +707,15 @@ function WikiPersonForm({
       <div className="grid sm:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-          <select value={personType} onChange={(e) => setPersonType(e.target.value as PersonType)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+          <select
+            value={personType}
+            onChange={(e) => {
+              const t = e.target.value as PersonType
+              setPersonType(t)
+              setSelectedHints(getDefaultWikiHintSchedule(t))
+            }}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          >
             <option value="politician">Politicien</option>
             <option value="sportsperson">Sportif</option>
             <option value="artist">Artiste</option>
@@ -835,8 +889,6 @@ function WikiPersonForm({
         <textarea rows={3} value={extract} onChange={(e) => setExtract(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
       </div>
 
-      {error && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
-
       <div className="flex justify-end gap-3 pt-2">
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm border rounded-lg">Annuler</button>
         <button type="submit" disabled={submitting} className="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50">
@@ -855,6 +907,20 @@ export function WikiPersonsPage() {
   const [search, setSearch] = useState('')
   const [modal, setModal] = useState<ModalState>(null)
   const [deleting, setDeleting] = useState(false)
+  const [randomLoading, setRandomLoading] = useState(false)
+
+  async function handlePageRandom() {
+    setRandomLoading(true)
+    try {
+      if (_wikiSlugPool.length === 0) {
+        const { slugs } = await fetchRandomWikiSlugs('fr', 30)
+        _wikiSlugPool.push(...slugs)
+      }
+      setModal({ type: 'create', autoRandom: true })
+    } finally {
+      setRandomLoading(false)
+    }
+  }
 
   const load = useCallback(() => {
     setLoading(true)
@@ -919,9 +985,22 @@ export function WikiPersonsPage() {
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher une personnalité..." className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg" />
         </div>
-        <button onClick={() => setModal({ type: 'create' })} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
-          <Plus size={15} /> Ajouter
-        </button>
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <button
+            onClick={handlePageRandom}
+            disabled={randomLoading}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors disabled:opacity-50"
+          >
+            {randomLoading
+              ? <span className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+              : <Shuffle size={15} />
+            }
+            <span className="hidden sm:inline">Personnalité aléatoire</span>
+          </button>
+          <button onClick={() => setModal({ type: 'create' })} className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+            <Plus size={15} /> Ajouter
+          </button>
+        </div>
       </div>
 
       {error && <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">{error}</div>}
@@ -941,7 +1020,7 @@ export function WikiPersonsPage() {
                   <th className="px-3 py-3">Nom</th>
                   <th className="px-3 py-3 hidden sm:table-cell">Type</th>
                   <th className="px-3 py-3 hidden md:table-cell">Statut</th>
-                  <th className="px-3 py-3 hidden lg:table-cell">Défis</th>
+                  <th className="px-3 py-3 hidden lg:table-cell">Difficulté</th>
                   <th className="sticky right-0 bg-gray-50 px-3 py-3 text-right w-24 border-l border-gray-100">Actions</th>
                 </tr>
               </thead>
@@ -973,7 +1052,10 @@ export function WikiPersonsPage() {
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm text-gray-900 truncate">{person.name}</div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-medium text-sm text-gray-900 truncate">{person.name}</span>
+                                <span className="text-amber-400 text-[10px] tracking-tighter shrink-0">{'★'.repeat(person.difficulty ?? 3)}</span>
+                              </div>
                               <div className="text-xs text-gray-400 flex items-center gap-1 min-w-0">
                                 <span className="truncate">{person.wikipedia_slug}</span>
                                 {person.wikipedia_url && <a href={person.wikipedia_url} target="_blank" rel="noreferrer" className="text-indigo-500 shrink-0"><ExternalLink size={11} /></a>}
@@ -1022,11 +1104,13 @@ export function WikiPersonsPage() {
                             {person.is_active ? 'Actif' : 'Inactif'}
                           </span>
                         </td>
-                        <td className="px-3 py-3 text-sm text-gray-600 hidden lg:table-cell">{person.used_dates.length}</td>
+                        <td className="px-3 py-3 text-sm hidden lg:table-cell">
+                          <span className="text-amber-400 tracking-tighter">{'★'.repeat(person.difficulty ?? 3)}{'☆'.repeat(5 - (person.difficulty ?? 3))}</span>
+                        </td>
                         <td className="px-3 py-3 w-24">
                           <div className="flex justify-end items-center gap-1">
-                            <button onClick={() => setModal({ type: 'edit', person })} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Pencil size={14} /></button>
-                            <button onClick={() => setModal({ type: 'delete', person })} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14} /></button>
+                            <button onClick={() => setModal({ type: 'edit', person })} className="p-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors"><Pencil size={14} /></button>
+                            <button onClick={() => setModal({ type: 'delete', person })} className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors"><Trash2 size={14} /></button>
                           </div>
                         </td>
                       </tr>
@@ -1041,7 +1125,7 @@ export function WikiPersonsPage() {
 
       {modal?.type === 'create' && (
         <Modal title="Ajouter une personnalité Wikipedia" onClose={() => setModal(null)}>
-          <WikiPersonForm onSubmit={handleCreate} onCancel={() => setModal(null)} />
+          <WikiPersonForm autoRandom={modal.autoRandom} onSubmit={handleCreate} onCancel={() => setModal(null)} />
         </Modal>
       )}
       {modal?.type === 'edit' && (

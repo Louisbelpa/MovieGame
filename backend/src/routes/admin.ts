@@ -3435,6 +3435,12 @@ adminRouter.delete('/wiki-persons/:id', strictAdminLimiter, (req: Request, res: 
 })
 
 async function fetchSparqlSlugs(lang: string, minFame: number): Promise<string[]> {
+  const cacheKey = `${lang}:${minFame}`
+  const cached = db.prepare<[string], { slugs_json: string; expires_at: number }>(
+    `SELECT slugs_json, expires_at FROM sparql_cache WHERE key = ?`
+  ).get(cacheKey)
+  if (cached && Date.now() < cached.expires_at) return JSON.parse(cached.slugs_json) as string[]
+
   const sparql = `
     SELECT ?title WHERE {
       ?person wdt:P31 wd:Q5 ;
@@ -3454,10 +3460,19 @@ async function fetchSparqlSlugs(lang: string, minFame: number): Promise<string[]
   })
   if (!sparqlRes.ok) throw new Error(`Wikidata SPARQL error: ${sparqlRes.status}`)
   const data = await sparqlRes.json() as { results?: { bindings?: Array<{ title?: { value: string } }> } }
-  return (data.results?.bindings ?? [])
+  const slugs = (data.results?.bindings ?? [])
     .map((b) => b.title?.value?.replace(/ /g, '_') ?? '')
     .filter(Boolean)
+  const expiresAt = Date.now() + 24 * 60 * 60 * 1000 // 24h
+  db.prepare(`INSERT OR REPLACE INTO sparql_cache (key, slugs_json, expires_at) VALUES (?, ?, ?)`)
+    .run(cacheKey, JSON.stringify(slugs), expiresAt)
+  return [...slugs]
 }
+
+const inFlightWikipediaFetches = new Map<
+  string,
+  Promise<{ data: Record<string, unknown>; resolvedSlug: string; resolvedLang: string }>
+>()
 
 // GET /api/admin/wiki-persons/random?lang=fr&minFame=30
 // Returns a batch of slugs; the frontend manages the pool to avoid repeated SPARQL calls.
@@ -3495,23 +3510,52 @@ adminRouter.post('/wiki-persons/fetch-wikipedia', async (req: Request, res: Resp
       res.status(400).json({ error: 'input, q ou slug est requis.' }); return
     }
     const { resolveWikipediaSlug, fetchWikipediaData } = await import('../lib/wikipedia.js')
-    const { slug: resolvedSlug, lang: resolvedLang } = await resolveWikipediaSlug(raw, lang)
-    const data = await fetchWikipediaData(resolvedSlug, resolvedLang)
+    const withTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+      let timer: NodeJS.Timeout | null = null
+      try {
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('Timeout: récupération Wikipedia trop lente. Réessaye dans quelques secondes.')), ms)
+        })
+        return await Promise.race([promise, timeoutPromise])
+      } finally {
+        if (timer) clearTimeout(timer)
+      }
+    }
+
+    const reqKey = `${lang}:${raw.trim().toLowerCase()}`
+    const existing = inFlightWikipediaFetches.get(reqKey)
+    const job = existing ?? (async () => {
+      const isDirectUrl = /^https?:\/\/[a-z]{2,}\.(?:m\.)?wikipedia\.org\/wiki\//i.test(raw)
+      const looksLikeSlug = !isDirectUrl && /^[^/\s]+(?:_[^/\s]+)+$/.test(raw)
+      const directSlug = raw.trim().replace(/\s+/g, '_')
+
+      const { slug: resolvedSlug, lang: resolvedLang } = looksLikeSlug
+        ? { slug: directSlug, lang }
+        : await withTimeout(
+            resolveWikipediaSlug(raw, lang),
+            12_000
+          )
+      const data = await withTimeout(
+        fetchWikipediaData(resolvedSlug, resolvedLang),
+        35_000
+      )
+      return { data: data as unknown as Record<string, unknown>, resolvedSlug, resolvedLang }
+    })()
+    if (!existing) inFlightWikipediaFetches.set(reqKey, job)
+    const { data, resolvedSlug, resolvedLang } = await job.finally(() => {
+      inFlightWikipediaFetches.delete(reqKey)
+    })
     res.json({
       ...data,
-      resolved_slug: data.canonical_wikipedia_slug ?? resolvedSlug,
+      resolved_slug: (data.canonical_wikipedia_slug as string | undefined) ?? resolvedSlug,
       resolved_lang: resolvedLang,
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    if (
-      msg === 'Recherche vide.'
-      || msg.startsWith('Aucune page Wikipédia')
-      || msg.startsWith('Page Wikipédia introuvable')
-      || msg === 'URL Wikipédia invalide.'
-    ) {
-      res.status(400).json({ error: msg }); return
-    }
+    if (msg.startsWith('Wikipedia rate limit')) { res.status(429).json({ error: msg }); return }
+    if (msg.startsWith('Timeout:')) { res.status(504).json({ error: msg }); return }
+    if (msg === 'Recherche vide.' || msg === 'URL Wikipédia invalide.') { res.status(400).json({ error: msg }); return }
+    if (msg.startsWith('Aucune page Wikipédia') || msg.startsWith('Page Wikipédia introuvable')) { res.status(404).json({ error: msg }); return }
     next(err)
   }
 })
