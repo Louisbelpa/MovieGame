@@ -15,8 +15,14 @@ interface ModalProps {
   isOpen: boolean
   onClose: () => void
   title?: string
+  /** Custom content rendered to the left of the close button (replaces title) */
+  headerContent?: React.ReactNode
   /** Fallback accessible name if no visible title is rendered */
   ariaLabel?: string
+  /** Optional explicit label element id */
+  ariaLabelledBy?: string
+  /** Optional description element id */
+  ariaDescribedBy?: string
   children: React.ReactNode
   className?: string
   /** If true, clicking backdrop does not close */
@@ -30,7 +36,10 @@ export function Modal({
   isOpen,
   onClose,
   title,
+  headerContent,
   ariaLabel,
+  ariaLabelledBy,
+  ariaDescribedBy,
   children,
   className,
   persistent = false,
@@ -101,7 +110,7 @@ export function Modal({
     return () => window.removeEventListener('keydown', handler)
   }, [isOpen, onClose, persistent])
 
-  const labelledBy = title ? titleId : undefined
+  const labelledBy = ariaLabelledBy ?? (title ? titleId : undefined)
   const fallbackLabel = !title ? (ariaLabel ?? 'Boîte de dialogue') : undefined
 
   return (
@@ -123,6 +132,7 @@ export function Modal({
             role="dialog"
             aria-modal="true"
             aria-labelledby={labelledBy}
+            aria-describedby={ariaDescribedBy}
             aria-label={fallbackLabel}
             tabIndex={-1}
             className={cn(
@@ -134,24 +144,39 @@ export function Modal({
             exit={{ opacity: 0, y: 16, scale: 0.97 }}
             transition={{ type: 'spring', stiffness: 340, damping: 28 }}
           >
-            {(title || !persistent) && (
-              <div className="flex items-center justify-between mb-5">
-                {title && (
-                  <h2
-                    id={titleId}
-                    className="font-title text-xl text-film-text font-semibold"
-                  >
-                    {title}
-                  </h2>
-                )}
-                {!persistent && (
-                  <button
-                    onClick={onClose}
-                    aria-label="Fermer"
-                    className="ml-auto inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
-                  >
-                    <X size={20} aria-hidden />
-                  </button>
+            {(title || headerContent || !persistent) && (
+              <div className={`mb-5 ${headerContent ? 'grid grid-cols-[44px_1fr_44px] items-center' : 'flex items-center justify-between'}`}>
+                {headerContent ? (
+                  <>
+                    <div />
+                    <div className="flex justify-center">{headerContent}</div>
+                    {!persistent && (
+                      <button
+                        onClick={onClose}
+                        aria-label="Fermer"
+                        className="justify-self-end inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+                      >
+                        <X size={20} aria-hidden />
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {title && (
+                      <h2 id={titleId} className="font-title text-xl text-film-text font-semibold">
+                        {title}
+                      </h2>
+                    )}
+                    {!persistent && (
+                      <button
+                        onClick={onClose}
+                        aria-label="Fermer"
+                        className="ml-auto inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+                      >
+                        <X size={20} aria-hidden />
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             )}

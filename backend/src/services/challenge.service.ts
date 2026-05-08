@@ -6,8 +6,9 @@
 
 import db from '../db/database.js';
 import { normalise, isGuessCorrect } from '../lib/matching.js';
+import { escapeHtml } from '../lib/utils.js';
 
-const MAX_ATTEMPTS = parseInt(process.env.MAX_ATTEMPTS ?? '3', 10);
+const MAX_ATTEMPTS = parseInt(process.env.MAX_ATTEMPTS ?? '5', 10);
 const MAX_HINTS = 3;
 const VALID_HINTS = new Set(['year', 'director', 'creator', 'genres', 'cast', 'tagline', 'synopsis']);
 const IMAGE_SOURCE = process.env.IMAGE_SOURCE ?? 'tmdb';
@@ -89,6 +90,27 @@ function getTodayParis(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
 }
 
+function hasAdjacentScheduledChallenge(
+  date: string,
+  direction: 'prev' | 'next',
+  mediaType: 'film' | 'series'
+): boolean {
+  const todayParis = getTodayParis();
+  const stmt =
+    direction === 'prev'
+      ? db.prepare<[string, string, string], { n: number }>(
+          `SELECT 1 AS n FROM daily_challenges
+           WHERE challenge_date < ? AND challenge_date <= ? AND media_type = ?
+           LIMIT 1`
+        )
+      : db.prepare<[string, string, string], { n: number }>(
+          `SELECT 1 AS n FROM daily_challenges
+           WHERE challenge_date > ? AND challenge_date <= ? AND media_type = ?
+           LIMIT 1`
+        );
+  return stmt.get(date, todayParis, mediaType) !== undefined;
+}
+
 // ─── Public service methods ───────────────────────────────────────────────────
 
 /** Return today's challenge row (throws if not found) */
@@ -96,8 +118,7 @@ export function getTodayChallenge(type: 'film' | 'series' = 'film'): ChallengeRo
   const today = getTodayParis();
   const row = db
     .prepare<[string, string], ChallengeRow>(
-      `SELECT * FROM daily_challenges WHERE challenge_date <= ? AND media_type = ?
-       ORDER BY challenge_date DESC LIMIT 1`
+      `SELECT * FROM daily_challenges WHERE challenge_date = ? AND media_type = ? AND is_active = 1`
     ).get(today, type);
   if (!row) throw Object.assign(new Error(`No ${type} challenge scheduled`), { status: 404 });
   return row;
@@ -116,7 +137,7 @@ export function getChallengeById(id: number): ChallengeRow {
 export function getChallengeByDate(date: string, type: 'film' | 'series' = 'film'): ChallengeRow {
   const row = db
     .prepare<[string, string], ChallengeRow>(
-      `SELECT * FROM daily_challenges WHERE challenge_date = ? AND media_type = ?`
+      `SELECT * FROM daily_challenges WHERE challenge_date = ? AND media_type = ? AND is_active = 1`
     ).get(date, type);
   if (!row) throw Object.assign(new Error(`No ${type} challenge for ${date}`), { status: 404 });
   return row;
@@ -220,13 +241,16 @@ export function buildChallengePayload(
   const resolvedImageUrl = resolveImageUrl(image_url);
   const today = getTodayParis();
   const isPastChallenge = challenge.challenge_date < today;
+  const mediaType = isSeries ? 'series' : 'film';
 
   return {
     challengeId: challenge.id,
     challengeNumber: challenge.challenge_number,
     date: challenge.challenge_date,
     isPastChallenge,
-    mediaType: isSeries ? 'series' : 'film',
+    mediaType,
+    hasPrevChallenge: hasAdjacentScheduledChallenge(challenge.challenge_date, 'prev', mediaType),
+    hasNextChallenge: hasAdjacentScheduledChallenge(challenge.challenge_date, 'next', mediaType),
     imageUrl: resolvedImageUrl,
     isGameOver,
     hintsAvailable: schedule.length,
@@ -253,90 +277,84 @@ export function processGuess(
   attemptsLeft: number;
   nextHintUnlocked: boolean;
 } {
-  const session = getOrCreateSession(sessionToken, challengeId);
+  return db.transaction(() => {
+    const session = getOrCreateSession(sessionToken, challengeId);
 
-  // Guard: game already finished
-  if (session.outcome !== null) {
-    throw Object.assign(new Error('Game already finished'), { status: 409 });
-  }
-
-  const attempts: AttemptEntry[] = JSON.parse(session.attempts);
-
-  // Guard: max attempts already reached (shouldn't normally happen if client is correct)
-  if (attempts.length >= MAX_ATTEMPTS) {
-    throw Object.assign(new Error('No attempts remaining'), { status: 409 });
-  }
-
-  // Fetch challenge then film/series
-  const challenge = db
-    .prepare<[number], ChallengeRow>(`SELECT * FROM daily_challenges WHERE id = ?`)
-    .get(challengeId)!;
-
-  let mediaTitle: string;
-  let mediaAliases: string;
-
-  if (challenge.series_id !== null) {
-    const s = db.prepare<[number], { title: string; title_aliases: string }>(`SELECT title, title_aliases FROM series WHERE id = ?`).get(challenge.series_id)!;
-    mediaTitle = s.title;
-    mediaAliases = s.title_aliases;
-  } else {
-    const f = db.prepare<[number], { title: string; title_aliases: string }>(`SELECT title, title_aliases FROM films WHERE id = ?`).get(challenge.film_id!)!;
-    mediaTitle = f.title;
-    mediaAliases = f.title_aliases;
-  }
-
-  // Build accepted answers from title + aliases
-  const aliases: string[] = JSON.parse(mediaAliases);
-  const accepted = [mediaTitle, ...aliases].map(normalise);
-  const correct = isGuessCorrect(rawGuess, accepted);
-
-  // Append attempt
-  const newAttempt: AttemptEntry = {
-    guess: rawGuess,
-    correct,
-    ts: new Date().toISOString(),
-  };
-  attempts.push(newAttempt);
-
-  // Determine new outcome
-  const schedule: string[] = (JSON.parse(challenge.hint_schedule) as string[]).filter(h => VALID_HINTS.has(h)).slice(0, MAX_HINTS);
-  let newOutcome: 'won' | 'lost' | null = null;
-  let newHintsRevealed = Math.min(session.hints_revealed, MAX_HINTS);
-  let nextHintUnlocked = false;
-
-  if (correct) {
-    newOutcome = 'won';
-  } else if (attempts.length >= MAX_ATTEMPTS) {
-    newOutcome = 'lost';
-  } else {
-    // Wrong guess: unlock the next hint automatically
-    if (newHintsRevealed < schedule.length) {
-      newHintsRevealed += 1;
-      nextHintUnlocked = true;
+    if (session.outcome !== null) {
+      throw Object.assign(new Error('Game already finished'), { status: 409 });
     }
-  }
 
-  const finishedAt = newOutcome ? new Date().toISOString() : null;
+    const attempts: AttemptEntry[] = JSON.parse(session.attempts);
 
-  db.prepare(
-    `UPDATE game_sessions
-     SET attempts = ?, hints_revealed = ?, outcome = ?, finished_at = ?
-     WHERE session_token = ? AND challenge_id = ?`
-  ).run(
-    JSON.stringify(attempts),
-    newHintsRevealed,
-    newOutcome,
-    finishedAt,
-    sessionToken,
-    challengeId
-  );
+    const challenge = db
+      .prepare<[number], ChallengeRow>(`SELECT * FROM daily_challenges WHERE id = ?`)
+      .get(challengeId);
+    if (!challenge) throw Object.assign(new Error('Challenge not found'), { status: 404 });
 
-  return {
-    correct,
-    outcome: newOutcome,
-    attemptsLeft: MAX_ATTEMPTS - attempts.length,
-    nextHintUnlocked,
-  };
+    let mediaTitle: string;
+    let mediaAliases: string;
+
+    if (challenge.series_id !== null) {
+      const s = db.prepare<[number], { title: string; title_aliases: string }>(`SELECT title, title_aliases FROM series WHERE id = ?`).get(challenge.series_id);
+      if (!s) throw Object.assign(new Error('Series not found'), { status: 500 });
+      mediaTitle = s.title;
+      mediaAliases = s.title_aliases;
+    } else {
+      const filmId = challenge.film_id
+      if (filmId === null) throw Object.assign(new Error('Challenge has no film'), { status: 500 })
+      const f = db.prepare<[number], { title: string; title_aliases: string }>(`SELECT title, title_aliases FROM films WHERE id = ?`).get(filmId);
+      if (!f) throw Object.assign(new Error('Film not found'), { status: 500 });
+      mediaTitle = f.title;
+      mediaAliases = f.title_aliases;
+    }
+
+    const aliases: string[] = JSON.parse(mediaAliases);
+    const accepted = [mediaTitle, ...aliases].map(normalise);
+    const correct = isGuessCorrect(rawGuess, accepted);
+
+    const newAttempt: AttemptEntry = {
+      guess: escapeHtml(rawGuess),
+      correct,
+      ts: new Date().toISOString(),
+    };
+    attempts.push(newAttempt);
+
+    const schedule: string[] = (JSON.parse(challenge.hint_schedule) as string[]).filter(h => VALID_HINTS.has(h)).slice(0, MAX_HINTS);
+    let newOutcome: 'won' | 'lost' | null = null;
+    let newHintsRevealed = Math.min(session.hints_revealed, MAX_HINTS);
+    let nextHintUnlocked = false;
+
+    if (correct) {
+      newOutcome = 'won';
+    } else if (attempts.length >= MAX_ATTEMPTS) {
+      newOutcome = 'lost';
+    } else {
+      if (newHintsRevealed < schedule.length) {
+        newHintsRevealed += 1;
+        nextHintUnlocked = true;
+      }
+    }
+
+    db.prepare(
+      `UPDATE game_sessions
+       SET attempts = ?, hints_revealed = ?, outcome = ?, finished_at = ?
+       WHERE session_token = ? AND challenge_id = ?`
+    ).run(
+      JSON.stringify(attempts),
+      newHintsRevealed,
+      newOutcome,
+      newOutcome ? new Date().toISOString() : null,
+      sessionToken,
+      challengeId
+    );
+
+    return {
+      correct,
+      outcome: newOutcome,
+      attemptsLeft: MAX_ATTEMPTS - attempts.length,
+      nextHintUnlocked,
+    };
+  })();
 }
 
 /**
@@ -440,7 +458,10 @@ export function getGlobalStats() {
     totalWins: stats.total_wins,
     totalLosses: stats.total_losses,
     winRate,
-    winsByAttempt: JSON.parse(stats.wins_by_attempt),
+    winsByAttempt: Object.fromEntries(
+      Object.entries(JSON.parse(stats.wins_by_attempt) as Record<string, number>)
+        .filter(([k]) => Number(k) <= MAX_ATTEMPTS)
+    ),
     lastUpdated: stats.last_updated,
   };
 }
@@ -448,6 +469,7 @@ export function getGlobalStats() {
 /** Autocomplete search for films – returns titles only, never exposes today's answer */
 export function searchFilms(query: string, limit = 10, excludeChallengeId?: number) {
   if (!query || query.trim().length < 2) return [];
+  const safeQuery = normalise(query).replace(/[%_]/g, '\\$&');
 
   const todayChallenge = (() => {
     try {
@@ -460,11 +482,15 @@ export function searchFilms(query: string, limit = 10, excludeChallengeId?: numb
   const rows = db
     .prepare<[string, number], { id: number; title: string; year: number }>(
       `SELECT id, title, year FROM films
-       WHERE title_lower LIKE ? AND is_active = 1
+       WHERE title_lower LIKE ? ESCAPE '\\' AND is_active = 1
+       AND NOT EXISTS (
+         SELECT 1 FROM daily_challenges dc
+         WHERE dc.film_id = films.id AND dc.challenge_date > date('now')
+       )
        ORDER BY title ASC
        LIMIT ?`
     )
-    .all(`%${normalise(query)}%`, limit + 1);
+    .all(`%${safeQuery}%`, limit + 1);
 
   const excludeIds = new Set<number>();
   if (todayChallenge?.film_id) excludeIds.add(todayChallenge.film_id);
@@ -480,6 +506,7 @@ export function searchFilms(query: string, limit = 10, excludeChallengeId?: numb
 /** Autocomplete search for series – returns titles only, never exposes today's answer */
 export function searchSeries(query: string, limit = 10, excludeChallengeId?: number) {
   if (!query || query.trim().length < 2) return [];
+  const safeQuery = normalise(query).replace(/[%_]/g, '\\$&');
 
   const todayChallenge = (() => {
     try {
@@ -492,11 +519,15 @@ export function searchSeries(query: string, limit = 10, excludeChallengeId?: num
   const rows = db
     .prepare<[string, number], { id: number; title: string; year: number }>(
       `SELECT id, title, year FROM series
-       WHERE title_lower LIKE ? AND is_active = 1
+       WHERE title_lower LIKE ? ESCAPE '\\' AND is_active = 1
+       AND NOT EXISTS (
+         SELECT 1 FROM daily_challenges dc
+         WHERE dc.series_id = series.id AND dc.challenge_date > date('now')
+       )
        ORDER BY title ASC
        LIMIT ?`
     )
-    .all(`%${normalise(query)}%`, limit + 1);
+    .all(`%${safeQuery}%`, limit + 1);
 
   const excludeIds = new Set<number>();
   if (todayChallenge?.series_id) excludeIds.add(todayChallenge.series_id);

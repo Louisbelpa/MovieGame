@@ -229,6 +229,19 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_action     ON audit_logs (action);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs (created_at);
 
 -- ---------------------------------------------------------------------------
+-- active_admin_tokens (revocable admin sessions)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS active_admin_tokens (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_tokens_hash ON active_admin_tokens (token_hash);
+
+-- ---------------------------------------------------------------------------
 -- Trigger: update global_stats when a session is finished.
 -- wins_by_attempt JSON key is the number of attempts used (1-6).
 -- We use json_set to update only the matching bucket atomically.

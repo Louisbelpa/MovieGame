@@ -4,12 +4,10 @@
  */
 
 import { useEffect } from 'react'
+import { MotionConfig } from 'framer-motion'
 import { WikiGamePage } from '@/components/wiki/WikiGamePage'
-import { WikiWinModal } from '@/components/wiki/WikiWinModal'
-import { WikiLoseModal } from '@/components/wiki/WikiLoseModal'
-import { WikiRulesModal } from '@/components/wiki/WikiRulesModal'
-import { WikiStatsModal } from '@/components/wiki/WikiStatsModal'
-import { WikiArchiveModal } from '@/components/wiki/WikiArchiveModal'
+import { RulesModal } from '@/components/modals/RulesModal'
+import { ArchiveModal } from '@/components/modals/ArchiveModal'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { useWikiStore } from '@/store/wikiStore'
@@ -18,7 +16,6 @@ const RULES_SEEN_KEY = 'cineguess:rules_seen:wiki'
 
 export function WikiApp() {
   const openModal = useWikiStore((s) => s.openModal)
-  const status = useWikiStore((s) => s.status)
 
   // Show rules modal on first visit
   useEffect(() => {
@@ -30,23 +27,17 @@ export function WikiApp() {
   }, [openModal])
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="min-h-screen flex flex-col bg-film-black text-film-text">
-      <Header />
-      <main className="flex-1">
+      <Header mode="wiki" />
+      <main id="main-content" className="flex-1">
         <WikiGamePage />
       </main>
       <Footer />
 
-      {/* Modals — rendered at root to avoid z-index issues */}
-      {status !== 'idle' && (
-        <>
-          <WikiWinModal />
-          <WikiLoseModal />
-        </>
-      )}
-      <WikiRulesModal />
-      <WikiStatsModal />
-      <WikiArchiveModal />
+      <RulesModal mode="wiki" />
+      <ArchiveModal mode="wiki" />
     </div>
+    </MotionConfig>
   )
 }

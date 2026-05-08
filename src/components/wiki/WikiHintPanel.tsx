@@ -4,58 +4,66 @@
  */
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { Briefcase, Calendar, Flag, Trophy, Lock, Lightbulb } from 'lucide-react'
-import type { WikiHintPayload, WikiVisibleProfile } from '@/api/wikiClient'
+import { Briefcase, Building2, Calendar, Flag, Trophy, Lock, Lightbulb } from 'lucide-react'
+import type { WikiChallengePayload, WikiHintPayload, WikiVisibleProfile } from '@/api/wikiClient'
+
+type WikiPersonUiType = WikiChallengePayload['personType']
 
 interface WikiHintPanelProps {
-  photoUrl: string | null
   profile: WikiVisibleProfile
   hints: WikiHintPayload[]
   hintsAvailable: number
   hintsRevealed: number
+  showProfile?: boolean
+  showHints?: boolean
+  wikiPersonType?: WikiPersonUiType
 }
 
-export function WikiHintPanel({ photoUrl, profile, hints, hintsAvailable, hintsRevealed }: WikiHintPanelProps) {
+function biographySectionTitle(personType: WikiPersonUiType | undefined): string {
+  switch (personType) {
+    case 'artist':
+      return 'Musique & parcours'
+    case 'scientist':
+      return 'Repères scientifiques'
+    case 'entrepreneur':
+      return 'Parcours & entreprises'
+    case 'writer':
+      return 'Littérature & œuvres'
+    case 'historical_figure':
+      return 'Contexte historique'
+    default:
+      return 'Repères biographiques'
+  }
+}
+
+export function WikiHintPanel({
+  profile,
+  hints,
+  hintsAvailable,
+  hintsRevealed,
+  showProfile = true,
+  showHints = true,
+  wikiPersonType,
+}: WikiHintPanelProps) {
   const lockedCount = hintsAvailable - hintsRevealed
 
   return (
     <section aria-label="Profil et indices" className="w-full flex flex-col gap-2">
-      {photoUrl && (
-        <div className="rounded-lg film-border overflow-hidden relative">
-          <img
-            src={photoUrl}
-            alt="Portrait flouté"
-            className="w-full h-32 object-cover object-top blur-md"
-            crossOrigin="anonymous"
-            referrerPolicy="no-referrer"
-            onError={(e) => { e.currentTarget.parentElement!.style.display = 'none' }}
-          />
-          <span className="absolute left-2 top-1.5 text-xs uppercase tracking-wider font-semibold px-2 py-0.5 rounded bg-black/70 text-white">
-            Photo floutée
-          </span>
-        </div>
+      {showProfile && (
+        <VisibleProfile profile={profile} biographyTitle={biographySectionTitle(wikiPersonType)} />
       )}
 
-      <VisibleProfile profile={profile} />
-
-      {(hints.length > 0 || lockedCount > 0) && (
-        <div className="flex items-center gap-1.5 mt-1">
-          <span className="text-xs font-semibold text-film-text-dim uppercase tracking-wider">Indices</span>
-          <span className="text-xs text-film-text-dim">{hintsRevealed}/{hintsAvailable}</span>
+      {showHints && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
+          <AnimatePresence initial={false}>
+            {hints.map((hint, i) => (
+              <WikiHintCard key={hint.type} hint={hint} index={i} />
+            ))}
+          </AnimatePresence>
+          {Array.from({ length: lockedCount }).map((_, i) => (
+            <LockedSlot key={`wiki-locked-${i}`} />
+          ))}
         </div>
-      )}
-
-      <AnimatePresence initial={false}>
-        {hints.map((hint, i) => (
-          <WikiHintCard key={hint.type} hint={hint} index={i} />
-        ))}
-      </AnimatePresence>
-
-      {lockedCount > 0 && (
-        <p className="text-xs text-film-text-dim text-center py-1 flex items-center justify-center gap-1.5">
-          <Lock size={11} className="shrink-0" />
-          {lockedCount} indice{lockedCount > 1 ? 's' : ''} se déverrouille{lockedCount > 1 ? 'nt' : ''} avec les tentatives
-        </p>
       )}
     </section>
   )
@@ -77,7 +85,13 @@ function ProfileCard({ icon: Icon, label, children }: { icon: typeof Briefcase; 
   )
 }
 
-function VisibleProfile({ profile }: { profile: WikiVisibleProfile }) {
+function VisibleProfile({
+  profile,
+  biographyTitle,
+}: {
+  profile: WikiVisibleProfile
+  biographyTitle: string
+}) {
   if (profile.type === 'politician') {
     return (
       <ProfileCard icon={Briefcase} label="Fonctions politiques">
@@ -107,11 +121,17 @@ function VisibleProfile({ profile }: { profile: WikiVisibleProfile }) {
   }
 
   if (profile.type === 'generic') {
+    const domainLabel = biographyTitle.startsWith('Musique') ? 'Musique' : 'Domaine'
+    const domainText = profile.domain?.trim() ?? ''
+    const domainDisplay =
+      domainLabel === 'Musique' && /^musique\b/i.test(domainText)
+        ? (domainText.replace(/^\s*Musique\s*(?:—|-|–|:)?\s*/i, '').trim() || domainText)
+        : domainText
     return (
-      <ProfileCard icon={Briefcase} label="Repères biographiques">
+      <ProfileCard icon={Briefcase} label={biographyTitle}>
         <div className="space-y-1 text-sm">
           {profile.domain && (
-            <p><span className="text-film-text-dim">Domaine · </span><span className="text-film-text">{profile.domain}</span></p>
+            <p><span className="text-film-text-dim">{domainLabel} · </span><span className="text-film-text">{domainDisplay}</span></p>
           )}
           {profile.notableWork && (
             <p><span className="text-film-text-dim">Oeuvre notable · </span><span className="text-film-text">{profile.notableWork}</span></p>
@@ -165,46 +185,59 @@ function VisibleProfile({ profile }: { profile: WikiVisibleProfile }) {
 // ─── Hint card ────────────────────────────────────────────────────────────────
 
 function WikiHintCard({ hint, index }: { hint: WikiHintPayload; index: number }) {
+  const { icon: Icon, label, formatted } = resolveWikiHint(hint)
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.97, y: 4 }}
+      initial={{ opacity: 0, scale: 0.92, y: 8 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.25, delay: index * 0.04 }}
+      transition={{ duration: 0.3, delay: index * 0.05 }}
+      className="flex items-start gap-2 sm:gap-2.5 px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-lg film-border"
     >
-      <HintContent hint={hint} />
+      <span className="mt-0.5 text-film-gold shrink-0" aria-hidden>
+        <Icon size={14} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-film-text-dim uppercase tracking-wider">{label}</p>
+        <p className="text-sm text-film-text leading-snug mt-0.5 break-words">{formatted}</p>
+      </div>
     </motion.div>
   )
 }
 
-function HintContent({ hint }: { hint: WikiHintPayload }) {
+function resolveWikiHint(hint: WikiHintPayload): {
+  icon: typeof Calendar
+  label: string
+  formatted: string
+} {
   switch (hint.type) {
     case 'wiki_birth_year':
-      return <CompactHint label="Année de naissance" value={hint.value != null ? String(hint.value) : 'Inconnue'} icon={Calendar} />
+      return { icon: Calendar, label: 'Année de naissance', formatted: hint.value != null ? String(hint.value) : 'Inconnue' }
     case 'wiki_nationality':
-      return <CompactHint label="Nationalité" value={(hint.value as string | null) ?? 'Inconnue'} icon={Flag} />
+      return { icon: Flag, label: 'Nationalité', formatted: (hint.value as string | null) ?? 'Inconnue' }
     case 'wiki_party':
-      return <CompactHint label="Parti politique" value={(hint.value as string | null) ?? 'Non renseigné'} icon={Briefcase} />
+      return { icon: Briefcase, label: 'Parti politique', formatted: (hint.value as string | null) ?? 'Non renseigné' }
     case 'wiki_position':
-      return <CompactHint label="Poste" value={(hint.value as string | null) ?? 'Non renseigné'} icon={Trophy} />
+      return { icon: Trophy, label: 'Poste', formatted: (hint.value as string | null) ?? 'Non renseigné' }
     case 'wiki_domain':
-      return <CompactHint label="Domaine" value={(hint.value as string | null) ?? 'Non renseigné'} icon={Briefcase} />
+      return { icon: Briefcase, label: 'Domaine', formatted: (hint.value as string | null) ?? 'Non renseigné' }
     case 'wiki_notable_work':
-      return <CompactHint label="Oeuvre notable" value={(hint.value as string | null) ?? 'Non renseigné'} icon={Lightbulb} />
+      return { icon: Lightbulb, label: 'Oeuvre notable', formatted: (hint.value as string | null) ?? 'Non renseigné' }
+    case 'wiki_company':
+      return { icon: Building2, label: 'Entreprise(s)', formatted: (hint.value as string | null) ?? 'Non renseigné' }
     case 'wiki_name_initials':
-      return <CompactHint label="Initiales" value={String(hint.value)} icon={Lightbulb} />
+      return { icon: Lightbulb, label: 'Initiales', formatted: String(hint.value) }
     case 'wiki_name_length':
-      return <CompactHint label="Lettres dans le nom" value={String(hint.value)} icon={Lightbulb} />
+      return { icon: Lightbulb, label: 'Lettres dans le nom', formatted: String(hint.value) }
     default:
-      return null
+      return { icon: Lightbulb, label: hint.type, formatted: String(hint.value ?? '') }
   }
 }
 
-function CompactHint({ label, value, icon: Icon }: { label: string; value: string; icon: typeof Briefcase }) {
+function LockedSlot() {
   return (
-    <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg film-border">
-      <Icon size={13} className="text-film-gold shrink-0" />
-      <span className="text-sm text-film-text-dim flex-1 min-w-0">{label}</span>
-      <span className="text-sm text-film-text font-medium text-right">{value}</span>
+    <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-dashed border-film-border/40 opacity-40">
+      <Lock size={14} className="text-film-text-dim shrink-0" aria-hidden />
+      <span className="text-sm text-film-text-dim">Indice verrouillé</span>
     </div>
   )
 }

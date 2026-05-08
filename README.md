@@ -21,6 +21,7 @@ Un nouveau défi chaque jour à minuit (heure de Paris). Les anciens défis rest
 - **Back office** — interface d'administration pour gérer le contenu, le planning et les analytics
 - **TMDB** — auto-remplissage des fiches films/séries via l'API The Movie Database
 - **Wikipedia / Wikidata** — import et parsing automatique des personnalités via les API Wikipedia et Wikidata
+- **Sécurité backend renforcée** — `helmet`, CORS multi-origines, payload JSON limité, sessions admin révocables
 
 ## Prérequis
 
@@ -144,11 +145,21 @@ Effets des flags :
 | `COOKIE_SECRET` | *(voir .env.example)* | Secret de signature des cookies — générer avec `openssl rand -hex 32` |
 | `ADMIN_PASSWORD` | *(voir .env.example)* | Mot de passe du back office (min. 12 caractères recommandé) |
 | `ADMIN_USERNAME` | *(optionnel)* | Identifiant du back office (si défini, requis à la connexion) |
-| `CORS_ORIGIN` | `http://localhost:5173` | Origine autorisée — domaine exact, sans slash final |
+| `CORS_ORIGIN` | *(obligatoire en prod)* | Origines frontend autorisées, séparées par des virgules (ex: `https://app.com,https://www.app.com`) |
 | `TMDB_API_KEY` | — | Clé API TMDB (back office uniquement) |
 | `IMAGE_SOURCE` | `tmdb` | `tmdb` ou `local` |
-| `MAX_ATTEMPTS` | `5` (films/séries) / `3` (wiki) | Nombre de tentatives par défi |
+| `MAX_ATTEMPTS` | `5` | Nombre de tentatives par défi films/séries |
+| `WIKI_MAX_ATTEMPTS` | `5` | Nombre de tentatives par défi WikiGuessr (optionnel) |
 | `BACKEND_URL` | — | URL publique du backend (pour les URLs d'images uploadées) |
+
+## Changements backend récents
+
+- **Sessions admin révocables** — table `active_admin_tokens`, stockage hashé du token, expiration 7 jours et révocation au logout.
+- **Serveur durci** — CORS via package `cors` (liste blanche), headers via `helmet`, `express.json`/`urlencoded` limités à `1mb`.
+- **Protection XSS côté tentatives** — les guesses utilisateur sont nettoyés via `escapeHtml()` avant persistance.
+- **Recherche anti-spoiler améliorée** — autocomplétion film/série/wiki exclut aussi les défis futurs planifiés et échappe `%`/`_` en SQL LIKE.
+- **Wikipedia plus stable** — cache LRU (1h), throttle 1 requête/s et fetch résumé + wikitext en parallèle.
+- **Seed sécurisé** — `npm run db:seed` est bloqué en production.
 
 ## API publique
 

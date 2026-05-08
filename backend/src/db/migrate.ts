@@ -19,6 +19,22 @@ const schema = fs.readFileSync(schemaPath, 'utf-8');
 console.log('Running migrations…');
 db.exec(schema);
 
+// ─── Schema migrations tracking table ────────────────────────────────────────
+db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT NOT NULL UNIQUE,
+  applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+)`);
+
+function isApplied(name: string): boolean {
+  const row = db.prepare(`SELECT 1 FROM schema_migrations WHERE name = ?`).get(name);
+  return row != null;
+}
+
+function markApplied(name: string) {
+  db.prepare(`INSERT OR IGNORE INTO schema_migrations (name) VALUES (?)`).run(name);
+}
+
 // Incremental migrations — safe to re-run (guarded by try/catch)
 const incremental: { name: string; sql: string }[] = [
   {
@@ -134,6 +150,28 @@ const incremental: { name: string; sql: string }[] = [
   {
     name: 'seed_wiki_global_stats',
     sql: `INSERT OR IGNORE INTO wiki_global_stats (id) VALUES (1)`,
+  },
+  {
+    name: 'create_active_admin_tokens',
+    sql: `CREATE TABLE IF NOT EXISTS active_admin_tokens (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      token_hash TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      expires_at TEXT NOT NULL,
+      revoked_at TEXT
+    )`,
+  },
+  {
+    name: 'create_active_admin_tokens_idx_hash',
+    sql: `CREATE INDEX IF NOT EXISTS idx_admin_tokens_hash ON active_admin_tokens (token_hash)`,
+  },
+  {
+    name: 'add_is_active_to_daily_challenges',
+    sql: `ALTER TABLE daily_challenges ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))`,
+  },
+  {
+    name: 'create_daily_challenges_idx_is_active',
+    sql: `CREATE INDEX IF NOT EXISTS idx_daily_challenges_is_active ON daily_challenges (is_active)`,
   },
 ]
 
@@ -297,42 +335,60 @@ const multiStatement: { name: string; sql: string }[] = [
   },
 ]
 
+// ─── Incremental migrations (single-statement, idempotent) ───────────────────
+
 for (const { name, sql } of incremental) {
+  if (isApplied(name)) {
+    console.log(`  – ${name} (already applied)`)
+    continue
+  }
   try {
     db.prepare(sql).run()
+    markApplied(name)
     console.log(`  ✓ ${name}`)
   } catch {
-    // column already exists — ignore
+    // column/index already exists on a DB that predates schema_migrations — mark as applied
+    markApplied(name)
   }
 }
 
+// ─── Multi-statement migrations (wrapped in transactions) ────────────────────
+
 for (const { name, sql } of multiStatement) {
+  if (isApplied(name)) {
+    console.log(`  – ${name} (already applied)`)
+    continue
+  }
+
+  // Legacy idempotency guards for DBs that predate schema_migrations tracking
+  const cols = db.prepare(`PRAGMA table_info(daily_challenges)`).all() as { name: string }[]
+  if (name === 'add_media_type_to_daily_challenges' && cols.some((c) => c.name === 'media_type')) {
+    markApplied(name); continue
+  }
+  if (name === 'add_wiki_person_id_to_daily_challenges' && cols.some((c) => c.name === 'wiki_person_id')) {
+    markApplied(name); continue
+  }
+  if (name === 'create_trg_wiki_session_finished') {
+    const triggers = db.prepare(`SELECT name FROM sqlite_master WHERE type='trigger' AND name='trg_wiki_session_finished'`).all()
+    if (triggers.length > 0) { markApplied(name); continue }
+  }
+  if (name === 'expand_wiki_person_type_values') {
+    const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='wiki_persons'`).get() as { sql?: string } | undefined
+    const tableSql = row?.sql ?? ''
+    if (tableSql.includes("'artist'") && tableSql.includes("'historical_figure'")) { markApplied(name); continue }
+  }
+  if (name === 'add_generic_to_wiki_person_types') {
+    const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='wiki_persons'`).get() as { sql?: string } | undefined
+    const tableSql = row?.sql ?? ''
+    if (tableSql.includes("'generic'")) { markApplied(name); continue }
+  }
+
   try {
-    const cols = db.prepare(`PRAGMA table_info(daily_challenges)`).all() as { name: string }[]
-    if (name === 'add_media_type_to_daily_challenges' && cols.some((c) => c.name === 'media_type')) {
-      continue
-    }
-    if (name === 'add_wiki_person_id_to_daily_challenges' && cols.some((c) => c.name === 'wiki_person_id')) {
-      continue
-    }
-    if (name === 'create_trg_wiki_session_finished') {
-      const triggers = db.prepare(`SELECT name FROM sqlite_master WHERE type='trigger' AND name='trg_wiki_session_finished'`).all()
-      if (triggers.length > 0) continue
-    }
-    if (name === 'expand_wiki_person_type_values') {
-      const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='wiki_persons'`).get() as { sql?: string } | undefined
-      const sql = row?.sql ?? ''
-      if (sql.includes("'artist'") && sql.includes("'historical_figure'")) continue
-    }
-    if (name === 'add_generic_to_wiki_person_types') {
-      const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='wiki_persons'`).get() as { sql?: string } | undefined
-      const sql = row?.sql ?? ''
-      if (sql.includes("'generic'")) continue
-    }
-    db.exec(sql)
+    db.transaction(() => { db.exec(sql) })()
+    markApplied(name)
     console.log(`  ✓ ${name}`)
   } catch (err) {
-    console.error(`  ✗ ${name}:`, err)
+    console.error(`  ✗ ${name} — rolled back:`, err)
   }
 }
 

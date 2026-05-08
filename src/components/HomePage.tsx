@@ -1,14 +1,32 @@
 import type { ReactNode } from 'react'
-import { Film, Tv, Sparkles, Eye, Keyboard, Lightbulb, Landmark, BookOpen } from 'lucide-react'
+import { Film, Tv, Sparkles, Eye, Keyboard, Lightbulb, Landmark } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Footer } from '@/components/layout/Footer'
 import { FEATURES, BRAND_NAME } from '@/config/features'
+import {
+  NewModesAnnouncementModal,
+  NEW_MODES_ANNOUNCEMENT_STORAGE_KEY,
+  type NewModesAnnouncementVariant,
+} from '@/components/modals/NewModesAnnouncementModal'
 
 type IconPhase = 'film' | 'tv' | 'wiki'
 
 export function HomePage() {
   const [iconPhase, setIconPhase] = useState<IconPhase>('film')
+  const [announcementVariant, setAnnouncementVariant] = useState<NewModesAnnouncementVariant | null>(null)
+  const [showNewBadge, setShowNewBadge] = useState(false)
+
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(NEW_MODES_ANNOUNCEMENT_STORAGE_KEY)) {
+        if (FEATURES.enableSeries && FEATURES.enableWiki) setAnnouncementVariant('both')
+        else if (FEATURES.enableSeries) setAnnouncementVariant('series')
+        else if (FEATURES.enableWiki) setAnnouncementVariant('wiki')
+        setShowNewBadge(true)
+      }
+    } catch {}
+  }, [])
 
   useEffect(() => {
     const modes: IconPhase[] = FEATURES.enableWiki
@@ -53,7 +71,7 @@ export function HomePage() {
                   className="absolute inset-0 inline-flex items-center justify-center"
                   style={{ color: 'var(--film-gold, #f5c542)' }}
                 >
-                  {iconPhase === 'tv' ? <Tv size={20} /> : iconPhase === 'wiki' ? <BookOpen size={20} /> : <Film size={20} />}
+                  {iconPhase === 'tv' ? <Tv size={20} /> : iconPhase === 'wiki' ? <Landmark size={20} /> : <Film size={20} />}
                 </motion.span>
               </AnimatePresence>
             </span>
@@ -100,11 +118,16 @@ export function HomePage() {
           {FEATURES.enableSeries ? (
             <a
               href="/series"
-              className="group rounded-2xl border border-[#33bc97] bg-gradient-to-br from-[#1eb088]/28 via-[#1eb088]/14 to-transparent p-6 sm:p-7 hover:from-[#1eb088]/36 hover:via-[#1eb088]/20 transition-all duration-200 cursor-pointer shadow-[0_0_0_1px_rgba(30,176,136,0.12),0_12px_28px_rgba(10,12,24,0.35)]"
+              className="group relative rounded-2xl border border-[#33bc97] bg-gradient-to-br from-[#1eb088]/28 via-[#1eb088]/14 to-transparent p-6 sm:p-7 hover:from-[#1eb088]/36 hover:via-[#1eb088]/20 transition-all duration-200 cursor-pointer shadow-[0_0_0_1px_rgba(30,176,136,0.12),0_12px_28px_rgba(10,12,24,0.35)]"
               style={{
                 borderColor: 'var(--sg-series)',
-              }}          
+              }}
             >
+              {showNewBadge && (
+                <span className="absolute top-3 right-3 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#1eb088]/20 text-[#7ad2b8] border border-[#1eb088]/30">
+                  Nouveau
+                </span>
+              )}
               <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-4"
                 style={{ background: 'rgba(30, 176, 136, 0.20)' }}>
                 <Tv size={28} style={{ color: 'var(--sg-series)' }} />
@@ -139,8 +162,13 @@ export function HomePage() {
           {FEATURES.enableWiki && (
             <a
               href="/wiki"
-              className="group rounded-2xl border border-[#9a7cf6] bg-gradient-to-br from-[#8b5cf6]/26 via-[#8b5cf6]/14 to-transparent p-6 sm:p-7 hover:from-[#8b5cf6]/34 hover:via-[#8b5cf6]/20 transition-all duration-200 cursor-pointer shadow-[0_0_0_1px_rgba(139,92,246,0.12),0_12px_28px_rgba(10,12,24,0.35)]"
+              className="group relative rounded-2xl border border-[#9a7cf6] bg-gradient-to-br from-[#8b5cf6]/26 via-[#8b5cf6]/14 to-transparent p-6 sm:p-7 hover:from-[#8b5cf6]/34 hover:via-[#8b5cf6]/20 transition-all duration-200 cursor-pointer shadow-[0_0_0_1px_rgba(139,92,246,0.12),0_12px_28px_rgba(10,12,24,0.35)]"
             >
+              {showNewBadge && (
+                <span className="absolute top-3 right-3 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#8b5cf6]/20 text-[#c4b5fd] border border-[#8b5cf6]/30">
+                  Nouveau
+                </span>
+              )}
               <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-4" style={{ background: 'rgba(139, 92, 246, 0.20)' }}>
                 <Landmark size={28} style={{ color: '#c4b5fd' }} />
               </div>
@@ -177,6 +205,14 @@ export function HomePage() {
         </section>
       </div>
       <Footer />
+
+      {announcementVariant && (
+        <NewModesAnnouncementModal
+          isOpen={true}
+          onClose={() => setAnnouncementVariant(null)}
+          variant={announcementVariant}
+        />
+      )}
     </div>
   )
 }
