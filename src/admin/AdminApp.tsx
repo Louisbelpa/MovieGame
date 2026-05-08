@@ -15,6 +15,7 @@ import { ImportPage } from './pages/ImportPage'
 import { LogsPage } from './pages/LogsPage'
 import { AnalyticsPage } from './pages/AnalyticsPage'
 import { WikiPersonsPage } from './pages/WikiPersonsPage'
+import { WikiPrefetchPoolPage } from './pages/WikiPrefetchPoolPage'
 
 export function AdminApp() {
   return (
@@ -30,6 +31,7 @@ export function AdminApp() {
         <Route path="/admin/logs" element={<LogsPage />} />
         <Route path="/admin/analytics" element={<AnalyticsPage />} />
         <Route path="/admin/wiki" element={<WikiPersonsPage />} />
+        <Route path="/admin/wiki-pool" element={<WikiPrefetchPoolPage />} />
         {/* Fallback: redirect unknown /admin/* to dashboard */}
         <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
       </Routes>

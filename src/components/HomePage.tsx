@@ -94,7 +94,7 @@ export function HomePage() {
           </p>
         </div>
 
-        <div className={`grid gap-4 w-full max-w-4xl mx-auto mb-8 ${FEATURES.enableWiki ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+        <div className="grid gap-4 w-full max-w-4xl mx-auto mb-8 sm:grid-cols-3">
           <a
             href="/films"
             className="group rounded-2xl border border-[#5a95ea] bg-gradient-to-br from-[#4d8ee8]/30 via-[#4d8ee8]/18 to-transparent p-6 sm:p-7 hover:from-[#4d8ee8]/40 hover:via-[#4d8ee8]/22 transition-all duration-200 cursor-pointer shadow-[0_0_0_1px_rgba(77,142,232,0.15),0_12px_28px_rgba(10,12,24,0.35)]"
@@ -159,7 +159,7 @@ export function HomePage() {
             </div>
           )}
 
-          {FEATURES.enableWiki && (
+          {FEATURES.enableWiki ? (
             <a
               href="/wiki"
               className="group relative rounded-2xl border border-[#9a7cf6] bg-gradient-to-br from-[#8b5cf6]/26 via-[#8b5cf6]/14 to-transparent p-6 sm:p-7 hover:from-[#8b5cf6]/34 hover:via-[#8b5cf6]/20 transition-all duration-200 cursor-pointer shadow-[0_0_0_1px_rgba(139,92,246,0.12),0_12px_28px_rgba(10,12,24,0.35)]"
@@ -180,6 +180,22 @@ export function HomePage() {
                 <p className="text-sm font-medium mt-4 text-[#c4b5fd] group-hover:text-[#d7ccff] transition-colors">Jouer en mode Wikipedia</p>
               </div>
             </a>
+          ) : (
+            <div
+              className="rounded-2xl border border-[#6d58ab] bg-gradient-to-br from-[#8b5cf6]/16 via-[#8b5cf6]/8 to-transparent p-6 sm:p-7 opacity-80 shadow-[0_0_0_1px_rgba(139,92,246,0.08),0_12px_28px_rgba(10,12,24,0.30)]"
+              aria-disabled="true"
+            >
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-4" style={{ background: 'rgba(139, 92, 246, 0.16)' }}>
+                <Landmark size={28} style={{ color: '#c4b5fd' }} />
+              </div>
+              <div>
+                <p className="font-semibold text-film-text text-xl">Mode Wikipedia</p>
+                <p className="text-film-text-dim text-sm mt-1">
+                  Le mode Wikipedia arrive bientôt. Le temps de finaliser le catalogue de personnalités.
+                </p>
+                <p className="text-sm font-medium mt-4 text-[#c4b5fd]">Bientôt disponible</p>
+              </div>
+            </div>
           )}
         </div>
 

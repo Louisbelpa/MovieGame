@@ -602,6 +602,35 @@ adminRouter.get(
   }
 );
 
+// POST /api/admin/prefetch/warm
+// External cron hook to keep prefetch pool warm without admin cookie auth.
+adminRouter.post('/prefetch/warm', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const bearer = req.headers.authorization?.startsWith('Bearer ')
+      ? req.headers.authorization.slice(7).trim()
+      : ''
+    const headerToken = (req.headers['x-prefetch-warm-token'] as string | undefined)?.trim() || ''
+    const token = headerToken || bearer
+    if (!PREFETCH_WARM_TOKEN || token !== PREFETCH_WARM_TOKEN) {
+      res.status(401).json({ error: 'Unauthorized prefetch warm token.' })
+      return
+    }
+
+    const lang = sanitizeLang(req.query.lang)
+    const minFame = sanitizeMinFame(req.query.minFame)
+    const targetRaw = parseInt(String(req.query.target ?? PREFETCH_TARGET_READY), 10)
+    const target = Math.max(1, Math.min(100, Number.isFinite(targetRaw) ? targetRaw : PREFETCH_TARGET_READY))
+
+    const before = readWikiPrefetchStats(lang, minFame)
+    await ensureWikiPrefetchPool(lang, minFame, target)
+    const after = readWikiPrefetchStats(lang, minFame)
+
+    res.json({ ok: true, lang, minFame, target, before, after })
+  } catch (err) {
+    next(err)
+  }
+})
+
 // ─── All routes below require admin authentication ────────────────────────────
 
 adminRouter.use(adminAuth);
@@ -3435,6 +3464,12 @@ adminRouter.delete('/wiki-persons/:id', strictAdminLimiter, (req: Request, res: 
 })
 
 async function fetchSparqlSlugs(lang: string, minFame: number): Promise<string[]> {
+  const cacheKey = `${lang}:${minFame}`
+  const cached = db.prepare<[string], { slugs_json: string; expires_at: number }>(
+    `SELECT slugs_json, expires_at FROM sparql_cache WHERE key = ?`
+  ).get(cacheKey)
+  if (cached && Date.now() < cached.expires_at) return JSON.parse(cached.slugs_json) as string[]
+
   const sparql = `
     SELECT ?title WHERE {
       ?person wdt:P31 wd:Q5 ;
@@ -3454,9 +3489,209 @@ async function fetchSparqlSlugs(lang: string, minFame: number): Promise<string[]
   })
   if (!sparqlRes.ok) throw new Error(`Wikidata SPARQL error: ${sparqlRes.status}`)
   const data = await sparqlRes.json() as { results?: { bindings?: Array<{ title?: { value: string } }> } }
-  return (data.results?.bindings ?? [])
+  const slugs = (data.results?.bindings ?? [])
     .map((b) => b.title?.value?.replace(/ /g, '_') ?? '')
     .filter(Boolean)
+  const expiresAt = Date.now() + 24 * 60 * 60 * 1000 // 24h
+  db.prepare(`INSERT OR REPLACE INTO sparql_cache (key, slugs_json, expires_at) VALUES (?, ?, ?)`)
+    .run(cacheKey, JSON.stringify(slugs), expiresAt)
+  return [...slugs]
+}
+
+const inFlightWikipediaFetches = new Map<
+  string,
+  Promise<{ data: Record<string, unknown>; resolvedSlug: string; resolvedLang: string }>
+>()
+const prefetchWorkers = new Set<string>()
+const PREFETCH_DEFAULT_LANG = 'fr'
+const PREFETCH_DEFAULT_MIN_FAME = 30
+const PREFETCH_TARGET_READY = 24
+const PREFETCH_MAX_FETCH_PER_RUN = 4
+const PREFETCH_READY_TTL_MS = 1000 * 60 * 60 * 24 * 2 // 48h
+const PREFETCH_FAILED_TTL_MS = 1000 * 60 * 30 // 30min
+const PREFETCH_REFRESH_INTERVAL_MS = 45_000
+const PREFETCH_WARM_TOKEN = process.env.PREFETCH_WARM_TOKEN?.trim() || ''
+const PREFETCH_PAUSE_AFTER_MANUAL_MS = 20_000
+const PREFETCH_PROCESSING_STALE_MS = 1000 * 60 * 8 // 8 min
+const PREFETCH_FETCH_TIMEOUT_MS = 40_000
+let manualWikiFetchInFlight = 0
+let prefetchPausedUntil = 0
+
+interface WikiPrefetchRow {
+  id: number
+  source_slug: string
+  payload_json: string | null
+  expires_at: number
+}
+
+function prefetchKey(lang: string, minFame: number): string {
+  return `${lang}:${minFame}`
+}
+
+function sanitizeLang(raw: unknown): string {
+  return typeof raw === 'string' && /^[a-z]{2}$/i.test(raw) ? raw.toLowerCase() : 'fr'
+}
+
+function sanitizeMinFame(raw: unknown): number {
+  return Math.max(5, Math.min(100, parseInt(String(raw ?? PREFETCH_DEFAULT_MIN_FAME), 10) || PREFETCH_DEFAULT_MIN_FAME))
+}
+
+function isWikiPrefetchEnabled(): boolean {
+  const row = db.prepare<[string], { value: string }>(
+    `SELECT value FROM app_settings WHERE key = ?`
+  ).get('wiki_prefetch_enabled')
+  if (!row) return true
+  return row.value === '1'
+}
+
+function setWikiPrefetchEnabled(enabled: boolean): void {
+  db.prepare<[string, string], void>(
+    `INSERT INTO app_settings (key, value, updated_at)
+     VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+     ON CONFLICT(key) DO UPDATE SET
+       value = excluded.value,
+       updated_at = excluded.updated_at`
+  ).run('wiki_prefetch_enabled', enabled ? '1' : '0')
+}
+
+async function ensureWikiPrefetchPool(lang: string, minFame: number, targetReady = PREFETCH_TARGET_READY): Promise<void> {
+  if (!isWikiPrefetchEnabled()) return
+  const nowGuard = Date.now()
+  if (manualWikiFetchInFlight > 0 || nowGuard < prefetchPausedUntil) return
+  const key = prefetchKey(lang, minFame)
+  if (prefetchWorkers.has(key)) return
+  prefetchWorkers.add(key)
+
+  try {
+    const now = Date.now()
+    db.prepare(`DELETE FROM wiki_prefetch_pool WHERE expires_at <= ?`).run(now)
+    db.prepare<[number, number], void>(
+      `UPDATE wiki_prefetch_pool
+       SET status = 'failed',
+           error_message = 'Stale processing entry reset',
+           expires_at = ?,
+           updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+       WHERE status = 'processing' AND expires_at < ?`
+    ).run(now + PREFETCH_FAILED_TTL_MS, now - PREFETCH_PROCESSING_STALE_MS)
+    const readyCountRow = db.prepare<[string, number, number], { count: number }>(
+      `SELECT COUNT(*) AS count
+       FROM wiki_prefetch_pool
+       WHERE lang = ? AND min_fame = ? AND status = 'ready' AND expires_at > ?`
+    ).get(lang, minFame, now)
+    const readyCount = readyCountRow?.count ?? 0
+    const missing = Math.max(0, targetReady - readyCount)
+    if (missing <= 0) return
+
+    const toFetch = Math.min(PREFETCH_MAX_FETCH_PER_RUN, missing)
+    const slugs = await fetchSparqlSlugs(lang, minFame)
+    if (slugs.length === 0) return
+    const shuffled = [...slugs]
+    for (let i = shuffled.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+
+    const busyRows = db.prepare<[string, number, number], { source_slug: string }>(
+      `SELECT source_slug FROM wiki_prefetch_pool
+       WHERE lang = ? AND min_fame = ? AND status IN ('processing', 'ready') AND expires_at > ?`
+    ).all(lang, minFame, now)
+    const skip = new Set(busyRows.map((r) => r.source_slug))
+    const candidates = shuffled.filter((slug) => !skip.has(slug)).slice(0, toFetch)
+    if (candidates.length === 0) return
+
+    const { fetchWikipediaData } = await import('../lib/wikipedia.js')
+    const withTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+      let timer: NodeJS.Timeout | null = null
+      try {
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('Timeout prefetch')), ms)
+        })
+        return await Promise.race([promise, timeoutPromise])
+      } finally {
+        if (timer) clearTimeout(timer)
+      }
+    }
+
+    for (const slug of candidates) {
+      const startedAt = Date.now()
+      db.prepare<[string, number, string, number], void>(
+        `INSERT OR REPLACE INTO wiki_prefetch_pool
+         (lang, min_fame, source_slug, status, expires_at, updated_at)
+         VALUES (?, ?, ?, 'processing', ?, strftime('%Y-%m-%dT%H:%M:%SZ','now'))`
+      ).run(lang, minFame, slug, startedAt + PREFETCH_FAILED_TTL_MS)
+
+      try {
+        const data = await withTimeout(fetchWikipediaData(slug, lang), PREFETCH_FETCH_TIMEOUT_MS)
+        db.prepare<[string, string, number, string, number, string], void>(
+          `UPDATE wiki_prefetch_pool
+           SET status = 'ready',
+               resolved_slug = ?,
+               payload_json = ?,
+               error_message = NULL,
+               expires_at = ?,
+               updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+           WHERE lang = ? AND min_fame = ? AND source_slug = ?`
+        ).run(
+          data.canonical_wikipedia_slug ?? slug,
+          JSON.stringify(data),
+          Date.now() + PREFETCH_READY_TTL_MS,
+          lang,
+          minFame,
+          slug
+        )
+      } catch (err) {
+        const message = err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300)
+        db.prepare<[string, number, string, number, string], void>(
+          `UPDATE wiki_prefetch_pool
+           SET status = 'failed',
+               payload_json = NULL,
+               error_message = ?,
+               expires_at = ?,
+               updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+           WHERE lang = ? AND min_fame = ? AND source_slug = ?`
+        ).run(message, Date.now() + PREFETCH_FAILED_TTL_MS, lang, minFame, slug)
+      }
+    }
+  } finally {
+    prefetchWorkers.delete(key)
+  }
+}
+
+function takePrefetchedWikipediaPayload(lang: string, minFame: number): Record<string, unknown> | null {
+  const now = Date.now()
+  const row = db.prepare<[string, number, number], WikiPrefetchRow>(
+    `SELECT id, source_slug, payload_json, expires_at
+     FROM wiki_prefetch_pool
+     WHERE lang = ? AND min_fame = ? AND status = 'ready' AND expires_at > ?
+     ORDER BY updated_at ASC
+     LIMIT 1`
+  ).get(lang, minFame, now)
+  if (!row?.payload_json) return null
+  db.prepare<[number], void>(`DELETE FROM wiki_prefetch_pool WHERE id = ?`).run(row.id)
+  try {
+    return JSON.parse(row.payload_json) as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
+function readWikiPrefetchStats(lang: string, minFame: number): { processing: number; ready: number; failed: number; total: number } {
+  const now = Date.now()
+  const rows = db.prepare<[string, number, number], { status: string; count: number }>(
+    `SELECT status, COUNT(*) AS count
+     FROM wiki_prefetch_pool
+     WHERE lang = ? AND min_fame = ? AND expires_at > ?
+     GROUP BY status`
+  ).all(lang, minFame, now)
+  const out = { processing: 0, ready: 0, failed: 0, total: 0 }
+  for (const row of rows) {
+    const key = row.status as 'processing' | 'ready' | 'failed'
+    if (key === 'processing' || key === 'ready' || key === 'failed') {
+      out[key] = row.count
+      out.total += row.count
+    }
+  }
+  return out
 }
 
 // GET /api/admin/wiki-persons/random?lang=fr&minFame=30
@@ -3481,9 +3716,103 @@ adminRouter.get('/wiki-persons/random', async (req: Request, res: Response, next
   }
 })
 
+// GET /api/admin/wiki-persons/random-prefetched?lang=fr&minFame=30
+// Returns a pre-resolved random Wikipedia payload from local pool for fast UX.
+adminRouter.get('/wiki-persons/random-prefetched', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!isWikiPrefetchEnabled()) {
+      res.status(409).json({ error: 'Le pool Wikipedia est désactivé.' })
+      return
+    }
+    const lang = sanitizeLang(req.query.lang)
+    const minFame = sanitizeMinFame(req.query.minFame)
+
+    const ready = takePrefetchedWikipediaPayload(lang, minFame)
+    if (ready) {
+      void ensureWikiPrefetchPool(lang, minFame)
+      res.json({ ...ready, source: 'prefetch_pool' })
+      return
+    }
+
+    // Best effort warm-up; return gracefully if nothing is ready yet.
+    await ensureWikiPrefetchPool(lang, minFame)
+    const afterWarm = takePrefetchedWikipediaPayload(lang, minFame)
+    if (afterWarm) {
+      void ensureWikiPrefetchPool(lang, minFame)
+      res.json({ ...afterWarm, source: 'prefetch_pool' })
+      return
+    }
+
+    res.status(404).json({ error: 'Pool vide, nouvelle génération en cours. Réessaie dans quelques secondes.' })
+  } catch (err) {
+    next(err)
+  }
+})
+
+adminRouter.get('/wiki-prefetch/settings', (_req: Request, res: Response) => {
+  res.json({ enabled: isWikiPrefetchEnabled() })
+})
+
+adminRouter.put('/wiki-prefetch/settings', (req: Request, res: Response) => {
+  const enabled = Boolean((req.body as { enabled?: boolean })?.enabled)
+  setWikiPrefetchEnabled(enabled)
+  res.json({ ok: true, enabled })
+})
+
+// GET /api/admin/wiki-persons/prefetch-pool?lang=fr&minFame=30&limit=100
+// Admin observability endpoint to inspect local prefetch pool entries.
+adminRouter.get('/wiki-persons/prefetch-pool', (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const lang = sanitizeLang(req.query.lang)
+    const minFame = sanitizeMinFame(req.query.minFame)
+    const limitRaw = parseInt(String(req.query.limit ?? '100'), 10)
+    const limit = Math.max(1, Math.min(300, Number.isFinite(limitRaw) ? limitRaw : 100))
+
+    const stats = readWikiPrefetchStats(lang, minFame)
+    const rows = db.prepare<[string, number, number, number], {
+      id: number
+      source_slug: string
+      resolved_slug: string | null
+      status: string
+      error_message: string | null
+      expires_at: number
+      updated_at: string
+    }>(
+      `SELECT id, source_slug, resolved_slug, status, error_message, expires_at, updated_at
+       FROM wiki_prefetch_pool
+       WHERE lang = ? AND min_fame = ? AND expires_at > ?
+       ORDER BY
+         CASE status
+           WHEN 'ready' THEN 0
+           WHEN 'processing' THEN 1
+           ELSE 2
+         END ASC,
+         updated_at DESC
+       LIMIT ?`
+    ).all(lang, minFame, Date.now(), limit)
+
+    res.json({
+      lang,
+      minFame,
+      stats,
+      entries: rows,
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Keep a warm pool in background for instant "random person" picks in admin.
+void ensureWikiPrefetchPool(PREFETCH_DEFAULT_LANG, PREFETCH_DEFAULT_MIN_FAME)
+setInterval(() => {
+  void ensureWikiPrefetchPool(PREFETCH_DEFAULT_LANG, PREFETCH_DEFAULT_MIN_FAME)
+}, PREFETCH_REFRESH_INTERVAL_MS)
+
 // POST /api/admin/wiki-persons/fetch-wikipedia
 // Body: { input | q | slug: string, lang?: string } — nom libre, titre, slug ou URL Wikipédia
 adminRouter.post('/wiki-persons/fetch-wikipedia', async (req: Request, res: Response, next: NextFunction) => {
+  manualWikiFetchInFlight += 1
+  prefetchPausedUntil = Date.now() + PREFETCH_PAUSE_AFTER_MANUAL_MS
   try {
     const body = req.body as { slug?: string; input?: string; q?: string; lang?: string }
     const langRaw = typeof body.lang === 'string' ? body.lang : 'fr'
@@ -3494,25 +3823,70 @@ adminRouter.post('/wiki-persons/fetch-wikipedia', async (req: Request, res: Resp
     if (!raw) {
       res.status(400).json({ error: 'input, q ou slug est requis.' }); return
     }
-    const { resolveWikipediaSlug, fetchWikipediaData } = await import('../lib/wikipedia.js')
-    const { slug: resolvedSlug, lang: resolvedLang } = await resolveWikipediaSlug(raw, lang)
-    const data = await fetchWikipediaData(resolvedSlug, resolvedLang)
+    const { resolveWikipediaSlug, fetchWikipediaData, runWithWikiFetchPriority } = await import('../lib/wikipedia.js')
+    const withTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+      let timer: NodeJS.Timeout | null = null
+      try {
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('Timeout: récupération Wikipedia trop lente. Réessaye dans quelques secondes.')), ms)
+        })
+        return await Promise.race([promise, timeoutPromise])
+      } finally {
+        if (timer) clearTimeout(timer)
+      }
+    }
+
+    const reqKey = `${lang}:${raw.trim().toLowerCase()}`
+    const existing = inFlightWikipediaFetches.get(reqKey)
+    const job = existing ?? (async () => {
+      const isDirectUrl = /^https?:\/\/[a-z]{2,}\.(?:m\.)?wikipedia\.org\/wiki\//i.test(raw)
+      const directSlug = raw.trim().replace(/\s+/g, '_')
+      const isLikelyNameOrSlug = !isDirectUrl
+
+      if (isLikelyNameOrSlug) {
+        try {
+          const directData = await runWithWikiFetchPriority('high', () =>
+            withTimeout(fetchWikipediaData(directSlug, lang, { bypassCache: true }), 60_000)
+          )
+          return { data: directData as unknown as Record<string, unknown>, resolvedSlug: directData.canonical_wikipedia_slug ?? directSlug, resolvedLang: lang }
+        } catch {
+          // Fallback to explicit resolver below (useful for URLs, typos and cross-lang redirects).
+        }
+      }
+
+      const { slug: resolvedSlug, lang: resolvedLang } = await runWithWikiFetchPriority('high', () =>
+        withTimeout(
+          resolveWikipediaSlug(raw, lang),
+          30_000
+        )
+      )
+      const data = await runWithWikiFetchPriority('high', () =>
+        withTimeout(
+          fetchWikipediaData(resolvedSlug, resolvedLang, { bypassCache: true }),
+          60_000
+        )
+      )
+      return { data: data as unknown as Record<string, unknown>, resolvedSlug, resolvedLang }
+    })()
+    if (!existing) inFlightWikipediaFetches.set(reqKey, job)
+    const { data, resolvedSlug, resolvedLang } = await job.finally(() => {
+      inFlightWikipediaFetches.delete(reqKey)
+    })
     res.json({
       ...data,
-      resolved_slug: data.canonical_wikipedia_slug ?? resolvedSlug,
+      resolved_slug: (data.canonical_wikipedia_slug as string | undefined) ?? resolvedSlug,
       resolved_lang: resolvedLang,
     })
+    prefetchPausedUntil = Date.now() + PREFETCH_PAUSE_AFTER_MANUAL_MS
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    if (
-      msg === 'Recherche vide.'
-      || msg.startsWith('Aucune page Wikipédia')
-      || msg.startsWith('Page Wikipédia introuvable')
-      || msg === 'URL Wikipédia invalide.'
-    ) {
-      res.status(400).json({ error: msg }); return
-    }
+    if (msg.startsWith('Wikipedia rate limit')) { res.status(429).json({ error: msg }); return }
+    if (msg.startsWith('Timeout:')) { res.status(504).json({ error: msg }); return }
+    if (msg === 'Recherche vide.' || msg === 'URL Wikipédia invalide.') { res.status(400).json({ error: msg }); return }
+    if (msg.startsWith('Aucune page Wikipédia') || msg.startsWith('Page Wikipédia introuvable')) { res.status(404).json({ error: msg }); return }
     next(err)
+  } finally {
+    manualWikiFetchInFlight = Math.max(0, manualWikiFetchInFlight - 1)
   }
 })
 

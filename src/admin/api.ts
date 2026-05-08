@@ -91,6 +91,18 @@ export interface WikipediaFetchPayload {
   resolved_slug?: string
   resolved_lang?: string
   canonical_wikipedia_slug?: string
+  /** Difficulté suggérée automatiquement (1–5) basée sur sitelinks Wikidata + pageviews mensuels */
+  suggested_difficulty?: number
+}
+
+export interface WikiPrefetchPoolEntry {
+  id: number
+  source_slug: string
+  resolved_slug: string | null
+  status: 'ready' | 'processing' | 'failed'
+  error_message: string | null
+  expires_at: number
+  updated_at: string
 }
 
 export interface SeriesPayload {
@@ -579,12 +591,66 @@ export async function fetchRandomWikiSlugs(lang = 'fr', minFame = 30): Promise<{
   return request<{ slugs: string[] }>(`/api/admin/wiki-persons/random?lang=${encodeURIComponent(lang)}&minFame=${minFame}`)
 }
 
+export async function fetchRandomPrefetchedWikipediaPerson(lang = 'fr', minFame = 30): Promise<WikipediaFetchPayload> {
+  return request<WikipediaFetchPayload>(
+    `/api/admin/wiki-persons/random-prefetched?lang=${encodeURIComponent(lang)}&minFame=${minFame}`
+  )
+}
+
+export async function getWikiPrefetchPool(
+  lang = 'fr',
+  minFame = 30,
+  limit = 100
+): Promise<{ lang: string; minFame: number; stats: { processing: number; ready: number; failed: number; total: number }; entries: WikiPrefetchPoolEntry[] }> {
+  return request<{ lang: string; minFame: number; stats: { processing: number; ready: number; failed: number; total: number }; entries: WikiPrefetchPoolEntry[] }>(
+    `/api/admin/wiki-persons/prefetch-pool?lang=${encodeURIComponent(lang)}&minFame=${minFame}&limit=${limit}`
+  )
+}
+
+export async function getWikiPrefetchSettings(): Promise<{ enabled: boolean }> {
+  return request<{ enabled: boolean }>('/api/admin/wiki-prefetch/settings')
+}
+
+export async function setWikiPrefetchSettings(enabled: boolean): Promise<{ ok: boolean; enabled: boolean }> {
+  return request<{ ok: boolean; enabled: boolean }>('/api/admin/wiki-prefetch/settings', {
+    method: 'PUT',
+    body: JSON.stringify({ enabled }),
+  })
+}
+
 /** `input` : nom affiché, titre, slug avec underscores ou URL complète Wikipédia */
 export async function fetchWikipediaPerson(input: string, lang = 'fr'): Promise<WikipediaFetchPayload> {
-  return request<WikipediaFetchPayload>('/api/admin/wiki-persons/fetch-wikipedia', {
+  const res = await fetch(`${BASE_URL}/api/admin/wiki-persons/fetch-wikipedia`, {
     method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ input, lang }),
   })
+  if (res.status === 401) {
+    window.location.href = '/admin/login'
+    throw new Error('Session admin expirée. Reconnecte-toi.')
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({} as { error?: string; message?: string }))
+    const backendMessage =
+      (body as { error?: string; message?: string }).error
+      ?? (body as { error?: string; message?: string }).message
+      ?? ''
+    if (res.status === 429) {
+      throw new Error('Trop de requêtes vers Wikipedia/Wikidata. Attends 3-5 secondes puis réessaie.')
+    }
+    if (res.status === 504) {
+      throw new Error('Wikipedia met trop de temps à répondre. Réessaie ou passe en EN pour cette personne.')
+    }
+    if (res.status === 404) {
+      throw new Error(backendMessage || 'Aucune page trouvée. Vérifie le nom, le slug ou essaie en EN.')
+    }
+    if (res.status === 400) {
+      throw new Error(backendMessage || 'Entrée invalide. Renseigne un nom, un slug ou une URL Wikipedia.')
+    }
+    throw new Error(backendMessage || `Erreur serveur (${res.status}).`)
+  }
+  return res.json() as Promise<WikipediaFetchPayload>
 }
 
 export async function createSeries(payload: SeriesPayload): Promise<AdminSeries> {
