@@ -150,7 +150,7 @@ Effets des flags :
 | `IMAGE_SOURCE` | `tmdb` | `tmdb` ou `local` |
 | `MAX_ATTEMPTS` | `5` | Nombre de tentatives par défi films/séries |
 | `WIKI_MAX_ATTEMPTS` | `5` | Nombre de tentatives par défi WikiGuessr (optionnel) |
-| `BACKEND_URL` | — | URL publique du backend (pour les URLs d'images uploadées) |
+| `UPLOADS_DIRECTORY` | `/data/uploads` en Docker | Dossier disque pour les fichiers uploadés depuis l’admin (même volume que la DB recommandé) |
 
 ## Changements backend récents
 
@@ -205,7 +205,7 @@ Le frontend est buildé dans `backend/public/` et servi directement par Express 
 ### Première mise en production
 
 1. Créer le service Railway et lier le repo
-2. Ajouter un **volume persistant** monté sur `/data` (pour la base SQLite)
+2. Ajouter un **volume persistant** monté sur `/data` (base SQLite + dossier `uploads` des images envoyées depuis l’admin)
 3. Configurer toutes les variables d'environnement (voir tableau ci-dessus + `.env.example`)
 4. Déployer — Railway détecte le `Dockerfile` automatiquement
 5. Après le premier déploiement réussi, peupler la base depuis la console Railway :
@@ -219,7 +219,6 @@ Le frontend est buildé dans `backend/public/` et servi directement par Express 
 COOKIE_SECRET=<openssl rand -hex 32>
 ADMIN_PASSWORD=<mot de passe fort, 12+ caractères>
 CORS_ORIGIN=https://votre-app.up.railway.app
-BACKEND_URL=https://votre-app.up.railway.app
 TMDB_API_KEY=<votre clé TMDB>
 ```
 
@@ -229,7 +228,7 @@ TMDB_API_KEY=<votre clé TMDB>
 - [ ] `ADMIN_PASSWORD` fort et unique (≥ 12 caractères)
 - [ ] `ADMIN_USERNAME` défini (recommandé pour le double facteur identifiant + mot de passe)
 - [ ] `CORS_ORIGIN` pointe vers le bon domaine (sans slash final)
-- [ ] `BACKEND_URL` configuré pour les URLs d'images uploadées
+- [ ] Volume `/data` : la DB **et** les fichiers sous `uploads` survivent aux redéploiements (`UPLOADS_DIRECTORY=/data/uploads` est défini par le Dockerfile ; surcharge possible)
 - [ ] Volume persistant Railway monté sur `/data`
 - [ ] HTTPS activé (Railway le fait automatiquement)
 - [ ] Au moins 2 semaines de défis planifiés dans le back office (films, séries, wiki)
