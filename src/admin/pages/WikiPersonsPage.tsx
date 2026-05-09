@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Plus, Search, X, WandSparkles, ExternalLink, Trash2, Pencil, Shuffle, History } from 'lucide-react'
+import { Plus, Search, X, WandSparkles, ExternalLink, Trash2, Pencil, Shuffle, History, Loader2, Upload } from 'lucide-react'
 import {
   getWikiPersons,
   createWikiPerson,
@@ -8,6 +8,7 @@ import {
   fetchWikipediaPerson,
   fetchRandomPrefetchedWikipediaPerson,
   fetchRandomWikiSlugs,
+  uploadImage,
   type AdminWikiPerson,
   type WikiPersonPayload,
 } from '../api'
@@ -15,6 +16,12 @@ import { AdminLayout } from '../components/AdminLayout'
 
 // Module-level pool — persists across modal open/close cycles
 const _wikiSlugPool: string[] = []
+
+function resolveWikiPhotoPreview(url: string): string {
+  if (!url) return ''
+  if (url.startsWith('http') || url.startsWith('/uploads/')) return url
+  return url
+}
 
 function personTypeLabel(personType: PersonType): string {
   switch (personType) {
@@ -312,6 +319,8 @@ function WikiPersonForm({
   const [error, setError] = useState<string | null>(null)
   const [parseScore, setParseScore] = useState<number | null>(null)
   const [parseWarnings, setParseWarnings] = useState<string[]>([])
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const photoFileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const raw = initial?.infobox_data ?? {}
@@ -878,10 +887,42 @@ function WikiPersonForm({
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Photo URL</label>
-          <input value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          <input value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="https://… ou chemin /uploads/…" />
+          <div className="flex gap-2 mt-2">
+            <input
+              ref={photoFileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (!file) return
+                setUploadingPhoto(true)
+                setError(null)
+                try {
+                  const url = await uploadImage(file)
+                  setPhotoUrl(url)
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : 'Échec de l’upload')
+                } finally {
+                  setUploadingPhoto(false)
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => photoFileRef.current?.click()}
+              disabled={uploadingPhoto}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+            >
+              {uploadingPhoto ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+              {uploadingPhoto ? 'Upload…' : 'Importer une image'}
+            </button>
+          </div>
           {photoUrl.trim() && (
             <img
-              src={photoUrl}
+              src={resolveWikiPhotoPreview(photoUrl)}
               alt="Aperçu"
               className="mt-2 h-24 w-24 rounded-lg object-cover object-top border border-gray-200"
               referrerPolicy="no-referrer"
@@ -1053,7 +1094,7 @@ export function WikiPersonsPage() {
                           <div className="flex items-center gap-3">
                             <div className="shrink-0">
                               {person.photo_url ? (
-                                <img src={person.photo_url} alt={person.name}
+                                <img src={resolveWikiPhotoPreview(person.photo_url)} alt={person.name}
                                   className="h-10 w-14 rounded-md object-cover object-top border border-gray-200"
                                   referrerPolicy="no-referrer"
                                   onError={(e) => { e.currentTarget.style.display = 'none' }} />
@@ -1084,7 +1125,7 @@ export function WikiPersonsPage() {
                       <tr key={`d-${person.id}`} className="hidden sm:table-row hover:bg-gray-50 group">
                         <td className="px-3 py-3 w-20">
                           {person.photo_url ? (
-                            <img src={person.photo_url} alt={person.name}
+                            <img src={resolveWikiPhotoPreview(person.photo_url)} alt={person.name}
                               className="h-10 w-16 rounded-md object-cover object-top border border-gray-200"
                               referrerPolicy="no-referrer"
                               onError={(e) => { e.currentTarget.style.display = 'none' }} />

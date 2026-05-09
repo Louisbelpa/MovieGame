@@ -10,6 +10,7 @@ import { normalise, isGuessCorrect } from '../lib/matching.js';
 import { escapeHtml } from '../lib/utils.js';
 
 const MAX_ATTEMPTS = parseInt(process.env.MAX_ATTEMPTS ?? '5', 10);
+const WIKI_MAX_ATTEMPTS = parseInt(process.env.WIKI_MAX_ATTEMPTS ?? '5', 10);
 const MAX_HINTS = 3;
 const VALID_HINTS = new Set(['year', 'director', 'creator', 'genres', 'cast', 'tagline', 'synopsis']);
 const IMAGE_SOURCE = process.env.IMAGE_SOURCE ?? 'tmdb';
@@ -473,6 +474,76 @@ export function getGlobalStats() {
         .filter(([k]) => Number(k) <= MAX_ATTEMPTS)
     ),
     lastUpdated: stats.last_updated,
+  };
+}
+
+/** Stats anonymes pour un défi précis — parties `game_sessions` liées à ce `challenge_id`. */
+export function getCommunityStatsForChallengeId(challengeId: number) {
+  const ch = db
+    .prepare<[number], { id: number; media_type: string }>(
+      `SELECT id, media_type FROM daily_challenges WHERE id = ? AND is_active = 1`
+    )
+    .get(challengeId);
+
+  if (!ch) {
+    return {
+      totalGames: 0,
+      totalWins: 0,
+      totalLosses: 0,
+      winRate: 0,
+      winsByAttempt: {} as Record<string, number>,
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+
+  const maxA = ch.media_type === 'wiki' ? WIKI_MAX_ATTEMPTS : MAX_ATTEMPTS;
+
+  const agg = db
+    .prepare<
+      [number],
+      { total_games: number; total_wins: number | null; total_losses: number | null } | undefined
+    >(
+      `SELECT COUNT(*) AS total_games,
+              SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) AS total_wins,
+              SUM(CASE WHEN outcome = 'lost' THEN 1 ELSE 0 END) AS total_losses
+       FROM game_sessions
+       WHERE challenge_id = ? AND outcome IS NOT NULL`
+    )
+    .get(challengeId);
+
+  const totalGames = agg?.total_games ?? 0;
+  const totalWins = Number(agg?.total_wins ?? 0);
+  const totalLosses = Number(agg?.total_losses ?? 0);
+
+  const rows = db
+    .prepare(
+      `SELECT json_array_length(attempts) AS n, COUNT(*) AS c
+       FROM game_sessions
+       WHERE challenge_id = ? AND outcome = 'won'
+       GROUP BY json_array_length(attempts)`
+    )
+    .all(challengeId) as { n: number; c: number }[];
+
+  const winsByAttempt: Record<string, number> = {};
+  for (let i = 1; i <= maxA; i += 1) {
+    winsByAttempt[String(i)] = 0;
+  }
+  for (const r of rows) {
+    if (Number.isFinite(r.n) && r.n >= 1 && r.n <= maxA) {
+      winsByAttempt[String(r.n)] = r.c;
+    }
+  }
+
+  const winRate =
+    totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0;
+
+  return {
+    totalGames,
+    totalWins,
+    totalLosses,
+    winRate,
+    winsByAttempt,
+    lastUpdated: new Date().toISOString(),
   };
 }
 

@@ -325,7 +325,7 @@ function ChallengeCard({ challenge }: { challenge: AdminChallenge }) {
       <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
         isWiki ? 'bg-slate-100 text-slate-700' : isSeries ? 'bg-violet-100 text-violet-700' : 'bg-indigo-100 text-indigo-700'
       }`}>
-        #{challenge.id}
+        #{challenge.challengeNumber}
       </span>
     </div>
   )

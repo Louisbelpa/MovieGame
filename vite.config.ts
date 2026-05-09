@@ -9,7 +9,8 @@ const { version } = JSON.parse(readFileSync('./package.json', 'utf-8'))
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const enableSeries = env.VITE_ENABLE_SERIES === 'true'
-  const siteUrl = enableSeries ? 'https://guesstoday.fr' : 'https://cineguessr.fr'
+  const fromEnv = env.VITE_PUBLIC_SITE_URL?.trim().replace(/\/$/, '')
+  const siteUrl = fromEnv || (enableSeries ? 'https://guesstoday.fr' : 'https://cineguessr.fr')
   const brandName = enableSeries ? 'GuessToday' : 'CinéGuessr'
   const siteDesc = enableSeries
     ? 'GuessToday : devine chaque jour un film, une série ou une personnalité mystère. Jeu quotidien gratuit, style Wordle.'
@@ -29,6 +30,7 @@ export default defineConfig(({ mode }) => {
           .replace(/%SITE_URL%/g, siteUrl)
           .replace(/%BRAND_NAME%/g, brandName)
           .replace(/%SITE_DESC%/g, siteDesc)
+          .replace(/%OG_ASSET_VERSION%/g, version)
       },
       closeBundle() {
         const outDir = 'backend/public'

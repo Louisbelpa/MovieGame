@@ -79,3 +79,28 @@ describe('GET /api/stats — global stats trigger', () => {
     expect(res.body.winRate).toBe(0);
   });
 });
+
+// ─── GET /api/stats/challenge — per-challenge community stats ─────────────────
+
+describe('GET /api/stats/challenge', () => {
+  it('returns distribution only for the given challengeId', async () => {
+    const agent = request.agent(app);
+    const filmId = createFilm({ title: 'Daily Dist' });
+    createChallenge({ filmId, date: today() });
+    const todayRes = await agent.get('/api/challenge/today');
+    const { challengeId } = todayRes.body as { challengeId: number };
+    await agent.post('/api/challenge/guess').send({ challengeId, guess: 'Daily Dist' });
+
+    const res = await request(app).get(`/api/stats/challenge?challengeId=${challengeId}`);
+    expect(res.status).toBe(200);
+    expect(res.body.totalWins).toBe(1);
+    expect(res.body.totalGames).toBe(1);
+    const w = res.body.winsByAttempt as Record<string, number>;
+    expect(w['1']).toBe(1);
+  });
+
+  it('returns 400 without challengeId', async () => {
+    const res = await request(app).get('/api/stats/challenge');
+    expect(res.status).toBe(400);
+  });
+});

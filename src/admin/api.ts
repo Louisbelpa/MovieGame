@@ -134,6 +134,8 @@ export interface TmdbTvSearchResult {
 
 export interface AdminChallenge {
   id: number
+  /** Numéro affiché côté joueur (#N dans le header / partages) — pas l’id SQL */
+  challengeNumber: number
   date: string
   film: AdminFilm | null
   series: AdminSeries | null

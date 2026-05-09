@@ -354,6 +354,7 @@ function formatChallenge(row: ChallengeRow) {
       .get(row.wiki_person_id)!;
     return {
       id: row.id,
+      challengeNumber: row.challenge_number,
       date: row.challenge_date,
       film: null,
       series: null,
@@ -367,6 +368,7 @@ function formatChallenge(row: ChallengeRow) {
       .get(row.series_id)!;
     return {
       id: row.id,
+      challengeNumber: row.challenge_number,
       date: row.challenge_date,
       film: null,
       series: formatSeries(series, getSeriesUsedDates(series.id)),
@@ -379,6 +381,7 @@ function formatChallenge(row: ChallengeRow) {
     .get(row.film_id!)!;
   return {
     id: row.id,
+    challengeNumber: row.challenge_number,
     date: row.challenge_date,
     film: formatFilm(film, getFilmUsedDates(film.id)),
     series: null,
@@ -445,18 +448,18 @@ function formatChallengesBatch(rows: ChallengeRow[]): ReturnType<typeof formatCh
   return rows.map(row => {
     if (row.wiki_person_id) {
       const person = wikiMap.get(row.wiki_person_id)!;
-      return { id: row.id, date: row.challenge_date, film: null, series: null,
+      return { id: row.id, challengeNumber: row.challenge_number, date: row.challenge_date, film: null, series: null,
         wiki: formatWikiPerson(person, usedDatesMap[`wiki:${person.id}`] ?? []),
         mediaType: 'wiki' as const }
     }
     if (row.series_id) {
       const series = seriesMap.get(row.series_id)!;
-      return { id: row.id, date: row.challenge_date, film: null,
+      return { id: row.id, challengeNumber: row.challenge_number, date: row.challenge_date, film: null,
         series: formatSeries(series, usedDatesMap[`series:${series.id}`] ?? []),
         wiki: null, mediaType: 'series' as const }
     }
     const film = filmMap.get(row.film_id!)!;
-    return { id: row.id, date: row.challenge_date,
+    return { id: row.id, challengeNumber: row.challenge_number, date: row.challenge_date,
       film: formatFilm(film, usedDatesMap[`film:${film.id}`] ?? []),
       series: null, wiki: null, mediaType: 'film' as const }
   })

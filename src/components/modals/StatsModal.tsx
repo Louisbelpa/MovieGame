@@ -10,6 +10,8 @@ export interface StatsModalProps {
   isOpen: boolean
   onClose: () => void
   mode: 'film' | 'series' | 'wiki'
+  /** Ligne sous « Résultats de la communauté » (ex. date du défi affiché) */
+  communityDateLabel?: string | null
   globalStats: {
     totalGames: number
     totalWins: number
@@ -28,6 +30,7 @@ export function StatsModal({
   isOpen,
   onClose,
   mode,
+  communityDateLabel,
   globalStats,
   personalStats,
 }: StatsModalProps) {
@@ -50,9 +53,12 @@ export function StatsModal({
         </div>
 
         <div>
-          <p className="text-sm font-semibold text-film-text-dim uppercase tracking-wider mb-3">
+          <p className={`text-sm font-semibold text-film-text-dim uppercase tracking-wider ${communityDateLabel ? 'mb-1' : 'mb-3'}`}>
             Résultats de la communauté
           </p>
+          {communityDateLabel && (
+            <p className="text-xs text-film-text-dim/90 mb-3">{communityDateLabel}</p>
+          )}
           <DistributionChart distribution={globalStats.winsByAttempt} />
         </div>
       </div>

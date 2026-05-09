@@ -9,4 +9,9 @@ export const FEATURES = {
 } as const
 
 export const BRAND_NAME = FEATURES.enableSeries ? 'GuessToday' : 'CinéGuessr'
-export const PUBLIC_SITE_URL = FEATURES.enableSeries ? 'https://guesstoday.fr' : 'https://cineguessr.fr'
+
+const publicSiteFromEnv = import.meta.env.VITE_PUBLIC_SITE_URL as string | undefined
+const normalizedPublic = publicSiteFromEnv?.trim().replace(/\/$/, '')
+
+export const PUBLIC_SITE_URL =
+  normalizedPublic || (FEATURES.enableSeries ? 'https://guesstoday.fr' : 'https://cineguessr.fr')

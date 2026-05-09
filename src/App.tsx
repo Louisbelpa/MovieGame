@@ -11,9 +11,8 @@ const StatsModal = lazy(() => import('./components/modals/StatsModal').then((m) 
 import { FEATURES } from './config/features'
 import { useGameStore } from './store/gameStore'
 import { useWikiStore } from './store/wikiStore'
-import { fetchGlobalStats } from './api/client'
+import { fetchChallengeCommunityStats } from './api/client'
 import type { GlobalStatsPayload } from './api/client'
-import { fetchWikiGlobalStats } from './api/wikiClient'
 import { loadStats } from './lib/storage'
 
 const EMPTY_GLOBAL_STATS: GlobalStatsPayload = {
@@ -28,7 +27,7 @@ const EMPTY_GLOBAL_STATS: GlobalStatsPayload = {
 function GameModals({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
   const ui = useGameStore((s) => s.ui)
   const closeModal = useGameStore((s) => s.closeModal)
-  const gameType = useGameStore((s) => s.gameType)
+  const challenge = useGameStore((s) => s.challenge)
   const [globalStats, setGlobalStats] = useState<GlobalStatsPayload>(EMPTY_GLOBAL_STATS)
 
   const statsType = mode === 'series' ? 'series' : 'film'
@@ -42,12 +41,27 @@ function GameModals({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
       : 0,
   }), [personalStatsRaw])
 
+  const communityDateLabel =
+    challenge?.date != null
+      ? `Pour le défi du ${new Date(challenge.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })} (tous les joueurs)`
+      : null
+
   useEffect(() => {
     if (!ui.isModalOpen || ui.modalType !== 'stats') return
-    fetchGlobalStats()
+    const id = challenge && 'challengeId' in challenge ? challenge.challengeId : null
+    if (id == null) {
+      setGlobalStats(EMPTY_GLOBAL_STATS)
+      return
+    }
+    fetchChallengeCommunityStats(id)
       .then(setGlobalStats)
       .catch(() => setGlobalStats(EMPTY_GLOBAL_STATS))
-  }, [ui.isModalOpen, ui.modalType, mode, gameType])
+  }, [ui.isModalOpen, ui.modalType, challenge?.challengeId])
 
   return (
     <Suspense>
@@ -57,6 +71,7 @@ function GameModals({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
         isOpen={ui.isModalOpen && ui.modalType === 'stats'}
         onClose={closeModal}
         mode={mode === 'series' ? 'series' : 'film'}
+        communityDateLabel={communityDateLabel}
         globalStats={globalStats}
         personalStats={personalStats}
       />
@@ -67,6 +82,7 @@ function GameModals({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
 function WikiModals() {
   const ui = useWikiStore((s) => s.ui)
   const closeModal = useWikiStore((s) => s.closeModal)
+  const challenge = useWikiStore((s) => s.challenge)
   const [globalStats, setGlobalStats] = useState<GlobalStatsPayload>(EMPTY_GLOBAL_STATS)
 
   const personalStatsRaw = useMemo(() => loadStats('wiki'), [ui.modalType, ui.isModalOpen])
@@ -79,12 +95,27 @@ function WikiModals() {
       : 0,
   }), [personalStatsRaw])
 
+  const communityDateLabel =
+    challenge?.date != null
+      ? `Pour le défi du ${new Date(challenge.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })} (tous les joueurs)`
+      : null
+
   useEffect(() => {
     if (!ui.isModalOpen || ui.modalType !== 'stats') return
-    fetchWikiGlobalStats()
+    const id = challenge && 'challengeId' in challenge ? challenge.challengeId : null
+    if (id == null) {
+      setGlobalStats(EMPTY_GLOBAL_STATS)
+      return
+    }
+    fetchChallengeCommunityStats(id)
       .then(setGlobalStats)
       .catch(() => setGlobalStats(EMPTY_GLOBAL_STATS))
-  }, [ui.isModalOpen, ui.modalType])
+  }, [ui.isModalOpen, ui.modalType, challenge?.challengeId])
 
   return (
     <Suspense>
@@ -94,6 +125,7 @@ function WikiModals() {
         isOpen={ui.isModalOpen && ui.modalType === 'stats'}
         onClose={closeModal}
         mode="wiki"
+        communityDateLabel={communityDateLabel}
         globalStats={globalStats}
         personalStats={personalStats}
       />
