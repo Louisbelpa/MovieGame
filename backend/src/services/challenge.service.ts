@@ -13,6 +13,27 @@ const MAX_ATTEMPTS = parseInt(process.env.MAX_ATTEMPTS ?? '5', 10);
 const WIKI_MAX_ATTEMPTS = parseInt(process.env.WIKI_MAX_ATTEMPTS ?? '5', 10);
 const MAX_HINTS = 3;
 const VALID_HINTS = new Set(['year', 'director', 'creator', 'genres', 'cast', 'tagline', 'synopsis']);
+
+const DEFAULT_FILM_HINT_SCHEDULE = JSON.stringify(['year', 'director', 'cast']);
+const DEFAULT_SERIES_HINT_SCHEDULE = JSON.stringify(['year', 'creator', 'cast']);
+
+/** Filtre et sérialise les clés d’indices pour un film (pas de clé « creator »). */
+export function normalizeFilmHintScheduleJson(input: unknown): string {
+  const raw = Array.isArray(input) ? input.map(String) : [];
+  const filtered = raw.filter((h) => VALID_HINTS.has(h) && h !== 'creator');
+  const deduped = [...new Set(filtered)];
+  if (deduped.length === 0) return DEFAULT_FILM_HINT_SCHEDULE;
+  return JSON.stringify(deduped);
+}
+
+/** Filtre et sérialise les clés d’indices pour une série (pas de clé « director »). */
+export function normalizeSeriesHintScheduleJson(input: unknown): string {
+  const raw = Array.isArray(input) ? input.map(String) : [];
+  const filtered = raw.filter((h) => VALID_HINTS.has(h) && h !== 'director');
+  const deduped = [...new Set(filtered)];
+  if (deduped.length === 0) return DEFAULT_SERIES_HINT_SCHEDULE;
+  return JSON.stringify(deduped);
+}
 const IMAGE_SOURCE = process.env.IMAGE_SOURCE ?? 'tmdb';
 const TMDB_BASE = process.env.TMDB_IMAGE_BASE_URL ?? 'https://image.tmdb.org/t/p/w500';
 
@@ -31,6 +52,7 @@ interface FilmRow {
   image_url: string;
   image_blurred_url: string | null;
   tmdb_id: number | null;
+  hint_schedule: string;
 }
 
 interface SeriesRow {
@@ -49,6 +71,10 @@ interface SeriesRow {
   number_of_seasons: number | null;
   network: string | null;
   status: string | null;
+  original_language?: string | null;
+  fame_level?: number;
+  is_active?: number;
+  hint_schedule: string;
 }
 
 interface ChallengeRow {
@@ -276,8 +302,8 @@ export function buildChallengePayload(
 
 /** Aperçu admin : même rendu qu’au démarrage du défi film (fiche en base). */
 export function buildFilmAdminPreviewPayload(filmId: number) {
-  const row = db.prepare<[number], { id: number }>(`SELECT id FROM films WHERE id = ?`).get(filmId);
-  if (!row) throw Object.assign(new Error('Film not found'), { status: 404 });
+  const filmRow = db.prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`).get(filmId);
+  if (!filmRow) throw Object.assign(new Error('Film not found'), { status: 404 });
 
   const today = getTodayParis();
   const fakeChallenge: ChallengeRow = {
@@ -286,7 +312,7 @@ export function buildFilmAdminPreviewPayload(filmId: number) {
     film_id: filmId,
     series_id: null,
     challenge_number: 1,
-    hint_schedule: JSON.stringify(['year', 'director', 'cast']),
+    hint_schedule: normalizeFilmHintScheduleJson(JSON.parse(filmRow.hint_schedule || DEFAULT_FILM_HINT_SCHEDULE)),
     media_type: 'film',
   };
   const previewSession: SessionRow = {
@@ -312,8 +338,8 @@ export function buildFilmAdminPreviewPayload(filmId: number) {
 
 /** Aperçu admin : même rendu qu’au démarrage du défi série. */
 export function buildSeriesAdminPreviewPayload(seriesId: number) {
-  const row = db.prepare<[number], { id: number }>(`SELECT id FROM series WHERE id = ?`).get(seriesId);
-  if (!row) throw Object.assign(new Error('Series not found'), { status: 404 });
+  const seriesRow = db.prepare<[number], SeriesRow>(`SELECT * FROM series WHERE id = ?`).get(seriesId);
+  if (!seriesRow) throw Object.assign(new Error('Series not found'), { status: 404 });
 
   const today = getTodayParis();
   const fakeChallenge: ChallengeRow = {
@@ -322,7 +348,7 @@ export function buildSeriesAdminPreviewPayload(seriesId: number) {
     film_id: null,
     series_id: seriesId,
     challenge_number: 1,
-    hint_schedule: JSON.stringify(['year', 'creator', 'cast']),
+    hint_schedule: normalizeSeriesHintScheduleJson(JSON.parse(seriesRow.hint_schedule || DEFAULT_SERIES_HINT_SCHEDULE)),
     media_type: 'series',
   };
   const previewSession: SessionRow = {
@@ -340,6 +366,81 @@ export function buildSeriesAdminPreviewPayload(seriesId: number) {
   return {
     ...inner,
     challengeId: 0,
+    hasPrevChallenge: false,
+    hasNextChallenge: false,
+    isPreview: true as const,
+  };
+}
+
+export interface FilmSeriesDraftPreviewInput {
+  mode: 'film' | 'series';
+  year: number;
+  director?: string | null;
+  creator?: string | null;
+  genres: string[];
+  cast_members: string[];
+  tagline?: string | null;
+  synopsis?: string | null;
+  image_url: string;
+  hint_schedule: unknown;
+}
+
+/** Aperçu admin depuis le formulaire (sans enregistrement). */
+export function buildFilmSeriesDraftPreviewPayload(body: FilmSeriesDraftPreviewInput) {
+  const genresJson = JSON.stringify(Array.isArray(body.genres) ? body.genres : []);
+  const castJson = JSON.stringify(Array.isArray(body.cast_members) ? body.cast_members : []);
+  const directorOrCreator =
+    body.mode === 'film'
+      ? String(body.director ?? '').trim()
+      : String(body.creator ?? '').trim();
+
+  const scheduleJson =
+    body.mode === 'film'
+      ? normalizeFilmHintScheduleJson(body.hint_schedule)
+      : normalizeSeriesHintScheduleJson(body.hint_schedule);
+  const schedule = (JSON.parse(scheduleJson) as string[])
+    .filter((h) => VALID_HINTS.has(h))
+    .slice(0, MAX_HINTS);
+
+  const hintsRevealed = Math.min(MAX_HINTS, schedule.length);
+  const hints = schedule.slice(0, hintsRevealed).map((type) => {
+    switch (type) {
+      case 'year':
+        return { type, value: body.year };
+      case 'director':
+      case 'creator':
+        return { type, value: directorOrCreator };
+      case 'genres':
+        return { type, value: JSON.parse(genresJson) as string[] };
+      case 'cast': {
+        const cast = JSON.parse(castJson) as string[];
+        return { type, value: cast.slice(0, 1) };
+      }
+      case 'tagline':
+        return { type, value: body.tagline ?? '' };
+      case 'synopsis':
+        return { type, value: body.synopsis ?? '' };
+      default:
+        return { type, value: null };
+    }
+  });
+
+  const today = getTodayParis();
+  return {
+    challengeId: 0,
+    challengeNumber: 1,
+    date: today,
+    isPastChallenge: false,
+    mediaType: body.mode === 'film' ? ('film' as const) : ('series' as const),
+    imageUrl: resolveImageUrl(body.image_url.trim()),
+    isGameOver: false,
+    hintsAvailable: schedule.length,
+    hintsRevealed,
+    hints,
+    attemptsUsed: 0,
+    maxAttempts: MAX_ATTEMPTS,
+    attempts: [] as { guess: string; correct: boolean }[],
+    outcome: null as 'won' | 'lost' | null,
     hasPrevChallenge: false,
     hasNextChallenge: false,
     isPreview: true as const,

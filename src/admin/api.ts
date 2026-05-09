@@ -25,6 +25,8 @@ export interface AdminFilm {
   is_active: boolean
   used_dates: string[]  // ISO dates this film has been scheduled
   fame_level: number    // 1–5, auto-filled from TMDB vote_count
+  /** Ordre des clés d’indices copié vers le calendrier à la planification */
+  hint_schedule: string[]
 }
 
 export interface AdminSeries {
@@ -46,6 +48,7 @@ export interface AdminSeries {
   network: string | null
   status: string | null
   original_language: string | null
+  hint_schedule: string[]
 }
 
 export interface AdminWikiPerson {
@@ -108,6 +111,23 @@ export interface WikiPrefetchPoolEntry {
   updated_at: string
   /** Présent si `status === 'ready'` — données `fetchWikipediaData` (aperçu admin) */
   payload: WikipediaFetchPayload | null
+  /** Aligné sur `wiki_persons.wikipedia_slug` (colonnes pool + champs JSON slug). */
+  has_wiki_person: boolean
+  wiki_person_id: number | null
+}
+
+export type WikiPrefetchPoolHasWikiFilter = 'all' | 'yes' | 'no'
+
+export interface WikiPrefetchPoolResponse {
+  lang: string
+  minFame: number
+  stats: { processing: number; ready: number; failed: number; total: number }
+  page: number
+  pageSize: number
+  totalMatching: number
+  totalPages: number
+  hasWikiPersonFilter: WikiPrefetchPoolHasWikiFilter
+  entries: WikiPrefetchPoolEntry[]
 }
 
 export interface SeriesPayload {
@@ -127,6 +147,7 @@ export interface SeriesPayload {
   network: string | null
   status: string | null
   original_language: string | null
+  hint_schedule: string[]
 }
 
 export interface TmdbTvSearchResult {
@@ -197,6 +218,7 @@ export interface FilmPayload {
   tmdb_id: number | null
   is_active: boolean
   fame_level: number
+  hint_schedule: string[]
 }
 
 export interface TmdbSearchResult {
@@ -602,12 +624,68 @@ export async function fetchWikiPoolEntryGamePreview(poolEntryId: number): Promis
   return request<WikiChallengePayload>(`/api/admin/wiki-prefetch-pool/${poolEntryId}/game-preview`)
 }
 
+export interface WikiPersonDraftPreviewBody {
+  name: string
+  person_type: string
+  infobox_data: Record<string, unknown>
+  hint_schedule: string[]
+  photo_url: string | null
+  extract: string | null
+  wikipedia_url: string | null
+  difficulty: number
+}
+
+export async function postWikiPersonDraftPreview(body: WikiPersonDraftPreviewBody): Promise<WikiChallengePayload> {
+  return request<WikiChallengePayload>('/api/admin/wiki-persons/preview-draft', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function refetchWikiPrefetchPoolEntry(
+  poolEntryId: number
+): Promise<{ ok: boolean; status: 'ready' | 'failed'; error?: string }> {
+  return request<{ ok: boolean; status: 'ready' | 'failed'; error?: string }>(
+    `/api/admin/wiki-prefetch-pool/${poolEntryId}/refetch`,
+    { method: 'POST' }
+  )
+}
+
+export async function importWikiPersonFromPrefetchPool(poolEntryId: number): Promise<{ id: number }> {
+  return request<{ id: number }>(`/api/admin/wiki-prefetch-pool/${poolEntryId}/import-wiki-person`, {
+    method: 'POST',
+  })
+}
+
 export async function fetchFilmGamePreview(filmId: number): Promise<ChallengePayload> {
   return request<ChallengePayload>(`/api/admin/films/${filmId}/game-preview`)
 }
 
 export async function fetchSeriesGamePreview(seriesId: number): Promise<ChallengePayload> {
   return request<ChallengePayload>(`/api/admin/series/${seriesId}/game-preview`)
+}
+
+/** Brouillon film/série pour aperçu sans enregistrement (aligné sur FilmPayload / SeriesPayload utiles au rendu). */
+export interface FilmSeriesGamePreviewDraftBody {
+  mode: 'film' | 'series'
+  year: number
+  director?: string
+  creator?: string
+  genres: string[]
+  cast_members: string[]
+  tagline: string
+  synopsis: string
+  image_url: string
+  hint_schedule: string[]
+}
+
+export async function postFilmSeriesGamePreviewDraft(
+  body: FilmSeriesGamePreviewDraftBody
+): Promise<ChallengePayload> {
+  return request<ChallengePayload>('/api/admin/game-preview-draft', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
 }
 
 export async function fetchRandomWikiSlugs(lang = 'fr', minFame = 30): Promise<{ slugs: string[] }> {
@@ -620,14 +698,20 @@ export async function fetchRandomPrefetchedWikipediaPerson(lang = 'fr', minFame 
   )
 }
 
-export async function getWikiPrefetchPool(
-  lang = 'fr',
-  minFame = 30,
-  limit = 100
-): Promise<{ lang: string; minFame: number; stats: { processing: number; ready: number; failed: number; total: number }; entries: WikiPrefetchPoolEntry[] }> {
-  return request<{ lang: string; minFame: number; stats: { processing: number; ready: number; failed: number; total: number }; entries: WikiPrefetchPoolEntry[] }>(
-    `/api/admin/wiki-persons/prefetch-pool?lang=${encodeURIComponent(lang)}&minFame=${minFame}&limit=${limit}`
-  )
+export async function getWikiPrefetchPool(params: {
+  lang?: string
+  minFame?: number
+  page?: number
+  pageSize?: number
+  hasWikiPerson?: WikiPrefetchPoolHasWikiFilter
+}): Promise<WikiPrefetchPoolResponse> {
+  const q = new URLSearchParams()
+  q.set('lang', params.lang ?? 'fr')
+  q.set('minFame', String(params.minFame ?? 30))
+  q.set('page', String(params.page ?? 1))
+  q.set('pageSize', String(params.pageSize ?? 25))
+  q.set('hasWikiPerson', params.hasWikiPerson ?? 'all')
+  return request<WikiPrefetchPoolResponse>(`/api/admin/wiki-persons/prefetch-pool?${q.toString()}`)
 }
 
 export async function addWikiPrefetchPoolEntry(body: {
@@ -643,6 +727,22 @@ export async function addWikiPrefetchPoolEntry(body: {
 
 export async function getWikiPrefetchSettings(): Promise<{ enabled: boolean }> {
   return request<{ enabled: boolean }>('/api/admin/wiki-prefetch/settings')
+}
+
+export interface AdminSettingsSummary {
+  wikiPrefetchEnabled: boolean
+  wikiPrefetchTargetReady: number
+  wikiPrefetchMaxFetchPerRun: number
+  wikiPrefetchSparqlLimit: number
+  maxAttempts: number
+  wikiMaxAttempts: number
+  imageSource: 'tmdb' | 'local'
+  planningAlertConfigured: boolean
+  nodeEnv: 'production' | 'development'
+}
+
+export async function fetchAdminSettingsSummary(): Promise<AdminSettingsSummary> {
+  return request<AdminSettingsSummary>('/api/admin/settings/summary')
 }
 
 export async function setWikiPrefetchSettings(enabled: boolean): Promise<{ ok: boolean; enabled: boolean }> {

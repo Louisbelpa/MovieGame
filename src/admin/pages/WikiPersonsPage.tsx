@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Plus, Search, X, WandSparkles, ExternalLink, Trash2, Pencil, Shuffle, History, Loader2, Upload } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { Plus, Search, X, WandSparkles, ExternalLink, Trash2, Pencil, Shuffle, History, Loader2, Upload, Eye } from 'lucide-react'
 import {
   getWikiPersons,
   createWikiPerson,
@@ -11,8 +11,10 @@ import {
   uploadImage,
   type AdminWikiPerson,
   type WikiPersonPayload,
+  type WikiPersonDraftPreviewBody,
 } from '../api'
 import { AdminLayout } from '../components/AdminLayout'
+import { AdminFormSection, AdminFormSubheading } from '../components/AdminFormSection'
 import { WikiGamePreviewModal, WikiGamePreviewOpenButton } from '../components/WikiGamePreviewModal'
 
 // Module-level pool — persists across modal open/close cycles
@@ -79,10 +81,16 @@ interface SportInfoboxForm {
   sport: string | null
   position: string | null
   clubs: WikiClubFormRow[]
+  /** Aligné sur le parse Wikipédia ; vide si tout est dans `clubs` (le jeu peut scinder à l’affichage). */
+  clubs_youth: WikiClubFormRow[]
   career_highlights: CareerHighlightRow[]
   national_team: { name: string; caps: number | null; goals: number | null } | null
   birth_year: number | null
   nationality: string | null
+}
+
+function clubsRowsToText(rows: WikiClubFormRow[]): string {
+  return rows.map((c) => [c.name, c.start_year ?? '', c.end_year ?? '', c.appearances ?? '', c.goals ?? ''].join(' | ')).join('\n')
 }
 
 function careerHighlightsToLines(highlights: CareerHighlightRow[]): string {
@@ -176,7 +184,18 @@ function parseGenericInfobox(raw: Record<string, unknown>): {
   birth_year: number | null
   nationality: string | null
   company: string | null
+  highlights: CareerHighlightRow[]
 } {
+  const hlRaw = Array.isArray(raw.highlights) ? raw.highlights : []
+  const highlights: CareerHighlightRow[] = hlRaw
+    .map((item) => {
+      const h = item as Record<string, unknown>
+      return {
+        label: typeof h.label === 'string' ? h.label.trim() : '',
+        value: typeof h.value === 'string' ? h.value.trim() : '',
+      }
+    })
+    .filter((h) => h.value.length > 0)
   return {
     domain: typeof raw.domain === 'string' ? raw.domain : null,
     notable_work: typeof raw.notable_work === 'string' ? raw.notable_work : null,
@@ -184,6 +203,7 @@ function parseGenericInfobox(raw: Record<string, unknown>): {
     birth_year: typeof raw.birth_year === 'number' ? raw.birth_year : null,
     nationality: typeof raw.nationality === 'string' ? raw.nationality : null,
     company: typeof raw.company === 'string' ? raw.company : null,
+    highlights,
   }
 }
 
@@ -211,9 +231,8 @@ function parsePoliticianInfobox(raw: Record<string, unknown>): PoliticianInfobox
   }
 }
 
-function parseSportInfobox(raw: Record<string, unknown>): SportInfoboxForm {
-  const clubsRaw = Array.isArray(raw.clubs) ? raw.clubs : []
-  const clubs: WikiClubFormRow[] = clubsRaw
+function mapRawClubRows(raw: unknown[]): WikiClubFormRow[] {
+  return raw
     .map((c) => {
       const club = c as Record<string, unknown>
       return {
@@ -225,6 +244,13 @@ function parseSportInfobox(raw: Record<string, unknown>): SportInfoboxForm {
       }
     })
     .filter((c) => c.name)
+}
+
+function parseSportInfobox(raw: Record<string, unknown>): SportInfoboxForm {
+  const clubsRaw = Array.isArray(raw.clubs) ? raw.clubs : []
+  const youthRaw = Array.isArray(raw.clubs_youth) ? raw.clubs_youth : []
+  const clubs = mapRawClubRows(clubsRaw)
+  const clubs_youth = mapRawClubRows(youthRaw)
 
   const ntRaw = (raw.national_team && typeof raw.national_team === 'object')
     ? (raw.national_team as Record<string, unknown>)
@@ -245,6 +271,7 @@ function parseSportInfobox(raw: Record<string, unknown>): SportInfoboxForm {
     sport: typeof raw.sport === 'string' ? raw.sport : null,
     position: typeof raw.position === 'string' ? raw.position : null,
     clubs,
+    clubs_youth,
     career_highlights,
     national_team: ntRaw
       ? {
@@ -261,7 +288,7 @@ function parseSportInfobox(raw: Record<string, unknown>): SportInfoboxForm {
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl my-4 sm:my-8">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl my-4 sm:my-8">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
           <h2 className="text-base font-semibold text-gray-900 truncate pr-4">{title}</h2>
           <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
@@ -304,6 +331,7 @@ function WikiPersonForm({
   const [sport, setSport] = useState('')
   const [position, setPosition] = useState('')
   const [clubsText, setClubsText] = useState('')
+  const [clubsYouthText, setClubsYouthText] = useState('')
   const [nationalTeamName, setNationalTeamName] = useState('')
   const [nationalTeamCaps, setNationalTeamCaps] = useState('')
   const [nationalTeamGoals, setNationalTeamGoals] = useState('')
@@ -326,6 +354,15 @@ function WikiPersonForm({
 
   useEffect(() => {
     const raw = initial?.infobox_data ?? {}
+    if (initial) {
+      const rawRec = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {}
+      setParseScore(typeof rawRec.parse_quality_score === 'number' ? rawRec.parse_quality_score : null)
+      const pw = rawRec.parse_warnings
+      setParseWarnings(Array.isArray(pw) ? pw.filter((x): x is string => typeof x === 'string') : [])
+    } else {
+      setParseScore(null)
+      setParseWarnings([])
+    }
     const currentType = (initial?.person_type ?? personType)
     if (currentType === 'politician') {
       const p = parsePoliticianInfobox(raw)
@@ -338,6 +375,13 @@ function WikiPersonForm({
           .join('\n')
       )
       setCareerHighlightsText('')
+      setClubsText('')
+      setClubsYouthText('')
+      setSport('')
+      setPosition('')
+      setNationalTeamName('')
+      setNationalTeamCaps('')
+      setNationalTeamGoals('')
       setDomain('')
       setNotableWork('')
       setCompany('')
@@ -348,11 +392,8 @@ function WikiPersonForm({
       setPosition(s.position ?? '')
       setBirthYear(s.birth_year != null ? String(s.birth_year) : '')
       setNationality(s.nationality ?? '')
-      setClubsText(
-        s.clubs
-          .map((c) => [c.name, c.start_year ?? '', c.end_year ?? '', c.appearances ?? '', c.goals ?? ''].join(' | '))
-          .join('\n')
-      )
+      setClubsText(clubsRowsToText(s.clubs))
+      setClubsYouthText(clubsRowsToText(s.clubs_youth))
       setNationalTeamName(s.national_team?.name ?? '')
       setNationalTeamCaps(s.national_team?.caps != null ? String(s.national_team.caps) : '')
       setNationalTeamGoals(s.national_team?.goals != null ? String(s.national_team.goals) : '')
@@ -369,7 +410,14 @@ function WikiPersonForm({
       setNotableWork(g.notable_work ?? '')
       setCompany(g.company ?? '')
       setEra(g.era ?? '')
-      setCareerHighlightsText('')
+      setCareerHighlightsText(careerHighlightsToLines(g.highlights))
+      setClubsText('')
+      setClubsYouthText('')
+      setSport('')
+      setPosition('')
+      setNationalTeamName('')
+      setNationalTeamCaps('')
+      setNationalTeamGoals('')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial?.id])
@@ -431,6 +479,7 @@ function WikiPersonForm({
       setNationalTeamCaps('')
       setNationalTeamGoals('')
       setCareerHighlightsText('')
+      setClubsYouthText('')
       setDomain('')
       setNotableWork('')
       setCompany('')
@@ -444,11 +493,8 @@ function WikiPersonForm({
       setPosition(s.position ?? '')
       setBirthYear(s.birth_year != null ? String(s.birth_year) : '')
       setNationality(s.nationality ?? '')
-      setClubsText(
-        s.clubs
-          .map((c) => [c.name, c.start_year ?? '', c.end_year ?? '', c.appearances ?? '', c.goals ?? ''].join(' | '))
-          .join('\n')
-      )
+      setClubsText(clubsRowsToText(s.clubs))
+      setClubsYouthText(clubsRowsToText(s.clubs_youth))
       setNationalTeamName(s.national_team?.name ?? '')
       setNationalTeamCaps(s.national_team?.caps != null ? String(s.national_team.caps) : '')
       setNationalTeamGoals(s.national_team?.goals != null ? String(s.national_team.goals) : '')
@@ -469,6 +515,7 @@ function WikiPersonForm({
     setNotableWork(g.notable_work ?? '')
     setCompany(g.company ?? '')
     setEra(g.era ?? '')
+    setCareerHighlightsText(careerHighlightsToLines(g.highlights))
     setParty('')
     setRolesText('')
     setSport('')
@@ -478,6 +525,7 @@ function WikiPersonForm({
     setNationalTeamCaps('')
     setNationalTeamGoals('')
     setCareerHighlightsText('')
+    setClubsYouthText('')
   }
 
   function parseRolesInput(): WikiRoleFormRow[] {
@@ -500,8 +548,8 @@ function WikiPersonForm({
       .filter((r) => r.title)
   }
 
-  function parseClubsInput(): WikiClubFormRow[] {
-    return clubsText
+  function parseClubsFromText(text: string): WikiClubFormRow[] {
+    return text
       .split('\n')
       .map((line) => line.trim())
       .filter(Boolean)
@@ -516,6 +564,14 @@ function WikiPersonForm({
         }
       })
       .filter((c) => c.name)
+  }
+
+  function parseClubsInput(): WikiClubFormRow[] {
+    return parseClubsFromText(clubsText)
+  }
+
+  function parseClubsYouthInput(): WikiClubFormRow[] {
+    return parseClubsFromText(clubsYouthText)
   }
 
   async function handleFetchWikipedia() {
@@ -577,42 +633,73 @@ function WikiPersonForm({
     }
   }
 
+  function buildCurrentInfoboxData(): Record<string, unknown> {
+    let data: Record<string, unknown>
+    if (personType === 'politician') {
+      data = {
+        roles: parseRolesInput(),
+        party: toNullableString(party),
+        birth_year: toNullableNumber(birthYear),
+        nationality: toNullableString(nationality),
+      }
+    } else if (personType === 'sportsperson') {
+      data = {
+        sport: toNullableString(sport),
+        position: toNullableString(position),
+        clubs: parseClubsInput(),
+        clubs_youth: parseClubsYouthInput(),
+        career_highlights: parseCareerHighlightsLines(careerHighlightsText),
+        national_team: toNullableString(nationalTeamName)
+          ? {
+              name: nationalTeamName.trim(),
+              caps: toNullableNumber(nationalTeamCaps),
+              goals: toNullableNumber(nationalTeamGoals),
+            }
+          : null,
+        birth_year: toNullableNumber(birthYear),
+        nationality: toNullableString(nationality),
+      }
+    } else {
+      const hl = parseCareerHighlightsLines(careerHighlightsText)
+      data = {
+        domain: toNullableString(domain),
+        notable_work: toNullableString(notableWork),
+        era: toNullableString(era),
+        birth_year: toNullableNumber(birthYear),
+        nationality: toNullableString(nationality),
+        company: toNullableString(company),
+        ...(hl.length > 0 ? { highlights: hl } : {}),
+      }
+    }
+    if (parseScore != null) {
+      data.parse_quality_score = parseScore
+      data.parse_warnings = parseWarnings
+    } else if (parseWarnings.length > 0) {
+      data.parse_warnings = parseWarnings
+    }
+    return data
+  }
+
+  function buildDraftPreviewBody(): WikiPersonDraftPreviewBody | null {
+    if (!name.trim()) return null
+    return {
+      name: name.trim(),
+      person_type: personType,
+      infobox_data: buildCurrentInfoboxData(),
+      hint_schedule: selectedHints,
+      photo_url: photoUrl.trim() || null,
+      extract: extract.trim() || null,
+      wikipedia_url: wikipediaUrl.trim() || null,
+      difficulty: Math.min(5, Math.max(1, difficulty)),
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
     setError(null)
     try {
-      const infoboxData: Record<string, unknown> = personType === 'politician'
-        ? {
-            roles: parseRolesInput(),
-            party: toNullableString(party),
-            birth_year: toNullableNumber(birthYear),
-            nationality: toNullableString(nationality),
-          }
-        : personType === 'sportsperson'
-          ? {
-            sport: toNullableString(sport),
-            position: toNullableString(position),
-            clubs: parseClubsInput(),
-            career_highlights: parseCareerHighlightsLines(careerHighlightsText),
-            national_team: toNullableString(nationalTeamName)
-              ? {
-                  name: nationalTeamName.trim(),
-                  caps: toNullableNumber(nationalTeamCaps),
-                  goals: toNullableNumber(nationalTeamGoals),
-                }
-              : null,
-            birth_year: toNullableNumber(birthYear),
-            nationality: toNullableString(nationality),
-          }
-          : {
-            domain: toNullableString(domain),
-            notable_work: toNullableString(notableWork),
-            era: toNullableString(era),
-            birth_year: toNullableNumber(birthYear),
-            nationality: toNullableString(nationality),
-            ...(personType === 'entrepreneur' ? { company: toNullableString(company) } : {}),
-          }
+      const infoboxData = buildCurrentInfoboxData()
 
       const payload: WikiPersonPayload = {
         name: name.trim(),
@@ -639,6 +726,11 @@ function WikiPersonForm({
   return (
     <>
     <form onSubmit={handleSubmit} className="space-y-4">
+      <AdminFormSection
+        title="Identité & import Wikipédia"
+        badges={['meta']}
+        description="Le slug relie la fiche à la page Wikipédia. « Remplir » importe infobox + Wikidata dans les champs ci-dessous (cache court côté serveur)."
+      >
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
@@ -701,6 +793,7 @@ function WikiPersonForm({
           </p>
         </div>
       </div>
+      </AdminFormSection>
 
       {error && (
         <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-start gap-2">
@@ -726,6 +819,13 @@ function WikiPersonForm({
         </div>
       )}
 
+      <AdminFormSection
+        variant="panel"
+        title="Contenu du défi WikiGuessr"
+        badges={['during-game', 'hints', 'secret', 'after-game']}
+        description="Une seule vue pour ce qui sert au jeu : type de profil, bloc sous la photo, alias et sélection des données utilisées comme indices après erreurs."
+      >
+      <AdminFormSubheading>Type de profil et réglages</AdminFormSubheading>
       <div className="grid sm:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
@@ -747,6 +847,7 @@ function WikiPersonForm({
             <option value="historical_figure">Personnalite historique</option>
             <option value="generic">Générique</option>
           </select>
+          <p className="mt-1 text-xs text-gray-500">Pilote les clés d’indices disponibles et le rendu du profil sous la photo.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Difficulté (1-5)</label>
@@ -758,37 +859,13 @@ function WikiPersonForm({
         </label>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Alias (séparés par des virgules)</label>
-        <input value={aliasesInput} onChange={(e) => setAliasesInput(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Ex: Leo Messi, L. Messi" />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Indices complémentaires utilisés</label>
-        <div className="grid sm:grid-cols-2 gap-2">
-          {getWikiHintKeysSelectable(personType).map((hintKey) => (
-            <label key={hintKey} className="inline-flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={selectedHints.includes(hintKey)}
-                onChange={(e) => {
-                  setSelectedHints((prev) => {
-                    if (e.target.checked) return [...prev, hintKey]
-                    const next = prev.filter((k) => k !== hintKey)
-                    return next.length > 0 ? next : [hintKey]
-                  })
-                }}
-              />
-              {hintKeyLabel(hintKey)}
-            </label>
-          ))}
-        </div>
-      </div>
-
+      <AdminFormSubheading>Profil sous la photo (indices permanents)</AdminFormSubheading>
       {personType === 'politician' ? (
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Parti politique</label>
             <input value={party} onChange={(e) => setParty(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            <p className="mt-1 text-xs text-gray-500">Import Wikidata : si l’infobox est vide, le parti peut être complété via Wikidata (P102).</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nationalité</label>
@@ -825,7 +902,22 @@ function WikiPersonForm({
           </div>
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Clubs (1 ligne = club | début | fin | matchs | buts)
+              Parcours junior (optionnel, 1 ligne = club | début | fin | matchs | buts)
+            </label>
+            <p className="text-xs text-gray-500 mb-1">
+              Laisser vide si tout est dans le bloc « pro » : le jeu peut alors scinder automatiquement une ligne sans stats suivie de la même équipe avec stats. L’import Wikipédia remplit ici les centres de formation lorsqu’ils sont distincts.
+            </p>
+            <textarea
+              rows={3}
+              value={clubsYouthText}
+              onChange={(e) => setClubsYouthText(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
+              placeholder="ex. SSC Naples | 1988 | 1992 |  | "
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Clubs — parcours pro / senior (1 ligne = club | début | fin | matchs | buts)
             </label>
             <textarea rows={6} value={clubsText} onChange={(e) => setClubsText(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono" />
           </div>
@@ -868,25 +960,71 @@ function WikiPersonForm({
             <label className="block text-sm font-medium text-gray-700 mb-1">Période</label>
             <input value={era} onChange={(e) => setEra(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
           </div>
-          {personType === 'entrepreneur' && (
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Entreprise(s)</label>
-              <textarea
-                rows={2}
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-                placeholder="ex. Tesla · SpaceX · X"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              />
-            </div>
-          )}
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Oeuvre / fait notable</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Entreprise(s) / organisation(s)</label>
+            <textarea
+              rows={2}
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              placeholder="ex. Tesla, SpaceX · ou MIT, CNRS…"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Repères carrière (optionnel, 1 ligne = libellé | valeur)
+            </label>
+            <p className="text-xs text-gray-500 mb-1">Chaque ligne apparaît séparément en jeu : ex. Distinction | Légion d’honneur</p>
+            <textarea
+              rows={4}
+              value={careerHighlightsText}
+              onChange={(e) => setCareerHighlightsText(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
+              placeholder={'Distinction | Prix Nobel de physique · 1921'}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Oeuvre / fait notable (résumé)</label>
+            <p className="text-xs text-gray-500 mb-1">Les segments séparés par « · » ou tiret long s’affichent en plusieurs puces.</p>
             <textarea rows={3} value={notableWork} onChange={(e) => setNotableWork(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
           </div>
         </div>
       )}
+      <AdminFormSubheading>Alias et indices après erreurs</AdminFormSubheading>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Alias (séparés par des virgules)</label>
+        <input value={aliasesInput} onChange={(e) => setAliasesInput(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Ex: Leo Messi, L. Messi" />
+        <p className="mt-1 text-xs text-gray-500">Acceptés à la saisie uniquement ; non affichés comme réponse pendant la partie.</p>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Données utilisées comme cartes indices</label>
+        <p className="text-xs text-gray-500 mb-2">Ordre des coches = ordre des indices ; le planning du jour du défi publié peut encore filtrer ce qui sort réellement.</p>
+        <div className="grid sm:grid-cols-2 gap-2">
+          {getWikiHintKeysSelectable(personType).map((hintKey) => (
+            <label key={hintKey} className="inline-flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={selectedHints.includes(hintKey)}
+                onChange={(e) => {
+                  setSelectedHints((prev) => {
+                    if (e.target.checked) return [...prev, hintKey]
+                    const next = prev.filter((k) => k !== hintKey)
+                    return next.length > 0 ? next : [hintKey]
+                  })
+                }}
+              />
+              {hintKeyLabel(hintKey)}
+            </label>
+          ))}
+        </div>
+      </div>
+      </AdminFormSection>
 
+      <AdminFormSection
+        title="Médias & hors zone de jeu principale"
+        badges={['meta']}
+        description="Photo : visible en jeu. Extrait et lien Wikipédia : utiles à l’admin et aux aperçus ; pas le cœur du défi côté joueur."
+      >
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Photo URL</label>
@@ -942,12 +1080,11 @@ function WikiPersonForm({
         <label className="block text-sm font-medium text-gray-700 mb-1">Extrait</label>
         <textarea rows={3} value={extract} onChange={(e) => setExtract(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
       </div>
+      </AdminFormSection>
 
       <div className="flex flex-wrap justify-between gap-3 pt-2 items-center">
         <div>
-          {initial?.id ? (
-            <WikiGamePreviewOpenButton onOpen={() => setWikiPreviewOpen(true)} />
-          ) : null}
+          <WikiGamePreviewOpenButton onOpen={() => setWikiPreviewOpen(true)} disabled={!name.trim()} />
         </div>
         <div className="flex gap-3 ml-auto">
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm border rounded-lg">Annuler</button>
@@ -960,7 +1097,9 @@ function WikiPersonForm({
     <WikiGamePreviewModal
       isOpen={wikiPreviewOpen}
       onClose={() => setWikiPreviewOpen(false)}
-      personId={initial?.id ?? null}
+      draft={wikiPreviewOpen ? buildDraftPreviewBody() : null}
+      personId={null}
+      poolEntryId={null}
     />
     </>
   )
@@ -972,6 +1111,7 @@ function WikiPersonListActions({
   onEdit,
   onDelete,
   onUpload,
+  onPreview,
   compact,
 }: {
   person: AdminWikiPerson
@@ -979,6 +1119,7 @@ function WikiPersonListActions({
   onEdit: (p: AdminWikiPerson) => void
   onDelete: (p: AdminWikiPerson) => void
   onUpload: (p: AdminWikiPerson, file: File) => void
+  onPreview: (p: AdminWikiPerson) => void
   compact?: boolean
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -997,6 +1138,14 @@ function WikiPersonListActions({
         className="hidden"
         onChange={handleFileChange}
       />
+      <button
+        type="button"
+        onClick={() => onPreview(person)}
+        title="Aperçu du défi"
+        className={`${pad} bg-violet-50 text-violet-600 hover:bg-violet-100 rounded-lg transition-colors`}
+      >
+        <Eye size={14} />
+      </button>
       <button
         type="button"
         onClick={() => fileInputRef.current?.click()}
@@ -1036,6 +1185,7 @@ export function WikiPersonsPage() {
   const [deleting, setDeleting] = useState(false)
   const [randomLoading, setRandomLoading] = useState(false)
   const [uploadingWikiPhotoId, setUploadingWikiPhotoId] = useState<number | null>(null)
+  const [listPreviewPersonId, setListPreviewPersonId] = useState<number | null>(null)
 
   async function handlePageRandom() {
     setRandomLoading(true)
@@ -1180,39 +1330,53 @@ export function WikiPersonsPage() {
                     </div>
                   )
                   return (
-                    <>
+                    <Fragment key={person.id}>
                       {/* Mobile card */}
-                      <tr key={`m-${person.id}`} className="sm:hidden border-b border-gray-100 last:border-0">
-                        <td className="px-3 py-3" colSpan={10}>
-                          <div className="flex items-center gap-3">
+                      <tr className="sm:hidden border-0">
+                        <td className="px-3 py-2.5" colSpan={10}>
+                          <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm ring-1 ring-black/[0.04]">
                             <div className="shrink-0">
                               {person.photo_url ? (
                                 <img src={resolveWikiPhotoPreview(person.photo_url)} alt={person.name}
-                                  className="h-10 w-14 rounded-md object-cover object-top border border-gray-200"
+                                  className="h-14 w-[4.5rem] rounded-lg object-cover object-top border border-gray-200"
                                   referrerPolicy="no-referrer"
                                   onError={(e) => { e.currentTarget.style.display = 'none' }} />
                               ) : (
-                                <div className="h-10 w-14 rounded-md bg-gray-100 border border-gray-200" />
+                                <div className="h-14 w-[4.5rem] rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 border border-gray-200 flex items-center justify-center text-slate-600 font-semibold">
+                                  {person.name.trim().slice(0, 1).toUpperCase() || '?'}
+                                </div>
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-medium text-sm text-gray-900 truncate">{person.name}</span>
-                                <span className="text-amber-400 text-[10px] tracking-tighter shrink-0">{'★'.repeat(person.difficulty ?? 3)}</span>
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                <span className="font-semibold text-base text-gray-900 leading-snug">{person.name}</span>
+                                <span className="text-[10px] font-medium text-gray-400 tabular-nums shrink-0">#{person.id}</span>
+                                <span className="text-amber-500 text-[11px] tracking-tighter shrink-0">{'★'.repeat(person.difficulty ?? 3)}</span>
                               </div>
-                              <div className="text-xs text-gray-400 flex items-center gap-1 min-w-0">
-                                <span className="truncate">{person.wikipedia_slug}</span>
-                                {person.wikipedia_url && <a href={person.wikipedia_url} target="_blank" rel="noreferrer" className="text-indigo-500 shrink-0"><ExternalLink size={11} /></a>}
+                              <div className="mt-1 flex flex-wrap items-center gap-2">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                                  person.person_type === 'politician' ? 'bg-indigo-100 text-indigo-800'
+                                  : person.person_type === 'sportsperson' ? 'bg-violet-100 text-violet-800'
+                                  : 'bg-slate-100 text-slate-700'
+                                }`}>{personTypeLabel(person.person_type)}</span>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${person.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}`}>
+                                  {person.is_active ? 'Actif' : 'Inactif'}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-500 flex items-center gap-1 min-w-0 mt-1">
+                                <span className="truncate font-mono">{person.wikipedia_slug}</span>
+                                {person.wikipedia_url && <a href={person.wikipedia_url} target="_blank" rel="noreferrer" className="text-indigo-600 shrink-0"><ExternalLink size={11} /></a>}
                               </div>
                               <Badges />
                             </div>
-                            <div className="flex items-center gap-1 shrink-0">
+                            <div className="flex items-center gap-1 shrink-0 self-start pt-0.5">
                               <WikiPersonListActions
                                 person={person}
                                 uploading={uploadingWikiPhotoId === person.id}
                                 onEdit={(p) => setModal({ type: 'edit', person: p })}
                                 onDelete={(p) => setModal({ type: 'delete', person: p })}
                                 onUpload={handleWikiPhotoUpload}
+                                onPreview={(p) => setListPreviewPersonId(p.id)}
                                 compact
                               />
                             </div>
@@ -1221,7 +1385,7 @@ export function WikiPersonsPage() {
                       </tr>
 
                       {/* Desktop row */}
-                      <tr key={`d-${person.id}`} className="hidden sm:table-row hover:bg-gray-50 group">
+                      <tr className="hidden sm:table-row hover:bg-indigo-50/45 even:bg-gray-50/55 group transition-colors">
                         <td className="px-3 py-3 w-20">
                           {person.photo_url ? (
                             <img src={resolveWikiPhotoPreview(person.photo_url)} alt={person.name}
@@ -1234,7 +1398,10 @@ export function WikiPersonsPage() {
                         </td>
                         <td className="px-3 py-3">
                           <div className="flex flex-col gap-0.5">
-                            <div className="font-medium text-sm text-gray-900 truncate max-w-[220px]">{person.name}</div>
+                            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
+                              <span className="font-semibold text-sm text-gray-900 truncate max-w-[220px]">{person.name}</span>
+                              <span className="text-[10px] text-gray-400 tabular-nums shrink-0">#{person.id}</span>
+                            </div>
                             <div className="text-xs text-gray-400 flex items-center gap-1.5 min-w-0">
                               <span className="truncate">{person.wikipedia_slug}</span>
                               {person.wikipedia_url && <a href={person.wikipedia_url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-700 flex-shrink-0"><ExternalLink size={12} /></a>}
@@ -1265,11 +1432,12 @@ export function WikiPersonsPage() {
                               onEdit={(p) => setModal({ type: 'edit', person: p })}
                               onDelete={(p) => setModal({ type: 'delete', person: p })}
                               onUpload={handleWikiPhotoUpload}
+                              onPreview={(p) => setListPreviewPersonId(p.id)}
                             />
                           </div>
                         </td>
                       </tr>
-                    </>
+                    </Fragment>
                   )
                 })}
               </tbody>
@@ -1301,6 +1469,12 @@ export function WikiPersonsPage() {
           </div>
         </Modal>
       )}
+
+      <WikiGamePreviewModal
+        isOpen={listPreviewPersonId !== null}
+        onClose={() => setListPreviewPersonId(null)}
+        personId={listPreviewPersonId}
+      />
     </AdminLayout>
   )
 }

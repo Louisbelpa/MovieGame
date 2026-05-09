@@ -86,6 +86,7 @@ npm run dev          # Express sur http://localhost:3001
 | `UPLOADS_DIRECTORY` | Dossier absolu des fichiers uploadés admin (défaut `public/uploads` ; prod Docker `/data/uploads`) |
 | `WIKI_PREFETCH_TARGET_READY` | Cible du pool admin « Au hasard » (défaut 24, max 400) |
 | `WIKI_PREFETCH_MAX_FETCH_PER_RUN` | Fiches enrichies par passe (défaut 4, max 40) |
+| `WIKI_PREFETCH_SPARQL_LIMIT` | Limite Wikidata (`LIMIT` SPARQL prefetch ; si absent : `max(100, WIKI_PREFETCH_TARGET_READY)` cap 800 ; si défini : 50–800 ; corrige l’ancien plafond fixe à 100) |
 | `PREFETCH_WARM_TOKEN` | Secrète pour `POST /api/admin/prefetch/warm` (cron) |
 
 ## Points techniques importants
@@ -185,10 +186,13 @@ Le service ajoute le préfixe au moment de construire le payload : `type: 'wiki_
 
 ### Admin Wikipedia
 - **`/admin/wiki`** — CRUD personnalités : recherche par slug FR/EN, bouton "Au hasard" via Wikidata SPARQL (`GET /api/admin/wiki-persons/random?lang=fr&minFame=30`)
-- **`/admin/wiki-pool`** — observabilité du pool préchargé + toggle `wiki_prefetch_enabled` (`/api/admin/wiki-prefetch/settings`)
+- **`/admin/settings`** — toggle `wiki_prefetch_enabled` (plus sur la page pool) ; **`GET /api/admin/settings/summary`** : récap non sensible (`wikiPrefetchTargetReady`, `wikiPrefetchMaxFetchPerRun`, `wikiPrefetchSparqlLimit`, flags Vite…)
+- **`/admin/wiki-pool`** — pool préchargé : pagination + param **`hasWikiPerson=all|yes|no`** sur **`GET /api/admin/wiki-persons/prefetch-pool`** ; dates affichées en Europe/Paris ; UX mobile (cartes, badges fiche existante). Activation pool via Réglages.
+- **`POST /api/admin/game-preview-draft`** — même payload jeu films/séries que pour une fiche enregistrée, depuis le formulaire admin sans persist DB.
 - **Planning** — onglet "Wiki" dans CalendarPage, même interface que films/séries
 - `minFame` = seuil de sitelinks Wikidata (≈ notoriété inter-langues, équivalent `vote_count` TMDB)
-- Pool ciblé par `WIKI_PREFETCH_TARGET_READY` (max 400) ; remplissage borné par passe (`WIKI_PREFETCH_MAX_FETCH_PER_RUN`) ; option **`POST /api/admin/prefetch/warm`** avec `PREFETCH_WARM_TOKEN`
+- Pool ciblé par `WIKI_PREFETCH_TARGET_READY` (max 400) ; remplissage borné par passe (`WIKI_PREFETCH_MAX_FETCH_PER_RUN`) ; **`WIKI_PREFETCH_SPARQL_LIMIT`** aligne la taille du lot Wikidata sur la cible ; option **`POST /api/admin/prefetch/warm`** avec `PREFETCH_WARM_TOKEN`
+- **Navigation admin** — l’entrée active « Personnalités » ne doit pas matcher **`/admin/wiki-pool`** : préfixe **`/admin/wiki`** réservé à la liste Wiki seule (`AdminLayout` plus précis que `startsWith('/admin/wiki')`).
 
 ### Routes API wiki
 Préfixe `/api/wiki/` — définies dans `wiki-challenge.ts`, enregistrées dans `app.ts`.

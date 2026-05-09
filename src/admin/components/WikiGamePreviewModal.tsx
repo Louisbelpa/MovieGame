@@ -6,7 +6,12 @@ import { WikiHintPanel } from '@/components/wiki/WikiHintPanel'
 import { AttemptTracker } from '@/components/game/AttemptTracker'
 import { Spinner } from '@/components/ui/Spinner'
 import type { WikiChallengePayload, WikiHintPayload, WikiVisibleProfile } from '@/api/wikiClient'
-import { fetchWikiGamePreview, fetchWikiPoolEntryGamePreview } from '../api'
+import {
+  fetchWikiGamePreview,
+  fetchWikiPoolEntryGamePreview,
+  postWikiPersonDraftPreview,
+  type WikiPersonDraftPreviewBody,
+} from '../api'
 
 function resolvePhotoForPreview(url: string | null): string | null {
   if (!url?.trim()) return null
@@ -18,6 +23,8 @@ function resolvePhotoForPreview(url: string | null): string | null {
 interface WikiGamePreviewModalProps {
   isOpen: boolean
   onClose: () => void
+  /** Aperçu sans enregistrer (prioritaire sur les autres sources) */
+  draft?: WikiPersonDraftPreviewBody | null
   /** Fiche `wiki_persons` en base */
   personId?: number | null
   /** Ligne du pool prefetch (`wiki_prefetch_pool`) — mutuellement exclusif avec `personId` en pratique */
@@ -27,18 +34,22 @@ interface WikiGamePreviewModalProps {
 export function WikiGamePreviewModal({
   isOpen,
   onClose,
+  draft = null,
   personId = null,
   poolEntryId = null,
 }: WikiGamePreviewModalProps) {
   const [payload, setPayload] = useState<WikiChallengePayload | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const previewSource: 'person' | 'pool' | null =
-    poolEntryId != null && poolEntryId > 0
-      ? 'pool'
-      : personId != null && personId > 0
-        ? 'person'
-        : null
+  const draftKey = draft ? JSON.stringify(draft) : ''
+  const previewSource: 'draft' | 'person' | 'pool' | null =
+    draft && draft.name.trim()
+      ? 'draft'
+      : poolEntryId != null && poolEntryId > 0
+        ? 'pool'
+        : personId != null && personId > 0
+          ? 'person'
+          : null
 
   useEffect(() => {
     if (!isOpen || previewSource === null) {
@@ -50,11 +61,13 @@ export function WikiGamePreviewModal({
     setLoading(true)
     setError(null)
     const promise =
-      previewSource === 'pool' && poolEntryId != null
-        ? fetchWikiPoolEntryGamePreview(poolEntryId)
-        : personId != null
-          ? fetchWikiGamePreview(personId)
-          : Promise.reject(new Error('Aucun identifiant'))
+      previewSource === 'draft' && draft
+        ? postWikiPersonDraftPreview(draft)
+        : previewSource === 'pool' && poolEntryId != null
+          ? fetchWikiPoolEntryGamePreview(poolEntryId)
+          : personId != null
+            ? fetchWikiGamePreview(personId)
+            : Promise.reject(new Error('Aucune source d’aperçu'))
     void promise
       .then((data) => {
         if (!cancelled) setPayload(data)
@@ -68,7 +81,7 @@ export function WikiGamePreviewModal({
     return () => {
       cancelled = true
     }
-  }, [isOpen, previewSource, personId, poolEntryId])
+  }, [isOpen, previewSource, draftKey, personId, poolEntryId])
 
   const profile = payload?.profile as WikiVisibleProfile | undefined
   const hints = (payload?.hints ?? []) as WikiHintPayload[]
@@ -86,13 +99,17 @@ export function WikiGamePreviewModal({
     >
       <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 space-y-3" data-mode="wiki">
         <p className="text-xs text-amber-200/95 bg-amber-950/50 border border-amber-700/40 rounded-lg px-3 py-2">
-          {previewSource === 'pool' ? (
+          {previewSource === 'draft' ? (
+            <>
+              Aperçu des <strong className="font-semibold">champs actuels</strong> (même normalisation qu’à l’enregistrement). Rien n’est écrit en base.{' '}
+            </>
+          ) : previewSource === 'pool' ? (
             <>
               Aperçu basé sur le <strong className="font-semibold">JSON du pool prefetch</strong> (pas la fiche enregistrée). Aucune tentative n’est enregistrée.{' '}
             </>
           ) : (
             <>
-              Aperçu basé sur la <strong className="font-semibold">fiche enregistrée</strong>. Les champs non sauvegardés ne sont pas visibles ici — enregistre puis rouvre l’aperçu. Aucune tentative n’est enregistrée.{' '}
+              Aperçu basé sur la <strong className="font-semibold">fiche enregistrée</strong> en base. Aucune tentative n’est enregistrée.{' '}
             </>
           )}
           <strong className="font-semibold">Tous les indices sont affichés</strong> (aperçu admin).
@@ -162,13 +179,21 @@ export function WikiGamePreviewModal({
   )
 }
 
-/** Bouton pour ouvrir la modale depuis le formulaire (fiche existante uniquement). */
-export function WikiGamePreviewOpenButton({ onOpen }: { onOpen: () => void }) {
+/** Bouton pour ouvrir la modale depuis le formulaire (brouillon = contenu actuel du formulaire). */
+export function WikiGamePreviewOpenButton({
+  onOpen,
+  disabled,
+}: {
+  onOpen: () => void
+  disabled?: boolean
+}) {
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100"
+      disabled={disabled}
+      title={disabled ? 'Renseigne au moins le nom pour l’aperçu' : undefined}
+      className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <Eye size={16} aria-hidden />
       Prévisualiser le rendu

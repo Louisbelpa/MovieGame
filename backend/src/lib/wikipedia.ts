@@ -7,6 +7,7 @@
 import { LRUCache } from 'lru-cache'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { commonsFilenameToUploadThumbUrl } from './commonsThumb.js'
+import { inferClubStintEndYears } from './wikiClubYears.js'
 
 export interface WikiRole {
   title: string
@@ -37,6 +38,8 @@ export interface WikiSportspersonData {
   sport: string | null
   position: string | null
   clubs: WikiClub[]
+  /** Infobox FR « parcours junior » ({{deux colonnes}}), distinct du parcours pro */
+  clubs_youth?: WikiClub[]
   career_highlights?: Array<{ label: string; value: string }>
   national_team: { name: string; caps: number | null; goals: number | null } | null
   birth_year: number | null
@@ -61,6 +64,8 @@ export interface WikiGenericData {
   nationality: string | null
   /** Entreprises / organisations (surtout type entrepreneur), distinct de notable_work */
   company: string | null
+  /** Repères carrière (admin / saisie manuelle), même schéma que career_highlights sportif */
+  highlights?: Array<{ label: string; value: string }>
 }
 
 export type WikiInfoboxData = WikiPoliticianData | WikiSportspersonData | WikiGenericData
@@ -94,6 +99,12 @@ interface WikidataFallback {
   notable_work: string | null
   notable_work_labels: string[]
   employer_labels: string[]
+  /** P102 — parti politique (souvent absent de l’infobox minimale). */
+  party_labels: string[]
+  /** P264 — maisons de disques (artistes). */
+  record_label_labels: string[]
+  /** P463 — groupes / collectifs dont la personne est membre (ex. groupe de musique). */
+  member_of_labels: string[]
   era: string | null
   languages: string[]
   fields_of_work: string[]
@@ -271,14 +282,131 @@ function stripLinks(s: string): string {
     .trim()
 }
 
-/** Extract a year range from raw wikitext like "1992-1995", "[[1992]]-[[1995]]", "2003–" */
+/**
+ * Plage d’années infobox (ex. « 2010-2011 », « 2010–2011 » tiret FR, [[2010]]–[[2011]]).
+ * Sans deux années explicites, la fin du dernier club ne peut pas être inférée (pas de « club suivant »).
+ */
 function extractYearRange(raw: string): { start: number | null; end: number | null } {
-  const years = raw.match(/\b(1[89]\d{2}|20\d{2})\b/g)
+  const cleaned = stripLinks(raw)
+    .replace(/''/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const sep = String.raw`[-–—\u2010\u2011\u2012\u2013\u2014]`
+  const explicit = cleaned.match(
+    new RegExp(`^(1[89]\\d{2}|20\\d{2})\\s*${sep}+\\s*(1[89]\\d{2}|20\\d{2})(?:\\b|$)`),
+  )
+  if (explicit) {
+    return { start: parseInt(explicit[1], 10), end: parseInt(explicit[2], 10) }
+  }
+  const loose = cleaned.match(
+    new RegExp(`\\b(1[89]\\d{2}|20\\d{2})\\s*${sep}+\\s*(1[89]\\d{2}|20\\d{2})\\b`),
+  )
+  if (loose) {
+    return { start: parseInt(loose[1], 10), end: parseInt(loose[2], 10) }
+  }
+  const years = cleaned.match(/\b(1[89]\d{2}|20\d{2})\b/g)
   if (!years || years.length === 0) return { start: null, end: null }
+  if (years.length === 1) return { start: parseInt(years[0], 10), end: null }
   return {
     start: parseInt(years[0], 10),
-    end: years.length > 1 ? parseInt(years[1], 10) : null,
+    end: parseInt(years[years.length - 1], 10),
   }
+}
+
+/** Pipes « de niveau infobox » — pas les | à l'intérieur de [[wikiliens]]. */
+function splitPipeColumns(line: string): string[] {
+  const trimmed = line.replace(/^\s*\|/, '').trimEnd()
+  const parts: string[] = []
+  let depth = 0
+  let cur = ''
+  for (let i = 0; i < trimmed.length; i += 1) {
+    if (trimmed[i] === '[' && trimmed[i + 1] === '[') {
+      depth += 1
+      cur += '[['
+      i += 1
+      continue
+    }
+    if (trimmed[i] === ']' && trimmed[i + 1] === ']' && depth > 0) {
+      depth -= 1
+      cur += ']]'
+      i += 1
+      continue
+    }
+    if (trimmed[i] === '|' && depth === 0) {
+      parts.push(cur.trim())
+      cur = ''
+      continue
+    }
+    cur += trimmed[i]
+  }
+  if (cur.trim()) parts.push(cur.trim())
+  return parts
+}
+
+function extractFrenchTemplateRows(raw: string, kind: 'deux' | 'trois'): string[] {
+  if (!raw) return []
+  const re = kind === 'deux' ? /\{\{\s*deux\s+colonnes\b/i : /\{\{\s*trois\s+colonnes\b/i
+  const lines = raw.split('\n')
+  const rows: string[] = []
+  let inside = false
+  for (const line of lines) {
+    if (re.test(line)) {
+      inside = true
+      continue
+    }
+    if (!inside) continue
+    const t = line.trim()
+    if (t === '}}' || /^\}\}\s*$/.test(t)) break
+    if (line.trimStart().startsWith('|')) rows.push(line)
+  }
+  return rows
+}
+
+/** Infobox FR « parcours junior » (2 col.) / « parcours senior » (3 col. avec stats). */
+function parseFrenchColonnesCareer(raw: string, kind: 'deux' | 'trois'): WikiClub[] {
+  const rows = extractFrenchTemplateRows(raw, kind)
+  const ncols = kind === 'deux' ? 2 : 3
+  const out: WikiClub[] = []
+  for (const rowLine of rows) {
+    const parts = splitPipeColumns(rowLine)
+    if (parts.length < 2) continue
+    const yearsRaw = parts[0]
+    const clubRaw = parts[1]
+    const statsRaw = ncols === 3 && parts.length >= 3 ? parts[2] : ''
+    const yLabel = stripLinks(yearsRaw).toLowerCase()
+    const cLabel = stripLinks(clubRaw).toLowerCase()
+    if (yLabel.includes('total') || cLabel.includes('total')) continue
+    const { start, end } = extractYearRange(yearsRaw)
+    const clubName = normalizeValue(stripLinks(clubRaw).replace(/''/g, '').trim()) ?? ''
+    if (clubName.length < 2 || /^\d+$/.test(clubName)) continue
+    let appearances: number | null = null
+    let goals: number | null = null
+    if (ncols === 3 && statsRaw) {
+      const sc = stripLinks(statsRaw).replace(/\s+/g, ' ')
+      const pa = sc.match(/(\d{1,4})\s*\((\d{1,4})\)/)
+      if (pa) {
+        appearances = parseInt(pa[1], 10)
+        goals = parseInt(pa[2], 10)
+      } else {
+        const onlyNum = sc.match(/(\d{1,4})/)
+        if (onlyNum) appearances = parseInt(onlyNum[1], 10)
+      }
+    }
+    out.push({ name: clubName, start_year: start, end_year: end, appearances, goals })
+  }
+  return out
+}
+
+function dedupeWikiClubs(clubs: WikiClub[]): WikiClub[] {
+  const out: WikiClub[] = []
+  const seen = new Set<string>()
+  for (const club of clubs) {
+    const key = `${club.name.toLowerCase()}|${club.start_year ?? ''}|${club.end_year ?? ''}|${club.appearances ?? ''}|${club.goals ?? ''}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(club)
+  }
+  return out
 }
 
 /** Extract year from strings like "2017", "14 mai 2017", "{{birth year|1977}}" */
@@ -549,6 +677,32 @@ function parseInfoboxFields(wikitext: string): Map<string, string> {
   return fields
 }
 
+/**
+ * Uniquement le premier bloc {{Infobox …}} — évite d’interpréter des `| clé =` du corps d’article
+ * (même classe de problème que le scan « carrière » hors infobox pour les sportifs).
+ */
+function extractFirstInfoboxWikitext(raw: string): string {
+  const m = /\{\{\s*Infobox\b/i.exec(raw)
+  if (!m || m.index === undefined) return raw
+  let depth = 0
+  let i = m.index
+  while (i < raw.length) {
+    if (raw.slice(i, i + 2) === '{{') {
+      depth += 1
+      i += 2
+      continue
+    }
+    if (raw.slice(i, i + 2) === '}}') {
+      depth -= 1
+      i += 2
+      if (depth === 0) return raw.slice(m.index, i)
+      continue
+    }
+    i += 1
+  }
+  return raw
+}
+
 function readInfoboxField(fields: Map<string, string>, keys: string[]): string {
   for (const key of keys) {
     const v = fields.get(key.toLowerCase())
@@ -564,7 +718,7 @@ function isFrenchNationalAssemblyDeputyTitle(title: string): boolean {
 
 function parsePoliticianData(wikitext: string): WikiPoliticianData {
   const roles: WikiRole[] = []
-  const fields = parseInfoboxFields(wikitext)
+  const fields = parseInfoboxFields(extractFirstInfoboxWikitext(wikitext))
 
   const officeEntries = [...fields.entries()]
     .filter(([key]) => /^(office|fonction|mandat|charge)\d*$/i.test(key))
@@ -627,7 +781,21 @@ function parsePoliticianData(wikitext: string): WikiPoliticianData {
 
 function parseSportspersonData(wikitext: string): WikiSportspersonData {
   const clubs: WikiClub[] = []
-  const fields = parseInfoboxFields(wikitext)
+  const infoboxOnly = extractFirstInfoboxWikitext(wikitext)
+  const fields = parseInfoboxFields(infoboxOnly)
+  const infoboxScope = [...fields.values()].join('\n')
+  const frYouth = parseFrenchColonnesCareer(
+    readInfoboxField(fields, [
+      'parcours junior', 'parcours_junior', 'jeunes', 'youthclubs', 'youth clubs', 'formation club',
+    ]),
+    'deux',
+  )
+  const frSenior = parseFrenchColonnesCareer(
+    readInfoboxField(fields, [
+      'parcours senior', 'parcours_senior', 'parcours professionnel', 'parcours_professionnel',
+    ]),
+    'trois',
+  )
 
   const splitMultiValue = (raw: string): string[] =>
     raw
@@ -636,9 +804,9 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
       .map((v) => stripLinks(v).trim())
       .filter(Boolean)
 
-  const extractClubsFromCareerRows = (): WikiClub[] => {
+  const extractClubsFromCareerRows = (scope: string): WikiClub[] => {
     const rows: WikiClub[] = []
-    const lines = wikitext.split('\n')
+    const lines = scope.split('\n')
     for (const rawLine of lines) {
       const line = rawLine.trim()
       if (!line.startsWith('|')) continue
@@ -682,10 +850,10 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
   }
 
   // clubs section: | clubs = \n {{fb cl|Club}} \n ...
-  const clubsBlock = wikitext.match(/\|\s*clubs\s*=\s*([\s\S]*?)(?=\n\s*\|(?![\s\S]*?\|\s*clubs))/)?.[1] ?? ''
-  const yearsBlock = wikitext.match(/\|\s*(?:clubyears|years)\s*=\s*([\s\S]*?)(?=\n\s*\|)/i)?.[1] ?? ''
-  const capsBlock = wikitext.match(/\|\s*(?:clubcaps|caps|apps)\s*=\s*([\s\S]*?)(?=\n\s*\|)/i)?.[1] ?? ''
-  const goalsBlock = wikitext.match(/\|\s*(?:clubgoals|goals)\s*=\s*([\s\S]*?)(?=\n\s*\|)/i)?.[1] ?? ''
+  const clubsBlock = infoboxOnly.match(/\|\s*clubs\s*=\s*([\s\S]*?)(?=\n\s*\|(?![\s\S]*?\|\s*clubs))/)?.[1] ?? ''
+  const yearsBlock = infoboxOnly.match(/\|\s*(?:clubyears|years)\s*=\s*([\s\S]*?)(?=\n\s*\|)/i)?.[1] ?? ''
+  const capsBlock = infoboxOnly.match(/\|\s*(?:clubcaps|caps|apps)\s*=\s*([\s\S]*?)(?=\n\s*\|)/i)?.[1] ?? ''
+  const goalsBlock = infoboxOnly.match(/\|\s*(?:clubgoals|goals)\s*=\s*([\s\S]*?)(?=\n\s*\|)/i)?.[1] ?? ''
 
   // Try simpler club extraction from list lines
   const clubLines = clubsBlock.split('\n').map(l => stripLinks(l).trim()).filter(Boolean)
@@ -726,8 +894,8 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
     }
   }
 
-  // FR tables fallback: career lines with years | club | stats.
-  clubs.push(...extractClubsFromCareerRows())
+  // FR tables fallback: career lines with years | club | stats (uniquement dans le texte des champs infobox).
+  clubs.push(...extractClubsFromCareerRows(infoboxScope))
 
   // FR fallback: club1/année1/matchs1/buts1 keys are very common.
   const frClubRows = [...fields.entries()].filter(([k]) => /^club\d+$/i.test(k))
@@ -781,15 +949,9 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
     }
   }
 
-  // De-duplicate clubs collected from multiple infobox styles.
-  const dedupedClubs: WikiClub[] = []
-  const seenClubs = new Set<string>()
-  for (const club of clubs) {
-    const key = `${club.name.toLowerCase()}|${club.start_year ?? ''}|${club.end_year ?? ''}`
-    if (seenClubs.has(key)) continue
-    seenClubs.add(key)
-    dedupedClubs.push(club)
-  }
+  const seniorPool = frSenior.length > 0 ? frSenior : clubs
+  const dedupedClubs = dedupeWikiClubs(seniorPool)
+  const dedupedYouth = dedupeWikiClubs(frYouth)
 
   // National team — look for the senior/main national team (highest numbered entry or explicit field)
   // FR infobox: sélection1, sélection2, matchs-sélection1, buts-sélection1
@@ -797,7 +959,7 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
   const findNationalTeam = (): { name: string; caps: number | null; goals: number | null } | null => {
     // Certains profils FR encapsulent les sélections dans un template `{{trois colonnes ...}}`
     // (ex: Lionel Messi). On le parse explicitement avant les autres fallbacks.
-    const fromTroisColonnes = parseFrenchTroisColonnesNationalTeam(wikitext)
+    const fromTroisColonnes = parseFrenchTroisColonnesNationalTeam(infoboxOnly)
     if (fromTroisColonnes) return fromTroisColonnes
 
     // Try numbered sélection fields (FR), pick the last/highest (most likely senior team)
@@ -839,28 +1001,32 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
   const birthYear = extractYear(readInfoboxField(fields, ['birth_date', 'date de naissance', 'naissance']))
 
   const sport = stripLinks(
-    wikitext.match(/\|\s*sport\s*=\s*([^\n|]+)/)?.[1]
-      ?? (wikitext.match(/\{\{Infobox\s+Footballeur/i) ? 'Football'
-        : wikitext.match(/\{\{Infobox\s+Joueur de tennis/i) ? 'Tennis'
-          : wikitext.match(/\{\{Infobox\s+Basketteur/i) ? 'Basket-ball'
+    infoboxOnly.match(/\|\s*sport\s*=\s*([^\n|]+)/)?.[1]
+      ?? (infoboxOnly.match(/\{\{Infobox\s+Footballeur/i) ? 'Football'
+        : infoboxOnly.match(/\{\{Infobox\s+Joueur de tennis/i) ? 'Tennis'
+          : infoboxOnly.match(/\{\{Infobox\s+Basketteur/i) ? 'Basket-ball'
             : 'Sport')
   ).trim()
   const isTennisProfile = /tennis/i.test(sport)
 
-  const cleanedClubs = dedupedClubs
-    .map((club) => ({
-      ...club,
-      name: normalizeValue(
-        club.name
-          .replace(/^[|:•\s]+/, '')
-          .replace(/\bFichier:[^|,\n]+/gi, '')
-          .replace(/\s{2,}/g, ' ')
-      ) ?? '',
-    }))
-    .filter((club) => club.name.length > 1)
+  const normalizeClubNames = (arr: WikiClub[]) =>
+    arr
+      .map((club) => ({
+        ...club,
+        name: normalizeValue(
+          club.name
+            .replace(/^[|:•\s]+/, '')
+            .replace(/\bFichier:[^|,\n]+/gi, '')
+            .replace(/\s{2,}/g, ' ')
+        ) ?? '',
+      }))
+      .filter((club) => club.name.length > 1)
+
+  const cleanedClubs = normalizeClubNames(dedupedClubs)
+  const cleanedYouth = normalizeClubNames(dedupedYouth)
 
   const position = stripLinks(
-    wikitext.match(/\|\s*(?:position|poste)\s*=\s*([^\n|]+)/i)?.[1] ?? ''
+    infoboxOnly.match(/\|\s*(?:position|poste)\s*=\s*([^\n|]+)/i)?.[1] ?? ''
   ).trim() || null
 
   const nationality = stripLinks(readInfoboxField(fields, ['nationality', 'nationalité', 'nation sportive'])).trim() || null
@@ -884,10 +1050,15 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
   pushHighlight('Meilleur classement double', highestDoubles)
   pushHighlight('Début carrière pro', turnedPro)
 
+  const seniorClubs = isTennisProfile ? [] : inferClubStintEndYears(cleanedClubs.slice(0, 8))
+  const youthClubs =
+    isTennisProfile || cleanedYouth.length === 0 ? undefined : inferClubStintEndYears(cleanedYouth.slice(0, 8))
+
   return {
     sport: sport || 'Football',
     position,
-    clubs: isTennisProfile ? [] : cleanedClubs.slice(0, 8),
+    clubs: seniorClubs,
+    clubs_youth: youthClubs,
     career_highlights: careerHighlights.slice(0, 6),
     national_team,
     birth_year: birthYear,
@@ -896,7 +1067,7 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
 }
 
 function parseGenericData(wikitext: string, domain: string): WikiGenericData {
-  const fields = parseInfoboxFields(wikitext)
+  const fields = parseInfoboxFields(extractFirstInfoboxWikitext(wikitext))
   const extractCompactField = (raw: string, maxLines = 2, maxLen = 180): string => {
     const lines = raw
       .replace(/\r/g, '')
@@ -1068,28 +1239,42 @@ async function fetchWikidataFallback(entityId: string, lang: string): Promise<Wi
   const occupationIds = readEntityIds('P106')
   const nationalityIds = readEntityIds('P27')
   const employerIds = readEntityIds('P108').slice(0, 12)
-  const notableWorkIds = readEntityIds('P800').slice(0, 10)
+  const partyIds = readEntityIds('P102').slice(0, 6)
+  /** Plusieurs P800 (albums, titres…) pour hydrater highlights artistes. */
+  const notableWorkIds = readEntityIds('P800').slice(0, 14)
+  const recordLabelIds = readEntityIds('P264').slice(0, 8)
+  const memberOfIds = readEntityIds('P463').slice(0, 10)
   const languageIds = readEntityIds('P1412').slice(0, 8)
   const fieldIds = readEntityIds('P101').slice(0, 8)
   const birthYear = readTimeYear('P569')
   const photoUrl = commonsFileToThumbUrl(readStringClaim('P18'))
 
+  /** Qualificatifs Wikidata : tableau de snaks avec `datavalue` direct (pas de `mainsnak`). */
+  const qualifierTimeYear = (
+    quals: Record<string, unknown[]> | undefined,
+    prop: string,
+  ): number | null => {
+    const snak = quals?.[prop]?.[0] as { datavalue?: { value?: { time?: string } } } | undefined
+    const t = snak?.datavalue?.value?.time
+    return t ? extractYear(t) : null
+  }
+
   const readP39Claims = (): Array<{ positionId: string; start_year: number | null; end_year: number | null }> => {
     const raw = claims['P39'] as Array<{
       mainsnak?: { datavalue?: { value?: { id?: string } } }
-      qualifiers?: Record<string, Array<{ mainsnak?: { datavalue?: { value?: { time?: string } } } }>>
+      qualifiers?: Record<string, unknown[]>
     }> | undefined
     if (!raw || !Array.isArray(raw)) return []
     const out: Array<{ positionId: string; start_year: number | null; end_year: number | null }> = []
     for (const c of raw) {
       const positionId = c.mainsnak?.datavalue?.value?.id
       if (!positionId) continue
-      const q580 = c.qualifiers?.['P580']?.[0]?.mainsnak?.datavalue?.value as { time?: string } | undefined
-      const q582 = c.qualifiers?.['P582']?.[0]?.mainsnak?.datavalue?.value as { time?: string } | undefined
+      const q580y = qualifierTimeYear(c.qualifiers, 'P580')
+      const q582y = qualifierTimeYear(c.qualifiers, 'P582')
       out.push({
         positionId,
-        start_year: q580?.time ? extractYear(q580.time) : null,
-        end_year: q582?.time ? extractYear(q582.time) : null,
+        start_year: q580y,
+        end_year: q582y,
       })
     }
     return out.slice(0, 12)
@@ -1097,12 +1282,33 @@ async function fetchWikidataFallback(entityId: string, lang: string): Promise<Wi
 
   const p39Claims = readP39Claims()
 
+  /** Orgs liées au mandat (P39) — ex. PDG + P2389 → LVMH ; souvent absent alors que P108 (employer) est vide. */
+  const readPositionHeldOrganizationIds = (): string[] => {
+    const raw = claims['P39'] as Array<{ qualifiers?: Record<string, unknown[]> }> | undefined
+    if (!raw || !Array.isArray(raw)) return []
+    const ids: string[] = []
+    for (const c of raw) {
+      const quals = c.qualifiers?.['P2389']
+      if (!Array.isArray(quals)) continue
+      for (const q of quals) {
+        const val = (q as { datavalue?: { value?: { id?: string; 'numeric-id'?: number } } }).datavalue?.value
+        if (val && typeof val === 'object') {
+          if (typeof val.id === 'string') ids.push(val.id)
+          else if (typeof val['numeric-id'] === 'number') ids.push(`Q${val['numeric-id']}`)
+        }
+      }
+    }
+    return [...new Set(ids)].slice(0, 16)
+  }
+  const positionHeldOrgIds = readPositionHeldOrganizationIds()
+
   // Batch all label lookups into 1-2 Wikidata requests (50 IDs/request max)
   // instead of 7 separate calls — major reduction in API usage
   const p39PositionIds = p39Claims.map((c) => c.positionId)
   const allIds = [
     ...occupationIds, ...nationalityIds, ...notableWorkIds,
-    ...languageIds, ...fieldIds, ...p39PositionIds, ...employerIds,
+    ...languageIds, ...fieldIds, ...p39PositionIds, ...employerIds, ...positionHeldOrgIds,
+    ...partyIds, ...recordLabelIds, ...memberOfIds,
   ]
   const uniqueIds = [...new Set(allIds)]
 
@@ -1126,10 +1332,13 @@ async function fetchWikidataFallback(entityId: string, lang: string): Promise<Wi
 
   const occupationLabels = resolve(occupationIds)
   const nationalityLabels = resolve(nationalityIds)
-  const notableWorkLabels = resolve(notableWorkIds)
+  const notableWorkLabels = [...new Set(resolve(notableWorkIds))]
   const languageLabels = resolve(languageIds)
   const fieldLabels = resolve(fieldIds)
-  const employerLabels = resolve(employerIds)
+  const employerLabels = [...new Set([...resolve(employerIds), ...resolve(positionHeldOrgIds)])]
+  const partyLabels = [...new Set(resolve(partyIds))]
+  const recordLabelLabels = [...new Set(resolve(recordLabelIds))]
+  const memberOfLabels = [...new Set(resolve(memberOfIds))]
 
   const p39_roles: WikidataP39Role[] = p39Claims
     .map((c) => ({
@@ -1146,6 +1355,9 @@ async function fetchWikidataFallback(entityId: string, lang: string): Promise<Wi
     notable_work: normalizeValue(notableWorkLabels[0] ?? null),
     notable_work_labels: notableWorkLabels,
     employer_labels: employerLabels,
+    party_labels: partyLabels,
+    record_label_labels: recordLabelLabels,
+    member_of_labels: memberOfLabels,
     era: null,
     languages: languageLabels,
     fields_of_work: fieldLabels,
@@ -1177,7 +1389,8 @@ function inferTypeFromWikidataOccupations(occupations: string[]): WikiPersonType
   if (lower.some((o) => /(activist|activisme|militant|militante|environmentalist|écologiste|ecologiste|human rights)/.test(o))) return 'generic'
   if (lower.some((o) => /(football|athl|tennis|basket|sport|joueur|player|coureur|nageur|rugby|cyclist|swimmer|boxer|golfer)/.test(o))) return 'sportsperson'
   if (lower.some((o) => /(singer|actor|actrice|acteur|artist|artiste|musician|musicien|rappeur|composer|filmmaker|comedian)/.test(o))) return 'artist'
-  if (lower.some((o) => /(scientist|scientifique|physicien|chimiste|mathématicien|mathematician|biologiste|astronomer|researcher)/.test(o))) return 'scientist'
+  if (lower.some((o) =>
+    /(scientist|scientifique|physicien|chimiste|mathématicien|mathematician|biologiste|astronomer|researcher|ingénieur|ingenieur|engineer)/.test(o))) return 'scientist'
   if (lower.some((o) => /(entrepreneur|business|investor|industriel|chef d'entreprise)/.test(o))) return 'entrepreneur'
   if (lower.some((o) => /(writer|écrivain|author|auteur|poet|poète|romancier|journalist)/.test(o))) return 'writer'
   if (lower.some((o) => /(politician|politique|ministre|président|député|sénateur|mayor|governor|chancellor)/.test(o))) return 'politician'
@@ -1207,11 +1420,15 @@ function applyWikidataFallback(
         successor: null,
       }))
     }
+    let partyMerged = normalizeValue(p.party ?? null)
+    if (!partyMerged && fallback.party_labels.length > 0) {
+      partyMerged = normalizeValue(fallback.party_labels.slice(0, 4).join(' · '))
+    }
     return {
       personType: resolvedType,
       infobox: {
         roles,
-        party: normalizeValue(p.party ?? null),
+        party: partyMerged,
         birth_year: p.birth_year ?? fallback.birth_year,
         nationality: normalizeValue(p.nationality ?? fallback.nationality),
       },
@@ -1225,6 +1442,7 @@ function applyWikidataFallback(
         sport: normalizeValue(s.sport ?? null),
         position: normalizeValue(s.position ?? null),
         clubs: s.clubs ?? [],
+        clubs_youth: s.clubs_youth,
         career_highlights: s.career_highlights ?? [],
         national_team: s.national_team ?? null,
         birth_year: s.birth_year ?? fallback.birth_year,
@@ -1245,10 +1463,23 @@ function applyWikidataFallback(
   let notableMerged = normalizeValue(g.notable_work ?? null)
   if (!notableMerged && fallback.notable_work) notableMerged = fallback.notable_work
   else if (fallback.notable_work_labels.length > 0) {
-    const fromWd = fallback.notable_work_labels.slice(0, 5).join(' · ')
-    notableMerged = notableMerged
-      ? normalizeValue(`${notableMerged} · ${fromWd}`) ?? notableMerged
-      : normalizeValue(fromWd)
+    if (resolvedType === 'artist') {
+      const firstWd = fallback.notable_work_labels[0]
+      if (!notableMerged) {
+        notableMerged = normalizeValue(firstWd)
+      } else if (firstWd) {
+        const low = notableMerged.toLowerCase()
+        const sub = firstWd.toLowerCase()
+        if (!low.includes(sub)) {
+          notableMerged = normalizeValue(`${notableMerged} · ${firstWd}`) ?? notableMerged
+        }
+      }
+    } else {
+      const fromWd = fallback.notable_work_labels.slice(0, 5).join(' · ')
+      notableMerged = notableMerged
+        ? normalizeValue(`${notableMerged} · ${fromWd}`) ?? notableMerged
+        : normalizeValue(fromWd)
+    }
   }
   if (!notableMerged && fallback.occupations.length > 0) {
     notableMerged = normalizeValue(fallback.occupations.slice(0, 3).join(', '))
@@ -1274,6 +1505,35 @@ function applyWikidataFallback(
     }
   }
 
+  const HIGHLIGHT_CAP = 10
+  const existingHighlights = Array.isArray(g.highlights) ? [...g.highlights] : []
+  let highlightsOut: Array<{ label: string; value: string }> | undefined
+
+  if (resolvedType === 'artist') {
+    const rows: Array<{ label: string; value: string }> = [...existingHighlights]
+    if (fallback.member_of_labels.length > 0) {
+      rows.push({
+        label: 'Membre de',
+        value: fallback.member_of_labels.slice(0, 6).join(' · '),
+      })
+    }
+    if (fallback.record_label_labels.length > 0) {
+      rows.push({
+        label: 'Label(s)',
+        value: fallback.record_label_labels.slice(0, 6).join(' · '),
+      })
+    }
+    for (const value of fallback.notable_work_labels.slice(1, 9)) {
+      const v = normalizeValue(value)
+      if (!v) continue
+      rows.push({ label: 'Album / titre', value: v })
+    }
+    highlightsOut = rows.slice(0, HIGHLIGHT_CAP)
+    if (highlightsOut.length === 0) highlightsOut = undefined
+  } else if (existingHighlights.length > 0) {
+    highlightsOut = existingHighlights
+  }
+
   return {
     personType: resolvedType,
     infobox: {
@@ -1283,6 +1543,7 @@ function applyWikidataFallback(
       birth_year: g.birth_year ?? fallback.birth_year,
       nationality: normalizeValue(g.nationality ?? fallback.nationality),
       company: companyMerged,
+      ...(highlightsOut ? { highlights: highlightsOut } : {}),
     },
   }
 }
@@ -1322,7 +1583,10 @@ function evaluateParseQuality(
   } else if (personType === 'sportsperson') {
     const s = infoboxData as WikiSportspersonData
     const isTennisProfile = /tennis/i.test(s.sport ?? '')
-    const hasCareerData = (s.clubs ?? []).length > 0 || (s.career_highlights ?? []).length > 0
+    const hasCareerData =
+      (s.clubs ?? []).length > 0
+      || (s.clubs_youth ?? []).length > 0
+      || (s.career_highlights ?? []).length > 0
     if (!hasCareerData) { score -= 35; warnings.push('Aucune carrière sportive extraite') }
     if (!isTennisProfile && !s.position) { score -= 15; warnings.push('Poste manquant') }
     if (!s.birth_year) { score -= 20; warnings.push('Année de naissance manquante') }

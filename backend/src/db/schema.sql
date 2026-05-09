@@ -57,6 +57,9 @@ CREATE TABLE IF NOT EXISTS films (
     -- Soft-delete / visibility flag
     is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
 
+    -- Ordre des clés d’indices pour nouvelles planifications (max 3 révélées en jeu).
+    hint_schedule   TEXT NOT NULL DEFAULT '["year","director","cast"]',
+
     created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
@@ -103,6 +106,8 @@ CREATE TABLE IF NOT EXISTS series (
 
     fame_level      INTEGER NOT NULL DEFAULT 3 CHECK (fame_level BETWEEN 1 AND 5),
     is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+
+    hint_schedule   TEXT NOT NULL DEFAULT '["year","creator","cast"]',
 
     created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))

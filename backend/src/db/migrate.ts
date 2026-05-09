@@ -218,6 +218,14 @@ const incremental: { name: string; sql: string }[] = [
     name: 'seed_wiki_prefetch_enabled',
     sql: `INSERT OR IGNORE INTO app_settings (key, value) VALUES ('wiki_prefetch_enabled', '1')`,
   },
+  {
+    name: 'add_hint_schedule_to_films',
+    sql: `ALTER TABLE films ADD COLUMN hint_schedule TEXT NOT NULL DEFAULT '["year","director","cast"]'`,
+  },
+  {
+    name: 'add_hint_schedule_to_series',
+    sql: `ALTER TABLE series ADD COLUMN hint_schedule TEXT NOT NULL DEFAULT '["year","creator","cast"]'`,
+  },
 ]
 
 // Multi-statement migrations that need db.exec() rather than db.prepare().run()

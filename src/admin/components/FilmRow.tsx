@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { Pencil, Trash2, Clapperboard, Images, Upload, History } from 'lucide-react'
+import { Pencil, Trash2, Clapperboard, Images, Upload, History, Eye } from 'lucide-react'
 import type { AdminFilm } from '../api'
 
 function resolveThumb(url: string): string {
@@ -18,9 +18,10 @@ interface FilmRowProps {
   onDelete: (film: AdminFilm) => void
   onBackdrops: (film: AdminFilm) => void
   onUpload: (film: AdminFilm, file: File) => void
+  onPreview: (film: AdminFilm) => void
 }
 
-export function FilmRow({ film, onEdit, onDelete, onBackdrops, onUpload }: FilmRowProps) {
+export function FilmRow({ film, onEdit, onDelete, onBackdrops, onUpload, onPreview }: FilmRowProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const today = getTodayStr()
   const pastDates = (film.used_dates ?? []).filter((d) => d <= today)
@@ -50,6 +51,10 @@ export function FilmRow({ film, onEdit, onDelete, onBackdrops, onUpload }: FilmR
   const ActionButtons = ({ compact }: { compact?: boolean }) => (
     <>
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+      <button onClick={() => onPreview(film)} title="Aperçu du défi"
+        className={`${compact ? 'p-2' : 'p-1.5'} bg-violet-50 text-violet-600 hover:bg-violet-100 rounded-lg transition-colors`}>
+        <Eye size={14} />
+      </button>
       <button onClick={() => fileInputRef.current?.click()} title="Uploader une image"
         className={`${compact ? 'p-2' : 'p-1.5'} bg-teal-50 text-teal-600 hover:bg-teal-100 rounded-lg transition-colors`}>
         <Upload size={14} />

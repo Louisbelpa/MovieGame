@@ -157,6 +157,7 @@ Branding : toujours **GuessToday** (marque et URL canonique par défaut `https:/
 | `UPLOADS_DIRECTORY` | `backend/public/uploads` (dev) ; **`/data/uploads`** en Docker | Fichiers images uploadés depuis l’admin ; **à persister en prod** sur le même volume que la base |
 | `WIKI_PREFETCH_TARGET_READY` | `24` | Cible d’entrées « prêtes » dans le pool admin « Au hasard » (Wikipedia), plafond **400** |
 | `WIKI_PREFETCH_MAX_FETCH_PER_RUN` | `4` | Fiches Wikipédia enrichies au plus par passe de remplissage, plafond **40** |
+| `WIKI_PREFETCH_SPARQL_LIMIT` | *(dérivé)* | `LIMIT` Wikidata pour le prefetch / « Au hasard » : si absent, **`max(100, WIKI_PREFETCH_TARGET_READY)`** (plafonné **800**) ; si défini explicitement, borné **50–800** |
 | `PREFETCH_WARM_TOKEN` | *(vide)* | Jeton Bearer / header `X-Prefetch-Warm-Token` pour `POST /api/admin/prefetch/warm` (cron) |
 
 **CORS** : renseigner `CORS_ORIGIN` en liste d’origines complètes `https://...` (sans slash final, sans espaces). Les origines sont normalisées côté serveur.
@@ -176,7 +177,9 @@ Branding : toujours **GuessToday** (marque et URL canonique par défaut `https:/
 ### Back office
 
 - **Uploads** — servis sous `/uploads/...` depuis `UPLOADS_DIRECTORY` (montage volume recommandé avec la DB).
-- **Wikipedia** — pool préchargé pour « Au hasard » ; page **`/admin/wiki-pool`** (stats, activation) ; `POST /api/admin/prefetch/warm?target=&lang=&minFame=` pour cron externe.
+- **Réglages** — **`/admin/settings`** : activation du préfetch Wikipedia (toggle `wiki_prefetch_enabled`), récap config serveur lisible via **`GET /api/admin/settings/summary`** (sans secrets, inclut cibles pool et limite SPARQL effective).
+- **Wikipedia** — pool préchargé pour « Au hasard » ; **`/admin/wiki-pool`** : liste paginée, filtre entrées avec/sans fiche personnalité (`hasWikiPerson`), cartes et dates au fuseau Europe/Paris ; activation pool gérée depuis Réglages ; `POST /api/admin/prefetch/warm?target=&lang=&minFame=` pour cron externe.
+- **Films / séries** — **`POST /api/admin/game-preview-draft`** : prévisualisation du rendu jeu depuis le formulaire **sans enregistrer** la fiche.
 - **Planning** — après changement de date ou restauration d’un défi, renumérotation des `challenge_number`.
 
 ### Domaine & branding
@@ -225,10 +228,11 @@ Branding : toujours **GuessToday** (marque et URL canonique par défaut `https:/
 Accessible sur `/admin`. Protégé par mot de passe (et identifiant si `ADMIN_USERNAME` est défini).
 
 - **Dashboard** — aperçu du défi du jour et des 7 prochains jours
-- **Films** — CRUD complet, recherche TMDB par titre, bouton "Film aléatoire" (TMDB discover, vote_count ≥ 500)
-- **Séries** — CRUD complet, recherche TMDB, bouton "Série aléatoire"
+- **Films** — CRUD complet, recherche TMDB par titre, bouton "Film aléatoire" (TMDB discover, vote_count ≥ 500), prévisualisation jeu depuis le brouillon du formulaire
+- **Séries** — CRUD complet, recherche TMDB, bouton "Série aléatoire", même prévisualisation brouillon
 - **Wikipedia** — CRUD personnalités : import depuis un slug Wikipedia (FR ou EN), bouton "Au hasard" via Wikidata SPARQL (filtre par sitelinks), parsing automatique du type de personnalité et de la carrière
-- **Pool Wikipedia** — `/admin/wiki-pool` : état du pool préchargé, activation/désactivation (`wiki_prefetch_enabled`)
+- **Pool Wikipedia** — `/admin/wiki-pool` : entrées du pool, pagination, filtre fiche existante, lien vers Réglages pour activer le préchargement
+- **Réglages** — `/admin/settings` : toggle préfetch Wikipedia et lecture seule des variables d’environnement pertinentes (dont flags Vite affichés à titre informatif)
 - **Planning** — calendrier des 30 prochains jours avec onglets Films / Séries / Wiki, assignation et auto-planification ; suppression = `is_active=0` sur `daily_challenges`
 - **Analytics** — statistiques de jeu, taux de victoire, joueurs récurrents
 

@@ -37,7 +37,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-4 sm:my-8">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl my-4 sm:my-8">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
           <h2 className="text-base font-semibold text-gray-900 truncate pr-4">{title}</h2>
           <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">

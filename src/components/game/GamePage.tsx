@@ -331,7 +331,15 @@ export function GamePage({ mode }: GamePageProps) {
   const hintsAvailable = challenge.hintsAvailable ?? 0
   const wikiProfile: WikiVisibleProfile = isWikiChallenge(challenge)
     ? (challenge.profile as WikiVisibleProfile)
-    : { type: 'generic', domain: null, notableWork: null, era: null }
+    : {
+        type: 'generic',
+        domain: null,
+        notableWork: null,
+        notableWorkParts: [],
+        era: null,
+        company: null,
+        highlights: [],
+      }
   const wikiPersonType = isWikiChallenge(challenge) ? challenge.personType : undefined
   const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
   const currentDate = viewingDate ?? todayParis

@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS films (
   imdb_id         TEXT,
   fame_level      INTEGER NOT NULL DEFAULT 3 CHECK (fame_level BETWEEN 1 AND 5),
   is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+  hint_schedule   TEXT NOT NULL DEFAULT '["year","director","cast"]',
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
@@ -58,6 +59,7 @@ CREATE TABLE IF NOT EXISTS series (
   original_language TEXT,
   fame_level      INTEGER NOT NULL DEFAULT 3 CHECK (fame_level BETWEEN 1 AND 5),
   is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+  hint_schedule   TEXT NOT NULL DEFAULT '["year","creator","cast"]',
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
