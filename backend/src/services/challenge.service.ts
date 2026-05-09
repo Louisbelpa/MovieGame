@@ -104,11 +104,13 @@ function hasAdjacentScheduledChallenge(
       ? db.prepare<[string, string, string], { n: number }>(
           `SELECT 1 AS n FROM daily_challenges
            WHERE challenge_date < ? AND challenge_date <= ? AND media_type = ?
+             AND is_active = 1
            LIMIT 1`
         )
       : db.prepare<[string, string, string], { n: number }>(
           `SELECT 1 AS n FROM daily_challenges
            WHERE challenge_date > ? AND challenge_date <= ? AND media_type = ?
+             AND is_active = 1
            LIMIT 1`
         );
   return stmt.get(date, todayParis, mediaType) !== undefined;

@@ -620,7 +620,7 @@ adminRouter.post('/prefetch/warm', async (req: Request, res: Response, next: Nex
     const lang = sanitizeLang(req.query.lang)
     const minFame = sanitizeMinFame(req.query.minFame)
     const targetRaw = parseInt(String(req.query.target ?? PREFETCH_TARGET_READY), 10)
-    const target = Math.max(1, Math.min(100, Number.isFinite(targetRaw) ? targetRaw : PREFETCH_TARGET_READY))
+    const target = clampInt(Number.isFinite(targetRaw) ? targetRaw : PREFETCH_TARGET_READY, 1, PREFETCH_WARM_TARGET_QUERY_MAX)
 
     const before = readWikiPrefetchStats(lang, minFame)
     await ensureWikiPrefetchPool(lang, minFame, target)
@@ -3511,8 +3511,26 @@ const inFlightWikipediaFetches = new Map<
 const prefetchWorkers = new Set<string>()
 const PREFETCH_DEFAULT_LANG = 'fr'
 const PREFETCH_DEFAULT_MIN_FAME = 30
-const PREFETCH_TARGET_READY = 24
-const PREFETCH_MAX_FETCH_PER_RUN = 4
+
+function clampInt(n: number, lo: number, hi: number): number {
+  if (!Number.isFinite(n)) return lo
+  return Math.max(lo, Math.min(hi, Math.trunc(n)))
+}
+
+/** Objectif nombre d’entrées `ready` (défaut 24 ; max 400 en env). */
+const PREFETCH_TARGET_READY = clampInt(
+  parseInt(process.env.WIKI_PREFETCH_TARGET_READY ?? '24', 10),
+  1,
+  400,
+)
+/** Nombre max de fetch Wikipédia par passe (réduit la charge externes). */
+const PREFETCH_MAX_FETCH_PER_RUN = clampInt(
+  parseInt(process.env.WIKI_PREFETCH_MAX_FETCH_PER_RUN ?? '4', 10),
+  1,
+  40,
+)
+
+const PREFETCH_WARM_TARGET_QUERY_MAX = 400
 const PREFETCH_READY_TTL_MS = 1000 * 60 * 60 * 24 * 2 // 48h
 const PREFETCH_FAILED_TTL_MS = 1000 * 60 * 30 // 30min
 const PREFETCH_REFRESH_INTERVAL_MS = 45_000
