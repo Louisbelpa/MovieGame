@@ -894,7 +894,12 @@ export async function uploadFilmImage(filmId: number, file: File): Promise<{ url
 // ─── Analytics ───────────────────────────────────────────────────────────────
 
 export interface AnalyticsOverview {
+  /** Lignes game_sessions (terminées + non terminées). */
   total_sessions: number
+  /** Parties allant au bout : victoire ou défaite (`outcome` renseigné). */
+  completed_sessions: number
+  /** Sessions ouvertes sans fin de partie enregistrée (`outcome` null). */
+  incomplete_sessions: number
   total_unique_players: number
   overall_win_rate: number
   avg_attempts_on_win: number

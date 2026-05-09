@@ -422,19 +422,22 @@ export function AnalyticsPage() {
         <section>
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Vue d'ensemble</h2>
           <p className="text-xs text-gray-500 mb-3 max-w-3xl">
-            Agrégats sur la <strong>période</strong> et le <strong>type de jeu</strong> sélectionnés (sessions dont le défi planifié tombe
-            dans l’intervalle).
+            Agrégats sur la <strong>période</strong> et le <strong>type de jeu</strong> sélectionnés (défis dont la date planifiée tombe dans
+            l’intervalle). <strong>Parties jouées</strong> = parties terminées (gagné ou perdu). <strong>Sessions non terminées</strong> =
+            ouvertures sans fin de partie enregistrée (en cours ou abandonnées). <strong>Ouvertures (total)</strong> = somme des deux.
           </p>
           {overviewErr && <ErrorMsg msg={overviewErr} />}
           {analyticsLoading && !overview && !overviewErr && <Spinner />}
           {overview && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <KpiCard label="Parties jouées" value={overview.total_sessions.toLocaleString('fr-FR')} />
+              <KpiCard label="Parties jouées" value={overview.completed_sessions.toLocaleString('fr-FR')} />
+              <KpiCard label="Sessions non terminées" value={overview.incomplete_sessions.toLocaleString('fr-FR')} />
+              <KpiCard label="Ouvertures (total)" value={overview.total_sessions.toLocaleString('fr-FR')} />
               <KpiCard label="Joueurs uniques" value={overview.total_unique_players.toLocaleString('fr-FR')} />
               <KpiCard label="Taux de complétion" value={`${overview.completion_rate} %`} />
               <KpiCard label="Taux de victoire" value={`${overview.overall_win_rate} %`} />
-              <KpiCard label="Moy. indices / partie" value={overview.avg_hints_per_session.toFixed(1)} />
-              <KpiCard label="Durée moy. session" value={formatDuration(overview.avg_session_duration_seconds)} />
+              <KpiCard label="Moy. indices / partie" value={(overview.avg_hints_per_session ?? 0).toFixed(1)} />
+              <KpiCard label="Durée moy. partie" value={formatDuration(overview.avg_session_duration_seconds ?? 0)} />
             </div>
           )}
         </section>

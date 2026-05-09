@@ -2514,10 +2514,12 @@ adminRouter.get(
       const overview = db.prepare(`
         SELECT
           COUNT(*) AS total_sessions,
+          SUM(CASE WHEN gs.outcome IS NOT NULL THEN 1 ELSE 0 END) AS completed_sessions,
+          SUM(CASE WHEN gs.outcome IS NULL THEN 1 ELSE 0 END) AS incomplete_sessions,
           COUNT(DISTINCT gs.session_token) AS total_unique_players,
           ROUND(100.0 * SUM(CASE WHEN gs.outcome = 'won' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN gs.outcome IS NOT NULL THEN 1 ELSE 0 END), 0)) AS overall_win_rate,
           ROUND(AVG(CASE WHEN gs.outcome = 'won' THEN json_array_length(gs.attempts) ELSE NULL END), 1) AS avg_attempts_on_win,
-          ROUND(AVG(gs.hints_revealed), 1) AS avg_hints_per_session,
+          ROUND(AVG(CASE WHEN gs.outcome IS NOT NULL THEN gs.hints_revealed ELSE NULL END), 1) AS avg_hints_per_session,
           ROUND(100.0 * SUM(CASE WHEN gs.outcome IS NOT NULL THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0)) AS completion_rate,
           ROUND(AVG(CASE WHEN gs.outcome IS NOT NULL THEN strftime('%s', gs.finished_at) - strftime('%s', gs.started_at) ELSE NULL END)) AS avg_session_duration_seconds
         FROM game_sessions gs
@@ -2526,6 +2528,8 @@ adminRouter.get(
         ${mediaSql}
       `).get(...(mediaType ? [from, to, mediaType] : [from, to])) as {
         total_sessions: number;
+        completed_sessions: number;
+        incomplete_sessions: number;
         total_unique_players: number;
         overall_win_rate: number | null;
         avg_attempts_on_win: number | null;
@@ -2536,6 +2540,8 @@ adminRouter.get(
 
       res.json({
         total_sessions: overview.total_sessions ?? 0,
+        completed_sessions: overview.completed_sessions ?? 0,
+        incomplete_sessions: overview.incomplete_sessions ?? 0,
         total_unique_players: overview.total_unique_players ?? 0,
         overall_win_rate: overview.overall_win_rate ?? 0,
         avg_attempts_on_win: overview.avg_attempts_on_win ?? 0,
