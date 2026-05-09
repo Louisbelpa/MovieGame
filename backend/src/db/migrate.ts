@@ -270,12 +270,13 @@ const multiStatement: { name: string; sql: string }[] = [
         wiki_person_id   INTEGER REFERENCES wiki_persons(id) ON DELETE RESTRICT,
         challenge_number INTEGER NOT NULL,
         hint_schedule    TEXT NOT NULL DEFAULT '["year","director","cast"]',
+        is_active        INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
         created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
         UNIQUE (challenge_date, media_type)
       );
       INSERT OR IGNORE INTO daily_challenges_v3
-        (id, challenge_date, media_type, film_id, series_id, wiki_person_id, challenge_number, hint_schedule, created_at)
-        SELECT id, challenge_date, media_type, film_id, series_id, NULL, challenge_number, hint_schedule, created_at
+        (id, challenge_date, media_type, film_id, series_id, wiki_person_id, challenge_number, hint_schedule, is_active, created_at)
+        SELECT id, challenge_date, media_type, film_id, series_id, NULL, challenge_number, hint_schedule, COALESCE(is_active, 1), created_at
         FROM daily_challenges;
       DROP TABLE daily_challenges;
       ALTER TABLE daily_challenges_v3 RENAME TO daily_challenges;
@@ -360,14 +361,15 @@ const multiStatement: { name: string; sql: string }[] = [
         series_id        INTEGER REFERENCES series(id) ON DELETE RESTRICT,
         challenge_number INTEGER NOT NULL,
         hint_schedule    TEXT NOT NULL DEFAULT '["year","director","cast"]',
+        is_active        INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
         created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
         UNIQUE (challenge_date, media_type)
       );
       INSERT OR IGNORE INTO daily_challenges_v2
-        (id, challenge_date, media_type, film_id, series_id, challenge_number, hint_schedule, created_at)
+        (id, challenge_date, media_type, film_id, series_id, challenge_number, hint_schedule, is_active, created_at)
         SELECT id, challenge_date,
           CASE WHEN series_id IS NOT NULL THEN 'series' ELSE 'film' END,
-          film_id, series_id, challenge_number, hint_schedule, created_at
+          film_id, series_id, challenge_number, hint_schedule, COALESCE(is_active, 1), created_at
         FROM daily_challenges;
       DROP TABLE daily_challenges;
       ALTER TABLE daily_challenges_v2 RENAME TO daily_challenges;
@@ -434,6 +436,31 @@ for (const { name, sql } of multiStatement) {
     console.log(`  ✓ ${name}`)
   } catch (err) {
     console.error(`  ✗ ${name} — rolled back:`, err)
+  }
+}
+
+const postMultiStatementIncremental: { name: string; sql: string }[] = [
+  {
+    name: 'repair_daily_challenges_is_active_after_table_recreate',
+    sql: `ALTER TABLE daily_challenges ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))`,
+  },
+  {
+    name: 'repair_daily_challenges_idx_is_active_after_recreate',
+    sql: `CREATE INDEX IF NOT EXISTS idx_daily_challenges_is_active ON daily_challenges (is_active)`,
+  },
+]
+
+for (const { name, sql } of postMultiStatementIncremental) {
+  if (isApplied(name)) {
+    console.log(`  – ${name} (already applied)`)
+    continue
+  }
+  try {
+    db.prepare(sql).run()
+    markApplied(name)
+    console.log(`  ✓ ${name}`)
+  } catch {
+    markApplied(name)
   }
 }
 
