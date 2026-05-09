@@ -64,7 +64,8 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
           spellCheck={false}
           className={cn(
             'flex-1 bg-transparent text-film-text placeholder:text-film-text-dim',
-            'text-xs sm:text-sm outline-none min-w-0 py-1.5 sm:py-2 rounded leading-snug',
+            /* ≥16px sur mobile : évite le zoom automatique Safari iOS au focus */
+            'text-base sm:text-sm outline-none min-w-0 py-1.5 sm:py-2 rounded leading-snug',
             'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold',
           )}
         />
