@@ -14,12 +14,12 @@ export default defineConfig(({ mode }) => {
   const brandName = 'GuessToday'
   /** SEO / JSON-LD (`index.html` : meta description + schema) — plus bavard */
   const siteDesc = enableSeries
-    ? 'GuessToday : trois jeux quotidiens gratuits — film, série TV ou personnalité (Wiki) — à deviner avec des indices progressifs, sans compte. Renouvelé chaque jour à minuit (Paris), style Wordle.'
-    : 'GuessToday : devinez chaque jour le film mystère grâce à une image et des indices (année, réalisateur, acteurs). Défi cinéma gratuit, renouvelé à minuit (Paris), style Wordle.'
+    ? 'GuessToday : trois jeux quotidiens — film, série TV ou personnalité (Wiki) — à deviner avec des indices progressifs, sans compte. Renouvelé chaque jour à minuit (Paris), style Wordle.'
+    : 'GuessToday : devinez chaque jour le film mystère grâce à une image et des indices (année, réalisateur, acteurs). Défi cinéma, renouvelé à minuit (Paris), style Wordle.'
   /** Réseaux sociaux (`og:description`, `twitter:description`) — court */
   const ogDesc = enableSeries
-    ? 'Film, série ou personnalité : un défi par jour. Gratuit.'
-    : 'Le film mystère du jour à deviner. Gratuit.'
+    ? 'Film, série ou personnalité : un défi par jour.'
+    : 'Le film mystère du jour à deviner.'
 
   return {
   define: {
