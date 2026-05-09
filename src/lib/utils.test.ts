@@ -59,6 +59,16 @@ describe('buildShareGrid', () => {
     expect(buildShareGrid(guesses)).toBe('❌ ⏭️ 🎬')
   })
 
+  it('series mode → 📺 for correct', () => {
+    const guesses: GuessEntry[] = [{ value: 'Show', status: 'correct', timestamp: 0 }]
+    expect(buildShareGrid(guesses, 'series')).toBe('📺')
+  })
+
+  it('wiki mode → 🏛️ for correct', () => {
+    const guesses: GuessEntry[] = [{ value: 'Nom', status: 'correct', timestamp: 0 }]
+    expect(buildShareGrid(guesses, 'wiki')).toBe('🏛️')
+  })
+
   it('empty → empty string', () => expect(buildShareGrid([])).toBe(''))
 })
 
@@ -89,11 +99,27 @@ describe('buildShareText', () => {
   it('includes challenge number when provided', () => {
     const text = buildShareText('2026-05-08', guesses, true, 5, 42)
     expect(text).toContain('#42')
+    expect(text).toContain('Film')
   })
 
-  it('includes site URL', () => {
+  it('includes site URL with /films for film mode', () => {
     const text = buildShareText('2026-05-08', guesses, true, 5)
     expect(text).toMatch(/https?:\/\//)
+    expect(text).toContain('/films')
+  })
+
+  it('series mode → lien /series et libellé Série', () => {
+    const text = buildShareText('2026-05-08', guesses, true, 5, 7, 'series')
+    expect(text).toContain('Série')
+    expect(text).toContain('/series')
+    expect(text).toContain('📺')
+  })
+
+  it('wiki mode → lien /wiki et libellé Wiki', () => {
+    const text = buildShareText('2026-05-08', guesses, true, 5, 3, 'wiki')
+    expect(text).toContain('Personnalités')
+    expect(text).toContain('/wiki')
+    expect(text).toContain('🏛️')
   })
 })
 

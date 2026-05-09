@@ -1,4 +1,4 @@
-# CinéGuessr / GuessToday 🎬
+# GuessToday 🎬
 
 Jeu quotidien multi-modes : devine le film, la série ou la personnalité du jour à partir d'indices progressifs.
 Un nouveau défi chaque jour à minuit (heure de Paris). Les anciens défis restent accessibles.
@@ -7,7 +7,7 @@ Un nouveau défi chaque jour à minuit (heure de Paris). Les anciens défis rest
 
 | Mode | Route | Description |
 |------|-------|-------------|
-| **CinéGuessr / Films** | `/films` | Devine le film à partir d'une image et d'indices (année, réalisateur, acteur) |
+| **Films** | `/films` | Devine le film à partir d'une image et d'indices (année, réalisateur, acteur) |
 | **Séries** | `/series` | Même principe pour les séries TV |
 | **WikiGuessr** | `/wiki` | Devine une personnalité réelle (politique, sport, art…) à partir de sa carrière et d'indices progressifs |
 
@@ -134,9 +134,11 @@ Voir `backend/.env.example` pour la liste complète.
 | `VITE_API_URL` | *(vide)* | Préfixe URL du backend (`fetch` / admin) si besoin ; sinon requêtes relatives même origine |
 
 Effets des flags :
-- `VITE_ENABLE_SERIES=false` + `VITE_ENABLE_WIKI=false` → mode films uniquement, branding `CinéGuessr`
-- `VITE_ENABLE_SERIES=true` → films + séries, branding `GuessToday`
+- `VITE_ENABLE_SERIES=false` + `VITE_ENABLE_WIKI=false` → mode films uniquement (routes / UI séries et wiki masquées)
+- `VITE_ENABLE_SERIES=true` → films + séries
 - `VITE_ENABLE_WIKI=true` → onglet WikiGuessr visible sur la homepage
+
+Branding : toujours **GuessToday** (marque et URL canonique par défaut `https://guesstoday.fr`).
 
 ### Backend
 
@@ -179,7 +181,7 @@ Effets des flags :
 
 ### Domaine & branding
 
-- Sur **`cineguessr.fr`** / **`www.cineguessr.fr`**, redirection client vers **`guesstoday.fr`** avec migration partielle du localStorage (`src/main.tsx`). À garder le temps que les anciens liens disparaissent ; une **301** infra reste l’idéal pour le SEO.
+- Redirection client depuis l’**ancien domaine** listé dans **`src/main.tsx`** vers **`guesstoday.fr`** avec migration partielle du localStorage. À conserver tant que d’anciens liens existent ; une **301** infra reste l’idéal pour le SEO.
 
 ### Déjà documenté plus bas
 

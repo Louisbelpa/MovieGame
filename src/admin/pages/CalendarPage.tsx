@@ -261,7 +261,7 @@ export function CalendarPage() {
         options={[
           { id: 'film', label: 'Films', icon: <Film size={14} /> },
           { id: 'series', label: 'Séries', icon: <Tv size={14} /> },
-          { id: 'wiki', label: 'Wikipedia', icon: <Landmark size={14} /> },
+          { id: 'wiki', label: 'Personnalités', icon: <Landmark size={14} /> },
         ]}
       />
 
@@ -427,7 +427,7 @@ export function CalendarPage() {
                     : mt === 'series'
                       ? 'bg-violet-100 text-violet-700'
                       : 'bg-indigo-100 text-indigo-700'
-                  const badgeLabel = mt === 'wiki' ? 'Wiki' : mt === 'series' ? 'Série' : 'Film'
+                  const badgeLabel = mt === 'wiki' ? 'Personnalités' : mt === 'series' ? 'Série' : 'Film'
 
                   return (
                     <div

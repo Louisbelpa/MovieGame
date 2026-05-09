@@ -186,14 +186,14 @@ export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps
     <Modal
       isOpen={isOpen}
       onClose={closeModal}
-      ariaLabel={isWiki ? 'Archives des défis WikiGuessr' : 'Archives des défis'}
+      ariaLabel={isWiki ? 'Archives des défis Personnalités' : 'Archives des défis'}
       ariaLabelledBy={modalTitleId}
       ariaDescribedBy={modalDescId}
       headerContent={monthNav}
     >
       <div className="flex flex-col gap-4">
         <p id={modalTitleId} className="sr-only">
-          {isWiki ? 'Archives des défis WikiGuessr' : 'Archives des défis'}
+          {isWiki ? 'Archives des défis Personnalités' : 'Archives des défis'}
         </p>
         <p id={modalDescId} className="sr-only">
           Navigation par mois et sélection d'une date de défi.

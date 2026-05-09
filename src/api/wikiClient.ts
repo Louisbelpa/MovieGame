@@ -84,6 +84,8 @@ export interface WikiChallengePayload {
   maxAttempts: number
   attempts: WikiAttemptPayload[]
   outcome: 'won' | 'lost' | null
+  /** Réponse admin — aperçu sans partie réelle */
+  isPreview?: boolean
 }
 
 export interface WikiGuessResultPayload {

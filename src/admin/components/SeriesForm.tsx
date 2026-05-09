@@ -9,6 +9,7 @@ import { X, Images, Search, Loader2, Upload, Shuffle } from 'lucide-react'
 import type { AdminSeries, SeriesPayload, TmdbTvSearchResult } from '../api'
 import { searchTmdbTv, getTmdbTvDetails, uploadImage, getRandomTmdbSeries } from '../api'
 import { BackdropPicker } from './BackdropPicker'
+import { FilmSeriesGamePreviewModal, FilmSeriesPreviewOpenButton } from './FilmSeriesGamePreviewModal'
 
 function resolvePreviewUrl(url: string): string {
   if (!url) return ''
@@ -255,6 +256,7 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
   const [showBackdrops, setShowBackdrops] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [randomLoading, setRandomLoading] = useState(false)
+  const [seriesPreviewOpen, setSeriesPreviewOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleRandom() {
@@ -307,6 +309,7 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
   }
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="space-y-4">
 
       {!initial?.id && (
@@ -454,7 +457,11 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
         <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
       )}
 
-      <div className="flex justify-end gap-3 pt-2">
+      <div className="flex flex-wrap justify-between gap-3 pt-2 items-center">
+        <div>
+          {initial?.id ? <FilmSeriesPreviewOpenButton mode="series" onOpen={() => setSeriesPreviewOpen(true)} /> : null}
+        </div>
+        <div className="flex gap-3 ml-auto">
         <button type="button" onClick={onCancel} disabled={submitting} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
           Annuler
         </button>
@@ -462,7 +469,15 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
           {submitting && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
           {initial?.id ? 'Enregistrer' : 'Créer la série'}
         </button>
+        </div>
       </div>
     </form>
+    <FilmSeriesGamePreviewModal
+      isOpen={seriesPreviewOpen}
+      onClose={() => setSeriesPreviewOpen(false)}
+      mode="series"
+      mediaId={initial?.id ?? null}
+    />
+    </>
   )
 }

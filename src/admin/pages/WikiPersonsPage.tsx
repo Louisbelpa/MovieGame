@@ -13,6 +13,7 @@ import {
   type WikiPersonPayload,
 } from '../api'
 import { AdminLayout } from '../components/AdminLayout'
+import { WikiGamePreviewModal, WikiGamePreviewOpenButton } from '../components/WikiGamePreviewModal'
 
 // Module-level pool — persists across modal open/close cycles
 const _wikiSlugPool: string[] = []
@@ -321,6 +322,7 @@ function WikiPersonForm({
   const [parseWarnings, setParseWarnings] = useState<string[]>([])
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const photoFileRef = useRef<HTMLInputElement>(null)
+  const [wikiPreviewOpen, setWikiPreviewOpen] = useState(false)
 
   useEffect(() => {
     const raw = initial?.infobox_data ?? {}
@@ -625,7 +627,7 @@ function WikiPersonForm({
         difficulty: Math.min(5, Math.max(1, difficulty)),
         is_active: isActive,
       }
-      if (!payload.name || !payload.wikipedia_slug) throw new Error('Nom et slug Wikipedia sont obligatoires.')
+      if (!payload.name || !payload.wikipedia_slug) throw new Error('Nom et slug Wikipédia sont obligatoires.')
       await onSubmit(payload)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue')
@@ -635,6 +637,7 @@ function WikiPersonForm({
   }
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
@@ -665,7 +668,7 @@ function WikiPersonForm({
                 href={'https://' + wikiLang + '.wikipedia.org/wiki/' + encodeURIComponent(slug.trim().split(/\s+/).join('_'))}
                 target="_blank"
                 rel="noreferrer"
-                title="Ouvrir la page Wikipedia"
+                title="Ouvrir la page Wikipédia"
                 className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
               >
                 <ExternalLink size={14} />
@@ -931,7 +934,7 @@ function WikiPersonForm({
           )}
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Wikipedia URL</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">URL Wikipédia</label>
           <input value={wikipediaUrl} onChange={(e) => setWikipediaUrl(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
         </div>
       </div>
@@ -940,13 +943,86 @@ function WikiPersonForm({
         <textarea rows={3} value={extract} onChange={(e) => setExtract(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
       </div>
 
-      <div className="flex justify-end gap-3 pt-2">
+      <div className="flex flex-wrap justify-between gap-3 pt-2 items-center">
+        <div>
+          {initial?.id ? (
+            <WikiGamePreviewOpenButton onOpen={() => setWikiPreviewOpen(true)} />
+          ) : null}
+        </div>
+        <div className="flex gap-3 ml-auto">
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm border rounded-lg">Annuler</button>
         <button type="submit" disabled={submitting} className="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50">
           {initial ? 'Enregistrer' : 'Créer'}
         </button>
+        </div>
       </div>
     </form>
+    <WikiGamePreviewModal
+      isOpen={wikiPreviewOpen}
+      onClose={() => setWikiPreviewOpen(false)}
+      personId={initial?.id ?? null}
+    />
+    </>
+  )
+}
+
+function WikiPersonListActions({
+  person,
+  uploading,
+  onEdit,
+  onDelete,
+  onUpload,
+  compact,
+}: {
+  person: AdminWikiPerson
+  uploading: boolean
+  onEdit: (p: AdminWikiPerson) => void
+  onDelete: (p: AdminWikiPerson) => void
+  onUpload: (p: AdminWikiPerson, file: File) => void
+  compact?: boolean
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) onUpload(person, file)
+    e.target.value = ''
+  }
+  const pad = compact ? 'p-2' : 'p-1.5'
+  return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        title="Uploader une image"
+        className={`${pad} bg-teal-50 text-teal-600 hover:bg-teal-100 rounded-lg transition-colors disabled:opacity-50`}
+      >
+        {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+      </button>
+      <button
+        type="button"
+        onClick={() => onEdit(person)}
+        title="Modifier"
+        className={`${pad} bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors`}
+      >
+        <Pencil size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={() => onDelete(person)}
+        title="Supprimer"
+        className={`${pad} bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors`}
+      >
+        <Trash2 size={14} />
+      </button>
+    </>
   )
 }
 
@@ -959,6 +1035,7 @@ export function WikiPersonsPage() {
   const [modal, setModal] = useState<ModalState>(null)
   const [deleting, setDeleting] = useState(false)
   const [randomLoading, setRandomLoading] = useState(false)
+  const [uploadingWikiPhotoId, setUploadingWikiPhotoId] = useState<number | null>(null)
 
   async function handlePageRandom() {
     setRandomLoading(true)
@@ -985,12 +1062,28 @@ export function WikiPersonsPage() {
     load()
   }, [load])
 
+  async function handleWikiPhotoUpload(person: AdminWikiPerson, file: File) {
+    setUploadingWikiPhotoId(person.id)
+    setError(null)
+    try {
+      const url = await uploadImage(file)
+      await updateWikiPerson(person.id, { photo_url: url })
+      setSuccess('Photo mise à jour.')
+      setTimeout(() => setSuccess(null), 3000)
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur upload')
+    } finally {
+      setUploadingWikiPhotoId(null)
+    }
+  }
+
   async function handleCreate(payload: WikiPersonPayload) {
     try {
       setError(null)
       setSuccess(null)
       await createWikiPerson(payload)
-      setSuccess('Personnalité Wikipedia créée.')
+      setSuccess('Fiche personnalité créée.')
       setModal(null)
       load()
     } catch (err) {
@@ -1004,7 +1097,7 @@ export function WikiPersonsPage() {
       setError(null)
       setSuccess(null)
       await updateWikiPerson(modal.person.id, payload)
-      setSuccess('Personnalité Wikipedia mise à jour.')
+      setSuccess('Fiche personnalité mise à jour.')
       setModal(null)
       load()
     } catch (err) {
@@ -1019,7 +1112,7 @@ export function WikiPersonsPage() {
       setError(null)
       setSuccess(null)
       await deleteWikiPerson(modal.person.id)
-      setSuccess('Personnalité Wikipedia supprimée.')
+      setSuccess('Fiche personnalité supprimée.')
       setModal(null)
       load()
     } catch (err) {
@@ -1072,7 +1165,7 @@ export function WikiPersonsPage() {
                   <th className="px-3 py-3 hidden sm:table-cell">Type</th>
                   <th className="px-3 py-3 hidden md:table-cell">Statut</th>
                   <th className="px-3 py-3 hidden lg:table-cell">Difficulté</th>
-                  <th className="sticky right-0 bg-gray-50 px-3 py-3 text-right w-24 border-l border-gray-100">Actions</th>
+                  <th className="sticky right-0 bg-gray-50 px-3 py-3 text-right whitespace-nowrap min-w-[8.5rem] border-l border-gray-100">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -1114,8 +1207,14 @@ export function WikiPersonsPage() {
                               <Badges />
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
-                              <button onClick={() => setModal({ type: 'edit', person })} className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors"><Pencil size={14} /></button>
-                              <button onClick={() => setModal({ type: 'delete', person })} className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors"><Trash2 size={14} /></button>
+                              <WikiPersonListActions
+                                person={person}
+                                uploading={uploadingWikiPhotoId === person.id}
+                                onEdit={(p) => setModal({ type: 'edit', person: p })}
+                                onDelete={(p) => setModal({ type: 'delete', person: p })}
+                                onUpload={handleWikiPhotoUpload}
+                                compact
+                              />
                             </div>
                           </div>
                         </td>
@@ -1158,10 +1257,15 @@ export function WikiPersonsPage() {
                         <td className="px-3 py-3 text-sm hidden lg:table-cell">
                           <span className="text-amber-400 tracking-tighter">{'★'.repeat(person.difficulty ?? 3)}{'☆'.repeat(5 - (person.difficulty ?? 3))}</span>
                         </td>
-                        <td className="px-3 py-3 w-24">
+                        <td className="px-3 py-3">
                           <div className="flex justify-end items-center gap-1">
-                            <button onClick={() => setModal({ type: 'edit', person })} className="p-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors"><Pencil size={14} /></button>
-                            <button onClick={() => setModal({ type: 'delete', person })} className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors"><Trash2 size={14} /></button>
+                            <WikiPersonListActions
+                              person={person}
+                              uploading={uploadingWikiPhotoId === person.id}
+                              onEdit={(p) => setModal({ type: 'edit', person: p })}
+                              onDelete={(p) => setModal({ type: 'delete', person: p })}
+                              onUpload={handleWikiPhotoUpload}
+                            />
                           </div>
                         </td>
                       </tr>
@@ -1175,7 +1279,7 @@ export function WikiPersonsPage() {
       </div>
 
       {modal?.type === 'create' && (
-        <Modal title="Ajouter une personnalité Wikipedia" onClose={() => setModal(null)}>
+        <Modal title="Ajouter une personnalité" onClose={() => setModal(null)}>
           <WikiPersonForm autoRandom={modal.autoRandom} onSubmit={handleCreate} onCancel={() => setModal(null)} />
         </Modal>
       )}

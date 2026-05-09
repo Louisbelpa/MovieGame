@@ -9,6 +9,7 @@ import { X, Images, Search, Loader2, Upload, Shuffle } from 'lucide-react'
 import type { AdminFilm, FilmPayload, TmdbSearchResult } from '../api'
 import { searchTmdb, getTmdbFilmDetails, uploadImage, getRandomTmdbFilm } from '../api'
 import { BackdropPicker } from './BackdropPicker'
+import { FilmSeriesGamePreviewModal, FilmSeriesPreviewOpenButton } from './FilmSeriesGamePreviewModal'
 
 function resolvePreviewUrl(url: string): string {
   if (!url) return ''
@@ -251,6 +252,7 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
   const [showBackdrops, setShowBackdrops] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [randomLoading, setRandomLoading] = useState(false)
+  const [filmPreviewOpen, setFilmPreviewOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleRandom() {
@@ -306,6 +308,7 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
   }
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="space-y-4">
 
       {/* TMDB search (only shown for new films) */}
@@ -433,7 +436,11 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
         <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
       )}
 
-      <div className="flex justify-end gap-3 pt-2">
+      <div className="flex flex-wrap justify-between gap-3 pt-2 items-center">
+        <div>
+          {initial?.id ? <FilmSeriesPreviewOpenButton mode="film" onOpen={() => setFilmPreviewOpen(true)} /> : null}
+        </div>
+        <div className="flex gap-3 ml-auto">
         <button type="button" onClick={onCancel} disabled={submitting} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
           Annuler
         </button>
@@ -441,7 +448,15 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
           {submitting && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
           {initial?.id ? 'Enregistrer' : 'Créer le film'}
         </button>
+        </div>
       </div>
     </form>
+    <FilmSeriesGamePreviewModal
+      isOpen={filmPreviewOpen}
+      onClose={() => setFilmPreviewOpen(false)}
+      mode="film"
+      mediaId={initial?.id ?? null}
+    />
+    </>
   )
 }

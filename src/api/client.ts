@@ -47,6 +47,7 @@ export interface ChallengePayload {
   challengeNumber: number
   date: string
   isPastChallenge: boolean
+  mediaType?: 'film' | 'series'
   imageUrl: string                  // always present; frontend applies CSS blur
   isGameOver: boolean
   hintsAvailable: number
@@ -56,6 +57,10 @@ export interface ChallengePayload {
   maxAttempts: number
   attempts: AttemptPayload[]
   outcome: 'won' | 'lost' | null
+  hasPrevChallenge?: boolean
+  hasNextChallenge?: boolean
+  /** Réponse admin — aperçu sans partie réelle */
+  isPreview?: boolean
 }
 
 export interface GuessResultPayload {

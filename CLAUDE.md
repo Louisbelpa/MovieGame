@@ -1,4 +1,4 @@
-# CinéGuessr / GuessToday — Guide pour Claude Code
+# GuessToday — Guide pour Claude Code
 
 ## Architecture
 
@@ -65,7 +65,7 @@ npm run dev          # Express sur http://localhost:3001
 
 | Variable | Défaut | Description |
 |----------|--------|-------------|
-| `VITE_ENABLE_SERIES` | `true` | `false` = films only + branding `CinéGuessr`, `true` = films+séries + branding `GuessToday` |
+| `VITE_ENABLE_SERIES` | `true` | `false` = films only (UI/ routes séries masquées), `true` = films + séries — branding toujours `GuessToday` |
 | `VITE_ENABLE_WIKI` | `true` | Active/désactive le mode WikiGuessr (route `/wiki`, tab Homepage) |
 | `VITE_API_URL` | *(vide)* | Préfixe API si le frontend n’est pas servi même origine que le backend |
 
@@ -135,7 +135,7 @@ Ordre d'affichage : année → réalisateur → acteur principal (1 seul, `cast.
 - Multer écrit dans `UPLOADS_DIRECTORY` ; Express sert `/uploads` via `getUploadsAbsDir()` (`app.ts`).
 
 ### Redirection de marque
-- `src/main.tsx` : `cineguessr.fr` / `www.` → `guesstoday.fr?migrate=` (localStorage stats/history partiels).
+- `src/main.tsx` : ancien hostname de prod → `guesstoday.fr?migrate=` (localStorage stats/history partiels) — seul endroit où l’ancien domaine reste référencé en dur.
 
 ### Durcissement backend
 - `helmet` gère les headers de sécurité (CSP incluse, images TMDB + Wikimedia autorisées).

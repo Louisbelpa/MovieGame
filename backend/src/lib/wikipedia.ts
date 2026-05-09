@@ -557,6 +557,11 @@ function readInfoboxField(fields: Map<string, string>, keys: string[]): string {
   return ''
 }
 
+/** Mandat de député à l'Assemblée nationale : l'infobox met souvent le prédécesseur électoral (même circonscription), peu lisible pour le jeu. */
+function isFrenchNationalAssemblyDeputyTitle(title: string): boolean {
+  return /\bd[ée]put[ée]e?\s+fran[cç]aise?\b/i.test(title)
+}
+
 function parsePoliticianData(wikitext: string): WikiPoliticianData {
   const roles: WikiRole[] = []
   const fields = parseInfoboxFields(wikitext)
@@ -591,14 +596,21 @@ function parsePoliticianData(wikitext: string): WikiPoliticianData {
 
     const titleRedacted = country ? title.replace(new RegExp(country, 'gi'), '[PAYS]') : title
 
+    let predecessor = pred.trim() ? stripLinks(pred).trim() : null
+    let successor = succ.trim() ? stripLinks(succ).trim() : null
+    if (isFrenchNationalAssemblyDeputyTitle(title)) {
+      predecessor = null
+      successor = null
+    }
+
     roles.push({
       title,
       title_redacted: titleRedacted,
       start_year: extractYear(termStart),
       end_year: termEnd.trim() ? extractYear(termEnd) : null,
       country: country || null,
-      predecessor: pred.trim() ? stripLinks(pred).trim() : null,
-      successor: succ.trim() ? stripLinks(succ).trim() : null,
+      predecessor,
+      successor,
     })
   }
 

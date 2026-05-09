@@ -73,7 +73,7 @@ if (path.startsWith('/admin')) {
   } else {
     setMeta(
       `${BRAND_NAME} — Devine la personnalité du jour`,
-      'Devine la personnalité mystère du jour à partir de sa biographie. Un nouveau défi WikiGuessr chaque jour.'
+      'Devine la personnalité mystère du jour à partir de sa biographie. Un nouveau défi Personnalités chaque jour.'
     )
   }
   import('./App').then(({ default: App }) => {

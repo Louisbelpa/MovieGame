@@ -59,13 +59,21 @@ function isWikiChallenge(challenge: SharedChallenge): challenge is SharedChallen
 }
 
 async function shareResult(
+  shareMode: 'film' | 'series' | 'wiki',
   challengeId: string,
   guesses: Array<{ status: 'correct' | 'wrong' | 'skipped' }>,
   maxAttempts: number,
   challengeNumber?: number,
 ) {
   const won = guesses.some((g) => g.status === 'correct')
-  const text = buildShareText(challengeId, guesses as GuessEntry[], won, maxAttempts, challengeNumber)
+  const text = buildShareText(
+    challengeId,
+    guesses as GuessEntry[],
+    won,
+    maxAttempts,
+    challengeNumber,
+    shareMode,
+  )
 
   if (navigator.share) {
     try {
@@ -295,7 +303,7 @@ export function GamePage({ mode }: GamePageProps) {
         <div className="flex flex-col items-center justify-center min-h-[50vh] gap-2 text-center">
           <p className="text-film-text font-semibold">
             {isWiki
-              ? 'Aucun défi Wikipedia n’est planifié pour cette date.'
+              ? 'Aucun défi Personnalités n’est planifié pour cette date.'
               : 'Aucun défi n’est planifié pour cette date.'}
           </p>
           <p className="text-film-text-dim text-sm">
@@ -540,7 +548,15 @@ export function GamePage({ mode }: GamePageProps) {
             tmdbId: resultDetails?.tmdbId ?? null,
           }}
           stats={{ attemptsUsed: guesses.length, maxAttempts: challenge.maxAttempts, hintsRevealed }}
-          onShare={() => { void shareResult(challenge.date ?? getTodayParis(), guessesForTracker, challenge.maxAttempts, challenge.challengeNumber) }}
+          onShare={() => {
+            void shareResult(
+              mode,
+              challenge.date ?? getTodayParis(),
+              guessesForTracker,
+              challenge.maxAttempts,
+              challenge.challengeNumber,
+            )
+          }}
           onOpenStats={() => openModal('stats')}
           unplayedModes={unplayedModes}
         />
@@ -563,7 +579,15 @@ export function GamePage({ mode }: GamePageProps) {
             wikipediaUrl: resultDetails?.wikipediaUrl ?? (isWikiChallenge(challenge) ? challenge.wikipediaUrl ?? null : null),
           }}
           stats={{ attemptsUsed: guesses.length, maxAttempts: challenge.maxAttempts, hintsRevealed }}
-          onShare={() => { void shareResult(challenge.date ?? getTodayParis(), guessesForTracker, challenge.maxAttempts, challenge.challengeNumber) }}
+          onShare={() => {
+            void shareResult(
+              mode,
+              challenge.date ?? getTodayParis(),
+              guessesForTracker,
+              challenge.maxAttempts,
+              challenge.challengeNumber,
+            )
+          }}
           onOpenStats={() => openModal('stats')}
           unplayedModes={unplayedModes}
         />

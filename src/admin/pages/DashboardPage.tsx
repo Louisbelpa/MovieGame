@@ -20,7 +20,7 @@ function wikiTypeLabel(type: string | undefined): string {
     case 'entrepreneur': return 'Business'
     case 'writer': return 'Litterature'
     case 'historical_figure': return 'Histoire'
-    default: return 'Wiki'
+    default: return 'Personnalités'
   }
 }
 import { AdminLayout } from '../components/AdminLayout'
@@ -99,7 +99,7 @@ export function DashboardPage() {
               <div className="flex-1 space-y-1.5 min-w-[160px]">
                 <RateBar label="Films" rate={data.stats.film_success_rate} color="indigo" />
                 <RateBar label="Séries" rate={data.stats.series_success_rate} color="violet" />
-                <RateBar label="Wiki" rate={data.stats.wiki_success_rate} color="slate" />
+                <RateBar label="Personnalités" rate={data.stats.wiki_success_rate} color="slate" />
               </div>
             </div>
             {/* Actions */}
@@ -130,7 +130,7 @@ export function DashboardPage() {
                 className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-slate-700 rounded-lg hover:bg-slate-800 transition-colors"
               >
                 <Landmark size={14} />
-                Wikipedia
+                Personnalités
               </button>
             </div>
           </div>
@@ -144,7 +144,7 @@ export function DashboardPage() {
             options={[
               { id: 'films', label: 'Films', icon: <Film size={15} /> },
               { id: 'series', label: 'Séries', icon: <Tv size={15} /> },
-              { id: 'wiki', label: 'Wikipedia', icon: <Landmark size={15} /> },
+              { id: 'wiki', label: 'Personnalités', icon: <Landmark size={15} /> },
             ]}
           />
 
@@ -199,9 +199,9 @@ export function DashboardPage() {
               <UpcomingList challenges={data.upcoming_series_challenges} />
             </div>
 
-            {/* ─ Colonne Wikipedia ─ */}
+            {/* ─ Colonne Personnalités ─ */}
             <div className={`space-y-4 ${activeTab !== 'wiki' ? 'hidden lg:block' : ''}`}>
-              <SectionHeader icon={<Landmark size={15} className="text-slate-500" />} label="Wikipedia" color="slate" />
+              <SectionHeader icon={<Landmark size={15} className="text-slate-500" />} label="Personnalités" color="slate" />
 
               <div className="grid grid-cols-2 gap-3">
                 <StatCard icon={<UserRound size={17} className="text-slate-500" />} label="Personnalités actives" value={data.stats.total_wiki_persons} bg="bg-slate-50" />

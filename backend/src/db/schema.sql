@@ -213,7 +213,7 @@ CREATE TABLE IF NOT EXISTS changelog (
 INSERT OR IGNORE INTO changelog (id, version, release_date, changes) VALUES
   (1, '1.2.0', 'Avril 2026',   '["Navigation dans les défis passés avec les flèches ◀ ▶","Bouton « En savoir plus » vers la page TMDB du film en fin de partie","Réinitialisation du jeu à minuit heure de Paris (corrigé)","Back office : recherche TMDB avec auto-remplissage des fiches film","Back office : connexion par identifiant + mot de passe","Back office : badge « Joué / Planifié » sur les films","Back office : responsive mobile","Footer : FAQ, politique de confidentialité, contact, changelog"]'),
   (2, '1.1.0', 'Mars 2026',    '["Tutoriel affiché à la première visite","Indices progressifs : année → réalisateur → acteur principal","Statistiques personnelles (victoires, séries, distribution)","Partage du résultat en grille emoji"]'),
-  (3, '1.0.0', 'Janvier 2026', '["Lancement de CinéGuessr","Défi quotidien avec une image tirée d''un film","Autocomplétion des titres","Back office pour gérer les films et le planning"]');
+  (3, '1.0.0', 'Janvier 2026', '["Lancement de GuessToday","Défi quotidien avec une image tirée d''un film","Autocomplétion des titres","Back office pour gérer les films et le planning"]');
 
 -- ---------------------------------------------------------------------------
 -- audit_logs  (trail of admin actions for security and debugging)

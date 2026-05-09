@@ -401,11 +401,11 @@ export function getOrCreateWikiSession(sessionToken: string, challengeId: number
     .get(sessionToken, challengeId)!
 }
 
-export function buildWikiChallengePayload(challenge: WikiChallengeRow, session: SessionRow) {
-  const person = db
-    .prepare<[number], WikiPersonRow>(`SELECT * FROM wiki_persons WHERE id = ?`)
-    .get(challenge.wiki_person_id)!
-
+function buildWikiChallengePayloadFromPerson(
+  person: WikiPersonRow,
+  challenge: WikiChallengeRow,
+  session: SessionRow,
+) {
   const schedule = computeHintSchedule(person, challenge.hint_schedule)
   const hintsRevealed = Math.min(session.hints_revealed, MAX_HINTS)
   const attempts: AttemptEntry[] = JSON.parse(session.attempts)
@@ -441,6 +441,89 @@ export function buildWikiChallengePayload(challenge: WikiChallengeRow, session: 
     attempts: attempts.map(a => ({ guess: a.guess, correct: a.correct })),
     outcome: session.outcome,
   }
+}
+
+export function buildWikiChallengePayload(challenge: WikiChallengeRow, session: SessionRow) {
+  const person = db
+    .prepare<[number], WikiPersonRow>(`SELECT * FROM wiki_persons WHERE id = ?`)
+    .get(challenge.wiki_person_id)!
+  return buildWikiChallengePayloadFromPerson(person, challenge, session)
+}
+
+export type WikiFetchPayloadForAdminPreview = {
+  name: string
+  extract: string | null
+  photo_url: string | null
+  wikipedia_url: string
+  infobox_data: unknown
+  person_type: WikiPersonRow['person_type']
+  hint_schedule: string[]
+  suggested_difficulty?: number
+}
+
+function wikiPersonRowFromFetchPayload(data: WikiFetchPayloadForAdminPreview, syntheticPersonId: number): WikiPersonRow {
+  const infobox =
+    typeof data.infobox_data === 'string'
+      ? data.infobox_data
+      : JSON.stringify(data.infobox_data ?? {})
+  return {
+    id: syntheticPersonId,
+    name: data.name,
+    name_aliases: '[]',
+    person_type: data.person_type,
+    infobox_data: infobox,
+    hint_schedule: JSON.stringify(Array.isArray(data.hint_schedule) ? data.hint_schedule : []),
+    photo_url: data.photo_url,
+    extract: data.extract,
+    wikipedia_url: data.wikipedia_url,
+    difficulty: typeof data.suggested_difficulty === 'number' ? data.suggested_difficulty : 3,
+  }
+}
+
+/** Aperçu admin : même rendu que le défi public au démarrage, sans session ni ligne calendrier. */
+export function buildWikiAdminPreviewFromPerson(person: WikiPersonRow, wikiPersonId: number) {
+  const today = getTodayParis()
+  const fakeChallenge: WikiChallengeRow = {
+    id: -Math.abs(wikiPersonId),
+    challenge_date: today,
+    wiki_person_id: wikiPersonId,
+    challenge_number: 1,
+    hint_schedule: person.hint_schedule,
+  }
+  const previewSession: SessionRow = {
+    id: 0,
+    session_token: '',
+    challenge_id: fakeChallenge.id,
+    attempts: '[]',
+    hints_revealed: MAX_HINTS,
+    outcome: null,
+    started_at: new Date().toISOString(),
+    finished_at: null,
+  }
+
+  const inner = buildWikiChallengePayloadFromPerson(person, fakeChallenge, previewSession)
+  return {
+    ...inner,
+    challengeId: 0,
+    hasPrevChallenge: false,
+    hasNextChallenge: false,
+    isPreview: true as const,
+  }
+}
+
+export function buildWikiAdminPreviewPayload(wikiPersonId: number) {
+  const person = db
+    .prepare<[number], WikiPersonRow>(`SELECT * FROM wiki_persons WHERE id = ?`)
+    .get(wikiPersonId)
+  if (!person) throw Object.assign(new Error('Wiki person not found'), { status: 404 })
+  return buildWikiAdminPreviewFromPerson(person, wikiPersonId)
+}
+
+/** Aperçu jeu à partir du JSON prefetch pool (sans fiche `wiki_persons`). */
+export function buildWikiAdminPreviewFromPoolPayload(data: WikiFetchPayloadForAdminPreview, poolEntryId: number) {
+  const syn = -Math.abs(poolEntryId)
+  const person = wikiPersonRowFromFetchPayload(data, syn)
+  return buildWikiAdminPreviewFromPerson(person, syn)
 }
 
 export function processWikiGuess(

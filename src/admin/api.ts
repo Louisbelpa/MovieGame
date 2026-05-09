@@ -3,6 +3,9 @@
  * Typed fetch helpers for all /api/admin/* routes.
  */
 
+import type { ChallengePayload } from '@/api/client'
+import type { WikiChallengePayload } from '@/api/wikiClient'
+
 const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -103,6 +106,8 @@ export interface WikiPrefetchPoolEntry {
   error_message: string | null
   expires_at: number
   updated_at: string
+  /** Présent si `status === 'ready'` — données `fetchWikipediaData` (aperçu admin) */
+  payload: WikipediaFetchPayload | null
 }
 
 export interface SeriesPayload {
@@ -589,6 +594,22 @@ export async function deleteWikiPerson(id: number): Promise<void> {
   await request<{ ok: boolean }>(`/api/admin/wiki-persons/${id}`, { method: 'DELETE' })
 }
 
+export async function fetchWikiGamePreview(personId: number): Promise<WikiChallengePayload> {
+  return request<WikiChallengePayload>(`/api/admin/wiki-persons/${personId}/game-preview`)
+}
+
+export async function fetchWikiPoolEntryGamePreview(poolEntryId: number): Promise<WikiChallengePayload> {
+  return request<WikiChallengePayload>(`/api/admin/wiki-prefetch-pool/${poolEntryId}/game-preview`)
+}
+
+export async function fetchFilmGamePreview(filmId: number): Promise<ChallengePayload> {
+  return request<ChallengePayload>(`/api/admin/films/${filmId}/game-preview`)
+}
+
+export async function fetchSeriesGamePreview(seriesId: number): Promise<ChallengePayload> {
+  return request<ChallengePayload>(`/api/admin/series/${seriesId}/game-preview`)
+}
+
 export async function fetchRandomWikiSlugs(lang = 'fr', minFame = 30): Promise<{ slugs: string[] }> {
   return request<{ slugs: string[] }>(`/api/admin/wiki-persons/random?lang=${encodeURIComponent(lang)}&minFame=${minFame}`)
 }
@@ -606,6 +627,17 @@ export async function getWikiPrefetchPool(
 ): Promise<{ lang: string; minFame: number; stats: { processing: number; ready: number; failed: number; total: number }; entries: WikiPrefetchPoolEntry[] }> {
   return request<{ lang: string; minFame: number; stats: { processing: number; ready: number; failed: number; total: number }; entries: WikiPrefetchPoolEntry[] }>(
     `/api/admin/wiki-persons/prefetch-pool?lang=${encodeURIComponent(lang)}&minFame=${minFame}&limit=${limit}`
+  )
+}
+
+export async function addWikiPrefetchPoolEntry(body: {
+  input: string
+  lang?: string
+  minFame?: number
+}): Promise<{ ok: boolean; resolved_slug?: string; resolved_lang?: string }> {
+  return request<{ ok: boolean; resolved_slug?: string; resolved_lang?: string }>(
+    '/api/admin/wiki-persons/prefetch-pool/add',
+    { method: 'POST', body: JSON.stringify(body) }
   )
 }
 
@@ -811,7 +843,7 @@ export interface SeriesAnalytics {
 export interface ChallengeAnalytics {
   challenge_id: number
   challenge_date: string
-  media_type: 'film' | 'series'
+  media_type: 'film' | 'series' | 'wiki'
   title: string
   year: number
   fame_level: number
@@ -837,15 +869,13 @@ export interface HourlyData {
   sessions: number
 }
 
-export async function getAnalyticsOverview(): Promise<AnalyticsOverview> {
-  return request<AnalyticsOverview>('/api/admin/analytics/overview')
-}
-
-export async function getAnalyticsOverviewByMedia(mediaType?: 'film' | 'series' | 'wiki'): Promise<AnalyticsOverview> {
-  const params = new URLSearchParams()
-  if (mediaType) params.set('mediaType', mediaType)
-  const qs = params.toString()
-  return request<AnalyticsOverview>(`/api/admin/analytics/overview${qs ? `?${qs}` : ''}`)
+export async function getAnalyticsOverviewByMedia(
+  mediaType: 'film' | 'series' | 'wiki',
+  from: string,
+  to: string
+): Promise<AnalyticsOverview> {
+  const params = new URLSearchParams({ mediaType, from, to })
+  return request<AnalyticsOverview>(`/api/admin/analytics/overview?${params}`)
 }
 
 export async function getAnalyticsDaily(from: string, to: string, mediaType?: 'film' | 'series' | 'wiki'): Promise<DailyAnalytics[]> {
@@ -874,10 +904,12 @@ export async function getAnalyticsSeries(
 
 export async function getAnalyticsChallenges(
   mediaType: 'film' | 'series' | 'wiki',
-  sort?: 'win_rate' | 'sessions' | 'avg_hints'
+  sort: 'challenge_date' | 'win_rate' | 'sessions' | 'avg_hints',
+  from: string,
+  to: string
 ): Promise<ChallengeAnalytics[]> {
-  const params = new URLSearchParams({ mediaType })
-  if (sort) params.set('sort', sort)
+  const params = new URLSearchParams({ mediaType, from, to })
+  params.set('sort', sort)
   return request<ChallengeAnalytics[]>(`/api/admin/analytics/challenges?${params}`)
 }
 
@@ -894,33 +926,40 @@ export async function getReturningPlayers(days?: number): Promise<ReturningPlaye
   return request<ReturningPlayer[]>(`/api/admin/analytics/returning-players${qs ? `?${qs}` : ''}`)
 }
 
-export async function getReturningPlayersByMedia(days?: number, mediaType?: 'film' | 'series' | 'wiki'): Promise<ReturningPlayer[]> {
-  const params = new URLSearchParams()
-  if (days !== undefined) params.set('days', String(days))
-  if (mediaType) params.set('mediaType', mediaType)
-  const qs = params.toString()
-  return request<ReturningPlayer[]>(`/api/admin/analytics/returning-players${qs ? `?${qs}` : ''}`)
+export async function getReturningPlayersByMedia(
+  from: string,
+  to: string,
+  mediaType: 'film' | 'series' | 'wiki'
+): Promise<ReturningPlayer[]> {
+  const params = new URLSearchParams({ from, to, mediaType })
+  return request<ReturningPlayer[]>(`/api/admin/analytics/returning-players?${params}`)
 }
 
-export async function getHourlyDistribution(mediaType?: 'film' | 'series' | 'wiki'): Promise<HourlyData[]> {
-  const params = new URLSearchParams()
-  if (mediaType) params.set('mediaType', mediaType)
-  const qs = params.toString()
-  return request<HourlyData[]>(`/api/admin/analytics/hourly${qs ? `?${qs}` : ''}`)
+export async function getHourlyDistribution(
+  mediaType: 'film' | 'series' | 'wiki',
+  from: string,
+  to: string
+): Promise<HourlyData[]> {
+  const params = new URLSearchParams({ mediaType, from, to })
+  return request<HourlyData[]>(`/api/admin/analytics/hourly?${params}`)
 }
 
-export async function getAttemptsDistribution(mediaType?: 'film' | 'series' | 'wiki'): Promise<Record<string, number>> {
-  const params = new URLSearchParams()
-  if (mediaType) params.set('mediaType', mediaType)
-  const qs = params.toString()
-  return request<Record<string, number>>(`/api/admin/analytics/attempts-distribution${qs ? `?${qs}` : ''}`)
+export async function getAttemptsDistribution(
+  mediaType: 'film' | 'series' | 'wiki',
+  from: string,
+  to: string
+): Promise<Record<string, number>> {
+  const params = new URLSearchParams({ mediaType, from, to })
+  return request<Record<string, number>>(`/api/admin/analytics/attempts-distribution?${params}`)
 }
 
-export async function getHintsDistribution(mediaType?: 'film' | 'series' | 'wiki'): Promise<Record<string, number>> {
-  const params = new URLSearchParams()
-  if (mediaType) params.set('mediaType', mediaType)
-  const qs = params.toString()
-  return request<Record<string, number>>(`/api/admin/analytics/hints-distribution${qs ? `?${qs}` : ''}`)
+export async function getHintsDistribution(
+  mediaType: 'film' | 'series' | 'wiki',
+  from: string,
+  to: string
+): Promise<Record<string, number>> {
+  const params = new URLSearchParams({ mediaType, from, to })
+  return request<Record<string, number>>(`/api/admin/analytics/hints-distribution?${params}`)
 }
 
 // ─── Audit logs ───────────────────────────────────────────────────────────────

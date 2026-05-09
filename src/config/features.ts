@@ -8,10 +8,9 @@ export const FEATURES = {
   enableWiki: envFlag(import.meta.env.VITE_ENABLE_WIKI, true),
 } as const
 
-export const BRAND_NAME = FEATURES.enableSeries ? 'GuessToday' : 'CinéGuessr'
+export const BRAND_NAME = 'GuessToday'
 
 const publicSiteFromEnv = import.meta.env.VITE_PUBLIC_SITE_URL as string | undefined
 const normalizedPublic = publicSiteFromEnv?.trim().replace(/\/$/, '')
 
-export const PUBLIC_SITE_URL =
-  normalizedPublic || (FEATURES.enableSeries ? 'https://guesstoday.fr' : 'https://cineguessr.fr')
+export const PUBLIC_SITE_URL = normalizedPublic || 'https://guesstoday.fr'

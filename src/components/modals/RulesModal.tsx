@@ -52,10 +52,10 @@ export function RulesModal({ mode }: { mode?: RulesMode }) {
       >
         <div className="flex flex-col gap-5 text-sm text-film-text">
           <p id={modalDescId} className="text-film-text-dim leading-relaxed">
-            Une photo et un profil partiel d'une personnalité s'affichent.
+            Une photo floutée et un profil partiel d'une personnalité s'affichent.
             <br />
             Devinez qui c'est en{' '}
-            <strong className="text-film-gold">3 tentatives maximum</strong>.
+            <strong className="text-film-gold">5 tentatives maximum</strong>.
             À chaque mauvaise réponse, un nouvel indice se débloque.
           </p>
 

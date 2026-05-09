@@ -9,7 +9,7 @@ type GameMode = 'film' | 'series' | 'wiki'
 const MODE_META: Record<GameMode, { label: string; icon: React.ElementType }> = {
   film: { label: 'Cinéma', icon: Film },
   series: { label: 'Séries', icon: Tv },
-  wiki: { label: 'WikiGuessr', icon: Landmark },
+  wiki: { label: 'Personnalités', icon: Landmark },
 }
 
 interface LoseModalProps {

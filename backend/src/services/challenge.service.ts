@@ -274,6 +274,78 @@ export function buildChallengePayload(
   };
 }
 
+/** Aperçu admin : même rendu qu’au démarrage du défi film (fiche en base). */
+export function buildFilmAdminPreviewPayload(filmId: number) {
+  const row = db.prepare<[number], { id: number }>(`SELECT id FROM films WHERE id = ?`).get(filmId);
+  if (!row) throw Object.assign(new Error('Film not found'), { status: 404 });
+
+  const today = getTodayParis();
+  const fakeChallenge: ChallengeRow = {
+    id: -Math.abs(filmId),
+    challenge_date: today,
+    film_id: filmId,
+    series_id: null,
+    challenge_number: 1,
+    hint_schedule: JSON.stringify(['year', 'director', 'cast']),
+    media_type: 'film',
+  };
+  const previewSession: SessionRow = {
+    id: 0,
+    session_token: '',
+    challenge_id: fakeChallenge.id,
+    attempts: '[]',
+    hints_revealed: MAX_HINTS,
+    outcome: null,
+    started_at: new Date().toISOString(),
+    finished_at: null,
+  };
+
+  const inner = buildChallengePayload(fakeChallenge, previewSession);
+  return {
+    ...inner,
+    challengeId: 0,
+    hasPrevChallenge: false,
+    hasNextChallenge: false,
+    isPreview: true as const,
+  };
+}
+
+/** Aperçu admin : même rendu qu’au démarrage du défi série. */
+export function buildSeriesAdminPreviewPayload(seriesId: number) {
+  const row = db.prepare<[number], { id: number }>(`SELECT id FROM series WHERE id = ?`).get(seriesId);
+  if (!row) throw Object.assign(new Error('Series not found'), { status: 404 });
+
+  const today = getTodayParis();
+  const fakeChallenge: ChallengeRow = {
+    id: -Math.abs(seriesId),
+    challenge_date: today,
+    film_id: null,
+    series_id: seriesId,
+    challenge_number: 1,
+    hint_schedule: JSON.stringify(['year', 'creator', 'cast']),
+    media_type: 'series',
+  };
+  const previewSession: SessionRow = {
+    id: 0,
+    session_token: '',
+    challenge_id: fakeChallenge.id,
+    attempts: '[]',
+    hints_revealed: MAX_HINTS,
+    outcome: null,
+    started_at: new Date().toISOString(),
+    finished_at: null,
+  };
+
+  const inner = buildChallengePayload(fakeChallenge, previewSession);
+  return {
+    ...inner,
+    challengeId: 0,
+    hasPrevChallenge: false,
+    hasNextChallenge: false,
+    isPreview: true as const,
+  };
+}
+
 /**
  * Process a guess attempt.
  * Returns { correct, outcome, attemptsLeft, payload }
