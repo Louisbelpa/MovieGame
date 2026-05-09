@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react'
-import { ChevronDown, Sparkles, Film, Tv, X, Landmark, LayoutList, LayoutGrid } from 'lucide-react'
+import { ChevronDown, Sparkles, Film, Tv, X, Landmark, LayoutList, LayoutGrid, Eye, EyeOff } from 'lucide-react'
 import {
   getChallenges,
   getFilms,
@@ -51,12 +51,11 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 function getTodayISO(): string {
-  return new Date().toISOString().slice(0, 10)
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
 }
 
 function getCurrentYearMonth(): string {
-  const today = new Date()
-  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+  return getTodayISO().slice(0, 7)
 }
 
 function buildMonthDates(yearMonth: string): string[] {
@@ -97,10 +96,30 @@ export function CalendarPage() {
   const [dragSourceDate, setDragSourceDate] = useState<string | null>(null)
   const [dropError, setDropError] = useState<string | null>(null)
 
+  const [todayISO, setTodayISO] = useState(getTodayISO)
+  const [showPast, setShowPast] = useState(false)
+
+  // Reset todayISO at Paris midnight
+  useEffect(() => {
+    const scheduleReset = () => {
+      const now = new Date()
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Europe/Paris',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      }).formatToParts(now)
+      const h = parseInt(parts.find((p) => p.type === 'hour')!.value, 10)
+      const m = parseInt(parts.find((p) => p.type === 'minute')!.value, 10)
+      const s = parseInt(parts.find((p) => p.type === 'second')!.value, 10)
+      const secsUntilMidnight = 86400 - h * 3600 - m * 60 - s
+      return setTimeout(() => setTodayISO(getTodayISO()), (secsUntilMidnight + 2) * 1000)
+    }
+    const timer = scheduleReset()
+    return () => clearTimeout(timer)
+  }, [todayISO])
+
   const monthDates = buildMonthDates(currentMonth)
   const from = monthDates[0]
   const to = monthDates[monthDates.length - 1]
-  const todayISO = getTodayISO()
   const isCurrentMonth = currentMonth === getCurrentYearMonth()
 
   useEffect(() => {
@@ -301,6 +320,18 @@ export function CalendarPage() {
           <span className="text-xs text-gray-400">
             {plannedCount} / {monthDates.length} jours planifiés
           </span>
+          {/* Show/hide past dates (list view, current month only) */}
+          {view === 'list' && isCurrentMonth && (
+            <button
+              type="button"
+              onClick={() => setShowPast((v) => !v)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${showPast ? 'bg-gray-100 border-gray-400 text-gray-700' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}`}
+              title={showPast ? 'Masquer les jours passés' : 'Afficher les jours passés'}
+            >
+              {showPast ? <EyeOff size={13} /> : <Eye size={13} />}
+              <span className="hidden sm:inline">{showPast ? 'Masquer passé' : 'Passé'}</span>
+            </button>
+          )}
           {/* View toggle */}
           <div className="flex rounded-lg border border-gray-300 overflow-hidden">
             <button
@@ -362,9 +393,9 @@ export function CalendarPage() {
             </div>
           ) : (
             <ul className="divide-y divide-gray-100">
-              {monthDates.map((date, i) => (
+              {(isCurrentMonth && !showPast ? monthDates.filter((d) => d >= todayISO) : monthDates).map((date, i) => (
                 <React.Fragment key={date}>
-                  {isCurrentMonth && date === todayISO && i > 0 && (
+                  {isCurrentMonth && date === todayISO && i > 0 && showPast && (
                     <li className="flex items-center gap-3 px-4 py-2 bg-indigo-50">
                       <span className="flex-1 border-t border-indigo-200" />
                       <span className="text-sm font-semibold text-indigo-500 uppercase tracking-wider">Aujourd'hui</span>

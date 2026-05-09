@@ -1106,6 +1106,7 @@ function parseGenericData(wikitext: string, domain: string): WikiGenericData {
     'ouvrages principaux', 'principal_work', 'principal work', 'famous_works', 'works',
   ]), 3, 220)
   const mediaWorksRaw = extractCompactField(readInfoboxField(fields, [
+    'films', 'filmographie', 'films notables',
     'television', 'tv', 'programmes', 'programs', 'shows', 'émissions', 'emissions',
     'notable_role', 'notable role', 'roles notables',
   ]), 2, 180)
@@ -1451,8 +1452,11 @@ function applyWikidataFallback(
     }
   }
   const g = infobox as Partial<WikiGenericData>
+  const isActorResolved = resolvedType === 'artist' && fallback.occupations.some((o) =>
+    /(actor|acteur|actrice|actress|réalisateur|director|filmmaker|comedian|comédien|comédienne)/.test(o.toLowerCase())
+  )
   const fallbackDomain = (() => {
-    if (resolvedType === 'artist') return 'Musique'
+    if (resolvedType === 'artist') return isActorResolved ? 'Cinéma' : 'Musique'
     if (resolvedType === 'scientist') return 'Science'
     if (resolvedType === 'entrepreneur') return 'Entrepreneuriat'
     if (resolvedType === 'writer') return 'Littérature'
@@ -1511,22 +1515,30 @@ function applyWikidataFallback(
 
   if (resolvedType === 'artist') {
     const rows: Array<{ label: string; value: string }> = [...existingHighlights]
-    if (fallback.member_of_labels.length > 0) {
-      rows.push({
-        label: 'Membre de',
-        value: fallback.member_of_labels.slice(0, 6).join(' · '),
-      })
-    }
-    if (fallback.record_label_labels.length > 0) {
-      rows.push({
-        label: 'Label(s)',
-        value: fallback.record_label_labels.slice(0, 6).join(' · '),
-      })
-    }
-    for (const value of fallback.notable_work_labels.slice(1, 9)) {
-      const v = normalizeValue(value)
-      if (!v) continue
-      rows.push({ label: 'Album / titre', value: v })
+    if (isActorResolved) {
+      for (const value of fallback.notable_work_labels.slice(0, 9)) {
+        const v = normalizeValue(value)
+        if (!v) continue
+        rows.push({ label: 'Film / série', value: v })
+      }
+    } else {
+      if (fallback.member_of_labels.length > 0) {
+        rows.push({
+          label: 'Membre de',
+          value: fallback.member_of_labels.slice(0, 6).join(' · '),
+        })
+      }
+      if (fallback.record_label_labels.length > 0) {
+        rows.push({
+          label: 'Label(s)',
+          value: fallback.record_label_labels.slice(0, 6).join(' · '),
+        })
+      }
+      for (const value of fallback.notable_work_labels.slice(1, 9)) {
+        const v = normalizeValue(value)
+        if (!v) continue
+        rows.push({ label: 'Album / titre', value: v })
+      }
     }
     highlightsOut = rows.slice(0, HIGHLIGHT_CAP)
     if (highlightsOut.length === 0) highlightsOut = undefined
@@ -1863,12 +1875,15 @@ export async function fetchWikipediaData(
 
   const wikidataType = wikidata ? inferTypeFromWikidataOccupations(wikidata.occupations) : null
   let personType = wikidataType ?? detectPersonTypeFromSummary(summaryDescription) ?? detectPersonType(wikitext)
+  const isActorOccupation = (wikidata?.occupations ?? []).some((o) =>
+    /(actor|acteur|actrice|actress|réalisateur|director|filmmaker|comedian|comédien|comédienne)/.test(o.toLowerCase())
+  )
   let infobox_data: WikiInfoboxData = personType === 'politician'
     ? parsePoliticianData(wikitext)
     : personType === 'sportsperson'
       ? parseSportspersonData(wikitext)
       : personType === 'artist'
-        ? parseGenericData(wikitext, 'Musique')
+        ? parseGenericData(wikitext, isActorOccupation ? 'Cinéma' : 'Musique')
         : personType === 'scientist'
           ? parseGenericData(wikitext, 'Science')
           : personType === 'entrepreneur'

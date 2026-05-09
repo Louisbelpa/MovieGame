@@ -6,7 +6,7 @@
 
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Film, Tv, Calendar, LayoutDashboard, LogOut, Menu, X, ScrollText, Upload, ShieldAlert, BarChart2, Landmark, Database, Settings } from 'lucide-react'
+import { Film, Tv, Calendar, LayoutDashboard, LogOut, Menu, X, ScrollText, Upload, ShieldAlert, BarChart2, Landmark, Database, Settings, ExternalLink } from 'lucide-react'
 import { adminLogout } from '../api'
 
 const navItems = [
@@ -169,6 +169,15 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             </button>
             <h1 className="text-base lg:text-lg font-semibold text-gray-800">{currentLabel}</h1>
           </div>
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <ExternalLink size={14} />
+            <span className="hidden sm:inline">Voir le site</span>
+          </a>
           <span className="text-sm text-gray-400 hidden sm:block">Back office</span>
         </header>
 
