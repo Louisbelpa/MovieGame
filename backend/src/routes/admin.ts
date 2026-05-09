@@ -33,6 +33,7 @@ import fs from 'fs';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import { fileTypeFromBuffer } from 'file-type';
+import { ensureUploadsDir, getUploadsAbsDir } from '../config/uploads.js';
 import db from '../db/database.js';
 import { normalizeCommonsPhotoUrl } from '../lib/commonsThumb.js';
 import { adminAuth, computeAdminToken, ADMIN_COOKIE } from '../middleware/adminAuth.js';
@@ -43,8 +44,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ─── Multer upload setup ──────────────────────────────────────────────────────
 
-const uploadsDir = path.join(__dirname, '../../public/uploads');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+ensureUploadsDir();
+const uploadsDir = getUploadsAbsDir();
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadsDir),

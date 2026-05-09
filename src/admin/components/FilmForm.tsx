@@ -12,7 +12,7 @@ import { BackdropPicker } from './BackdropPicker'
 
 function resolvePreviewUrl(url: string): string {
   if (!url) return ''
-  if (url.startsWith('http')) return url
+  if (url.startsWith('http') || url.startsWith('/uploads/')) return url
   return `https://image.tmdb.org/t/p/w300${url}`
 }
 

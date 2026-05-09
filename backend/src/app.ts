@@ -24,6 +24,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { createRateLimiter } from './middleware/rateLimiter.js';
 import { logger } from './lib/logger.js';
+import { ensureUploadsDir, getUploadsAbsDir } from './config/uploads.js';
 import db from './db/database.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -83,6 +84,11 @@ export function createApp(): express.Application {
   app.use(cookieParser(process.env.COOKIE_SECRET ?? 'dev_secret'));
 
   // Static files before CORS — same-origin assets don't need CORS headers
+  ensureUploadsDir();
+  app.use(
+    '/uploads',
+    express.static(getUploadsAbsDir(), { maxAge: '7d' })
+  );
   app.use('/assets', express.static(path.join(__dirname, '../public/assets'), { maxAge: '1y', immutable: true }));
   app.use(express.static(path.join(__dirname, '../public'), {
     maxAge: '1d',
