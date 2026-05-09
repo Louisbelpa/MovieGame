@@ -54,6 +54,22 @@ describe('POST /api/wiki/guess', () => {
     expect(guessRes.body.challenge.isGameOver).toBe(true);
   });
 
+  it('accepts surname-only guess for multi-word name', async () => {
+    const agent = request.agent(app);
+    const personId = createWikiPerson({ name: 'Jacques Chirac' });
+    createWikiChallenge({ wikiPersonId: personId, date: today() });
+
+    const todayRes = await agent.get('/api/wiki/today');
+    const { challengeId } = todayRes.body as { challengeId: number };
+
+    const guessRes = await agent
+      .post('/api/wiki/guess')
+      .send({ challengeId, guess: 'Chirac' });
+    expect(guessRes.status).toBe(200);
+    expect(guessRes.body.correct).toBe(true);
+    expect(guessRes.body.outcome).toBe('won');
+  });
+
   it('returns correct:false and isGameOver:false on wrong guess', async () => {
     const agent = request.agent(app);
     const personId = createWikiPerson({ name: 'Jacques Chirac' });

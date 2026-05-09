@@ -9,10 +9,13 @@ import { X, Images, Search, Loader2, Upload, Shuffle } from 'lucide-react'
 import type { AdminSeries, SeriesPayload, TmdbTvSearchResult } from '../api'
 import { searchTmdbTv, getTmdbTvDetails, uploadImage, getRandomTmdbSeries } from '../api'
 import { BackdropPicker } from './BackdropPicker'
+import { AdminFormSection, AdminFormSubheading } from './AdminFormSection'
+import { DEFAULT_SERIES_HINT_SCHEDULE, MediaHintScheduleEditor } from './MediaHintScheduleEditor'
+import { FilmSeriesGamePreviewModal, FilmSeriesPreviewOpenButton } from './FilmSeriesGamePreviewModal'
 
 function resolvePreviewUrl(url: string): string {
   if (!url) return ''
-  if (url.startsWith('http')) return url
+  if (url.startsWith('http') || url.startsWith('/uploads/')) return url
   return `https://image.tmdb.org/t/p/w300${url}`
 }
 
@@ -249,12 +252,17 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
     network: initial?.network ?? null,
     status: initial?.status ?? null,
     original_language: initial?.original_language ?? null,
+    hint_schedule:
+      initial?.hint_schedule && initial.hint_schedule.length > 0
+        ? [...initial.hint_schedule]
+        : [...DEFAULT_SERIES_HINT_SCHEDULE],
   })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showBackdrops, setShowBackdrops] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [randomLoading, setRandomLoading] = useState(false)
+  const [seriesPreviewOpen, setSeriesPreviewOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleRandom() {
@@ -262,7 +270,14 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
     setError(null)
     try {
       const details = await getRandomTmdbSeries()
-      setForm({ ...details, is_active: form.is_active })
+      setForm({
+        ...details,
+        is_active: form.is_active,
+        hint_schedule:
+          details.hint_schedule && details.hint_schedule.length > 0
+            ? [...details.hint_schedule]
+            : form.hint_schedule,
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la récupération aléatoire')
     } finally {
@@ -290,7 +305,14 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
   }
 
   function handleTmdbFill(details: SeriesPayload) {
-    setForm({ ...details, is_active: form.is_active })
+    setForm({
+      ...details,
+      is_active: form.is_active,
+      hint_schedule:
+        details.hint_schedule && details.hint_schedule.length > 0
+          ? [...details.hint_schedule]
+          : form.hint_schedule,
+    })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -307,35 +329,105 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
   }
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="space-y-4">
 
       {!initial?.id && (
-        <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-100 space-y-2">
-          <TmdbTvSearch onSelect={handleTmdbFill} />
-          <button
-            type="button"
-            onClick={handleRandom}
-            disabled={randomLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 border border-indigo-200 bg-white rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
-          >
-            {randomLoading
-              ? <Loader2 size={13} className="animate-spin" />
-              : <Shuffle size={13} />
-            }
-            Série aléatoire
-          </button>
-        </div>
+        <AdminFormSection title="Import depuis TMDB (TV)" badges={['meta']} description="Remplit les champs ; publication seulement après enregistrement." defaultOpen>
+          <div className="p-3 bg-indigo-50/80 rounded-lg border border-indigo-100 space-y-2">
+            <TmdbTvSearch onSelect={handleTmdbFill} />
+            <button
+              type="button"
+              onClick={handleRandom}
+              disabled={randomLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 border border-indigo-200 bg-white rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
+            >
+              {randomLoading
+                ? <Loader2 size={13} className="animate-spin" />
+                : <Shuffle size={13} />
+              }
+              Série aléatoire
+            </button>
+          </div>
+        </AdminFormSection>
       )}
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="col-span-2 min-w-0">
-          <Field label="Titre" id="title" required value={form.title} onChange={(v) => setField('title', v)} placeholder="Ex: Breaking Bad" />
+      <AdminFormSection
+        variant="panel"
+        title="Contenu du défi GuessToday (série)"
+        badges={['during-game', 'hints', 'secret', 'after-game']}
+        description="Tout ce qui impacte la partie pour cette série. Les dates déjà planifiées conservent leur ordre d’indices jusqu’à modification au calendrier."
+      >
+        <AdminFormSubheading>Réponse secrète</AdminFormSubheading>
+        <Field label="Titre" id="title" required value={form.title} onChange={(v) => setField('title', v)} placeholder="Ex: Breaking Bad" />
+        <TagsInput label="Titres alternatifs (alias)" tags={form.title_aliases} onChange={(tags) => setField('title_aliases', tags)} placeholder="Ajouter un alias..." />
+        <p className="text-xs text-gray-500">Le titre n’est pas envoyé pendant la partie ; les alias servent uniquement à la validation.</p>
+
+        <AdminFormSubheading>Image du défi</AdminFormSubheading>
+        <div>
+          <Field label="URL de l'image" id="image_url" required value={form.image_url} onChange={(v) => setField('image_url', v)} placeholder="https://..." />
+          <div className="flex gap-2 mt-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors whitespace-nowrap disabled:opacity-50"
+            >
+              {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+              {uploading ? 'Upload…' : 'Importer'}
+            </button>
+            {form.tmdb_id && (
+              <button
+                type="button"
+                onClick={() => setShowBackdrops(true)}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors whitespace-nowrap"
+              >
+                <Images size={15} />
+                Backdrops TMDB
+              </button>
+            )}
+          </div>
+          {form.image_url && (
+            <div className="mt-2">
+              <img
+                src={resolvePreviewUrl(form.image_url)}
+                alt="Aperçu"
+                className="h-32 w-auto rounded-lg object-cover border border-gray-200"
+                onError={(e) => { e.currentTarget.style.display = 'none' }}
+              />
+            </div>
+          )}
         </div>
+        <p className="text-xs text-gray-500">Affiche toujours visible ; pas une carte indice à débloquer.</p>
+
+        <AdminFormSubheading>Données pour les cartes indices</AdminFormSubheading>
         <Field label="Année" id="year" required type="number" value={form.year} onChange={(v) => setField('year', parseInt(v, 10) || 0)} placeholder="2008" />
-      </div>
+        <Field label="Créateur" id="creator" required value={form.creator} onChange={(v) => setField('creator', v)} placeholder="Ex: Vince Gilligan" />
+        <TagsInput label="Genres" tags={form.genres} onChange={(tags) => setField('genres', tags)} placeholder="Drame, Thriller..." />
+        <TagsInput label="Casting (ordre = priorité si la carte casting est active)" tags={form.cast_members} onChange={(tags) => setField('cast_members', tags)} placeholder="Ajouter un acteur..." />
+        <Field label="Tagline" id="tagline" value={form.tagline ?? ''} onChange={(v) => setField('tagline', v)} placeholder="La phrase d'accroche de la série" />
+        <TextareaField label="Synopsis" id="synopsis" value={form.synopsis ?? ''} onChange={(v) => setField('synopsis', v)} placeholder="Résumé de la série..." />
 
-      <Field label="Créateur" id="creator" required value={form.creator} onChange={(v) => setField('creator', v)} placeholder="Ex: Vince Gilligan" />
+        <MediaHintScheduleEditor
+          mode="series"
+          selectedHints={form.hint_schedule}
+          onChange={(next) => setField('hint_schedule', next)}
+        />
+      </AdminFormSection>
 
+      <AdminFormSection
+        title="Fiche série (hors payload joueur)"
+        badges={['meta']}
+        description="Réseau, statut, saisons et langue : utiles au back-office uniquement."
+        defaultOpen={false}
+      >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Réseau / Plateforme" id="network" value={form.network ?? ''} onChange={(v) => setField('network', v || null)} placeholder="Ex: Netflix, HBO…" />
         <div>
@@ -357,56 +449,7 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
         <Field label="Nombre de saisons" id="number_of_seasons" type="number" value={form.number_of_seasons ?? ''} onChange={(v) => setField('number_of_seasons', v ? parseInt(v, 10) : null)} placeholder="Ex: 5" />
         <Field label="Langue originale" id="original_language" value={form.original_language ?? ''} onChange={(v) => setField('original_language', v || null)} placeholder="Ex: en, fr, ko…" />
       </div>
-
-      <TagsInput label="Titres alternatifs" tags={form.title_aliases} onChange={(tags) => setField('title_aliases', tags)} placeholder="Ajouter un alias..." />
-      <TagsInput label="Genres" tags={form.genres} onChange={(tags) => setField('genres', tags)} placeholder="Drame, Thriller..." />
-      <TagsInput label="Casting" tags={form.cast_members} onChange={(tags) => setField('cast_members', tags)} placeholder="Ajouter un acteur..." />
-
-      <Field label="Tagline" id="tagline" value={form.tagline ?? ''} onChange={(v) => setField('tagline', v)} placeholder="La phrase d'accroche de la série" />
-      <TextareaField label="Synopsis" id="synopsis" value={form.synopsis ?? ''} onChange={(v) => setField('synopsis', v)} placeholder="Résumé de la série..." />
-
-      {/* Image URL + preview */}
-      <div>
-        <Field label="URL de l'image" id="image_url" required value={form.image_url} onChange={(v) => setField('image_url', v)} placeholder="https://..." />
-        <div className="flex gap-2 mt-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileUpload}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors whitespace-nowrap disabled:opacity-50"
-          >
-            {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-            {uploading ? 'Upload…' : 'Importer'}
-          </button>
-          {form.tmdb_id && (
-            <button
-              type="button"
-              onClick={() => setShowBackdrops(true)}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors whitespace-nowrap"
-            >
-              <Images size={15} />
-              Backdrops TMDB
-            </button>
-          )}
-        </div>
-        {form.image_url && (
-          <div className="mt-2">
-            <img
-              src={resolvePreviewUrl(form.image_url)}
-              alt="Aperçu"
-              className="h-32 w-auto rounded-lg object-cover border border-gray-200"
-              onError={(e) => { e.currentTarget.style.display = 'none' }}
-            />
-          </div>
-        )}
-      </div>
+      </AdminFormSection>
 
       {showBackdrops && form.tmdb_id && (
         <BackdropPicker
@@ -416,6 +459,7 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
         />
       )}
 
+      <AdminFormSection title="Références back-office" badges={['meta']} description="TMDB et « célébrité » ne sont pas exposés au joueur en cours de partie." defaultOpen={false}>
       <Field label="TMDB ID" id="tmdb_id" type="number" value={form.tmdb_id ?? ''} onChange={(v) => setField('tmdb_id', v ? parseInt(v, 10) : null)} placeholder="Optionnel" />
 
       {/* Fame level */}
@@ -449,12 +493,24 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
         />
         <span className="text-sm font-medium text-gray-700">Série active</span>
       </label>
+      </AdminFormSection>
 
       {error && (
         <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
       )}
 
-      <div className="flex justify-end gap-3 pt-2">
+      <div className="flex flex-wrap justify-between gap-3 pt-2 items-center">
+        <div className="flex flex-col gap-1">
+          <FilmSeriesPreviewOpenButton
+            mode="series"
+            onOpen={() => setSeriesPreviewOpen(true)}
+            disabled={!form.title.trim() || !form.image_url.trim()}
+          />
+          {(!form.title.trim() || !form.image_url.trim()) && (
+            <span className="text-xs text-gray-400">Titre et image requis pour l’aperçu.</span>
+          )}
+        </div>
+        <div className="flex gap-3 ml-auto">
         <button type="button" onClick={onCancel} disabled={submitting} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
           Annuler
         </button>
@@ -462,7 +518,30 @@ export function SeriesForm({ initial, onSubmit, onCancel }: SeriesFormProps) {
           {submitting && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
           {initial?.id ? 'Enregistrer' : 'Créer la série'}
         </button>
+        </div>
       </div>
     </form>
+    <FilmSeriesGamePreviewModal
+      isOpen={seriesPreviewOpen}
+      onClose={() => setSeriesPreviewOpen(false)}
+      mode="series"
+      draft={
+        seriesPreviewOpen
+          ? {
+              mode: 'series',
+              year: form.year,
+              creator: form.creator,
+              genres: form.genres,
+              cast_members: form.cast_members,
+              tagline: form.tagline ?? '',
+              synopsis: form.synopsis ?? '',
+              image_url: form.image_url,
+              hint_schedule: form.hint_schedule,
+            }
+          : null
+      }
+      mediaId={initial?.id ?? null}
+    />
+    </>
   )
 }

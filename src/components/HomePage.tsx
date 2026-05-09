@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Footer } from '@/components/layout/Footer'
 import { FEATURES, BRAND_NAME } from '@/config/features'
+import { hasReturningFilmPlayerActivity } from '@/lib/storage'
 import {
   NewModesAnnouncementModal,
   NEW_MODES_ANNOUNCEMENT_STORAGE_KEY,
@@ -19,12 +20,13 @@ export function HomePage() {
 
   useEffect(() => {
     try {
-      if (!localStorage.getItem(NEW_MODES_ANNOUNCEMENT_STORAGE_KEY)) {
-        if (FEATURES.enableSeries && FEATURES.enableWiki) setAnnouncementVariant('both')
-        else if (FEATURES.enableSeries) setAnnouncementVariant('series')
-        else if (FEATURES.enableWiki) setAnnouncementVariant('wiki')
-        setShowNewBadge(true)
-      }
+      if (localStorage.getItem(NEW_MODES_ANNOUNCEMENT_STORAGE_KEY)) return
+      if (!hasReturningFilmPlayerActivity()) return
+
+      if (FEATURES.enableSeries && FEATURES.enableWiki) setAnnouncementVariant('both')
+      else if (FEATURES.enableSeries) setAnnouncementVariant('series')
+      else if (FEATURES.enableWiki) setAnnouncementVariant('wiki')
+      setShowNewBadge(true)
     } catch {}
   }, [])
 
@@ -173,11 +175,11 @@ export function HomePage() {
                 <Landmark size={28} style={{ color: '#c4b5fd' }} />
               </div>
               <div>
-                <p className="font-semibold text-film-text text-xl">Mode Wikipedia</p>
+                <p className="font-semibold text-film-text text-xl">Personnalités</p>
                 <p className="text-film-text-dim text-sm mt-1">
-                  Devinez la personnalité du jour grâce à des indices progressifs issus de Wikipedia.
+                  Devinez la personnalité du jour grâce à des indices progressifs (sources Wikipédia / Wikidata).
                 </p>
-                <p className="text-sm font-medium mt-4 text-[#c4b5fd] group-hover:text-[#d7ccff] transition-colors">Jouer en mode Wikipedia</p>
+                <p className="text-sm font-medium mt-4 text-[#c4b5fd] group-hover:text-[#d7ccff] transition-colors">Jouer en mode Personnalités</p>
               </div>
             </a>
           ) : (
@@ -189,9 +191,9 @@ export function HomePage() {
                 <Landmark size={28} style={{ color: '#c4b5fd' }} />
               </div>
               <div>
-                <p className="font-semibold text-film-text text-xl">Mode Wikipedia</p>
+                <p className="font-semibold text-film-text text-xl">Personnalités</p>
                 <p className="text-film-text-dim text-sm mt-1">
-                  Le mode Wikipedia arrive bientôt. Le temps de finaliser le catalogue de personnalités.
+                  Le mode Personnalités arrive bientôt. Le temps de finaliser le catalogue.
                 </p>
                 <p className="text-sm font-medium mt-4 text-[#c4b5fd]">Bientôt disponible</p>
               </div>
@@ -205,7 +207,7 @@ export function HomePage() {
             <HowToCard
               icon={<Eye size={15} className="text-film-gold" />}
               title="1. Observez les indices"
-              description={FEATURES.enableWiki ? "Une image (films/séries) ou un profil (Wikipedia) s'affiche." : "Regardez l'image du jour et repérez les détails utiles."}
+              description={FEATURES.enableWiki ? "Une image (films/séries) ou un profil (personnalité) s'affiche." : "Regardez l'image du jour et repérez les détails utiles."}
             />
             <HowToCard
               icon={<Keyboard size={15} className="text-film-gold" />}

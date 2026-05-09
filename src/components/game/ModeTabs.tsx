@@ -7,7 +7,7 @@ import { FEATURES } from '@/config/features'
 const ALL_TABS = [
   { id: 'films',  label: 'Films',  to: '/films',  Icon: Film,     color: 'var(--sg-films)',  enabled: true },
   { id: 'series', label: 'Séries', to: '/series', Icon: Tv,       color: 'var(--sg-series)', enabled: FEATURES.enableSeries },
-  { id: 'wiki',   label: 'Wiki',   to: '/wiki',   Icon: Landmark, color: '#a78bfa',          enabled: FEATURES.enableWiki },
+  { id: 'wiki',   label: 'Personnalités',   to: '/wiki',   Icon: Landmark, color: '#a78bfa',          enabled: FEATURES.enableWiki },
 ];
 
 export function ModeTabs() {

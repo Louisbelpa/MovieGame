@@ -79,7 +79,7 @@ function FaqModal({ onClose }: { onClose: () => void }) {
         <FaqItem
           q="Combien de tentatives ai-je par jour ?"
           a={FEATURES.enableWiki
-            ? "Films/Séries : 5 tentatives. Mode Wikipedia (WikiGuessr) : 3 tentatives. Chaque mauvaise réponse débloque un indice supplémentaire."
+            ? "Films/Séries : 5 tentatives. Mode Personnalités : 3 tentatives. Chaque mauvaise réponse débloque un indice supplémentaire."
             : "Vous avez 5 tentatives par défi. Chaque mauvaise réponse débloque un indice supplémentaire."}
         />
         <FaqItem
@@ -88,7 +88,7 @@ function FaqModal({ onClose }: { onClose: () => void }) {
         />
         {FEATURES.enableWiki && (
           <FaqItem
-            q="Comment fonctionne le mode Wikipedia (WikiGuessr) ?"
+            q="Comment fonctionne le mode Personnalités ?"
             a="Chaque jour, une personnalité à deviner : politicien, sportif, artiste… Son profil (fonctions, clubs, biographie) se dévoile progressivement à chaque erreur. Vous avez 3 tentatives."
           />
         )}
@@ -102,7 +102,7 @@ function FaqModal({ onClose }: { onClose: () => void }) {
         />
         <FaqItem
           q="Les titres en français et en anglais sont-ils acceptés ?"
-          a="Oui, les titres originaux et les titres français sont tous les deux acceptés. Pour WikiGuessr, les alias courants du nom de la personnalité sont aussi reconnus."
+          a="Oui, les titres originaux et les titres français sont tous les deux acceptés. Pour le mode Personnalités, les alias courants du nom sont aussi reconnus."
         />
         <FaqItem
           q={`D'où viennent les informations sur les ${FEATURES.enableSeries ? 'films et séries' : 'films'} ?`}
@@ -110,7 +110,7 @@ function FaqModal({ onClose }: { onClose: () => void }) {
         />
         {FEATURES.enableWiki && (
           <FaqItem
-            q="D'où viennent les données du mode Wikipedia ?"
+            q="D'où viennent les données du mode Personnalités ?"
             a="Les biographies et informations de carrière proviennent de Wikipédia et Wikidata, sous licence Creative Commons. Les photos sont issues de Wikimedia Commons."
           />
         )}
@@ -175,9 +175,9 @@ function PrivacyModal({ onClose }: { onClose: () => void }) {
 
         {FEATURES.enableWiki && (
           <section>
-            <h3 className="font-semibold text-film-text mb-1">Wikipedia / Wikidata</h3>
+            <h3 className="font-semibold text-film-text mb-1">Sources Wikipédia / Wikidata</h3>
             <p className="text-sm">
-              Le mode WikiGuessr utilise des données issues de{' '}
+              Le mode Personnalités utilise des données issues de{' '}
               <a href="https://fr.wikipedia.org" target="_blank" rel="noopener noreferrer" className="underline hover:text-film-text">Wikipédia</a>
               {' '}et{' '}
               <a href="https://www.wikidata.org" target="_blank" rel="noopener noreferrer" className="underline hover:text-film-text">Wikidata</a>
@@ -204,6 +204,7 @@ export function Footer() {
   const [modal, setModal] = useState<ModalType>(null)
   const location = useLocation()
   const isWikiPage = location.pathname.startsWith('/wiki')
+  const isHomePage = location.pathname === '/' || location.pathname === ''
 
   return (
     <>
@@ -224,7 +225,7 @@ export function Footer() {
               Politique de confidentialité
             </button>
             <a
-              href="mailto:contact@cineguessr.fr"
+              href="mailto:contact@guesstoday.fr"
               className="flex items-center gap-1.5 hover:text-film-text transition-colors"
             >
               <ExternalLink size={12} />
@@ -232,8 +233,8 @@ export function Footer() {
             </a>
           </div>
 
-          {/* TMDB attribution */}
-          {!isWikiPage && (
+          {/* TMDB attribution (pas sur l’accueil — pas de contenu TMDB affiché) */}
+          {!isWikiPage && !isHomePage && (
             <div className="flex items-center justify-center gap-2 mb-2 text-xs text-film-text-dim">
               <Film size={11} />
               <span>
@@ -242,12 +243,12 @@ export function Footer() {
               </span>
             </div>
           )}
-          {/* Wikipedia attribution */}
+          {/* Wikipédia / Wikidata attribution (mode Personnalités) */}
           {FEATURES.enableWiki && isWikiPage && (
             <div className="flex items-center justify-center gap-2 mb-3 text-xs text-film-text-dim">
               <Landmark size={11} />
               <span>
-                Mode WikiGuessr — données issues de{' '}
+                Mode Personnalités — données issues de{' '}
                 <a href="https://fr.wikipedia.org" target="_blank" rel="noopener noreferrer" className="underline hover:text-film-text-dim transition-colors">Wikipédia</a>
                 {' '}(CC BY-SA 4.0).
               </span>

@@ -65,10 +65,16 @@ export function Header({ mode }: HeaderProps) {
 
         {/* Center: logo */}
         <div className="flex items-center gap-2">
-          {icon}
-          <span className="font-title text-xl font-bold text-gradient-gold tracking-tight">
-            {BRAND_NAME}
-          </span>
+          <a
+            href="/"
+            aria-label={`Accueil ${BRAND_NAME}`}
+            className="inline-flex items-center gap-2 rounded-lg px-1 -mx-1 min-h-[44px] text-film-text hover:bg-film-gray/60 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+          >
+            {icon}
+            <span className="font-title text-xl font-bold text-gradient-gold tracking-tight">
+              {BRAND_NAME}
+            </span>
+          </a>
           {displayNumber && (
             <div className="overflow-hidden h-5 flex items-center">
               <AnimatePresence mode="wait">

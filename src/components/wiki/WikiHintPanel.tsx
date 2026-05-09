@@ -127,19 +127,61 @@ function VisibleProfile({
       domainLabel === 'Musique' && /^musique\b/i.test(domainText)
         ? (domainText.replace(/^\s*Musique\s*(?:—|-|–|:)?\s*/i, '').trim() || domainText)
         : domainText
+    const parts =
+      profile.notableWorkParts?.length
+        ? profile.notableWorkParts
+        : profile.notableWork
+          ? [profile.notableWork]
+          : []
+    const hasBody =
+      (profile.highlights?.length ?? 0) > 0 ||
+      !!profile.company?.trim() ||
+      !!profile.domain?.trim() ||
+      parts.length > 0 ||
+      !!profile.era?.trim()
+
     return (
       <ProfileCard icon={Briefcase} label={biographyTitle}>
-        <div className="space-y-1 text-sm">
+        <div className="space-y-3 text-sm">
+          {(profile.highlights?.length ?? 0) > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-1.5">Repères</p>
+              <ul className="space-y-1.5">
+                {profile.highlights!.map((h, i) => (
+                  <li key={i} className="leading-snug">
+                    <span className="text-film-text-dim">{h.label}</span>
+                    <span className="text-film-text-dim"> · </span>
+                    <span className="text-film-text">{h.value}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {profile.company?.trim() && (
+            <p>
+              <span className="text-film-text-dim">Entreprise(s) · </span>
+              <span className="text-film-text">{profile.company.trim()}</span>
+            </p>
+          )}
           {profile.domain && (
             <p><span className="text-film-text-dim">{domainLabel} · </span><span className="text-film-text">{domainDisplay}</span></p>
           )}
-          {profile.notableWork && (
-            <p><span className="text-film-text-dim">Oeuvre notable · </span><span className="text-film-text">{profile.notableWork}</span></p>
-          )}
+          {parts.length > 1 ? (
+            <div>
+              <p className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-1">Œuvres & faits</p>
+              <ul className="list-disc pl-4 space-y-0.5 text-film-text">
+                {parts.map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ) : parts.length === 1 ? (
+            <p><span className="text-film-text-dim">Oeuvre / fait notable · </span><span className="text-film-text">{parts[0]}</span></p>
+          ) : null}
           {profile.era && (
             <p><span className="text-film-text-dim">Période · </span><span className="text-film-text">{profile.era}</span></p>
           )}
-          {!profile.domain && !profile.notableWork && !profile.era && (
+          {!hasBody && (
             <p className="text-film-text-dim italic">Informations non renseignées.</p>
           )}
         </div>
@@ -149,18 +191,58 @@ function VisibleProfile({
 
   return (
     <ProfileCard icon={Trophy} label={`Carrière sportive${profile.sport ? ` · ${profile.sport}` : ''}`}>
-      {profile.clubs.length > 0 ? (
-        <div className="space-y-1.5">
-          {profile.clubs.map((c, i) => (
-            <div key={i} className="text-sm leading-snug">
-              <span className="text-film-text font-medium">{c.name}</span>
-              <span className="text-film-text-dim">
-                {c.years ? ` · ${c.years}` : ''}
-                {c.apps != null ? ` · ${c.apps} mat.` : ''}
-                {c.goals != null ? ` · ${c.goals} b.` : ''}
-              </span>
+      {(profile.clubs.length > 0 || profile.clubsYouth.length > 0) ? (
+        <div className="space-y-3">
+          {profile.clubsYouth.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-1.5">Parcours junior</p>
+              <div className="overflow-x-auto rounded-md border border-film-border/40">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="border-b border-film-border/40 bg-film-black/20">
+                      <th className="text-left font-medium text-film-text-dim py-1.5 px-2">Années</th>
+                      <th className="text-left font-medium text-film-text-dim py-1.5 px-2">Club</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {profile.clubsYouth.map((c, i) => (
+                      <tr key={`y-${i}`} className="border-b border-film-border/20 last:border-0">
+                        <td className="py-1.5 px-2 text-film-text tabular-nums whitespace-nowrap">{c.years || '—'}</td>
+                        <td className="py-1.5 px-2 text-film-text">{c.name}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          ))}
+          )}
+          {profile.clubs.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-film-text-dim uppercase tracking-wider mb-1.5">Parcours senior</p>
+              <div className="overflow-x-auto rounded-md border border-film-border/40">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="border-b border-film-border/40 bg-film-black/20">
+                      <th className="text-left font-medium text-film-text-dim py-1.5 px-2">Années</th>
+                      <th className="text-left font-medium text-film-text-dim py-1.5 px-2">Club</th>
+                      <th className="text-left font-medium text-film-text-dim py-1.5 px-2 w-[5rem]">M. (B.)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {profile.clubs.map((c, i) => (
+                      <tr key={`s-${i}`} className="border-b border-film-border/20 last:border-0">
+                        <td className="py-1.5 px-2 text-film-text tabular-nums whitespace-nowrap">{c.years || '—'}</td>
+                        <td className="py-1.5 px-2 text-film-text">{c.name}</td>
+                        <td className="py-1.5 px-2 text-film-text-dim tabular-nums whitespace-nowrap">
+                          {c.apps != null && c.goals != null ? `${c.apps} (${c.goals})` : c.apps != null ? `${c.apps}` : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
           {profile.nationalTeam && (
             <div className="text-sm pt-1 border-t border-film-border/30 text-film-text-dim">
               {profile.nationalTeam.name}

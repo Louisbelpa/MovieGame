@@ -24,6 +24,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { createRateLimiter } from './middleware/rateLimiter.js';
 import { logger } from './lib/logger.js';
+import { ensureUploadsDir, getUploadsAbsDir } from './config/uploads.js';
 import db from './db/database.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -31,11 +32,27 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export function createApp(): express.Application {
   const app = express();
 
+  const toOrigin = (value: string): string | null => {
+    const raw = value.trim()
+    if (!raw) return null
+    const withScheme = raw.startsWith('http://') || raw.startsWith('https://')
+      ? raw
+      : `https://${raw}`
+    try {
+      const url = new URL(withScheme)
+      return url.origin
+    } catch {
+      return null
+    }
+  }
+
   const allowedOrigins = (process.env.CORS_ORIGIN ?? '')
     .split(',')
     .map(o => o.trim())
     .filter(Boolean)
-    .map(o => o.startsWith('http') ? o : `https://${o}`);
+    .map(toOrigin)
+    .filter((o): o is string => Boolean(o));
+  const allowedOriginsSet = new Set(allowedOrigins)
 
   app.set('trust proxy', 1);
   app.use(requestIdMiddleware);
@@ -67,6 +84,11 @@ export function createApp(): express.Application {
   app.use(cookieParser(process.env.COOKIE_SECRET ?? 'dev_secret'));
 
   // Static files before CORS — same-origin assets don't need CORS headers
+  ensureUploadsDir();
+  app.use(
+    '/uploads',
+    express.static(getUploadsAbsDir(), { maxAge: '7d' })
+  );
   app.use('/assets', express.static(path.join(__dirname, '../public/assets'), { maxAge: '1y', immutable: true }));
   app.use(express.static(path.join(__dirname, '../public'), {
     maxAge: '1d',
@@ -77,8 +99,15 @@ export function createApp(): express.Application {
 
   app.use(cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) callback(null, true);
-      else callback(new Error('Not allowed by CORS'));
+      if (!origin) { callback(null, true); return }
+      if (allowedOriginsSet.size === 0) { callback(null, true); return }
+      const normalized = toOrigin(origin)
+      if (normalized && allowedOriginsSet.has(normalized)) {
+        callback(null, true)
+        return
+      }
+      logger.warn({ origin, normalizedOrigin: normalized, allowedOrigins }, 'CORS rejected origin')
+      callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
   }));

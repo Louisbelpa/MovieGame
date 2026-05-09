@@ -602,7 +602,7 @@ describe('DELETE /api/admin/wiki-persons/:id', () => {
 
 describe('GET /api/admin/analytics/daily', () => {
   it('returns 200 with array payload', async () => {
-    const res = await agent.get('/api/admin/analytics/daily');
+    const res = await agent.get('/api/admin/analytics/daily?from=2020-01-01&to=2030-12-31');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
   });

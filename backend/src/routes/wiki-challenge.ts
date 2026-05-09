@@ -124,6 +124,7 @@ wikiChallengeRouter.get('/dates', (req: Request, res: Response, next: NextFuncti
       .prepare<[string, string], { challenge_date: string }>(
         `SELECT challenge_date FROM daily_challenges
          WHERE challenge_date >= ? AND challenge_date <= ? AND media_type = 'wiki'
+           AND is_active = 1
          ORDER BY challenge_date DESC`
       )
       .all(fromStr, todayParis)
@@ -150,11 +151,13 @@ wikiChallengeRouter.get('/adjacent', (req: Request, res: Response, next: NextFun
       ? db.prepare<[string, string], { challenge_date: string }>(
           `SELECT challenge_date FROM daily_challenges
            WHERE challenge_date < ? AND challenge_date <= ? AND media_type = 'wiki'
+             AND is_active = 1
            ORDER BY challenge_date DESC LIMIT 1`
         ).get(date, todayParis)
       : db.prepare<[string, string], { challenge_date: string }>(
           `SELECT challenge_date FROM daily_challenges
            WHERE challenge_date > ? AND challenge_date <= ? AND media_type = 'wiki'
+             AND is_active = 1
            ORDER BY challenge_date ASC LIMIT 1`
         ).get(date, todayParis)
 

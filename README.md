@@ -1,4 +1,4 @@
-# CinéGuessr / GuessToday 🎬
+# GuessToday 🎬
 
 Jeu quotidien multi-modes : devine le film, la série ou la personnalité du jour à partir d'indices progressifs.
 Un nouveau défi chaque jour à minuit (heure de Paris). Les anciens défis restent accessibles.
@@ -7,7 +7,7 @@ Un nouveau défi chaque jour à minuit (heure de Paris). Les anciens défis rest
 
 | Mode | Route | Description |
 |------|-------|-------------|
-| **CinéGuessr / Films** | `/films` | Devine le film à partir d'une image et d'indices (année, réalisateur, acteur) |
+| **Films** | `/films` | Devine le film à partir d'une image et d'indices (année, réalisateur, acteur) |
 | **Séries** | `/series` | Même principe pour les séries TV |
 | **WikiGuessr** | `/wiki` | Devine une personnalité réelle (politique, sport, art…) à partir de sa carrière et d'indices progressifs |
 
@@ -94,6 +94,7 @@ Back office sur `http://localhost:5173/admin`.
     │   ├── routes/               # challenge.ts, films.ts, stats.ts, admin.ts, wiki-challenge.ts
     │   ├── services/             # challenge.service.ts, wiki-challenge.service.ts
     │   ├── lib/                  # wikipedia.ts (parser Wikipedia + Wikidata)
+    │   ├── config/               # uploads.ts (UPLOADS_DIRECTORY)
     │   ├── middleware/           # session, rateLimiter, adminAuth, errorHandler
     │   └── db/                   # schema.sql, migrate.ts, database.ts
     └── scripts/
@@ -130,11 +131,14 @@ Voir `backend/.env.example` pour la liste complète.
 |----------|--------|-------------|
 | `VITE_ENABLE_SERIES` | `true` | Active le mode Séries (home, tabs, route `/series`) |
 | `VITE_ENABLE_WIKI` | `true` | Active le mode WikiGuessr (home, tab, route `/wiki`) |
+| `VITE_API_URL` | *(vide)* | Préfixe URL du backend (`fetch` / admin) si besoin ; sinon requêtes relatives même origine |
 
 Effets des flags :
-- `VITE_ENABLE_SERIES=false` + `VITE_ENABLE_WIKI=false` → mode films uniquement, branding `CinéGuessr`
-- `VITE_ENABLE_SERIES=true` → films + séries, branding `GuessToday`
+- `VITE_ENABLE_SERIES=false` + `VITE_ENABLE_WIKI=false` → mode films uniquement (routes / UI séries et wiki masquées)
+- `VITE_ENABLE_SERIES=true` → films + séries
 - `VITE_ENABLE_WIKI=true` → onglet WikiGuessr visible sur la homepage
+
+Branding : toujours **GuessToday** (marque et URL canonique par défaut `https://guesstoday.fr`).
 
 ### Backend
 
@@ -150,16 +154,45 @@ Effets des flags :
 | `IMAGE_SOURCE` | `tmdb` | `tmdb` ou `local` |
 | `MAX_ATTEMPTS` | `5` | Nombre de tentatives par défi films/séries |
 | `WIKI_MAX_ATTEMPTS` | `5` | Nombre de tentatives par défi WikiGuessr (optionnel) |
-| `BACKEND_URL` | — | URL publique du backend (pour les URLs d'images uploadées) |
+| `UPLOADS_DIRECTORY` | `backend/public/uploads` (dev) ; **`/data/uploads`** en Docker | Fichiers images uploadés depuis l’admin ; **à persister en prod** sur le même volume que la base |
+| `WIKI_PREFETCH_TARGET_READY` | `24` | Cible d’entrées « prêtes » dans le pool admin « Au hasard » (Wikipedia), plafond **400** |
+| `WIKI_PREFETCH_MAX_FETCH_PER_RUN` | `4` | Fiches Wikipédia enrichies au plus par passe de remplissage, plafond **40** |
+| `WIKI_PREFETCH_SPARQL_LIMIT` | *(dérivé)* | `LIMIT` Wikidata pour le prefetch / « Au hasard » : si absent, **`max(100, WIKI_PREFETCH_TARGET_READY)`** (plafonné **800**) ; si défini explicitement, borné **50–800** |
+| `PREFETCH_WARM_TOKEN` | *(vide)* | Jeton Bearer / header `X-Prefetch-Warm-Token` pour `POST /api/admin/prefetch/warm` (cron) |
 
-## Changements backend récents
+**CORS** : renseigner `CORS_ORIGIN` en liste d’origines complètes `https://...` (sans slash final, sans espaces). Les origines sont normalisées côté serveur.
 
-- **Sessions admin révocables** — table `active_admin_tokens`, stockage hashé du token, expiration 7 jours et révocation au logout.
-- **Serveur durci** — CORS via package `cors` (liste blanche), headers via `helmet`, `express.json`/`urlencoded` limités à `1mb`.
-- **Protection XSS côté tentatives** — les guesses utilisateur sont nettoyés via `escapeHtml()` avant persistance.
-- **Recherche anti-spoiler améliorée** — autocomplétion film/série/wiki exclut aussi les défis futurs planifiés et échappe `%`/`_` en SQL LIKE.
-- **Wikipedia plus stable** — cache LRU (1h), throttle 1 requête/s et fetch résumé + wikitext en parallèle.
-- **Seed sécurisé** — `npm run db:seed` est bloqué en production.
+## Changements récents (résumé)
+
+### Base de données & migrations
+
+- `daily_challenges.is_active` — soft-delete du planning ; migrations réparatrices si la colonne avait disparu après d’anciennes recréations de table.
+- Tables `wiki_prefetch_pool`, `app_settings` (toggle pool), etc. — voir `backend/src/db/migrate.ts`.
+
+### Jeu public
+
+- **`#N` dans le header** — le numéro affiché est le **rang chronologique** parmi les défis actifs du même type (film / série / wiki), pas seulement la colonne SQL brute.
+- **Archives (modale calendrier)** — les routes `GET /api/challenge/dates`, `GET /api/wiki/dates` et `.../adjacent` ne listent que les défis **`is_active = 1`**. Retirer un jour du planning ne le compte plus comme « joué » dans le résumé du mois.
+
+### Back office
+
+- **Uploads** — servis sous `/uploads/...` depuis `UPLOADS_DIRECTORY` (montage volume recommandé avec la DB).
+- **Réglages** — **`/admin/settings`** : activation du préfetch Wikipedia (toggle `wiki_prefetch_enabled`), récap config serveur lisible via **`GET /api/admin/settings/summary`** (sans secrets, inclut cibles pool et limite SPARQL effective).
+- **Wikipedia** — pool préchargé pour « Au hasard » ; **`/admin/wiki-pool`** : liste paginée, filtre entrées avec/sans fiche personnalité (`hasWikiPerson`), cartes et dates au fuseau Europe/Paris ; activation pool gérée depuis Réglages ; `POST /api/admin/prefetch/warm?target=&lang=&minFame=` pour cron externe.
+- **Films / séries** — **`POST /api/admin/game-preview-draft`** : prévisualisation du rendu jeu depuis le formulaire **sans enregistrer** la fiche.
+- **Planning** — après changement de date ou restauration d’un défi, renumérotation des `challenge_number`.
+
+### Domaine & branding
+
+- Redirection client depuis l’**ancien domaine** listé dans **`src/main.tsx`** vers **`guesstoday.fr`** avec migration partielle du localStorage. À conserver tant que d’anciens liens existent ; une **301** infra reste l’idéal pour le SEO.
+
+### Déjà documenté plus bas
+
+- **Sessions admin révocables** — table `active_admin_tokens`, hash SHA-256, logout révocable.
+- **Serveur durci** — `helmet`, CORS liste blanche, body `1mb`.
+- **XSS / LIKE / anti-spoiler** — comme précédemment.
+- **Wikipedia** — cache LRU, throttle, etc.
+- **Seed** — bloqué en production.
 
 ## API publique
 
@@ -171,6 +204,8 @@ Effets des flags :
 | `GET` | `/api/challenge/date/:date` | Défi d'une date passée (`YYYY-MM-DD`) |
 | `POST` | `/api/challenge/guess` | Soumettre une tentative |
 | `GET` | `/api/challenge/result?challengeId=` | Révéler le titre (fin de partie) |
+| `GET` | `/api/challenge/dates?days=&type=` | Dates ayant un défi actif (archive ; `type=film` ou `series`) |
+| `GET` | `/api/challenge/adjacent?date=&direction=&type=` | Date voisine planifiée (prev/next) |
 | `GET` | `/api/films/search?q=` | Autocomplétion des titres |
 | `GET` | `/api/stats` | Statistiques globales anonymes |
 | `GET` | `/health` | Santé du serveur |
@@ -185,6 +220,7 @@ Effets des flags :
 | `POST` | `/api/wiki/guess` | Soumettre une tentative |
 | `GET` | `/api/wiki/result?challengeId=` | Révéler la personnalité (fin de partie) |
 | `GET` | `/api/wiki/search?q=` | Autocomplétion des noms |
+| `GET` | `/api/wiki/dates?days=` | Dates ayant un défi wiki actif (archive) |
 | `GET` | `/api/wiki/stats` | Statistiques globales |
 
 ## Back office
@@ -192,10 +228,12 @@ Effets des flags :
 Accessible sur `/admin`. Protégé par mot de passe (et identifiant si `ADMIN_USERNAME` est défini).
 
 - **Dashboard** — aperçu du défi du jour et des 7 prochains jours
-- **Films** — CRUD complet, recherche TMDB par titre, bouton "Film aléatoire" (TMDB discover, vote_count ≥ 500)
-- **Séries** — CRUD complet, recherche TMDB, bouton "Série aléatoire"
+- **Films** — CRUD complet, recherche TMDB par titre, bouton "Film aléatoire" (TMDB discover, vote_count ≥ 500), prévisualisation jeu depuis le brouillon du formulaire
+- **Séries** — CRUD complet, recherche TMDB, bouton "Série aléatoire", même prévisualisation brouillon
 - **Wikipedia** — CRUD personnalités : import depuis un slug Wikipedia (FR ou EN), bouton "Au hasard" via Wikidata SPARQL (filtre par sitelinks), parsing automatique du type de personnalité et de la carrière
-- **Planning** — calendrier des 30 prochains jours avec onglets Films / Séries / Wiki, assignation et auto-planification
+- **Pool Wikipedia** — `/admin/wiki-pool` : entrées du pool, pagination, filtre fiche existante, lien vers Réglages pour activer le préchargement
+- **Réglages** — `/admin/settings` : toggle préfetch Wikipedia et lecture seule des variables d’environnement pertinentes (dont flags Vite affichés à titre informatif)
+- **Planning** — calendrier des 30 prochains jours avec onglets Films / Séries / Wiki, assignation et auto-planification ; suppression = `is_active=0` sur `daily_challenges`
 - **Analytics** — statistiques de jeu, taux de victoire, joueurs récurrents
 
 ## Déploiement (Railway)
@@ -205,7 +243,7 @@ Le frontend est buildé dans `backend/public/` et servi directement par Express 
 ### Première mise en production
 
 1. Créer le service Railway et lier le repo
-2. Ajouter un **volume persistant** monté sur `/data` (pour la base SQLite)
+2. Ajouter un **volume persistant** monté sur `/data` (base SQLite + dossier `uploads` des images envoyées depuis l’admin)
 3. Configurer toutes les variables d'environnement (voir tableau ci-dessus + `.env.example`)
 4. Déployer — Railway détecte le `Dockerfile` automatiquement
 5. Après le premier déploiement réussi, peupler la base depuis la console Railway :
@@ -219,7 +257,6 @@ Le frontend est buildé dans `backend/public/` et servi directement par Express 
 COOKIE_SECRET=<openssl rand -hex 32>
 ADMIN_PASSWORD=<mot de passe fort, 12+ caractères>
 CORS_ORIGIN=https://votre-app.up.railway.app
-BACKEND_URL=https://votre-app.up.railway.app
 TMDB_API_KEY=<votre clé TMDB>
 ```
 
@@ -229,7 +266,7 @@ TMDB_API_KEY=<votre clé TMDB>
 - [ ] `ADMIN_PASSWORD` fort et unique (≥ 12 caractères)
 - [ ] `ADMIN_USERNAME` défini (recommandé pour le double facteur identifiant + mot de passe)
 - [ ] `CORS_ORIGIN` pointe vers le bon domaine (sans slash final)
-- [ ] `BACKEND_URL` configuré pour les URLs d'images uploadées
+- [ ] Volume `/data` : la DB **et** les fichiers sous `uploads` survivent aux redéploiements (`UPLOADS_DIRECTORY=/data/uploads` est défini par le Dockerfile ; surcharge possible)
 - [ ] Volume persistant Railway monté sur `/data`
 - [ ] HTTPS activé (Railway le fait automatiquement)
 - [ ] Au moins 2 semaines de défis planifiés dans le back office (films, séries, wiki)

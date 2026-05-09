@@ -9,10 +9,13 @@ import { X, Images, Search, Loader2, Upload, Shuffle } from 'lucide-react'
 import type { AdminFilm, FilmPayload, TmdbSearchResult } from '../api'
 import { searchTmdb, getTmdbFilmDetails, uploadImage, getRandomTmdbFilm } from '../api'
 import { BackdropPicker } from './BackdropPicker'
+import { AdminFormSection, AdminFormSubheading } from './AdminFormSection'
+import { DEFAULT_FILM_HINT_SCHEDULE, MediaHintScheduleEditor } from './MediaHintScheduleEditor'
+import { FilmSeriesGamePreviewModal, FilmSeriesPreviewOpenButton } from './FilmSeriesGamePreviewModal'
 
 function resolvePreviewUrl(url: string): string {
   if (!url) return ''
-  if (url.startsWith('http')) return url
+  if (url.startsWith('http') || url.startsWith('/uploads/')) return url
   return `https://image.tmdb.org/t/p/w300${url}`
 }
 
@@ -245,12 +248,17 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
     tmdb_id: initial?.tmdb_id ?? null,
     is_active: initial?.is_active ?? true,
     fame_level: initial?.fame_level ?? 3,
+    hint_schedule:
+      initial?.hint_schedule && initial.hint_schedule.length > 0
+        ? [...initial.hint_schedule]
+        : [...DEFAULT_FILM_HINT_SCHEDULE],
   })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showBackdrops, setShowBackdrops] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [randomLoading, setRandomLoading] = useState(false)
+  const [filmPreviewOpen, setFilmPreviewOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleRandom() {
@@ -258,7 +266,14 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
     setError(null)
     try {
       const details = await getRandomTmdbFilm()
-      setForm({ ...details, is_active: form.is_active })
+      setForm({
+        ...details,
+        is_active: form.is_active,
+        hint_schedule:
+          details.hint_schedule && details.hint_schedule.length > 0
+            ? [...details.hint_schedule]
+            : form.hint_schedule,
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la récupération aléatoire')
     } finally {
@@ -289,6 +304,10 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
     setForm({
       ...details,
       is_active: form.is_active,
+      hint_schedule:
+        details.hint_schedule && details.hint_schedule.length > 0
+          ? [...details.hint_schedule]
+          : form.hint_schedule,
     })
   }
 
@@ -306,86 +325,103 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
   }
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="space-y-4">
 
-      {/* TMDB search (only shown for new films) */}
       {!initial?.id && (
-        <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-100 space-y-2">
-          <TmdbSearch onSelect={handleTmdbFill} />
-          <button
-            type="button"
-            onClick={handleRandom}
-            disabled={randomLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 border border-indigo-200 bg-white rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
-          >
-            {randomLoading
-              ? <Loader2 size={13} className="animate-spin" />
-              : <Shuffle size={13} />
-            }
-            Film aléatoire
-          </button>
-        </div>
-      )}
-
-      {/* Row: title + year */}
-      <div className="grid grid-cols-3 sm:grid-cols-3 gap-4">
-        <div className="col-span-2">
-          <Field label="Titre" id="title" required value={form.title} onChange={(v) => setField('title', v)} placeholder="Ex: Inception" />
-        </div>
-        <Field label="Année" id="year" required type="number" value={form.year} onChange={(v) => setField('year', parseInt(v, 10) || 0)} placeholder="2010" />
-      </div>
-
-      <Field label="Réalisateur" id="director" required value={form.director} onChange={(v) => setField('director', v)} placeholder="Ex: Christopher Nolan" />
-
-      <TagsInput label="Titres alternatifs" tags={form.title_aliases} onChange={(tags) => setField('title_aliases', tags)} placeholder="Ajouter un alias..." />
-      <TagsInput label="Genres" tags={form.genres} onChange={(tags) => setField('genres', tags)} placeholder="Action, Drame..." />
-      <TagsInput label="Casting" tags={form.cast_members} onChange={(tags) => setField('cast_members', tags)} placeholder="Ajouter un acteur..." />
-
-      <Field label="Tagline" id="tagline" value={form.tagline} onChange={(v) => setField('tagline', v)} placeholder="La phrase d'accroche du film" />
-      <TextareaField label="Synopsis" id="synopsis" value={form.synopsis} onChange={(v) => setField('synopsis', v)} placeholder="Résumé du film..." />
-
-      {/* Image URL + preview */}
-      <div>
-        <Field label="URL de l'image" id="image_url" required value={form.image_url} onChange={(v) => setField('image_url', v)} placeholder="https://..." />
-        <div className="flex gap-2 mt-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileUpload}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors whitespace-nowrap disabled:opacity-50"
-          >
-            {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-            {uploading ? 'Upload…' : 'Importer'}
-          </button>
-          {form.tmdb_id && (
+        <AdminFormSection
+          title="Import depuis TMDB"
+          badges={['meta']}
+          description="Remplit les champs ci-dessous ; rien n’est publié tant que tu n’enregistres pas."
+          defaultOpen
+        >
+          <div className="p-3 bg-indigo-50/80 rounded-lg border border-indigo-100 space-y-2">
+            <TmdbSearch onSelect={handleTmdbFill} />
             <button
               type="button"
-              onClick={() => setShowBackdrops(true)}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors whitespace-nowrap"
+              onClick={handleRandom}
+              disabled={randomLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 border border-indigo-200 bg-white rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
             >
-              <Images size={15} />
-              Backdrops TMDB
+              {randomLoading
+                ? <Loader2 size={13} className="animate-spin" />
+                : <Shuffle size={13} />
+              }
+              Film aléatoire
             </button>
+          </div>
+        </AdminFormSection>
+      )}
+
+      <AdminFormSection
+        variant="panel"
+        title="Contenu du défi CinéGuessr"
+        badges={['during-game', 'hints', 'secret', 'after-game']}
+        description="Tout ce qui impacte la partie : titre secret, affiche, données derrière les indices et ordre des cartes. Les dates déjà planifiées gardent leur planning jusqu’à modification au calendrier."
+      >
+        <AdminFormSubheading>Réponse secrète</AdminFormSubheading>
+        <Field label="Titre" id="title" required value={form.title} onChange={(v) => setField('title', v)} placeholder="Ex: Inception" />
+        <TagsInput label="Titres alternatifs (alias)" tags={form.title_aliases} onChange={(tags) => setField('title_aliases', tags)} placeholder="Ajouter un alias..." />
+        <p className="text-xs text-gray-500">Le titre n’est pas envoyé pendant la partie ; les alias servent uniquement à valider la saisie.</p>
+
+        <AdminFormSubheading>Image du défi</AdminFormSubheading>
+        <div>
+          <Field label="URL de l'image" id="image_url" required value={form.image_url} onChange={(v) => setField('image_url', v)} placeholder="https://..." />
+          <div className="flex gap-2 mt-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors whitespace-nowrap disabled:opacity-50"
+            >
+              {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+              {uploading ? 'Upload…' : 'Importer'}
+            </button>
+            {form.tmdb_id && (
+              <button
+                type="button"
+                onClick={() => setShowBackdrops(true)}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors whitespace-nowrap"
+              >
+                <Images size={15} />
+                Backdrops TMDB
+              </button>
+            )}
+          </div>
+          {form.image_url && (
+            <div className="mt-2">
+              <img
+                src={resolvePreviewUrl(form.image_url)}
+                alt="Aperçu"
+                className="h-32 w-auto rounded-lg object-cover border border-gray-200"
+                onError={(e) => { e.currentTarget.style.display = 'none' }}
+              />
+            </div>
           )}
         </div>
-        {form.image_url && (
-          <div className="mt-2">
-            <img
-              src={resolvePreviewUrl(form.image_url)}
-              alt="Aperçu"
-              className="h-32 w-auto rounded-lg object-cover border border-gray-200"
-              onError={(e) => { e.currentTarget.style.display = 'none' }}
-            />
-          </div>
-        )}
-      </div>
+        <p className="text-xs text-gray-500">Affiche toujours visible ; ce n’est pas une carte indice à débloquer.</p>
+
+        <AdminFormSubheading>Données pour les cartes indices</AdminFormSubheading>
+        <Field label="Année" id="year" required type="number" value={form.year} onChange={(v) => setField('year', parseInt(v, 10) || 0)} placeholder="2010" />
+        <Field label="Réalisateur" id="director" required value={form.director} onChange={(v) => setField('director', v)} placeholder="Ex: Christopher Nolan" />
+        <TagsInput label="Genres" tags={form.genres} onChange={(tags) => setField('genres', tags)} placeholder="Action, Drame..." />
+        <TagsInput label="Casting (ordre = priorité si la carte casting est active)" tags={form.cast_members} onChange={(tags) => setField('cast_members', tags)} placeholder="Ajouter un acteur..." />
+        <Field label="Tagline" id="tagline" value={form.tagline} onChange={(v) => setField('tagline', v)} placeholder="La phrase d'accroche du film" />
+        <TextareaField label="Synopsis" id="synopsis" value={form.synopsis} onChange={(v) => setField('synopsis', v)} placeholder="Résumé du film..." />
+
+        <MediaHintScheduleEditor
+          mode="film"
+          selectedHints={form.hint_schedule}
+          onChange={(next) => setField('hint_schedule', next)}
+        />
+      </AdminFormSection>
 
       {showBackdrops && form.tmdb_id && (
         <BackdropPicker
@@ -395,6 +431,7 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
         />
       )}
 
+      <AdminFormSection title="Références back-office" badges={['meta']} description="TMDB et étoiles de « célébrité » ne sont pas envoyés au client pendant une partie." defaultOpen={false}>
       <Field label="TMDB ID" id="tmdb_id" type="number" value={form.tmdb_id ?? ''} onChange={(v) => setField('tmdb_id', v ? parseInt(v, 10) : null)} placeholder="Optionnel" />
 
       {/* Fame level */}
@@ -428,12 +465,24 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
         />
         <span className="text-sm font-medium text-gray-700">Film actif</span>
       </label>
+      </AdminFormSection>
 
       {error && (
         <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
       )}
 
-      <div className="flex justify-end gap-3 pt-2">
+      <div className="flex flex-wrap justify-between gap-3 pt-2 items-center">
+        <div className="flex flex-col gap-1">
+          <FilmSeriesPreviewOpenButton
+            mode="film"
+            onOpen={() => setFilmPreviewOpen(true)}
+            disabled={!form.title.trim() || !form.image_url.trim()}
+          />
+          {(!form.title.trim() || !form.image_url.trim()) && (
+            <span className="text-xs text-gray-400">Titre et image requis pour l’aperçu.</span>
+          )}
+        </div>
+        <div className="flex gap-3 ml-auto">
         <button type="button" onClick={onCancel} disabled={submitting} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
           Annuler
         </button>
@@ -441,7 +490,30 @@ export function FilmForm({ initial, onSubmit, onCancel }: FilmFormProps) {
           {submitting && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
           {initial?.id ? 'Enregistrer' : 'Créer le film'}
         </button>
+        </div>
       </div>
     </form>
+    <FilmSeriesGamePreviewModal
+      isOpen={filmPreviewOpen}
+      onClose={() => setFilmPreviewOpen(false)}
+      mode="film"
+      draft={
+        filmPreviewOpen
+          ? {
+              mode: 'film',
+              year: form.year,
+              director: form.director,
+              genres: form.genres,
+              cast_members: form.cast_members,
+              tagline: form.tagline,
+              synopsis: form.synopsis,
+              image_url: form.image_url,
+              hint_schedule: form.hint_schedule,
+            }
+          : null
+      }
+      mediaId={initial?.id ?? null}
+    />
+    </>
   )
 }

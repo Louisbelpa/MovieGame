@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { ChevronUp, ChevronDown, X } from 'lucide-react'
 import { AdminLayout } from '../components/AdminLayout'
 import { SegmentedToggle } from '../components/SegmentedToggle'
@@ -12,12 +12,14 @@ import {
   getAttemptsDistribution,
   getHintsDistribution,
   type AnalyticsOverview,
+  type AnalyticsMediaFilter,
   type DailyAnalytics,
   type ChallengeAnalytics,
   type WrongGuess,
   type ReturningPlayer,
   type HourlyData,
 } from '../api'
+import { FEATURES } from '@/config/features'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -27,11 +29,16 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: '2-digit',
+/** Date du planning (`YYYY-MM-DD`) sans décalage fuseau : même jour qu’en base */
+function formatChallengeDate(iso: string): string {
+  const day = iso.includes('T') ? iso.split('T')[0]! : iso
+  const [y, m, d] = day.split('-').map((x) => parseInt(x, 10))
+  if (!y || !m || !d) return iso
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
   })
 }
 
@@ -39,10 +46,25 @@ function todayISO(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
 }
 
+function challengeDateYmd(iso: string): string {
+  return iso.includes('T') ? iso.split('T')[0]! : iso
+}
+
 function subtractDays(days: number): string {
   const d = new Date()
   d.setDate(d.getDate() - days)
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(d)
+}
+
+type Period = '1' | '7' | '30' | '90' | 'all' | 'custom'
+
+/** Même plage que le graphique « Activité quotidienne » (dates défi, calendrier Paris). */
+function analyticsDateRange(period: Period, customFrom: string, customTo: string): { from: string; to: string } {
+  const to = period === 'custom' ? customTo : todayISO()
+  if (period === 'all') return { from: '2000-01-01', to }
+  if (period === 'custom') return { from: customFrom, to: customTo }
+  if (period === '1') return { from: todayISO(), to: todayISO() }
+  return { from: subtractDays(Number(period)), to }
 }
 
 function Stars({ level }: { level: number }) {
@@ -140,41 +162,55 @@ function HBar({ label, value, max, color }: { label: string; value: number; max:
   )
 }
 
-// Section 6 — Hourly SVG vertical bars
+// Section 6 — Barres par heure (HTML + grille : libellés lisibles, pas d’écrasement SVG)
 function HourlyChart({ data }: { data: HourlyData[] }) {
   if (data.length === 0) return <p className="text-sm text-gray-400 py-4">Aucune donnée.</p>
 
-  const H = 80
-  const labelH = 16
-  const totalH = H + labelH
   const all24: HourlyData[] = Array.from({ length: 24 }, (_, h) => ({
     hour: h,
     sessions: data.find((d) => d.hour === h)?.sessions ?? 0,
   }))
   const maxSessions = Math.max(...all24.map((d) => d.sessions), 1)
   const maxHour = all24.reduce((best, d) => (d.sessions > best.sessions ? d : best), all24[0])
-  const barW = 100 / 24
+  const totalHr = all24.reduce((s, d) => s + d.sessions, 0)
 
   return (
-    <svg width="100%" viewBox={`0 0 100 ${totalH}`} preserveAspectRatio="none" className="w-full" style={{ height: 120 }}>
-      {all24.map((d) => {
-        const bh = (d.sessions / maxSessions) * H
-        const x = d.hour * barW
-        const fill = d.hour === maxHour.hour ? '#f97316' : '#6366f1'
-        return (
-          <g key={d.hour}>
-            <rect x={x + barW * 0.1} y={H - bh} width={barW * 0.8} height={bh} fill={fill}>
-              <title>{d.hour}h: {d.sessions} parties</title>
-            </rect>
-            {d.hour % 4 === 0 && (
-              <text x={x + barW / 2} y={totalH - 2} fontSize="3.5" fill="#9ca3af" textAnchor="middle">
-                {d.hour}h
-              </text>
-            )}
-          </g>
-        )
-      })}
-    </svg>
+    <div className="pt-1">
+      {totalHr > 0 ? (
+        <p className="text-xs text-gray-500 mb-2">
+          Pic à l’heure {maxHour.hour}h ({maxHour.sessions} parties sur {totalHr.toLocaleString('fr-FR')}).
+        </p>
+      ) : null}
+      <div className="flex h-32 items-end gap-px sm:gap-0.5">
+        {all24.map((d) => {
+          const pct = maxSessions > 0 ? (d.sessions / maxSessions) * 100 : 0
+          const hPx = Math.max((pct / 100) * 128, d.sessions > 0 ? 3 : 0)
+          const orange = d.hour === maxHour.hour && maxSessions > 0
+          return (
+            <div
+              key={d.hour}
+              className="min-w-0 flex-1 flex flex-col justify-end"
+              title={`${d.hour}h — ${d.sessions} partie${d.sessions > 1 ? 's' : ''}`}
+            >
+              <div
+                className={`w-full rounded-t transition-colors ${orange ? 'bg-orange-500' : 'bg-indigo-500'}`}
+                style={{ height: `${hPx}px` }}
+              />
+            </div>
+          )
+        })}
+      </div>
+      <div
+        className="mt-2 grid text-[10px] sm:text-xs text-gray-700"
+        style={{ gridTemplateColumns: 'repeat(24, minmax(0, 1fr))' }}
+      >
+        {all24.map((d) => (
+          <div key={d.hour} className="text-center leading-tight tabular-nums px-0 min-w-0">
+            {d.hour % 4 === 0 ? <span className="inline-block whitespace-nowrap">{d.hour}h</span> : null}
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -227,20 +263,18 @@ function WrongGuessesPanel({
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-type Period = '7' | '30' | '90' | 'all' | 'custom'
-type AnalyticsSort = 'win_rate' | 'sessions' | 'avg_hints'
-type MediaTab = 'film' | 'series' | 'wiki'
+type AnalyticsSort = 'challenge_date' | 'win_rate' | 'sessions' | 'avg_hints'
+type MediaTab = AnalyticsMediaFilter
 
 export function AnalyticsPage() {
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
   const [overviewErr, setOverviewErr] = useState<string | null>(null)
 
-  const [period, setPeriod] = useState<Period>('30')
+  const [period, setPeriod] = useState<Period>('1')
   const [customFrom, setCustomFrom] = useState(subtractDays(30))
   const [customTo, setCustomTo] = useState(todayISO())
   const [daily, setDaily] = useState<DailyAnalytics[]>([])
   const [dailyErr, setDailyErr] = useState<string | null>(null)
-  const [dailyLoading, setDailyLoading] = useState(false)
 
   const [attempts, setAttempts] = useState<Record<string, number>>({})
   const [hints, setHints] = useState<Record<string, number>>({})
@@ -249,58 +283,65 @@ export function AnalyticsPage() {
   const [distErr, setDistErr] = useState<string | null>(null)
 
   const [activeTab, setActiveTab] = useState<MediaTab>('film')
-  const [sort, setSort] = useState<AnalyticsSort>('win_rate')
+  const [sort, setSort] = useState<AnalyticsSort>('challenge_date')
   const [challenges, setChallenges] = useState<ChallengeAnalytics[]>([])
   const [challengesErr, setChallengesErr] = useState<string | null>(null)
-  const [challengesLoading, setChallengesLoading] = useState(false)
   const [selectedChallenge, setSelectedChallenge] = useState<ChallengeAnalytics | null>(null)
 
-  // Load overview + distributions when media tab changes
+  const [analyticsLoading, setAnalyticsLoading] = useState(true)
+  const [customApplyNonce, setCustomApplyNonce] = useState(0)
+
+  const dateRange = useMemo(
+    () => analyticsDateRange(period, customFrom, customTo),
+    [period, customFrom, customTo]
+  )
+
   useEffect(() => {
-    getAnalyticsOverviewByMedia(activeTab)
-      .then(setOverview)
-      .catch((e: unknown) => setOverviewErr(e instanceof Error ? e.message : 'Erreur'))
-
-    Promise.all([
-      getAttemptsDistribution(activeTab),
-      getHintsDistribution(activeTab),
-      getHourlyDistribution(activeTab),
-      getReturningPlayersByMedia(undefined, activeTab),
-    ])
-      .then(([att, hin, hou, ret]) => {
-        setAttempts(att)
-        setHints(hin)
-        setHourly(hou)
-        setReturning(ret)
-      })
-      .catch((e: unknown) => setDistErr(e instanceof Error ? e.message : 'Erreur distributions'))
-  }, [activeTab])
-
-  // Load daily data when period changes
-  const loadDaily = useCallback((p: Period) => {
-    setDailyLoading(true)
+    const { from, to } = dateRange
+    setOverview(null)
+    setDaily([])
+    setAttempts({})
+    setHints({})
+    setHourly([])
+    setReturning([])
+    setChallenges([])
+    setOverviewErr(null)
     setDailyErr(null)
-    const to = p === 'custom' ? customTo : todayISO()
-    const from = p === 'all' ? '2000-01-01' : p === 'custom' ? customFrom : subtractDays(Number(p))
-    getAnalyticsDaily(from, to, activeTab)
-      .then(setDaily)
-      .catch((e: unknown) => setDailyErr(e instanceof Error ? e.message : 'Erreur'))
-      .finally(() => setDailyLoading(false))
-  }, [activeTab, customFrom, customTo])
-
-  useEffect(() => { loadDaily(period) }, [period, loadDaily])
-
-  // Load challenge analytics for active media tab
-  const loadChallenges = useCallback((mediaType: MediaTab, sortBy: AnalyticsSort) => {
-    setChallengesLoading(true)
+    setDistErr(null)
     setChallengesErr(null)
-    getAnalyticsChallenges(mediaType, sortBy)
-      .then(setChallenges)
-      .catch((e: unknown) => setChallengesErr(e instanceof Error ? e.message : 'Erreur'))
-      .finally(() => setChallengesLoading(false))
-  }, [])
+    setAnalyticsLoading(true)
 
-  useEffect(() => { loadChallenges(activeTab, sort) }, [activeTab, sort, loadChallenges])
+    const fail =
+      (setErr: (msg: string | null) => void) => (e: unknown) =>
+        setErr(e instanceof Error ? e.message : 'Erreur')
+
+    void Promise.all([
+      getAnalyticsOverviewByMedia(activeTab, from, to)
+        .then(setOverview)
+        .catch((e) => {
+          fail(setOverviewErr)(e)
+          setOverview(null)
+        }),
+      getAnalyticsDaily(from, to, activeTab)
+        .then(setDaily)
+        .catch(fail(setDailyErr)),
+      getAttemptsDistribution(activeTab, from, to)
+        .then(setAttempts)
+        .catch(fail(setDistErr)),
+      getHintsDistribution(activeTab, from, to)
+        .then(setHints)
+        .catch(fail(setDistErr)),
+      getHourlyDistribution(activeTab, from, to)
+        .then(setHourly)
+        .catch(fail(setDistErr)),
+      getReturningPlayersByMedia(from, to, activeTab)
+        .then(setReturning)
+        .catch(fail(setDistErr)),
+      getAnalyticsChallenges(activeTab, sort, from, to)
+        .then(setChallenges)
+        .catch(fail(setChallengesErr)),
+    ]).finally(() => setAnalyticsLoading(false))
+  }, [activeTab, sort, dateRange, customApplyNonce])
 
   function handleSort(col: AnalyticsSort) {
     if (col === sort) return
@@ -310,10 +351,22 @@ export function AnalyticsPage() {
   const attMax = Math.max(...Object.values(attempts), 1)
   const hinMax = Math.max(...Object.values(hints), 1)
 
+  const typeToggleOptions = useMemo(() => {
+    const o: { id: MediaTab; label: string }[] = [{ id: 'film', label: 'Films' }]
+    if (FEATURES.enableSeries) o.push({ id: 'series', label: 'Séries' })
+    if (FEATURES.enableWiki) o.push({ id: 'wiki', label: 'Personnalités' })
+    o.push({ id: 'all', label: 'Tout' })
+    return o
+  }, [])
+
+  const attemptSlots = activeTab === 'wiki' ? [1, 2, 3] : [1, 2, 3, 4, 5]
+
   const SortIcon = ({ col }: { col: AnalyticsSort }) =>
     sort === col
       ? <ChevronUp size={13} className="inline ml-0.5 text-indigo-600" />
       : <ChevronDown size={13} className="inline ml-0.5 text-gray-400" />
+
+  const parisTodayYmd = todayISO()
 
   return (
     <AdminLayout>
@@ -322,39 +375,25 @@ export function AnalyticsPage() {
         {/* ── Section 1 : Type de jeu ──────────────────────────────────────── */}
         <section>
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Type de jeu</h2>
+          <p className="text-xs text-gray-500 mb-2 max-w-3xl">
+            <strong>Tout</strong> agrège films, séries et personnalités sur la période (même périmètre que les graphiques et le classement).
+          </p>
           <SegmentedToggle
             value={activeTab}
             onChange={(v) => setActiveTab(v as MediaTab)}
-            options={[
-              { id: 'film', label: 'Films' },
-              { id: 'series', label: 'Séries' },
-              { id: 'wiki', label: 'Wikipedia' },
-            ]}
+            options={typeToggleOptions}
           />
         </section>
 
-        {/* ── Section 2 : KPIs ─────────────────────────────────────────────── */}
-        <section>
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Vue d'ensemble</h2>
-          {overviewErr && <ErrorMsg msg={overviewErr} />}
-          {!overview && !overviewErr && <Spinner />}
-          {overview && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <KpiCard label="Parties jouées" value={overview.total_sessions.toLocaleString('fr-FR')} />
-              <KpiCard label="Joueurs uniques" value={overview.total_unique_players.toLocaleString('fr-FR')} />
-              <KpiCard label="Taux de complétion" value={`${overview.completion_rate} %`} />
-              <KpiCard label="Taux de victoire" value={`${overview.overall_win_rate} %`} />
-              <KpiCard label="Moy. indices / partie" value={overview.avg_hints_per_session.toFixed(1)} />
-              <KpiCard label="Durée moy. session" value={formatDuration(overview.avg_session_duration_seconds)} />
-            </div>
-          )}
-        </section>
-
-        {/* ── Section 3 : Sélecteur de période ────────────────────────────── */}
+        {/* ── Section 2 : Période (filtre toute la page) ───────────────────── */}
         <section>
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Période</h2>
+          <p className="text-xs text-gray-500 mb-3 max-w-3xl">
+            Toutes les statistiques ci-dessous portent sur les parties liées à un <strong>défi dont la date planifiée</strong> (calendrier
+            Paris) est comprise entre les deux bornes — y compris la vue d’ensemble, les graphiques et le classement.
+          </p>
           <div className="flex gap-2 flex-wrap items-center">
-            {(['7', '30', '90', 'all', 'custom'] as Period[]).map((p) => (
+            {(['1', '7', '30', '90', 'all', 'custom'] as Period[]).map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
@@ -379,10 +418,37 @@ export function AnalyticsPage() {
               <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
                 min={customFrom} max={todayISO()}
                 className="border border-gray-200 rounded-lg px-2 py-1 text-sm" />
-              <button onClick={() => loadDaily('custom')}
-                className="px-3 py-1.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+              <button
+                type="button"
+                onClick={() => setCustomApplyNonce((n) => n + 1)}
+                className="px-3 py-1.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+              >
                 Appliquer
               </button>
+            </div>
+          )}
+        </section>
+
+        {/* ── Section 3 : KPIs ─────────────────────────────────────────────── */}
+        <section>
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Vue d'ensemble</h2>
+          <p className="text-xs text-gray-500 mb-3 max-w-3xl">
+            Agrégats sur la <strong>période</strong> et le <strong>type de jeu</strong> sélectionnés (défis dont la date planifiée tombe dans
+            l’intervalle). <strong>Parties jouées</strong> = parties terminées (gagné ou perdu). <strong>Sessions non terminées</strong> =
+            ouvertures sans fin de partie enregistrée (en cours ou abandonnées). <strong>Ouvertures (total)</strong> = somme des deux.
+          </p>
+          {overviewErr && <ErrorMsg msg={overviewErr} />}
+          {analyticsLoading && !overview && !overviewErr && <Spinner />}
+          {overview && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <KpiCard label="Parties jouées" value={overview.completed_sessions.toLocaleString('fr-FR')} />
+              <KpiCard label="Sessions non terminées" value={overview.incomplete_sessions.toLocaleString('fr-FR')} />
+              <KpiCard label="Ouvertures (total)" value={overview.total_sessions.toLocaleString('fr-FR')} />
+              <KpiCard label="Joueurs uniques" value={overview.total_unique_players.toLocaleString('fr-FR')} />
+              <KpiCard label="Taux de complétion" value={`${overview.completion_rate} %`} />
+              <KpiCard label="Taux de victoire" value={`${overview.overall_win_rate} %`} />
+              <KpiCard label="Moy. indices / partie" value={(overview.avg_hints_per_session ?? 0).toFixed(1)} />
+              <KpiCard label="Durée moy. partie" value={formatDuration(overview.avg_session_duration_seconds ?? 0)} />
             </div>
           )}
         </section>
@@ -390,68 +456,89 @@ export function AnalyticsPage() {
         {/* ── Section 4 : Timeline ─────────────────────────────────────────── */}
         <section className="bg-white rounded-xl border border-gray-200 p-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Activité quotidienne</h2>
+          <p className="text-xs text-gray-500 mb-3">Une ligne par <strong>jour de défi</strong> (date planifiée) dans la période.</p>
           {dailyErr && <ErrorMsg msg={dailyErr} />}
-          {dailyLoading && <Spinner />}
-          {!dailyLoading && !dailyErr && <TimelineChart data={daily} />}
+          {analyticsLoading && <Spinner />}
+          {!analyticsLoading && !dailyErr && <TimelineChart data={daily} />}
         </section>
 
         {/* ── Section 4 : Distribution tentatives ──────────────────────────── */}
         <section className="bg-white rounded-xl border border-gray-200 p-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Victoires par tentative</h2>
           {distErr && <ErrorMsg msg={distErr} />}
-          {!distErr && Object.keys(attempts).length === 0 && <p className="text-sm text-gray-400">Aucune donnée.</p>}
-          <div className="space-y-2">
-            {(activeTab === 'wiki' ? [1, 2, 3] : [1, 2, 3, 4, 5]).map((n) => (
-              <HBar
-                key={n}
-                label={`${n} tentative${n > 1 ? 's' : ''}`}
-                value={attempts[String(n)] ?? 0}
-                max={attMax}
-                color="#6366f1"
-              />
-            ))}
-          </div>
+          {analyticsLoading && <Spinner />}
+          {!analyticsLoading && !distErr && Object.keys(attempts).length === 0 && <p className="text-sm text-gray-400">Aucune donnée.</p>}
+          {!analyticsLoading && (
+            <div className="space-y-2">
+              {attemptSlots.map((n) => (
+                <HBar
+                  key={n}
+                  label={`${n} tentative${n > 1 ? 's' : ''}`}
+                  value={attempts[String(n)] ?? 0}
+                  max={attMax}
+                  color="#6366f1"
+                />
+              ))}
+            </div>
+          )}
         </section>
 
         {/* ── Section 5 : Distribution indices ─────────────────────────────── */}
         <section className="bg-white rounded-xl border border-gray-200 p-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Indices utilisés par partie</h2>
           {distErr && <ErrorMsg msg={distErr} />}
-          {!distErr && Object.keys(hints).length === 0 && <p className="text-sm text-gray-400">Aucune donnée.</p>}
-          <div className="space-y-2">
-            {[0, 1, 2, 3, 4, 5, 6].map((n) => (
-              <HBar
-                key={n}
-                label={`${n} indice${n > 1 ? 's' : ''}`}
-                value={hints[String(n)] ?? 0}
-                max={hinMax}
-                color="#10b981"
-              />
-            ))}
-          </div>
+          {analyticsLoading && <Spinner />}
+          {!analyticsLoading && !distErr && Object.keys(hints).length === 0 && <p className="text-sm text-gray-400">Aucune donnée.</p>}
+          {!analyticsLoading && (
+            <div className="space-y-2">
+              {[0, 1, 2, 3, 4, 5, 6].map((n) => (
+                <HBar
+                  key={n}
+                  label={`${n} indice${n > 1 ? 's' : ''}`}
+                  value={hints[String(n)] ?? 0}
+                  max={hinMax}
+                  color="#10b981"
+                />
+              ))}
+            </div>
+          )}
         </section>
 
         {/* ── Section 6 : Répartition horaire ──────────────────────────────── */}
         <section className="bg-white rounded-xl border border-gray-200 p-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Répartition horaire (heure Paris)</h2>
+          <p className="text-xs text-gray-500 mb-3">Heure de début de partie, sessions dont le défi est dans la période.</p>
           {distErr && <ErrorMsg msg={distErr} />}
-          {!distErr && <HourlyChart data={hourly} />}
+          {analyticsLoading && <Spinner />}
+          {!analyticsLoading && !distErr && <HourlyChart data={hourly} />}
         </section>
 
         {/* ── Section 7 : Classement défis ─────────────────────────────────── */}
         <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100">
             <h2 className="text-sm font-semibold text-gray-700">Classement des défis par difficulté</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Même <strong>période</strong> et type de jeu que ci-dessus. La colonne <strong>Date du défi</strong> est le jour planifié
+              (Paris). Tri par défaut du plus récent au plus ancien ; autres tris via les en-têtes. Sont listés les défis avec au moins
+              une partie commencée ou le défi du jour dans la fenêtre sans session encore.
+            </p>
           </div>
           {challengesErr && <div className="p-4"><ErrorMsg msg={challengesErr} /></div>}
-          {challengesLoading && <Spinner />}
-          {!challengesLoading && !challengesErr && (
+          {analyticsLoading && <Spinner />}
+          {!analyticsLoading && !challengesErr && (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-sm text-gray-500 border-b border-gray-100 bg-gray-50">
-                    <th className="px-4 py-2.5 font-medium">Date</th>
-                    <th className="px-4 py-2.5 font-medium">{activeTab === 'film' ? 'Film' : activeTab === 'series' ? 'Série' : 'Personnalité'}</th>
+                    <th
+                      className="px-4 py-2.5 font-medium cursor-pointer hover:text-indigo-600 select-none"
+                      onClick={() => handleSort('challenge_date')}
+                    >
+                      Date du défi<SortIcon col="challenge_date" />
+                    </th>
+                    <th className="px-4 py-2.5 font-medium">
+                      {activeTab === 'all' ? 'Défi' : activeTab === 'film' ? 'Film' : activeTab === 'series' ? 'Série' : 'Personnalité'}
+                    </th>
                     <th className="px-4 py-2.5 font-medium">Fame</th>
                     <th
                       className="px-4 py-2.5 font-medium cursor-pointer hover:text-indigo-600 select-none"
@@ -475,16 +562,43 @@ export function AnalyticsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {challenges.map((item) => (
+                  {challenges.map((item) => {
+                    const isToday = challengeDateYmd(item.challenge_date) === parisTodayYmd
+                    return (
                     <tr
                       key={item.challenge_id}
-                      className="hover:bg-indigo-50 cursor-pointer transition-colors"
+                      className={[
+                        'cursor-pointer transition-colors border-l-[3px]',
+                        isToday
+                          ? 'bg-amber-50 hover:bg-amber-100/80 border-l-amber-500 shadow-[inset_0_1px_0_0_rgba(253,230,138,0.9)]'
+                          : 'hover:bg-indigo-50 border-l-transparent',
+                      ].join(' ')}
                       onClick={() => setSelectedChallenge(item)}
                     >
-                      <td className="px-4 py-2.5 text-gray-500 text-sm whitespace-nowrap">{formatDate(item.challenge_date)}</td>
-                      <td className="px-4 py-2.5 font-medium text-gray-800 max-w-[160px] truncate">
-                        {item.title}
-                        <span className="ml-1 text-sm text-gray-400">{item.year}</span>
+                      <td className="px-4 py-2.5 text-gray-600 text-sm whitespace-nowrap">
+                        <span className="inline-flex items-center gap-2 flex-wrap">
+                          {isToday ? (
+                            <span className="shrink-0 rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">
+                              {'Aujourd\'hui'}
+                            </span>
+                          ) : null}
+                          <span>{formatChallengeDate(item.challenge_date)}</span>
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 font-medium text-gray-800 max-w-[200px]">
+                        <span className="flex items-center gap-1.5 min-w-0">
+                          {activeTab === 'all' && (
+                            <span className="shrink-0 rounded px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-gray-100 text-gray-600">
+                              {item.media_type === 'film' ? 'Film' : item.media_type === 'series' ? 'Série' : 'Wiki'}
+                            </span>
+                          )}
+                          <span className="truncate">
+                            {item.title}
+                            {item.media_type !== 'wiki' && item.year > 0 ? (
+                              <span className="ml-1 text-sm text-gray-400">{item.year}</span>
+                            ) : null}
+                          </span>
+                        </span>
                       </td>
                       <td className="px-4 py-2.5"><Stars level={item.fame_level} /></td>
                       <td className="px-4 py-2.5 text-gray-700">{item.sessions}</td>
@@ -501,11 +615,18 @@ export function AnalyticsPage() {
                       <td className="px-4 py-2.5 text-gray-600">{item.avg_attempts.toFixed(1)}</td>
                       <td className="px-4 py-2.5 text-gray-600">{item.avg_hints.toFixed(1)}</td>
                     </tr>
-                  ))}
+                    )
+                  })}
                   {challenges.length === 0 && (
                     <tr>
                       <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-400">
-                        {activeTab === 'film' ? 'Aucun film trouvé.' : activeTab === 'series' ? 'Aucune série trouvée.' : 'Aucune personnalité trouvée.'}
+                        {activeTab === 'all'
+                          ? 'Aucun défi avec activité dans la période.'
+                          : activeTab === 'film'
+                            ? 'Aucun film trouvé.'
+                            : activeTab === 'series'
+                              ? 'Aucune série trouvée.'
+                              : 'Aucune personnalité trouvée.'}
                       </td>
                     </tr>
                   )}
@@ -517,9 +638,11 @@ export function AnalyticsPage() {
         {/* ── Section 8 : Fidélité joueurs ──────────────────────────────────── */}
         <section className="bg-white rounded-xl border border-gray-200 p-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Fidélité des joueurs</h2>
+          <p className="text-xs text-gray-500 mb-3">Nombre de <strong>jours de défi distincts</strong> joués dans la période, par joueur.</p>
           {distErr && <ErrorMsg msg={distErr} />}
-          {!distErr && returning.length === 0 && <p className="text-sm text-gray-400">Aucune donnée.</p>}
-          {returning.length > 0 && (
+          {analyticsLoading && <Spinner />}
+          {!analyticsLoading && !distErr && returning.length === 0 && <p className="text-sm text-gray-400">Aucune donnée.</p>}
+          {!analyticsLoading && returning.length > 0 && (
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-sm text-gray-500 border-b border-gray-100">

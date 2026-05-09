@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { Pencil, Trash2, Tv, Images, Upload, History } from 'lucide-react'
+import { Pencil, Trash2, Tv, Images, Upload, History, Eye } from 'lucide-react'
 import type { AdminSeries } from '../api'
 
 function resolveThumb(url: string): string {
@@ -18,9 +18,10 @@ interface SeriesRowProps {
   onDelete: (series: AdminSeries) => void
   onBackdrops: (series: AdminSeries) => void
   onUpload: (series: AdminSeries, file: File) => void
+  onPreview: (series: AdminSeries) => void
 }
 
-export function SeriesRow({ series, onEdit, onDelete, onBackdrops, onUpload }: SeriesRowProps) {
+export function SeriesRow({ series, onEdit, onDelete, onBackdrops, onUpload, onPreview }: SeriesRowProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const today = getTodayStr()
   const pastDates = (series.used_dates ?? []).filter((d) => d <= today)
@@ -50,6 +51,10 @@ export function SeriesRow({ series, onEdit, onDelete, onBackdrops, onUpload }: S
   const ActionButtons = ({ compact }: { compact?: boolean }) => (
     <>
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+      <button onClick={() => onPreview(series)} title="Aperçu du défi"
+        className={`${compact ? 'p-2' : 'p-1.5'} bg-violet-50 text-violet-600 hover:bg-violet-100 rounded-lg transition-colors`}>
+        <Eye size={14} />
+      </button>
       <button onClick={() => fileInputRef.current?.click()} title="Uploader une image"
         className={`${compact ? 'p-2' : 'p-1.5'} bg-teal-50 text-teal-600 hover:bg-teal-100 rounded-lg transition-colors`}>
         <Upload size={14} />

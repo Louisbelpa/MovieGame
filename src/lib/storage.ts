@@ -61,3 +61,10 @@ export function saveStats(stats: GameStats, type: 'film' | 'series' | 'wiki' = '
     localStorage.setItem(keys(type).STATS, JSON.stringify(stats))
   } catch {}
 }
+
+/** Anciens joueurs (activité mode Films avant l’annonce séries / personnalités). */
+export function hasReturningFilmPlayerActivity(): boolean {
+  const stats = loadStats('film')
+  const history = loadHistory('film')
+  return stats.gamesPlayed > 0 || Object.keys(history).length > 0
+}

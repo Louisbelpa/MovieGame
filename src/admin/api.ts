@@ -3,6 +3,9 @@
  * Typed fetch helpers for all /api/admin/* routes.
  */
 
+import type { ChallengePayload } from '@/api/client'
+import type { WikiChallengePayload } from '@/api/wikiClient'
+
 const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -22,6 +25,8 @@ export interface AdminFilm {
   is_active: boolean
   used_dates: string[]  // ISO dates this film has been scheduled
   fame_level: number    // 1–5, auto-filled from TMDB vote_count
+  /** Ordre des clés d’indices copié vers le calendrier à la planification */
+  hint_schedule: string[]
 }
 
 export interface AdminSeries {
@@ -43,6 +48,7 @@ export interface AdminSeries {
   network: string | null
   status: string | null
   original_language: string | null
+  hint_schedule: string[]
 }
 
 export interface AdminWikiPerson {
@@ -103,6 +109,25 @@ export interface WikiPrefetchPoolEntry {
   error_message: string | null
   expires_at: number
   updated_at: string
+  /** Présent si `status === 'ready'` — données `fetchWikipediaData` (aperçu admin) */
+  payload: WikipediaFetchPayload | null
+  /** Aligné sur `wiki_persons.wikipedia_slug` (colonnes pool + champs JSON slug). */
+  has_wiki_person: boolean
+  wiki_person_id: number | null
+}
+
+export type WikiPrefetchPoolHasWikiFilter = 'all' | 'yes' | 'no'
+
+export interface WikiPrefetchPoolResponse {
+  lang: string
+  minFame: number
+  stats: { processing: number; ready: number; failed: number; total: number }
+  page: number
+  pageSize: number
+  totalMatching: number
+  totalPages: number
+  hasWikiPersonFilter: WikiPrefetchPoolHasWikiFilter
+  entries: WikiPrefetchPoolEntry[]
 }
 
 export interface SeriesPayload {
@@ -122,6 +147,7 @@ export interface SeriesPayload {
   network: string | null
   status: string | null
   original_language: string | null
+  hint_schedule: string[]
 }
 
 export interface TmdbTvSearchResult {
@@ -134,6 +160,8 @@ export interface TmdbTvSearchResult {
 
 export interface AdminChallenge {
   id: number
+  /** Numéro affiché côté joueur (#N dans le header / partages) — pas l’id SQL */
+  challengeNumber: number
   date: string
   film: AdminFilm | null
   series: AdminSeries | null
@@ -190,6 +218,7 @@ export interface FilmPayload {
   tmdb_id: number | null
   is_active: boolean
   fame_level: number
+  hint_schedule: string[]
 }
 
 export interface TmdbSearchResult {
@@ -587,6 +616,78 @@ export async function deleteWikiPerson(id: number): Promise<void> {
   await request<{ ok: boolean }>(`/api/admin/wiki-persons/${id}`, { method: 'DELETE' })
 }
 
+export async function fetchWikiGamePreview(personId: number): Promise<WikiChallengePayload> {
+  return request<WikiChallengePayload>(`/api/admin/wiki-persons/${personId}/game-preview`)
+}
+
+export async function fetchWikiPoolEntryGamePreview(poolEntryId: number): Promise<WikiChallengePayload> {
+  return request<WikiChallengePayload>(`/api/admin/wiki-prefetch-pool/${poolEntryId}/game-preview`)
+}
+
+export interface WikiPersonDraftPreviewBody {
+  name: string
+  person_type: string
+  infobox_data: Record<string, unknown>
+  hint_schedule: string[]
+  photo_url: string | null
+  extract: string | null
+  wikipedia_url: string | null
+  difficulty: number
+}
+
+export async function postWikiPersonDraftPreview(body: WikiPersonDraftPreviewBody): Promise<WikiChallengePayload> {
+  return request<WikiChallengePayload>('/api/admin/wiki-persons/preview-draft', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function refetchWikiPrefetchPoolEntry(
+  poolEntryId: number
+): Promise<{ ok: boolean; status: 'ready' | 'failed'; error?: string }> {
+  return request<{ ok: boolean; status: 'ready' | 'failed'; error?: string }>(
+    `/api/admin/wiki-prefetch-pool/${poolEntryId}/refetch`,
+    { method: 'POST' }
+  )
+}
+
+export async function importWikiPersonFromPrefetchPool(poolEntryId: number): Promise<{ id: number }> {
+  return request<{ id: number }>(`/api/admin/wiki-prefetch-pool/${poolEntryId}/import-wiki-person`, {
+    method: 'POST',
+  })
+}
+
+export async function fetchFilmGamePreview(filmId: number): Promise<ChallengePayload> {
+  return request<ChallengePayload>(`/api/admin/films/${filmId}/game-preview`)
+}
+
+export async function fetchSeriesGamePreview(seriesId: number): Promise<ChallengePayload> {
+  return request<ChallengePayload>(`/api/admin/series/${seriesId}/game-preview`)
+}
+
+/** Brouillon film/série pour aperçu sans enregistrement (aligné sur FilmPayload / SeriesPayload utiles au rendu). */
+export interface FilmSeriesGamePreviewDraftBody {
+  mode: 'film' | 'series'
+  year: number
+  director?: string
+  creator?: string
+  genres: string[]
+  cast_members: string[]
+  tagline: string
+  synopsis: string
+  image_url: string
+  hint_schedule: string[]
+}
+
+export async function postFilmSeriesGamePreviewDraft(
+  body: FilmSeriesGamePreviewDraftBody
+): Promise<ChallengePayload> {
+  return request<ChallengePayload>('/api/admin/game-preview-draft', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
 export async function fetchRandomWikiSlugs(lang = 'fr', minFame = 30): Promise<{ slugs: string[] }> {
   return request<{ slugs: string[] }>(`/api/admin/wiki-persons/random?lang=${encodeURIComponent(lang)}&minFame=${minFame}`)
 }
@@ -597,18 +698,51 @@ export async function fetchRandomPrefetchedWikipediaPerson(lang = 'fr', minFame 
   )
 }
 
-export async function getWikiPrefetchPool(
-  lang = 'fr',
-  minFame = 30,
-  limit = 100
-): Promise<{ lang: string; minFame: number; stats: { processing: number; ready: number; failed: number; total: number }; entries: WikiPrefetchPoolEntry[] }> {
-  return request<{ lang: string; minFame: number; stats: { processing: number; ready: number; failed: number; total: number }; entries: WikiPrefetchPoolEntry[] }>(
-    `/api/admin/wiki-persons/prefetch-pool?lang=${encodeURIComponent(lang)}&minFame=${minFame}&limit=${limit}`
+export async function getWikiPrefetchPool(params: {
+  lang?: string
+  minFame?: number
+  page?: number
+  pageSize?: number
+  hasWikiPerson?: WikiPrefetchPoolHasWikiFilter
+}): Promise<WikiPrefetchPoolResponse> {
+  const q = new URLSearchParams()
+  q.set('lang', params.lang ?? 'fr')
+  q.set('minFame', String(params.minFame ?? 30))
+  q.set('page', String(params.page ?? 1))
+  q.set('pageSize', String(params.pageSize ?? 25))
+  q.set('hasWikiPerson', params.hasWikiPerson ?? 'all')
+  return request<WikiPrefetchPoolResponse>(`/api/admin/wiki-persons/prefetch-pool?${q.toString()}`)
+}
+
+export async function addWikiPrefetchPoolEntry(body: {
+  input: string
+  lang?: string
+  minFame?: number
+}): Promise<{ ok: boolean; resolved_slug?: string; resolved_lang?: string }> {
+  return request<{ ok: boolean; resolved_slug?: string; resolved_lang?: string }>(
+    '/api/admin/wiki-persons/prefetch-pool/add',
+    { method: 'POST', body: JSON.stringify(body) }
   )
 }
 
 export async function getWikiPrefetchSettings(): Promise<{ enabled: boolean }> {
   return request<{ enabled: boolean }>('/api/admin/wiki-prefetch/settings')
+}
+
+export interface AdminSettingsSummary {
+  wikiPrefetchEnabled: boolean
+  wikiPrefetchTargetReady: number
+  wikiPrefetchMaxFetchPerRun: number
+  wikiPrefetchSparqlLimit: number
+  maxAttempts: number
+  wikiMaxAttempts: number
+  imageSource: 'tmdb' | 'local'
+  planningAlertConfigured: boolean
+  nodeEnv: 'production' | 'development'
+}
+
+export async function fetchAdminSettingsSummary(): Promise<AdminSettingsSummary> {
+  return request<AdminSettingsSummary>('/api/admin/settings/summary')
 }
 
 export async function setWikiPrefetchSettings(enabled: boolean): Promise<{ ok: boolean; enabled: boolean }> {
@@ -760,7 +894,12 @@ export async function uploadFilmImage(filmId: number, file: File): Promise<{ url
 // ─── Analytics ───────────────────────────────────────────────────────────────
 
 export interface AnalyticsOverview {
+  /** Lignes game_sessions (terminées + non terminées). */
   total_sessions: number
+  /** Parties allant au bout : victoire ou défaite (`outcome` renseigné). */
+  completed_sessions: number
+  /** Sessions ouvertes sans fin de partie enregistrée (`outcome` null). */
+  incomplete_sessions: number
   total_unique_players: number
   overall_win_rate: number
   avg_attempts_on_win: number
@@ -809,7 +948,7 @@ export interface SeriesAnalytics {
 export interface ChallengeAnalytics {
   challenge_id: number
   challenge_date: string
-  media_type: 'film' | 'series'
+  media_type: 'film' | 'series' | 'wiki'
   title: string
   year: number
   fame_level: number
@@ -835,20 +974,26 @@ export interface HourlyData {
   sessions: number
 }
 
-export async function getAnalyticsOverview(): Promise<AnalyticsOverview> {
-  return request<AnalyticsOverview>('/api/admin/analytics/overview')
-}
+/** Filtre type de jeu analytics ; `all` = films + séries + wiki (pas de paramètre `mediaType` côté API). */
+export type AnalyticsMediaFilter = 'film' | 'series' | 'wiki' | 'all'
 
-export async function getAnalyticsOverviewByMedia(mediaType?: 'film' | 'series' | 'wiki'): Promise<AnalyticsOverview> {
-  const params = new URLSearchParams()
-  if (mediaType) params.set('mediaType', mediaType)
-  const qs = params.toString()
-  return request<AnalyticsOverview>(`/api/admin/analytics/overview${qs ? `?${qs}` : ''}`)
-}
-
-export async function getAnalyticsDaily(from: string, to: string, mediaType?: 'film' | 'series' | 'wiki'): Promise<DailyAnalytics[]> {
+export async function getAnalyticsOverviewByMedia(
+  mediaType: AnalyticsMediaFilter,
+  from: string,
+  to: string
+): Promise<AnalyticsOverview> {
   const params = new URLSearchParams({ from, to })
-  if (mediaType) params.set('mediaType', mediaType)
+  if (mediaType !== 'all') params.set('mediaType', mediaType)
+  return request<AnalyticsOverview>(`/api/admin/analytics/overview?${params}`)
+}
+
+export async function getAnalyticsDaily(
+  from: string,
+  to: string,
+  mediaType?: AnalyticsMediaFilter
+): Promise<DailyAnalytics[]> {
+  const params = new URLSearchParams({ from, to })
+  if (mediaType && mediaType !== 'all') params.set('mediaType', mediaType)
   return request<DailyAnalytics[]>(`/api/admin/analytics/daily?${params}`)
 }
 
@@ -871,11 +1016,14 @@ export async function getAnalyticsSeries(
 }
 
 export async function getAnalyticsChallenges(
-  mediaType: 'film' | 'series' | 'wiki',
-  sort?: 'win_rate' | 'sessions' | 'avg_hints'
+  mediaType: AnalyticsMediaFilter,
+  sort: 'challenge_date' | 'win_rate' | 'sessions' | 'avg_hints',
+  from: string,
+  to: string
 ): Promise<ChallengeAnalytics[]> {
-  const params = new URLSearchParams({ mediaType })
-  if (sort) params.set('sort', sort)
+  const params = new URLSearchParams({ from, to })
+  params.set('mediaType', mediaType === 'all' ? 'all' : mediaType)
+  params.set('sort', sort)
   return request<ChallengeAnalytics[]>(`/api/admin/analytics/challenges?${params}`)
 }
 
@@ -892,33 +1040,44 @@ export async function getReturningPlayers(days?: number): Promise<ReturningPlaye
   return request<ReturningPlayer[]>(`/api/admin/analytics/returning-players${qs ? `?${qs}` : ''}`)
 }
 
-export async function getReturningPlayersByMedia(days?: number, mediaType?: 'film' | 'series' | 'wiki'): Promise<ReturningPlayer[]> {
-  const params = new URLSearchParams()
-  if (days !== undefined) params.set('days', String(days))
-  if (mediaType) params.set('mediaType', mediaType)
-  const qs = params.toString()
-  return request<ReturningPlayer[]>(`/api/admin/analytics/returning-players${qs ? `?${qs}` : ''}`)
+export async function getReturningPlayersByMedia(
+  from: string,
+  to: string,
+  mediaType: AnalyticsMediaFilter
+): Promise<ReturningPlayer[]> {
+  const params = new URLSearchParams({ from, to })
+  if (mediaType !== 'all') params.set('mediaType', mediaType)
+  return request<ReturningPlayer[]>(`/api/admin/analytics/returning-players?${params}`)
 }
 
-export async function getHourlyDistribution(mediaType?: 'film' | 'series' | 'wiki'): Promise<HourlyData[]> {
-  const params = new URLSearchParams()
-  if (mediaType) params.set('mediaType', mediaType)
-  const qs = params.toString()
-  return request<HourlyData[]>(`/api/admin/analytics/hourly${qs ? `?${qs}` : ''}`)
+export async function getHourlyDistribution(
+  mediaType: AnalyticsMediaFilter,
+  from: string,
+  to: string
+): Promise<HourlyData[]> {
+  const params = new URLSearchParams({ from, to })
+  if (mediaType !== 'all') params.set('mediaType', mediaType)
+  return request<HourlyData[]>(`/api/admin/analytics/hourly?${params}`)
 }
 
-export async function getAttemptsDistribution(mediaType?: 'film' | 'series' | 'wiki'): Promise<Record<string, number>> {
-  const params = new URLSearchParams()
-  if (mediaType) params.set('mediaType', mediaType)
-  const qs = params.toString()
-  return request<Record<string, number>>(`/api/admin/analytics/attempts-distribution${qs ? `?${qs}` : ''}`)
+export async function getAttemptsDistribution(
+  mediaType: AnalyticsMediaFilter,
+  from: string,
+  to: string
+): Promise<Record<string, number>> {
+  const params = new URLSearchParams({ from, to })
+  if (mediaType !== 'all') params.set('mediaType', mediaType)
+  return request<Record<string, number>>(`/api/admin/analytics/attempts-distribution?${params}`)
 }
 
-export async function getHintsDistribution(mediaType?: 'film' | 'series' | 'wiki'): Promise<Record<string, number>> {
-  const params = new URLSearchParams()
-  if (mediaType) params.set('mediaType', mediaType)
-  const qs = params.toString()
-  return request<Record<string, number>>(`/api/admin/analytics/hints-distribution${qs ? `?${qs}` : ''}`)
+export async function getHintsDistribution(
+  mediaType: AnalyticsMediaFilter,
+  from: string,
+  to: string
+): Promise<Record<string, number>> {
+  const params = new URLSearchParams({ from, to })
+  if (mediaType !== 'all') params.set('mediaType', mediaType)
+  return request<Record<string, number>>(`/api/admin/analytics/hints-distribution?${params}`)
 }
 
 // ─── Audit logs ───────────────────────────────────────────────────────────────

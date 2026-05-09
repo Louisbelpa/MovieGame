@@ -5,9 +5,17 @@
  */
 
 import db from '../db/database.js'
+import { activeChallengeOrdinalByDate } from '../lib/dailyChallengeOrdinal.js'
 import { normalizeCommonsPhotoUrl } from '../lib/commonsThumb.js'
-import { normalise, isGuessCorrect } from '../lib/matching.js'
+import { normalise, isGuessCorrect, expandWikiPersonAcceptedForms } from '../lib/matching.js'
 import { escapeHtml } from '../lib/utils.js'
+import {
+  dedupeYouthAgainstSeniorMergeEnds,
+  inferClubStintEndYears,
+  normalizeClubKey,
+  promoteLeadingBlankYouthFromSenior,
+  type ClubStint,
+} from '../lib/wikiClubYears.js'
 
 const MAX_ATTEMPTS = parseInt(process.env.WIKI_MAX_ATTEMPTS ?? '5', 10)
 const MAX_HINTS = 3
@@ -64,13 +72,7 @@ interface WikiRole {
   successor: string | null
 }
 
-interface WikiClub {
-  name: string
-  start_year: number | null
-  end_year: number | null
-  appearances: number | null
-  goals: number | null
-}
+type WikiClub = ClubStint
 
 interface PoliticianData {
   roles: WikiRole[]
@@ -83,6 +85,7 @@ interface SportspersonData {
   sport: string | null
   position: string | null
   clubs: WikiClub[]
+  clubs_youth?: WikiClub[]
   career_highlights?: Array<{ label: string; value: string }>
   national_team: { name: string; caps: number | null; goals: number | null } | null
   birth_year: number | null
@@ -96,6 +99,20 @@ interface GenericPersonData {
   birth_year: number | null
   nationality: string | null
   company?: string | null
+  highlights?: Array<{ label: string; value: string }>
+}
+
+/** Découpe le résumé « œuvre notable » concaténé par l’import (séparateurs · ou tirets cadratins). */
+function splitNotableWorkForDisplay(raw: string | null): string[] {
+  if (!raw?.trim()) return []
+  const norm = raw.trim()
+  if (norm.includes(' · ')) {
+    return norm.split(/\s*·\s*/).map((s) => s.trim()).filter(Boolean)
+  }
+  if (/\s[—–]\s/.test(norm)) {
+    return norm.split(/\s*[—–]\s+/).map((s) => s.trim()).filter(Boolean)
+  }
+  return [norm]
 }
 
 interface PoliticianRoleView {
@@ -126,11 +143,13 @@ function hasAdjacentWikiChallenge(date: string, direction: 'prev' | 'next'): boo
       ? db.prepare<[string, string], { n: number }>(
           `SELECT 1 AS n FROM daily_challenges
            WHERE challenge_date < ? AND challenge_date <= ? AND media_type = 'wiki'
+             AND is_active = 1
            LIMIT 1`
         )
       : db.prepare<[string, string], { n: number }>(
           `SELECT 1 AS n FROM daily_challenges
            WHERE challenge_date > ? AND challenge_date <= ? AND media_type = 'wiki'
+             AND is_active = 1
            LIMIT 1`
         )
   return stmt.get(date, todayParis) !== undefined
@@ -139,6 +158,54 @@ function hasAdjacentWikiChallenge(date: string, direction: 'prev' | 'next'): boo
 function formatYearRange(start: number | null, end: number | null): string {
   if (!start) return ''
   return end ? `${start}–${end}` : `${start}–présent`
+}
+
+/** Périodes de club : une seule année en base = plage ouverte ; « présent » est trompeur pour des carrières terminées. */
+function formatSportClubYears(start: number | null, end: number | null): string {
+  if (!start) return ''
+  if (end != null) {
+    if (end === start) return `${start}`
+    return `${start}–${end}`
+  }
+  return `${start}`
+}
+
+/**
+ * Deux lignes « même club » (sans stats puis avec stats) : première phase = parcours junior, comme sur frwiki.
+ * Sans ça, tout reste en « senior » et le rendu ne colle pas à l’infobox.
+ */
+function partitionFlatClubsIntoYouthAndSenior(all: WikiClub[]): { youth: WikiClub[]; senior: WikiClub[] } {
+  const byName = new Map<string, WikiClub[]>()
+  for (const c of all) {
+    const k = normalizeClubKey(c.name)
+    if (!k) continue
+    if (!byName.has(k)) byName.set(k, [])
+    byName.get(k)!.push(c)
+  }
+  const youth: WikiClub[] = []
+  const senior: WikiClub[] = []
+  const hasStats = (c: WikiClub) =>
+    (c.appearances != null && c.appearances > 0) || (c.goals != null && c.goals > 0)
+
+  for (const [, rows] of byName) {
+    const sorted = [...rows].sort((a, b) => (a.start_year ?? 0) - (b.start_year ?? 0))
+    for (const c of sorted) {
+      const laterPro = sorted.some(
+        (r) =>
+          hasStats(r) &&
+          (r.start_year ?? 0) > (c.start_year ?? 0),
+      )
+      if (!hasStats(c) && laterPro) {
+        youth.push(c)
+      } else {
+        senior.push(c)
+      }
+    }
+  }
+  const byStart = (a: WikiClub, b: WikiClub) => (a.start_year ?? 0) - (b.start_year ?? 0)
+  youth.sort(byStart)
+  senior.sort(byStart)
+  return { youth, senior }
 }
 
 function computeInitials(name: string): string {
@@ -184,7 +251,9 @@ function getSupplementalHintKeys(personType: WikiPersonRow['person_type']): stri
 /** Clés déjà visibles dans le bloc profil — inutiles comme « indice » progressif. */
 function wikiHintDuplicatesVisibleProfile(key: string, personType: WikiPersonRow['person_type']): boolean {
   if (personType === 'politician' || personType === 'sportsperson') return false
-  return key === 'domain' || key === 'notable_work'
+  if (key === 'domain' || key === 'notable_work') return true
+  if (personType === 'entrepreneur' && key === 'company') return true
+  return false
 }
 
 function normalizeMediaUrl(raw: string | null | undefined): string | null {
@@ -239,6 +308,7 @@ function computeHintSchedule(person: WikiPersonRow, challengeScheduleRaw: string
 function buildVisibleProfile(person: WikiPersonRow): { type: 'politician'; roles: PoliticianRoleView[] } | {
   type: 'sportsperson'
   clubs: SportClubView[]
+  clubsYouth: SportClubView[]
   sport: string | null
   careerHighlights: Array<{ label: string; value: string }>
   nationalTeam: SportspersonData['national_team']
@@ -246,7 +316,10 @@ function buildVisibleProfile(person: WikiPersonRow): { type: 'politician'; roles
   type: 'generic'
   domain: string | null
   notableWork: string | null
+  notableWorkParts: string[]
   era: string | null
+  company: string | null
+  highlights: Array<{ label: string; value: string }>
 } {
   const data = JSON.parse(person.infobox_data)
   if (person.person_type === 'politician') {
@@ -261,27 +334,59 @@ function buildVisibleProfile(person: WikiPersonRow): { type: 'politician'; roles
     return { type: 'politician', roles }
   }
   if (person.person_type === 'sportsperson') {
-    const s = data as SportspersonData
-    const clubs = (s.clubs ?? []).map((c) => ({
-      name: c.name,
-      years: formatYearRange(c.start_year, c.end_year),
-      apps: c.appearances,
-      goals: c.goals,
-    }))
+    const rawInfobox = data as Record<string, unknown>
+    const s = rawInfobox as unknown as SportspersonData
+    let seniorList = s.clubs ?? []
+    let youthList = Array.isArray(rawInfobox.clubs_youth) ? (rawInfobox.clubs_youth as WikiClub[]) : []
+    const youthKeyPresent = Object.prototype.hasOwnProperty.call(rawInfobox, 'clubs_youth')
+    if (!youthKeyPresent && youthList.length === 0 && seniorList.length > 0) {
+      const split = partitionFlatClubsIntoYouthAndSenior(seniorList)
+      youthList = split.youth
+      seniorList = split.senior
+    }
+    const mergedYS = dedupeYouthAgainstSeniorMergeEnds(youthList, seniorList)
+    const promoted = promoteLeadingBlankYouthFromSenior(mergedYS.youth, mergedYS.senior)
+    youthList = promoted.youth
+    seniorList = promoted.senior
+    seniorList = inferClubStintEndYears(seniorList)
+    youthList = inferClubStintEndYears(youthList)
+    const mapClubs = (list: WikiClub[]) =>
+      list.map((c) => ({
+        name: c.name,
+        years: formatSportClubYears(c.start_year, c.end_year),
+        apps: c.appearances,
+        goals: c.goals,
+      }))
+    const clubs = mapClubs(seniorList)
+    const clubsYouth = mapClubs(youthList)
     return {
       type: 'sportsperson',
       clubs,
+      clubsYouth,
       sport: s.sport,
       careerHighlights: (s.career_highlights ?? []).slice(0, 6),
       nationalTeam: s.national_team,
     }
   }
   const g = data as GenericPersonData
+  const hlRaw = Array.isArray(g.highlights) ? g.highlights : []
+  const highlights = hlRaw
+    .map((h) => ({
+      label: typeof h?.label === 'string' ? h.label.trim() || 'Repère' : 'Repère',
+      value: typeof h?.value === 'string' ? h.value.trim() : '',
+    }))
+    .filter((h) => h.value.length > 0)
+    .slice(0, 8)
+
+  const companyTrim = typeof g.company === 'string' ? g.company.trim() : ''
   return {
     type: 'generic',
     domain: g.domain,
     notableWork: g.notable_work,
+    notableWorkParts: splitNotableWorkForDisplay(g.notable_work),
     era: g.era,
+    company: companyTrim ? companyTrim : null,
+    highlights,
   }
 }
 
@@ -398,11 +503,11 @@ export function getOrCreateWikiSession(sessionToken: string, challengeId: number
     .get(sessionToken, challengeId)!
 }
 
-export function buildWikiChallengePayload(challenge: WikiChallengeRow, session: SessionRow) {
-  const person = db
-    .prepare<[number], WikiPersonRow>(`SELECT * FROM wiki_persons WHERE id = ?`)
-    .get(challenge.wiki_person_id)!
-
+function buildWikiChallengePayloadFromPerson(
+  person: WikiPersonRow,
+  challenge: WikiChallengeRow,
+  session: SessionRow,
+) {
   const schedule = computeHintSchedule(person, challenge.hint_schedule)
   const hintsRevealed = Math.min(session.hints_revealed, MAX_HINTS)
   const attempts: AttemptEntry[] = JSON.parse(session.attempts)
@@ -416,7 +521,11 @@ export function buildWikiChallengePayload(challenge: WikiChallengeRow, session: 
 
   return {
     challengeId: challenge.id,
-    challengeNumber: challenge.challenge_number,
+    challengeNumber: activeChallengeOrdinalByDate(
+      challenge.id,
+      challenge.challenge_date,
+      'wiki'
+    ),
     date: challenge.challenge_date,
     isPastChallenge: challenge.challenge_date < today,
     mediaType: 'wiki' as const,
@@ -434,6 +543,118 @@ export function buildWikiChallengePayload(challenge: WikiChallengeRow, session: 
     attempts: attempts.map(a => ({ guess: a.guess, correct: a.correct })),
     outcome: session.outcome,
   }
+}
+
+export function buildWikiChallengePayload(challenge: WikiChallengeRow, session: SessionRow) {
+  const person = db
+    .prepare<[number], WikiPersonRow>(`SELECT * FROM wiki_persons WHERE id = ?`)
+    .get(challenge.wiki_person_id)!
+  return buildWikiChallengePayloadFromPerson(person, challenge, session)
+}
+
+export type WikiFetchPayloadForAdminPreview = {
+  name: string
+  extract: string | null
+  photo_url: string | null
+  wikipedia_url: string
+  infobox_data: unknown
+  person_type: WikiPersonRow['person_type']
+  hint_schedule: string[]
+  suggested_difficulty?: number
+  /** Métadonnées parse Wikipédia — conservées dans `infobox_data` à l’import pool */
+  parse_quality_score?: number
+  parse_warnings?: string[]
+}
+
+function wikiPersonRowFromFetchPayload(data: WikiFetchPayloadForAdminPreview, syntheticPersonId: number): WikiPersonRow {
+  const infobox =
+    typeof data.infobox_data === 'string'
+      ? data.infobox_data
+      : JSON.stringify(data.infobox_data ?? {})
+  return {
+    id: syntheticPersonId,
+    name: data.name,
+    name_aliases: '[]',
+    person_type: data.person_type,
+    infobox_data: infobox,
+    hint_schedule: JSON.stringify(Array.isArray(data.hint_schedule) ? data.hint_schedule : []),
+    photo_url: data.photo_url,
+    extract: data.extract,
+    wikipedia_url: data.wikipedia_url,
+    difficulty: typeof data.suggested_difficulty === 'number' ? data.suggested_difficulty : 3,
+  }
+}
+
+/** Aperçu admin : même rendu que le défi public au démarrage, sans session ni ligne calendrier. */
+export function buildWikiAdminPreviewFromPerson(person: WikiPersonRow, wikiPersonId: number) {
+  const today = getTodayParis()
+  const fakeChallenge: WikiChallengeRow = {
+    id: -Math.abs(wikiPersonId),
+    challenge_date: today,
+    wiki_person_id: wikiPersonId,
+    challenge_number: 1,
+    hint_schedule: person.hint_schedule,
+  }
+  const previewSession: SessionRow = {
+    id: 0,
+    session_token: '',
+    challenge_id: fakeChallenge.id,
+    attempts: '[]',
+    hints_revealed: MAX_HINTS,
+    outcome: null,
+    started_at: new Date().toISOString(),
+    finished_at: null,
+  }
+
+  const inner = buildWikiChallengePayloadFromPerson(person, fakeChallenge, previewSession)
+  return {
+    ...inner,
+    challengeId: 0,
+    hasPrevChallenge: false,
+    hasNextChallenge: false,
+    isPreview: true as const,
+  }
+}
+
+export function buildWikiAdminPreviewPayload(wikiPersonId: number) {
+  const person = db
+    .prepare<[number], WikiPersonRow>(`SELECT * FROM wiki_persons WHERE id = ?`)
+    .get(wikiPersonId)
+  if (!person) throw Object.assign(new Error('Wiki person not found'), { status: 404 })
+  return buildWikiAdminPreviewFromPerson(person, wikiPersonId)
+}
+
+/** Aperçu admin à partir du formulaire (brouillon) — même rendu que la fiche enregistrée après normalisation infobox. */
+export function buildWikiAdminPreviewFromDraft(input: {
+  name: string
+  person_type: WikiPersonRow['person_type']
+  infobox_data: string
+  hint_schedule: string
+  photo_url: string | null
+  extract: string | null
+  wikipedia_url: string | null
+  difficulty: number
+}) {
+  const person: WikiPersonRow = {
+    id: -1,
+    name: input.name,
+    name_aliases: '[]',
+    person_type: input.person_type,
+    infobox_data: input.infobox_data,
+    hint_schedule: input.hint_schedule,
+    photo_url: input.photo_url,
+    extract: input.extract,
+    wikipedia_url: input.wikipedia_url,
+    difficulty: input.difficulty,
+  }
+  return buildWikiAdminPreviewFromPerson(person, -1)
+}
+
+/** Aperçu jeu à partir du JSON prefetch pool (sans fiche `wiki_persons`). */
+export function buildWikiAdminPreviewFromPoolPayload(data: WikiFetchPayloadForAdminPreview, poolEntryId: number) {
+  const syn = -Math.abs(poolEntryId)
+  const person = wikiPersonRowFromFetchPayload(data, syn)
+  return buildWikiAdminPreviewFromPerson(person, syn)
 }
 
 export function processWikiGuess(
@@ -465,7 +686,7 @@ export function processWikiGuess(
     if (!answerPerson) throw Object.assign(new Error('Person not found'), { status: 500 })
 
     const aliases: string[] = JSON.parse(answerPerson.name_aliases)
-    const accepted = [answerPerson.name, ...aliases].map(normalise)
+    const accepted = expandWikiPersonAcceptedForms([answerPerson.name, ...aliases].map(normalise))
     const correct = isGuessCorrect(rawGuess, accepted)
 
     attempts.push({ guess: escapeHtml(rawGuess), correct, ts: new Date().toISOString() })

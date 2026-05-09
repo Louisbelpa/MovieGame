@@ -163,6 +163,7 @@ challengeRouter.get(
         .prepare<[string, string, string], { challenge_date: string }>(
           `SELECT challenge_date FROM daily_challenges
            WHERE challenge_date >= ? AND challenge_date <= ? AND media_type = ?
+             AND is_active = 1
            ORDER BY challenge_date DESC`
         )
         .all(fromStr, todayParis, type)
@@ -206,11 +207,13 @@ challengeRouter.get(
         ? db.prepare<[string, string, string], { challenge_date: string }>(
             `SELECT challenge_date FROM daily_challenges
              WHERE challenge_date < ? AND challenge_date <= ? AND media_type = ?
+               AND is_active = 1
              ORDER BY challenge_date DESC LIMIT 1`
           ).get(date, todayParis, type)
         : db.prepare<[string, string, string], { challenge_date: string }>(
             `SELECT challenge_date FROM daily_challenges
              WHERE challenge_date > ? AND challenge_date <= ? AND media_type = ?
+               AND is_active = 1
              ORDER BY challenge_date ASC LIMIT 1`
           ).get(date, todayParis, type);
 

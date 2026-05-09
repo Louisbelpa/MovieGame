@@ -6,7 +6,7 @@
 
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Film, Tv, Calendar, LayoutDashboard, LogOut, Menu, X, ScrollText, Upload, ShieldAlert, BarChart2, Landmark, Database } from 'lucide-react'
+import { Film, Tv, Calendar, LayoutDashboard, LogOut, Menu, X, ScrollText, Upload, ShieldAlert, BarChart2, Landmark, Database, Settings } from 'lucide-react'
 import { adminLogout } from '../api'
 
 const navItems = [
@@ -14,10 +14,11 @@ const navItems = [
   { to: '/admin/analytics', label: 'Analytiques', icon: BarChart2, exact: false },
   { to: '/admin/films', label: 'Films', icon: Film, exact: false },
   { to: '/admin/series', label: 'Séries', icon: Tv, exact: false },
-  { to: '/admin/wiki', label: 'Wikipedia', icon: Landmark, exact: false },
-  { to: '/admin/wiki-pool', label: 'Pool Wikipedia', icon: Database, exact: false },
+  { to: '/admin/wiki', label: 'Personnalités', icon: Landmark, exact: false },
+  { to: '/admin/wiki-pool', label: 'Pool personnalités', icon: Database, exact: false },
   { to: '/admin/calendar', label: 'Planning', icon: Calendar, exact: false },
   { to: '/admin/import', label: 'Import CSV', icon: Upload, exact: false },
+  { to: '/admin/settings', label: 'Réglages', icon: Settings, exact: true },
   { to: '/admin/changelog', label: 'Changelog', icon: ScrollText, exact: false },
   { to: '/admin/logs', label: 'Activité', icon: ShieldAlert, exact: false },
 ]
@@ -37,8 +38,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   function isActive(item: (typeof navItems)[0]) {
-    if (item.exact) return location.pathname === item.to
-    return location.pathname.startsWith(item.to)
+    const p = location.pathname
+    if (item.exact) return p === item.to
+    if (item.to === '/admin/wiki') {
+      return p === '/admin/wiki' || p.startsWith('/admin/wiki/')
+    }
+    return p.startsWith(item.to)
   }
 
   const currentLabel = navItems.find((n) => isActive(n))?.label ?? 'Admin'

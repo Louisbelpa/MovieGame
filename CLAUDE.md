@@ -1,4 +1,4 @@
-# CinéGuessr / GuessToday — Guide pour Claude Code
+# GuessToday — Guide pour Claude Code
 
 ## Architecture
 
@@ -31,9 +31,10 @@ Monorepo avec un **frontend** React/Vite à la racine et un **backend** Express/
     ├── src/
     │   ├── routes/               # challenge.ts, films.ts, stats.ts, admin.ts, wiki-challenge.ts
     │   ├── services/             # challenge.service.ts, wiki-challenge.service.ts
-    │   ├── lib/                  # wikipedia.ts (parser + fetch Wikidata)
-    │   ├── middleware/           # session, rateLimiter, adminAuth, errorHandler
-    │   └── db/                   # schema.sql, migrate.ts, database.ts
+│   ├── lib/                  # wikipedia.ts (parser + fetch Wikidata)
+│   ├── config/               # uploads.ts (chemins disque upload admin)
+│   ├── middleware/           # session, rateLimiter, adminAuth, errorHandler
+│   └── db/                   # schema.sql, migrate.ts, database.ts
     └── scripts/
         ├── seed.ts
         └── reset.ts
@@ -64,8 +65,9 @@ npm run dev          # Express sur http://localhost:3001
 
 | Variable | Défaut | Description |
 |----------|--------|-------------|
-| `VITE_ENABLE_SERIES` | `true` | `false` = films only + branding `CinéGuessr`, `true` = films+séries + branding `GuessToday` |
+| `VITE_ENABLE_SERIES` | `true` | `false` = films only (UI/ routes séries masquées), `true` = films + séries — branding toujours `GuessToday` |
 | `VITE_ENABLE_WIKI` | `true` | Active/désactive le mode WikiGuessr (route `/wiki`, tab Homepage) |
+| `VITE_API_URL` | *(vide)* | Préfixe API si le frontend n’est pas servi même origine que le backend |
 
 ### Backend (`backend/.env`)
 
@@ -76,11 +78,16 @@ npm run dev          # Express sur http://localhost:3001
 | `COOKIE_SECRET` | Secret de signature des cookies de session |
 | `ADMIN_PASSWORD` | Mot de passe back office |
 | `ADMIN_USERNAME` | Identifiant back office (optionnel — si vide, login par mdp seul) |
-| `CORS_ORIGIN` | Origines frontend autorisées (CSV, ex: `https://app.com,https://www.app.com`) |
+| `CORS_ORIGIN` | Origines frontend autorisées (CSV, ex: `https://app.com,https://www.app.com`) — normalisation d’origine côté `app.ts` |
 | `TMDB_API_KEY` | Clé API TMDB (back office uniquement) |
 | `IMAGE_SOURCE` | `tmdb` ou `local` |
 | `MAX_ATTEMPTS` | Tentatives par défi films/séries (défaut: 5) |
 | `WIKI_MAX_ATTEMPTS` | Tentatives par défi wiki (défaut: 5, optionnel) |
+| `UPLOADS_DIRECTORY` | Dossier absolu des fichiers uploadés admin (défaut `public/uploads` ; prod Docker `/data/uploads`) |
+| `WIKI_PREFETCH_TARGET_READY` | Cible du pool admin « Au hasard » (défaut 24, max 400) |
+| `WIKI_PREFETCH_MAX_FETCH_PER_RUN` | Fiches enrichies par passe (défaut 4, max 40) |
+| `WIKI_PREFETCH_SPARQL_LIMIT` | Limite Wikidata (`LIMIT` SPARQL prefetch ; si absent : `max(100, WIKI_PREFETCH_TARGET_READY)` cap 800 ; si défini : 50–800 ; corrige l’ancien plafond fixe à 100) |
+| `PREFETCH_WARM_TOKEN` | Secrète pour `POST /api/admin/prefetch/warm` (cron) |
 
 ## Points techniques importants
 
@@ -105,7 +112,7 @@ new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date()
 - Même structure pour `wikiStore.ts` (miroir de `gameStore.ts`)
 
 ### Tutoriel (premier visit)
-- Clé localStorage : `cineguess:rules_seen`
+- Clés localStorage : `cineguess:rules_seen:film`, `:series`, `:wiki` ; ancienne `cineguess:rules_seen` migrée une fois vers film+séries (`migrateLegacyRulesSeen`).
 - `useFirstVisit()` dans `App.tsx` ouvre la modale au montage, **sans dépendance sur `status`**
 - `RULES_SEEN_KEY` est écrit dans `RulesModal.handleClose()`, pas au montage
 
@@ -116,6 +123,20 @@ Ordre d'affichage : année → réalisateur → acteur principal (1 seul, `cast.
 - Le back office utilise l'API TMDB pour la recherche et l'auto-remplissage de fiches film/série
 - Les images du jeu viennent de TMDB (`IMAGE_SOURCE=tmdb`) ou de fichiers locaux
 - Attribution TMDB obligatoire dans le footer
+
+### Numéro de défi (`#N` header)
+- Le payload API expose `challengeNumber` = **ordinal 1-based** parmi les défis **actifs** du même `media_type`, ordre `challenge_date` puis `id` (`activeChallengeOrdinalByDate`).
+
+### Planning & archives
+- Suppression calendrier admin = `daily_challenges.is_active = 0` (ligne conservée).
+- **`GET /api/challenge/dates`**, **`/api/wiki/dates`**, **`.../adjacent`** : uniquement `is_active = 1` — les jours retirés ne sortent plus dans l’archive ni dans le compteur « joués ».
+- Après **reschedule** ou **restore** d’un défi : `renumberChallenges()`.
+
+### Uploads admin
+- Multer écrit dans `UPLOADS_DIRECTORY` ; Express sert `/uploads` via `getUploadsAbsDir()` (`app.ts`).
+
+### Redirection de marque
+- `src/main.tsx` : ancien hostname de prod → `guesstoday.fr?migrate=` (localStorage stats/history partiels) — seul endroit où l’ancien domaine reste référencé en dur.
 
 ### Durcissement backend
 - `helmet` gère les headers de sécurité (CSP incluse, images TMDB + Wikimedia autorisées).
@@ -133,7 +154,7 @@ Ordre d'affichage : année → réalisateur → acteur principal (1 seul, `cast.
 ## Mode Wikipedia (WikiGuessr)
 
 ### Concept
-Jeu quotidien séparé : l'utilisateur doit deviner une personnalité réelle à partir de sa carrière (fonctions politiques, clubs sportifs, biographie) et d'indices progressifs débloqués à chaque mauvaise réponse. **3 tentatives** par défaut.
+Jeu quotidien séparé : l'utilisateur doit deviner une personnalité réelle à partir de sa carrière (fonctions politiques, clubs sportifs, biographie) et d'indices progressifs débloqués à chaque mauvaise réponse. **5 tentatives** par défaut (`WIKI_MAX_ATTEMPTS`).
 
 ### Table DB `wiki_persons`
 ```sql
@@ -165,8 +186,13 @@ Le service ajoute le préfixe au moment de construire le payload : `type: 'wiki_
 
 ### Admin Wikipedia
 - **`/admin/wiki`** — CRUD personnalités : recherche par slug FR/EN, bouton "Au hasard" via Wikidata SPARQL (`GET /api/admin/wiki-persons/random?lang=fr&minFame=30`)
+- **`/admin/settings`** — toggle `wiki_prefetch_enabled` (plus sur la page pool) ; **`GET /api/admin/settings/summary`** : récap non sensible (`wikiPrefetchTargetReady`, `wikiPrefetchMaxFetchPerRun`, `wikiPrefetchSparqlLimit`, flags Vite…)
+- **`/admin/wiki-pool`** — pool préchargé : pagination + param **`hasWikiPerson=all|yes|no`** sur **`GET /api/admin/wiki-persons/prefetch-pool`** ; dates affichées en Europe/Paris ; UX mobile (cartes, badges fiche existante). Activation pool via Réglages.
+- **`POST /api/admin/game-preview-draft`** — même payload jeu films/séries que pour une fiche enregistrée, depuis le formulaire admin sans persist DB.
 - **Planning** — onglet "Wiki" dans CalendarPage, même interface que films/séries
 - `minFame` = seuil de sitelinks Wikidata (≈ notoriété inter-langues, équivalent `vote_count` TMDB)
+- Pool ciblé par `WIKI_PREFETCH_TARGET_READY` (max 400) ; remplissage borné par passe (`WIKI_PREFETCH_MAX_FETCH_PER_RUN`) ; **`WIKI_PREFETCH_SPARQL_LIMIT`** aligne la taille du lot Wikidata sur la cible ; option **`POST /api/admin/prefetch/warm`** avec `PREFETCH_WARM_TOKEN`
+- **Navigation admin** — l’entrée active « Personnalités » ne doit pas matcher **`/admin/wiki-pool`** : préfixe **`/admin/wiki`** réservé à la liste Wiki seule (`AdminLayout` plus précis que `startsWith('/admin/wiki')`).
 
 ### Routes API wiki
 Préfixe `/api/wiki/` — définies dans `wiki-challenge.ts`, enregistrées dans `app.ts`.
@@ -180,6 +206,9 @@ Préfixe `/api/wiki/` — définies dans `wiki-challenge.ts`, enregistrées dans
 | `GET` | `/api/wiki/result?challengeId=` | Résultat (fin de partie) |
 | `GET` | `/api/wiki/search?q=` | Autocomplétion noms |
 | `GET` | `/api/wiki/stats` | Statistiques globales |
+| `GET` | `/api/wiki/dates?days=` | Dates avec défi wiki actif (archive) |
+
+**Films / séries** — `GET /api/challenge/dates?days=&type=film|series` : idem pour l’archive ; `adjacent` filtre aussi `is_active = 1`.
 
 ---
 

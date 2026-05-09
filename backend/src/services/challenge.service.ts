@@ -5,12 +5,35 @@
  */
 
 import db from '../db/database.js';
+import { activeChallengeOrdinalByDate } from '../lib/dailyChallengeOrdinal.js';
 import { normalise, isGuessCorrect } from '../lib/matching.js';
 import { escapeHtml } from '../lib/utils.js';
 
 const MAX_ATTEMPTS = parseInt(process.env.MAX_ATTEMPTS ?? '5', 10);
+const WIKI_MAX_ATTEMPTS = parseInt(process.env.WIKI_MAX_ATTEMPTS ?? '5', 10);
 const MAX_HINTS = 3;
 const VALID_HINTS = new Set(['year', 'director', 'creator', 'genres', 'cast', 'tagline', 'synopsis']);
+
+const DEFAULT_FILM_HINT_SCHEDULE = JSON.stringify(['year', 'director', 'cast']);
+const DEFAULT_SERIES_HINT_SCHEDULE = JSON.stringify(['year', 'creator', 'cast']);
+
+/** Filtre et sérialise les clés d’indices pour un film (pas de clé « creator »). */
+export function normalizeFilmHintScheduleJson(input: unknown): string {
+  const raw = Array.isArray(input) ? input.map(String) : [];
+  const filtered = raw.filter((h) => VALID_HINTS.has(h) && h !== 'creator');
+  const deduped = [...new Set(filtered)];
+  if (deduped.length === 0) return DEFAULT_FILM_HINT_SCHEDULE;
+  return JSON.stringify(deduped);
+}
+
+/** Filtre et sérialise les clés d’indices pour une série (pas de clé « director »). */
+export function normalizeSeriesHintScheduleJson(input: unknown): string {
+  const raw = Array.isArray(input) ? input.map(String) : [];
+  const filtered = raw.filter((h) => VALID_HINTS.has(h) && h !== 'director');
+  const deduped = [...new Set(filtered)];
+  if (deduped.length === 0) return DEFAULT_SERIES_HINT_SCHEDULE;
+  return JSON.stringify(deduped);
+}
 const IMAGE_SOURCE = process.env.IMAGE_SOURCE ?? 'tmdb';
 const TMDB_BASE = process.env.TMDB_IMAGE_BASE_URL ?? 'https://image.tmdb.org/t/p/w500';
 
@@ -29,6 +52,7 @@ interface FilmRow {
   image_url: string;
   image_blurred_url: string | null;
   tmdb_id: number | null;
+  hint_schedule: string;
 }
 
 interface SeriesRow {
@@ -47,6 +71,10 @@ interface SeriesRow {
   number_of_seasons: number | null;
   network: string | null;
   status: string | null;
+  original_language?: string | null;
+  fame_level?: number;
+  is_active?: number;
+  hint_schedule: string;
 }
 
 interface ChallengeRow {
@@ -56,6 +84,8 @@ interface ChallengeRow {
   series_id: number | null;
   challenge_number: number;
   hint_schedule: string;
+  /** Présent sur les lignes SQLite `SELECT *` */
+  media_type?: 'film' | 'series' | 'wiki';
 }
 
 interface SessionRow {
@@ -101,11 +131,13 @@ function hasAdjacentScheduledChallenge(
       ? db.prepare<[string, string, string], { n: number }>(
           `SELECT 1 AS n FROM daily_challenges
            WHERE challenge_date < ? AND challenge_date <= ? AND media_type = ?
+             AND is_active = 1
            LIMIT 1`
         )
       : db.prepare<[string, string, string], { n: number }>(
           `SELECT 1 AS n FROM daily_challenges
            WHERE challenge_date > ? AND challenge_date <= ? AND media_type = ?
+             AND is_active = 1
            LIMIT 1`
         );
   return stmt.get(date, todayParis, mediaType) !== undefined;
@@ -242,10 +274,15 @@ export function buildChallengePayload(
   const today = getTodayParis();
   const isPastChallenge = challenge.challenge_date < today;
   const mediaType = isSeries ? 'series' : 'film';
+  const mediaTypeForOrdinal = challenge.media_type ?? mediaType;
 
   return {
     challengeId: challenge.id,
-    challengeNumber: challenge.challenge_number,
+    challengeNumber: activeChallengeOrdinalByDate(
+      challenge.id,
+      challenge.challenge_date,
+      mediaTypeForOrdinal
+    ),
     date: challenge.challenge_date,
     isPastChallenge,
     mediaType,
@@ -260,6 +297,153 @@ export function buildChallengePayload(
     maxAttempts: MAX_ATTEMPTS,
     attempts: attempts.map((a) => ({ guess: a.guess, correct: a.correct })),
     outcome: session.outcome,
+  };
+}
+
+/** Aperçu admin : même rendu qu’au démarrage du défi film (fiche en base). */
+export function buildFilmAdminPreviewPayload(filmId: number) {
+  const filmRow = db.prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`).get(filmId);
+  if (!filmRow) throw Object.assign(new Error('Film not found'), { status: 404 });
+
+  const today = getTodayParis();
+  const fakeChallenge: ChallengeRow = {
+    id: -Math.abs(filmId),
+    challenge_date: today,
+    film_id: filmId,
+    series_id: null,
+    challenge_number: 1,
+    hint_schedule: normalizeFilmHintScheduleJson(JSON.parse(filmRow.hint_schedule || DEFAULT_FILM_HINT_SCHEDULE)),
+    media_type: 'film',
+  };
+  const previewSession: SessionRow = {
+    id: 0,
+    session_token: '',
+    challenge_id: fakeChallenge.id,
+    attempts: '[]',
+    hints_revealed: MAX_HINTS,
+    outcome: null,
+    started_at: new Date().toISOString(),
+    finished_at: null,
+  };
+
+  const inner = buildChallengePayload(fakeChallenge, previewSession);
+  return {
+    ...inner,
+    challengeId: 0,
+    hasPrevChallenge: false,
+    hasNextChallenge: false,
+    isPreview: true as const,
+  };
+}
+
+/** Aperçu admin : même rendu qu’au démarrage du défi série. */
+export function buildSeriesAdminPreviewPayload(seriesId: number) {
+  const seriesRow = db.prepare<[number], SeriesRow>(`SELECT * FROM series WHERE id = ?`).get(seriesId);
+  if (!seriesRow) throw Object.assign(new Error('Series not found'), { status: 404 });
+
+  const today = getTodayParis();
+  const fakeChallenge: ChallengeRow = {
+    id: -Math.abs(seriesId),
+    challenge_date: today,
+    film_id: null,
+    series_id: seriesId,
+    challenge_number: 1,
+    hint_schedule: normalizeSeriesHintScheduleJson(JSON.parse(seriesRow.hint_schedule || DEFAULT_SERIES_HINT_SCHEDULE)),
+    media_type: 'series',
+  };
+  const previewSession: SessionRow = {
+    id: 0,
+    session_token: '',
+    challenge_id: fakeChallenge.id,
+    attempts: '[]',
+    hints_revealed: MAX_HINTS,
+    outcome: null,
+    started_at: new Date().toISOString(),
+    finished_at: null,
+  };
+
+  const inner = buildChallengePayload(fakeChallenge, previewSession);
+  return {
+    ...inner,
+    challengeId: 0,
+    hasPrevChallenge: false,
+    hasNextChallenge: false,
+    isPreview: true as const,
+  };
+}
+
+export interface FilmSeriesDraftPreviewInput {
+  mode: 'film' | 'series';
+  year: number;
+  director?: string | null;
+  creator?: string | null;
+  genres: string[];
+  cast_members: string[];
+  tagline?: string | null;
+  synopsis?: string | null;
+  image_url: string;
+  hint_schedule: unknown;
+}
+
+/** Aperçu admin depuis le formulaire (sans enregistrement). */
+export function buildFilmSeriesDraftPreviewPayload(body: FilmSeriesDraftPreviewInput) {
+  const genresJson = JSON.stringify(Array.isArray(body.genres) ? body.genres : []);
+  const castJson = JSON.stringify(Array.isArray(body.cast_members) ? body.cast_members : []);
+  const directorOrCreator =
+    body.mode === 'film'
+      ? String(body.director ?? '').trim()
+      : String(body.creator ?? '').trim();
+
+  const scheduleJson =
+    body.mode === 'film'
+      ? normalizeFilmHintScheduleJson(body.hint_schedule)
+      : normalizeSeriesHintScheduleJson(body.hint_schedule);
+  const schedule = (JSON.parse(scheduleJson) as string[])
+    .filter((h) => VALID_HINTS.has(h))
+    .slice(0, MAX_HINTS);
+
+  const hintsRevealed = Math.min(MAX_HINTS, schedule.length);
+  const hints = schedule.slice(0, hintsRevealed).map((type) => {
+    switch (type) {
+      case 'year':
+        return { type, value: body.year };
+      case 'director':
+      case 'creator':
+        return { type, value: directorOrCreator };
+      case 'genres':
+        return { type, value: JSON.parse(genresJson) as string[] };
+      case 'cast': {
+        const cast = JSON.parse(castJson) as string[];
+        return { type, value: cast.slice(0, 1) };
+      }
+      case 'tagline':
+        return { type, value: body.tagline ?? '' };
+      case 'synopsis':
+        return { type, value: body.synopsis ?? '' };
+      default:
+        return { type, value: null };
+    }
+  });
+
+  const today = getTodayParis();
+  return {
+    challengeId: 0,
+    challengeNumber: 1,
+    date: today,
+    isPastChallenge: false,
+    mediaType: body.mode === 'film' ? ('film' as const) : ('series' as const),
+    imageUrl: resolveImageUrl(body.image_url.trim()),
+    isGameOver: false,
+    hintsAvailable: schedule.length,
+    hintsRevealed,
+    hints,
+    attemptsUsed: 0,
+    maxAttempts: MAX_ATTEMPTS,
+    attempts: [] as { guess: string; correct: boolean }[],
+    outcome: null as 'won' | 'lost' | null,
+    hasPrevChallenge: false,
+    hasNextChallenge: false,
+    isPreview: true as const,
   };
 }
 
@@ -463,6 +647,76 @@ export function getGlobalStats() {
         .filter(([k]) => Number(k) <= MAX_ATTEMPTS)
     ),
     lastUpdated: stats.last_updated,
+  };
+}
+
+/** Stats anonymes pour un défi précis — parties `game_sessions` liées à ce `challenge_id`. */
+export function getCommunityStatsForChallengeId(challengeId: number) {
+  const ch = db
+    .prepare<[number], { id: number; media_type: string }>(
+      `SELECT id, media_type FROM daily_challenges WHERE id = ? AND is_active = 1`
+    )
+    .get(challengeId);
+
+  if (!ch) {
+    return {
+      totalGames: 0,
+      totalWins: 0,
+      totalLosses: 0,
+      winRate: 0,
+      winsByAttempt: {} as Record<string, number>,
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+
+  const maxA = ch.media_type === 'wiki' ? WIKI_MAX_ATTEMPTS : MAX_ATTEMPTS;
+
+  const agg = db
+    .prepare<
+      [number],
+      { total_games: number; total_wins: number | null; total_losses: number | null } | undefined
+    >(
+      `SELECT COUNT(*) AS total_games,
+              SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) AS total_wins,
+              SUM(CASE WHEN outcome = 'lost' THEN 1 ELSE 0 END) AS total_losses
+       FROM game_sessions
+       WHERE challenge_id = ? AND outcome IS NOT NULL`
+    )
+    .get(challengeId);
+
+  const totalGames = agg?.total_games ?? 0;
+  const totalWins = Number(agg?.total_wins ?? 0);
+  const totalLosses = Number(agg?.total_losses ?? 0);
+
+  const rows = db
+    .prepare(
+      `SELECT json_array_length(attempts) AS n, COUNT(*) AS c
+       FROM game_sessions
+       WHERE challenge_id = ? AND outcome = 'won'
+       GROUP BY json_array_length(attempts)`
+    )
+    .all(challengeId) as { n: number; c: number }[];
+
+  const winsByAttempt: Record<string, number> = {};
+  for (let i = 1; i <= maxA; i += 1) {
+    winsByAttempt[String(i)] = 0;
+  }
+  for (const r of rows) {
+    if (Number.isFinite(r.n) && r.n >= 1 && r.n <= maxA) {
+      winsByAttempt[String(r.n)] = r.c;
+    }
+  }
+
+  const winRate =
+    totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0;
+
+  return {
+    totalGames,
+    totalWins,
+    totalLosses,
+    winRate,
+    winsByAttempt,
+    lastUpdated: new Date().toISOString(),
   };
 }
 

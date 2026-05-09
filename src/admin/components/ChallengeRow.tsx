@@ -128,7 +128,7 @@ function MediaPicker({ films, seriesList, wikiPersons, mediaType, onSelect, onCa
               tab === 'wiki' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700',
             ].join(' ')}
           >
-            <Landmark size={11} /> Wiki
+            <Landmark size={11} /> Personnalités
           </button>
         </div>
       )}
@@ -392,7 +392,7 @@ export function ChallengeRow({
               )}
               {isWiki && (
                 <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-violet-100 text-violet-700">
-                  <Landmark size={9} /> Wiki
+                  <Landmark size={9} /> Personnalités
                 </span>
               )}
             </span>

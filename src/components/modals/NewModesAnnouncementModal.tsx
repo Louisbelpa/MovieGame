@@ -34,7 +34,7 @@ export function NewModesAnnouncementModal({ isOpen, onClose, variant }: NewModes
       ? 'Deux nouveaux modes de jeu'
       : variant === 'series'
         ? 'Nouveau : mode Séries'
-        : 'Nouveau : mode Wikipedia'
+        : 'Nouveau : mode Personnalités'
 
   return (
     <Modal
@@ -47,7 +47,7 @@ export function NewModesAnnouncementModal({ isOpen, onClose, variant }: NewModes
         {variant === 'both' && (
           <p id={modalDescId} className="text-film-text-dim leading-relaxed">
             Tu peux maintenant jouer au défi du jour en <strong className="text-film-text">Séries</strong> et deviner une{' '}
-            <strong className="text-film-text">personnalité</strong> grâce au mode Wikipedia — mêmes idées : indices
+            <strong className="text-film-text">personnalité</strong> grâce au mode Personnalités — mêmes idées : indices
             progressifs et tentatives limitées.
           </p>
         )}
@@ -59,7 +59,7 @@ export function NewModesAnnouncementModal({ isOpen, onClose, variant }: NewModes
         )}
         {variant === 'wiki' && (
           <p id={modalDescId} className="text-film-text-dim leading-relaxed">
-            Le <strong className="text-film-text">mode Wikipedia</strong> te propose de deviner la personnalité du jour
+            Le <strong className="text-film-text">mode Personnalités</strong> te propose de deviner la personnalité du jour
             à partir d&apos;indices issus de sa biographie.
           </p>
         )}
@@ -85,7 +85,7 @@ export function NewModesAnnouncementModal({ isOpen, onClose, variant }: NewModes
                 <Landmark size={18} className="text-[#c4b5fd]" aria-hidden />
               </span>
               <span className="text-film-text-dim leading-relaxed pt-1">
-                <span className="text-film-text font-medium">Wikipedia</span> — devine la personnalité à partir de son
+                <span className="text-film-text font-medium">Personnalités</span> — devine la personnalité à partir de son
                 parcours.
               </span>
             </li>

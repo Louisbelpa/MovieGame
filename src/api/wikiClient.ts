@@ -54,6 +54,12 @@ export type WikiVisibleProfile =
         apps: number | null
         goals: number | null
       }>
+      clubsYouth: Array<{
+        name: string
+        years: string
+        apps: number | null
+        goals: number | null
+      }>
       careerHighlights: Array<{
         label: string
         value: string
@@ -64,7 +70,11 @@ export type WikiVisibleProfile =
       type: 'generic'
       domain: string | null
       notableWork: string | null
+      /** Découpe affichage de `notableWork` (séparateurs · ou tiret long) */
+      notableWorkParts?: string[]
       era: string | null
+      company?: string | null
+      highlights?: Array<{ label: string; value: string }>
     }
 
 export interface WikiChallengePayload {
@@ -84,6 +94,8 @@ export interface WikiChallengePayload {
   maxAttempts: number
   attempts: WikiAttemptPayload[]
   outcome: 'won' | 'lost' | null
+  /** Réponse admin — aperçu sans partie réelle */
+  isPreview?: boolean
 }
 
 export interface WikiGuessResultPayload {

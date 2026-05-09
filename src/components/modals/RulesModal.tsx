@@ -7,6 +7,7 @@ import type { ReactNode } from 'react'
 import { CheckCircle2, XCircle, SkipForward, Calendar, Clapperboard, User, Flag, Lightbulb } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { RULES_SEEN_KEY_FILM, RULES_SEEN_KEY_SERIES, RULES_SEEN_KEY_WIKI } from '@/lib/rulesSeen'
 import { useGameStore } from '@/store/gameStore'
 import { useWikiStore } from '@/store/wikiStore'
 
@@ -33,7 +34,12 @@ export function RulesModal({ mode }: { mode?: RulesMode }) {
   const closeModal = isWiki ? wikiCloseModal : gameCloseModal
   const status = isWiki ? wikiStatus : gameStatus
   const openModal = isWiki ? wikiOpenModal : gameOpenModal
-  const rulesSeenKey = isWiki ? 'cineguess:rules_seen:wiki' : 'cineguess:rules_seen'
+  const rulesSeenKey =
+    resolvedMode === 'wiki'
+      ? RULES_SEEN_KEY_WIKI
+      : resolvedMode === 'series'
+        ? RULES_SEEN_KEY_SERIES
+        : RULES_SEEN_KEY_FILM
 
   function handleClose() {
     try { localStorage.setItem(rulesSeenKey, '1') } catch { /* private browsing */ }
@@ -52,10 +58,10 @@ export function RulesModal({ mode }: { mode?: RulesMode }) {
       >
         <div className="flex flex-col gap-5 text-sm text-film-text">
           <p id={modalDescId} className="text-film-text-dim leading-relaxed">
-            Une photo et un profil partiel d'une personnalité s'affichent.
+            Une photo floutée et un profil partiel d'une personnalité s'affichent.
             <br />
             Devinez qui c'est en{' '}
-            <strong className="text-film-gold">3 tentatives maximum</strong>.
+            <strong className="text-film-gold">5 tentatives maximum</strong>.
             À chaque mauvaise réponse, un nouvel indice se débloque.
           </p>
 

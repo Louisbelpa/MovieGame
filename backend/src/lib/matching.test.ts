@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { normalise, stripArticles, levenshtein, typoThreshold, isGuessCorrect } from './matching.js'
+import {
+  normalise,
+  stripArticles,
+  levenshtein,
+  typoThreshold,
+  isGuessCorrect,
+  expandWikiPersonAcceptedForms,
+} from './matching.js'
 
 describe('normalise', () => {
   it('lowercases', () => expect(normalise('TITANIC')).toBe('titanic'))
@@ -54,4 +61,19 @@ describe('isGuessCorrect', () => {
   it('typo rejected for short title (≤5 chars)', () => expect(isGuessCorrect('ricky', ['rocky'])).toBe(false))
   it('empty guess → false', () => expect(isGuessCorrect('', ['titanic'])).toBe(false))
   it('skip guess (empty) matches nothing', () => expect(isGuessCorrect('', [''])).toBe(true))
+})
+
+describe('expandWikiPersonAcceptedForms', () => {
+  it('adds last token for two-word names', () => {
+    const expanded = expandWikiPersonAcceptedForms([normalise('Emmanuel Macron')])
+    expect(expanded).toContain('emmanuel macron')
+    expect(expanded).toContain('macron')
+  })
+
+  it('adds last two tokens for three-plus-word names', () => {
+    const expanded = expandWikiPersonAcceptedForms([normalise('Charles de Gaulle')])
+    expect(expanded).toContain('charles de gaulle')
+    expect(expanded).toContain('gaulle')
+    expect(expanded).toContain('de gaulle')
+  })
 })

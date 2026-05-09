@@ -31,6 +31,9 @@ npm run db:seed
 - Sécurité serveur: `helmet`, CORS whitelist via `CORS_ORIGIN` (CSV), body limit `1mb`.
 - Les guesses utilisateur persistées sont échappées (`escapeHtml`).
 - Les recherches (`/search`) ne doivent pas leak le planning futur.
+- `GET /api/challenge/dates` et `/api/wiki/dates` (+ adjacent) : filtrer **`is_active = 1`** sur `daily_challenges`.
+- Uploads admin : `UPLOADS_DIRECTORY` + static `/uploads` (volume persistant avec la DB en prod).
+- Numéro défi header : ordinal parmi défis actifs, pas seulement la colonne SQL `challenge_number`.
 
 ## Variables d'environnement clés (backend)
 
@@ -39,8 +42,10 @@ npm run db:seed
 - `COOKIE_SECRET`
 - `ADMIN_PASSWORD`
 - `ADMIN_USERNAME` (optionnel mais recommandé)
-- `CORS_ORIGIN` (CSV d'origines)
-- `BACKEND_URL`
+- `CORS_ORIGIN` (CSV d'origines `https://…`)
+- `UPLOADS_DIRECTORY` (fichiers image admin ; ex. `/data/uploads` avec volume `/data`)
+- `WIKI_PREFETCH_TARGET_READY` / `WIKI_PREFETCH_MAX_FETCH_PER_RUN` (pool admin Wikipedia)
+- `PREFETCH_WARM_TOKEN` (cron `POST /api/admin/prefetch/warm`)
 - `TMDB_API_KEY`
 - `MAX_ATTEMPTS` (films/séries)
 - `WIKI_MAX_ATTEMPTS` (wiki, optionnel)

@@ -18,6 +18,7 @@ import {
 import { AdminLayout } from '../components/AdminLayout'
 import { FilmForm } from '../components/FilmForm'
 import { FilmRow } from '../components/FilmRow'
+import { FilmSeriesGamePreviewModal } from '../components/FilmSeriesGamePreviewModal'
 import { BackdropPicker } from '../components/BackdropPicker'
 import { Pagination } from '../components/Pagination'
 
@@ -37,7 +38,7 @@ function Modal({
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-4 sm:my-8">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl my-4 sm:my-8">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
           <h2 className="text-base font-semibold text-gray-900 truncate pr-4">{title}</h2>
           <button
@@ -117,6 +118,7 @@ export function FilmsPage() {
   const [page, setPage] = useState(1)
   const [pages, setPages] = useState(1)
   const [total, setTotal] = useState(0)
+  const [previewFilmId, setPreviewFilmId] = useState<number | null>(null)
   const LIMIT = 20
 
   function showSuccess(msg: string) {
@@ -290,6 +292,7 @@ export function FilmsPage() {
                     onDelete={(f) => setModal({ type: 'delete', film: f })}
                     onBackdrops={(f) => setModal({ type: 'backdrops', film: f })}
                     onUpload={handleUpload}
+                    onPreview={(f) => setPreviewFilmId(f.id)}
                   />
                 ))}
               </tbody>
@@ -337,6 +340,13 @@ export function FilmsPage() {
           onClose={() => setModal(null)}
         />
       )}
+
+      <FilmSeriesGamePreviewModal
+        isOpen={previewFilmId !== null}
+        onClose={() => setPreviewFilmId(null)}
+        mode="film"
+        mediaId={previewFilmId}
+      />
     </AdminLayout>
   )
 }

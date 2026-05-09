@@ -47,6 +47,7 @@ export interface ChallengePayload {
   challengeNumber: number
   date: string
   isPastChallenge: boolean
+  mediaType?: 'film' | 'series'
   imageUrl: string                  // always present; frontend applies CSS blur
   isGameOver: boolean
   hintsAvailable: number
@@ -56,6 +57,10 @@ export interface ChallengePayload {
   maxAttempts: number
   attempts: AttemptPayload[]
   outcome: 'won' | 'lost' | null
+  hasPrevChallenge?: boolean
+  hasNextChallenge?: boolean
+  /** Réponse admin — aperçu sans partie réelle */
+  isPreview?: boolean
 }
 
 export interface GuessResultPayload {
@@ -167,9 +172,15 @@ export function searchSeries(
     .then(r => r.results)
 }
 
-/** GET /api/stats */
+/** GET /api/stats — cumul global (tous les défis) */
 export function fetchGlobalStats(): Promise<GlobalStatsPayload> {
   return request<GlobalStatsPayload>('/api/stats')
+}
+
+/** GET /api/stats/challenge?challengeId= — stats communautaires pour ce défi (jour + type) */
+export function fetchChallengeCommunityStats(challengeId: number): Promise<GlobalStatsPayload> {
+  const params = new URLSearchParams({ challengeId: String(challengeId) })
+  return request<GlobalStatsPayload>(`/api/stats/challenge?${params}`)
 }
 
 /** GET /api/challenge/adjacent – nearest scheduled challenge before or after a date */

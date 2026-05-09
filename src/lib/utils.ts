@@ -29,33 +29,59 @@ export function isCorrectGuess(guess: string, answer: string): boolean {
   return normaliseTitle(guess) === normaliseTitle(answer)
 }
 
+export type ShareGameMode = 'film' | 'series' | 'wiki'
+
+const SHARE_CORRECT_EMOJI: Record<ShareGameMode, string> = {
+  film: '🎬',
+  series: '📺',
+  wiki: '🏛️',
+}
+
+function sharePathForMode(mode: ShareGameMode): string {
+  if (mode === 'series') return '/series'
+  if (mode === 'wiki') return '/wiki'
+  return '/films'
+}
+
+function shareLabelForMode(mode: ShareGameMode): string {
+  if (mode === 'series') return 'Série'
+  if (mode === 'wiki') return 'Personnalités'
+  return 'Film'
+}
+
 /** Build an emoji grid for sharing (Wordle-style) */
-export function buildShareGrid(guesses: GuessEntry[]): string {
+export function buildShareGrid(guesses: GuessEntry[], mode: ShareGameMode = 'film'): string {
+  const correctEmoji = SHARE_CORRECT_EMOJI[mode]
   return guesses
     .map((g) => {
-      if (g.status === 'correct') return '🎬'
+      if (g.status === 'correct') return correctEmoji
       if (g.status === 'skipped') return '⏭️'
       return '❌'
     })
     .join(' ')
 }
 
-/** Format a share text */
+/** Format a share text (header + grille + lien vers le bon mode de jeu) */
 export function buildShareText(
   challengeId: string,
   guesses: GuessEntry[],
   won: boolean,
   maxAttempts?: number,
-  challengeNumber?: number
+  challengeNumber?: number,
+  gameMode: ShareGameMode = 'film'
 ): string {
-  const grid = buildShareGrid(guesses)
+  const grid = buildShareGrid(guesses, gameMode)
   const max = maxAttempts ?? guesses.length
   const score = won ? `${guesses.length}/${max}` : `X/${max}`
-  const url = PUBLIC_SITE_URL
+  const base = PUBLIC_SITE_URL.replace(/\/$/, '')
+  const url = `${base}${sharePathForMode(gameMode)}`
   const dateFr = new Date(challengeId + 'T12:00:00Z').toLocaleDateString('fr-FR', {
     day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
   })
-  const header = challengeNumber ? `${BRAND_NAME} #${challengeNumber} – ${dateFr}` : `${BRAND_NAME} – ${dateFr}`
+  const modeTag = shareLabelForMode(gameMode)
+  const header = challengeNumber
+    ? `${BRAND_NAME} — ${modeTag} #${challengeNumber} – ${dateFr}`
+    : `${BRAND_NAME} — ${modeTag} – ${dateFr}`
   return `${header}\n${score} ${grid}\n\n${url}`
 }
 

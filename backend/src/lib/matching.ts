@@ -61,3 +61,23 @@ export function isGuessCorrect(rawGuess: string, normalisedAccepted: string[]): 
   }
   return false
 }
+
+/**
+ * Ajoute des formes courtes pour les personnalités (Wiki uniquement) : nom de famille seul
+ * (dernier mot) et, si ≥ 3 mots, les deux derniers mots (particule + nom, ex. « van damme », « de gaulle »).
+ */
+export function expandWikiPersonAcceptedForms(normalisedFullNames: string[]): string[] {
+  const out = new Set<string>()
+  for (const acc of normalisedFullNames) {
+    out.add(acc)
+    const tokens = acc.split(' ').filter(Boolean)
+    if (tokens.length < 2) continue
+    const last = tokens[tokens.length - 1]!
+    if (last.length > 0) out.add(last)
+    if (tokens.length >= 3) {
+      const lastTwo = tokens.slice(-2).join(' ')
+      if (lastTwo !== acc) out.add(lastTwo)
+    }
+  }
+  return [...out]
+}

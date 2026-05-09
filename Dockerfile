@@ -46,8 +46,8 @@ RUN npm prune --omit=dev
 FROM node:20-alpine
 WORKDIR /app
 
-# Persistent volume for SQLite database (mount at /data on Railway)
-RUN mkdir -p /data
+# Persistent volume: DB + uploads (mount at /data on Railway)
+RUN mkdir -p /data/uploads
 
 # Compiled backend (JS + schema.sql copied by the build script)
 COPY --from=backend-builder /app/dist           ./backend/dist
@@ -58,6 +58,7 @@ COPY --from=frontend-builder /app/backend/public ./backend/public
 
 ENV NODE_ENV=production
 ENV DATABASE_PATH=/data/moviegame.db
+ENV UPLOADS_DIRECTORY=/data/uploads
 ENV PORT=3001
 
 EXPOSE 3001
