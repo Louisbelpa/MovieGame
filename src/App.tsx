@@ -9,6 +9,7 @@ const RulesModal = lazy(() => import('./components/modals/RulesModal').then((m) 
 const ArchiveModal = lazy(() => import('./components/modals/ArchiveModal').then((m) => ({ default: m.ArchiveModal })))
 const StatsModal = lazy(() => import('./components/modals/StatsModal').then((m) => ({ default: m.StatsModal })))
 import { FEATURES } from './config/features'
+import { migrateLegacyRulesSeen, rulesSeenKeyForRoute } from './lib/rulesSeen'
 import { useGameStore } from './store/gameStore'
 import { useWikiStore } from './store/wikiStore'
 import { fetchChallengeCommunityStats } from './api/client'
@@ -134,6 +135,23 @@ function WikiModals() {
 }
 
 function GameLayout({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
+  const gameOpenModal = useGameStore((s) => s.openModal)
+  const wikiOpenModal = useWikiStore((s) => s.openModal)
+
+  useEffect(() => {
+    try {
+      migrateLegacyRulesSeen()
+      const key = rulesSeenKeyForRoute(mode)
+      if (mode === 'wiki') {
+        if (!localStorage.getItem(key)) wikiOpenModal('rules')
+      } else if (!localStorage.getItem(key)) {
+        gameOpenModal('rules')
+      }
+    } catch {
+      /* navigation privée */
+    }
+  }, [mode, gameOpenModal, wikiOpenModal])
+
   return (
     <div className="app min-h-dvh flex flex-col bg-film-black text-film-text" data-mode={mode}>
       <Header mode={mode} />

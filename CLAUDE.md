@@ -112,7 +112,7 @@ new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date()
 - Même structure pour `wikiStore.ts` (miroir de `gameStore.ts`)
 
 ### Tutoriel (premier visit)
-- Clé localStorage : `cineguess:rules_seen`
+- Clés localStorage : `cineguess:rules_seen:film`, `:series`, `:wiki` ; ancienne `cineguess:rules_seen` migrée une fois vers film+séries (`migrateLegacyRulesSeen`).
 - `useFirstVisit()` dans `App.tsx` ouvre la modale au montage, **sans dépendance sur `status`**
 - `RULES_SEEN_KEY` est écrit dans `RulesModal.handleClose()`, pas au montage
 

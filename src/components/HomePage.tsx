@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Footer } from '@/components/layout/Footer'
 import { FEATURES, BRAND_NAME } from '@/config/features'
+import { hasReturningFilmPlayerActivity } from '@/lib/storage'
 import {
   NewModesAnnouncementModal,
   NEW_MODES_ANNOUNCEMENT_STORAGE_KEY,
@@ -19,12 +20,13 @@ export function HomePage() {
 
   useEffect(() => {
     try {
-      if (!localStorage.getItem(NEW_MODES_ANNOUNCEMENT_STORAGE_KEY)) {
-        if (FEATURES.enableSeries && FEATURES.enableWiki) setAnnouncementVariant('both')
-        else if (FEATURES.enableSeries) setAnnouncementVariant('series')
-        else if (FEATURES.enableWiki) setAnnouncementVariant('wiki')
-        setShowNewBadge(true)
-      }
+      if (localStorage.getItem(NEW_MODES_ANNOUNCEMENT_STORAGE_KEY)) return
+      if (!hasReturningFilmPlayerActivity()) return
+
+      if (FEATURES.enableSeries && FEATURES.enableWiki) setAnnouncementVariant('both')
+      else if (FEATURES.enableSeries) setAnnouncementVariant('series')
+      else if (FEATURES.enableWiki) setAnnouncementVariant('wiki')
+      setShowNewBadge(true)
     } catch {}
   }, [])
 

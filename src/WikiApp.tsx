@@ -10,9 +10,8 @@ import { RulesModal } from '@/components/modals/RulesModal'
 import { ArchiveModal } from '@/components/modals/ArchiveModal'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
+import { RULES_SEEN_KEY_WIKI } from '@/lib/rulesSeen'
 import { useWikiStore } from '@/store/wikiStore'
-
-const RULES_SEEN_KEY = 'cineguess:rules_seen:wiki'
 
 export function WikiApp() {
   const openModal = useWikiStore((s) => s.openModal)
@@ -20,7 +19,7 @@ export function WikiApp() {
   // Show rules modal on first visit
   useEffect(() => {
     try {
-      if (!localStorage.getItem(RULES_SEEN_KEY)) {
+      if (!localStorage.getItem(RULES_SEEN_KEY_WIKI)) {
         openModal('rules')
       }
     } catch {}
