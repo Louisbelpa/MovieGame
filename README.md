@@ -94,6 +94,7 @@ Back office sur `http://localhost:5173/admin`.
     │   ├── routes/               # challenge.ts, films.ts, stats.ts, admin.ts, wiki-challenge.ts
     │   ├── services/             # challenge.service.ts, wiki-challenge.service.ts
     │   ├── lib/                  # wikipedia.ts (parser Wikipedia + Wikidata)
+    │   ├── config/               # uploads.ts (UPLOADS_DIRECTORY)
     │   ├── middleware/           # session, rateLimiter, adminAuth, errorHandler
     │   └── db/                   # schema.sql, migrate.ts, database.ts
     └── scripts/
@@ -130,6 +131,7 @@ Voir `backend/.env.example` pour la liste complète.
 |----------|--------|-------------|
 | `VITE_ENABLE_SERIES` | `true` | Active le mode Séries (home, tabs, route `/series`) |
 | `VITE_ENABLE_WIKI` | `true` | Active le mode WikiGuessr (home, tab, route `/wiki`) |
+| `VITE_API_URL` | *(vide)* | Préfixe URL du backend (`fetch` / admin) si besoin ; sinon requêtes relatives même origine |
 
 Effets des flags :
 - `VITE_ENABLE_SERIES=false` + `VITE_ENABLE_WIKI=false` → mode films uniquement, branding `CinéGuessr`
@@ -150,16 +152,42 @@ Effets des flags :
 | `IMAGE_SOURCE` | `tmdb` | `tmdb` ou `local` |
 | `MAX_ATTEMPTS` | `5` | Nombre de tentatives par défi films/séries |
 | `WIKI_MAX_ATTEMPTS` | `5` | Nombre de tentatives par défi WikiGuessr (optionnel) |
-| `UPLOADS_DIRECTORY` | `/data/uploads` en Docker | Dossier disque pour les fichiers uploadés depuis l’admin (même volume que la DB recommandé) |
+| `UPLOADS_DIRECTORY` | `backend/public/uploads` (dev) ; **`/data/uploads`** en Docker | Fichiers images uploadés depuis l’admin ; **à persister en prod** sur le même volume que la base |
+| `WIKI_PREFETCH_TARGET_READY` | `24` | Cible d’entrées « prêtes » dans le pool admin « Au hasard » (Wikipedia), plafond **400** |
+| `WIKI_PREFETCH_MAX_FETCH_PER_RUN` | `4` | Fiches Wikipédia enrichies au plus par passe de remplissage, plafond **40** |
+| `PREFETCH_WARM_TOKEN` | *(vide)* | Jeton Bearer / header `X-Prefetch-Warm-Token` pour `POST /api/admin/prefetch/warm` (cron) |
 
-## Changements backend récents
+**CORS** : renseigner `CORS_ORIGIN` en liste d’origines complètes `https://...` (sans slash final, sans espaces). Les origines sont normalisées côté serveur.
 
-- **Sessions admin révocables** — table `active_admin_tokens`, stockage hashé du token, expiration 7 jours et révocation au logout.
-- **Serveur durci** — CORS via package `cors` (liste blanche), headers via `helmet`, `express.json`/`urlencoded` limités à `1mb`.
-- **Protection XSS côté tentatives** — les guesses utilisateur sont nettoyés via `escapeHtml()` avant persistance.
-- **Recherche anti-spoiler améliorée** — autocomplétion film/série/wiki exclut aussi les défis futurs planifiés et échappe `%`/`_` en SQL LIKE.
-- **Wikipedia plus stable** — cache LRU (1h), throttle 1 requête/s et fetch résumé + wikitext en parallèle.
-- **Seed sécurisé** — `npm run db:seed` est bloqué en production.
+## Changements récents (résumé)
+
+### Base de données & migrations
+
+- `daily_challenges.is_active` — soft-delete du planning ; migrations réparatrices si la colonne avait disparu après d’anciennes recréations de table.
+- Tables `wiki_prefetch_pool`, `app_settings` (toggle pool), etc. — voir `backend/src/db/migrate.ts`.
+
+### Jeu public
+
+- **`#N` dans le header** — le numéro affiché est le **rang chronologique** parmi les défis actifs du même type (film / série / wiki), pas seulement la colonne SQL brute.
+- **Archives (modale calendrier)** — les routes `GET /api/challenge/dates`, `GET /api/wiki/dates` et `.../adjacent` ne listent que les défis **`is_active = 1`**. Retirer un jour du planning ne le compte plus comme « joué » dans le résumé du mois.
+
+### Back office
+
+- **Uploads** — servis sous `/uploads/...` depuis `UPLOADS_DIRECTORY` (montage volume recommandé avec la DB).
+- **Wikipedia** — pool préchargé pour « Au hasard » ; page **`/admin/wiki-pool`** (stats, activation) ; `POST /api/admin/prefetch/warm?target=&lang=&minFame=` pour cron externe.
+- **Planning** — après changement de date ou restauration d’un défi, renumérotation des `challenge_number`.
+
+### Domaine & branding
+
+- Sur **`cineguessr.fr`** / **`www.cineguessr.fr`**, redirection client vers **`guesstoday.fr`** avec migration partielle du localStorage (`src/main.tsx`). À garder le temps que les anciens liens disparaissent ; une **301** infra reste l’idéal pour le SEO.
+
+### Déjà documenté plus bas
+
+- **Sessions admin révocables** — table `active_admin_tokens`, hash SHA-256, logout révocable.
+- **Serveur durci** — `helmet`, CORS liste blanche, body `1mb`.
+- **XSS / LIKE / anti-spoiler** — comme précédemment.
+- **Wikipedia** — cache LRU, throttle, etc.
+- **Seed** — bloqué en production.
 
 ## API publique
 
@@ -171,6 +199,8 @@ Effets des flags :
 | `GET` | `/api/challenge/date/:date` | Défi d'une date passée (`YYYY-MM-DD`) |
 | `POST` | `/api/challenge/guess` | Soumettre une tentative |
 | `GET` | `/api/challenge/result?challengeId=` | Révéler le titre (fin de partie) |
+| `GET` | `/api/challenge/dates?days=&type=` | Dates ayant un défi actif (archive ; `type=film` ou `series`) |
+| `GET` | `/api/challenge/adjacent?date=&direction=&type=` | Date voisine planifiée (prev/next) |
 | `GET` | `/api/films/search?q=` | Autocomplétion des titres |
 | `GET` | `/api/stats` | Statistiques globales anonymes |
 | `GET` | `/health` | Santé du serveur |
@@ -185,6 +215,7 @@ Effets des flags :
 | `POST` | `/api/wiki/guess` | Soumettre une tentative |
 | `GET` | `/api/wiki/result?challengeId=` | Révéler la personnalité (fin de partie) |
 | `GET` | `/api/wiki/search?q=` | Autocomplétion des noms |
+| `GET` | `/api/wiki/dates?days=` | Dates ayant un défi wiki actif (archive) |
 | `GET` | `/api/wiki/stats` | Statistiques globales |
 
 ## Back office
@@ -195,7 +226,8 @@ Accessible sur `/admin`. Protégé par mot de passe (et identifiant si `ADMIN_US
 - **Films** — CRUD complet, recherche TMDB par titre, bouton "Film aléatoire" (TMDB discover, vote_count ≥ 500)
 - **Séries** — CRUD complet, recherche TMDB, bouton "Série aléatoire"
 - **Wikipedia** — CRUD personnalités : import depuis un slug Wikipedia (FR ou EN), bouton "Au hasard" via Wikidata SPARQL (filtre par sitelinks), parsing automatique du type de personnalité et de la carrière
-- **Planning** — calendrier des 30 prochains jours avec onglets Films / Séries / Wiki, assignation et auto-planification
+- **Pool Wikipedia** — `/admin/wiki-pool` : état du pool préchargé, activation/désactivation (`wiki_prefetch_enabled`)
+- **Planning** — calendrier des 30 prochains jours avec onglets Films / Séries / Wiki, assignation et auto-planification ; suppression = `is_active=0` sur `daily_challenges`
 - **Analytics** — statistiques de jeu, taux de victoire, joueurs récurrents
 
 ## Déploiement (Railway)
