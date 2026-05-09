@@ -40,7 +40,7 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
       <motion.div
         key={shakeTrigger}
         className={cn(
-          'flex items-center gap-2 p-1 pl-3 rounded-xl film-border transition-all min-h-[52px]',
+          'flex items-center gap-1.5 sm:gap-2 p-1 pl-2 sm:pl-3 rounded-xl film-border transition-all min-h-[48px] sm:min-h-[52px]',
           disabled && 'opacity-50'
         )}
         animate={shakeTrigger > 0 ? { x: [-8, 8, -5, 5, 0] } : {}}
@@ -57,16 +57,15 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Nom de la personnalité…"
+          placeholder="Personnalité…"
           disabled={disabled}
           autoComplete="off"
           enterKeyHint="search"
           spellCheck={false}
           className={cn(
             'flex-1 bg-transparent text-film-text placeholder:text-film-text-dim',
-            'text-sm outline-none min-w-0 py-2 rounded',
+            'text-xs sm:text-sm outline-none min-w-0 py-1.5 sm:py-2 rounded leading-snug',
             'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold',
-            'sm:text-sm text-base'
           )}
         />
 
