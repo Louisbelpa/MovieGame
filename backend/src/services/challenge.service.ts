@@ -5,6 +5,7 @@
  */
 
 import db from '../db/database.js';
+import { activeChallengeOrdinalByDate } from '../lib/dailyChallengeOrdinal.js';
 import { normalise, isGuessCorrect } from '../lib/matching.js';
 import { escapeHtml } from '../lib/utils.js';
 
@@ -56,6 +57,8 @@ interface ChallengeRow {
   series_id: number | null;
   challenge_number: number;
   hint_schedule: string;
+  /** Présent sur les lignes SQLite `SELECT *` */
+  media_type?: 'film' | 'series' | 'wiki';
 }
 
 interface SessionRow {
@@ -242,10 +245,15 @@ export function buildChallengePayload(
   const today = getTodayParis();
   const isPastChallenge = challenge.challenge_date < today;
   const mediaType = isSeries ? 'series' : 'film';
+  const mediaTypeForOrdinal = challenge.media_type ?? mediaType;
 
   return {
     challengeId: challenge.id,
-    challengeNumber: challenge.challenge_number,
+    challengeNumber: activeChallengeOrdinalByDate(
+      challenge.id,
+      challenge.challenge_date,
+      mediaTypeForOrdinal
+    ),
     date: challenge.challenge_date,
     isPastChallenge,
     mediaType,

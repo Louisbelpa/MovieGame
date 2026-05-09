@@ -5,6 +5,7 @@
  */
 
 import db from '../db/database.js'
+import { activeChallengeOrdinalByDate } from '../lib/dailyChallengeOrdinal.js'
 import { normalizeCommonsPhotoUrl } from '../lib/commonsThumb.js'
 import { normalise, isGuessCorrect } from '../lib/matching.js'
 import { escapeHtml } from '../lib/utils.js'
@@ -416,7 +417,11 @@ export function buildWikiChallengePayload(challenge: WikiChallengeRow, session: 
 
   return {
     challengeId: challenge.id,
-    challengeNumber: challenge.challenge_number,
+    challengeNumber: activeChallengeOrdinalByDate(
+      challenge.id,
+      challenge.challenge_date,
+      'wiki'
+    ),
     date: challenge.challenge_date,
     isPastChallenge: challenge.challenge_date < today,
     mediaType: 'wiki' as const,

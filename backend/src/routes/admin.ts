@@ -1604,6 +1604,7 @@ adminRouter.post(
       }
 
       db.prepare(`UPDATE daily_challenges SET challenge_date = ? WHERE id = ?`).run(date, id);
+      renumberChallenges(existing.media_type as 'film' | 'series' | 'wiki');
       logAuditEvent('challenge.reschedule', { id, date });
 
       const updated = db
@@ -1639,6 +1640,10 @@ adminRouter.post(
       }
 
       db.prepare(`UPDATE daily_challenges SET is_active = 1 WHERE id = ?`).run(id);
+      const mediaRow = db
+        .prepare<[number], { media_type: string }>(`SELECT media_type FROM daily_challenges WHERE id = ?`)
+        .get(id)!;
+      renumberChallenges(mediaRow.media_type as 'film' | 'series' | 'wiki');
       logAuditEvent('challenge.restore', { id });
       res.json({ ok: true, id, message: 'Challenge restored.' });
     } catch (err) {
