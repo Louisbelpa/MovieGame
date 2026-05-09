@@ -3029,14 +3029,22 @@ adminRouter.get(
   }
 );
 
-// GET /api/admin/analytics/challenges?mediaType=…&sort=…&from=YYYY-MM-DD&to=YYYY-MM-DD
+// GET /api/admin/analytics/challenges?mediaType=film|series|wiki|all&sort=…&from=…&to=…
 // `from` / `to` : plage de dates du défi (Europe/Paris, même logique que la section Période). Obligatoires côté client actuel.
+// `mediaType=all` : tous les types (films + séries + wiki) dans une seule liste.
 adminRouter.get(
   '/analytics/challenges',
   (req: Request, res: Response, next: NextFunction) => {
     try {
-      const rawMediaType = req.query.mediaType;
-      const mediaType = rawMediaType === 'series' ? 'series' : rawMediaType === 'wiki' ? 'wiki' : 'film';
+      const rawMediaType = (req.query.mediaType as string | undefined)?.trim().toLowerCase();
+      const mediaType: 'film' | 'series' | 'wiki' | 'all' =
+        rawMediaType === 'all'
+          ? 'all'
+          : rawMediaType === 'series'
+            ? 'series'
+            : rawMediaType === 'wiki'
+              ? 'wiki'
+              : 'film';
       const sortParam = req.query.sort as string | undefined;
       const validSorts = ['challenge_date', 'win_rate', 'sessions', 'avg_hints'] as const;
       type SortOption = typeof validSorts[number];
@@ -3057,6 +3065,68 @@ adminRouter.get(
           ? 'ORDER BY sessions DESC, dc.challenge_date DESC'
           : 'ORDER BY avg_hints DESC, dc.challenge_date DESC';
 
+      const todayParis = getTodayParis();
+
+      if (mediaType === 'all') {
+        const rows = db.prepare(`
+          SELECT
+            dc.id AS challenge_id,
+            dc.challenge_date,
+            dc.media_type AS media_type,
+            COALESCE(f.title, s.title, wp.name) AS title,
+            COALESCE(f.year, s.year, 0) AS year,
+            COALESCE(f.fame_level, s.fame_level, wp.difficulty, 3) AS fame_level,
+            COUNT(gs.rowid) AS sessions,
+            ROUND(100.0 * SUM(CASE WHEN gs.outcome = 'won' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN gs.outcome IS NOT NULL THEN 1 ELSE 0 END), 0)) AS win_rate,
+            ROUND(AVG(CASE WHEN gs.outcome IS NOT NULL THEN json_array_length(gs.attempts) ELSE NULL END), 1) AS avg_attempts,
+            ROUND(AVG(CASE WHEN gs.outcome IS NOT NULL THEN gs.hints_revealed ELSE NULL END), 1) AS avg_hints,
+            (
+              SELECT j.value->>'$.guess'
+              FROM game_sessions gs2, json_each(gs2.attempts) j
+              WHERE gs2.challenge_id = dc.id AND j.value->>'$.correct' = 'false'
+              GROUP BY j.value->>'$.guess'
+              ORDER BY COUNT(*) DESC
+              LIMIT 1
+            ) AS most_common_wrong_guess
+          FROM daily_challenges dc
+          LEFT JOIN films f ON dc.media_type = 'film' AND f.id = dc.film_id
+          LEFT JOIN series s ON dc.media_type = 'series' AND s.id = dc.series_id
+          LEFT JOIN wiki_persons wp ON dc.media_type = 'wiki' AND wp.id = dc.wiki_person_id
+          LEFT JOIN game_sessions gs ON gs.challenge_id = dc.id
+          WHERE dc.challenge_date >= ? AND dc.challenge_date <= ?
+          GROUP BY dc.id
+          HAVING COUNT(gs.rowid) > 0 OR dc.challenge_date = ?
+          ${orderClause}
+        `).all(fromQ, toQ, todayParis) as {
+          challenge_id: number;
+          challenge_date: string;
+          media_type: string;
+          title: string;
+          year: number;
+          fame_level: number;
+          sessions: number;
+          win_rate: number | null;
+          avg_attempts: number | null;
+          avg_hints: number | null;
+          most_common_wrong_guess: string | null;
+        }[];
+
+        res.json(rows.map((r) => ({
+          challenge_id: r.challenge_id,
+          challenge_date: r.challenge_date,
+          media_type: r.media_type as 'film' | 'series' | 'wiki',
+          title: r.title,
+          year: r.year,
+          fame_level: r.fame_level,
+          sessions: r.sessions,
+          win_rate: r.win_rate ?? 0,
+          avg_attempts: r.avg_attempts ?? 0,
+          avg_hints: r.avg_hints ?? 0,
+          most_common_wrong_guess: r.most_common_wrong_guess ?? null,
+        })));
+        return;
+      }
+
       const mediaJoin =
         mediaType === 'series'
           ? `JOIN series m ON m.id = dc.series_id`
@@ -3068,8 +3138,6 @@ adminRouter.get(
       const yearCol = mediaType === 'wiki' ? `0` : `m.year`;
       const fameCol = mediaType === 'wiki' ? `m.difficulty` : `m.fame_level`;
 
-      const todayParis = getTodayParis();
-
       const rows = db.prepare(`
         SELECT
           dc.id AS challenge_id,
@@ -3080,7 +3148,7 @@ adminRouter.get(
           COUNT(gs.rowid) AS sessions,
           ROUND(100.0 * SUM(CASE WHEN gs.outcome = 'won' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN gs.outcome IS NOT NULL THEN 1 ELSE 0 END), 0)) AS win_rate,
           ROUND(AVG(CASE WHEN gs.outcome IS NOT NULL THEN json_array_length(gs.attempts) ELSE NULL END), 1) AS avg_attempts,
-          ROUND(AVG(gs.hints_revealed), 1) AS avg_hints,
+          ROUND(AVG(CASE WHEN gs.outcome IS NOT NULL THEN gs.hints_revealed ELSE NULL END), 1) AS avg_hints,
           (
             SELECT j.value->>'$.guess'
             FROM game_sessions gs2, json_each(gs2.attempts) j

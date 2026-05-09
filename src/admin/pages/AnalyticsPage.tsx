@@ -12,12 +12,14 @@ import {
   getAttemptsDistribution,
   getHintsDistribution,
   type AnalyticsOverview,
+  type AnalyticsMediaFilter,
   type DailyAnalytics,
   type ChallengeAnalytics,
   type WrongGuess,
   type ReturningPlayer,
   type HourlyData,
 } from '../api'
+import { FEATURES } from '@/config/features'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -262,7 +264,7 @@ function WrongGuessesPanel({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 type AnalyticsSort = 'challenge_date' | 'win_rate' | 'sessions' | 'avg_hints'
-type MediaTab = 'film' | 'series' | 'wiki'
+type MediaTab = AnalyticsMediaFilter
 
 export function AnalyticsPage() {
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
@@ -349,6 +351,16 @@ export function AnalyticsPage() {
   const attMax = Math.max(...Object.values(attempts), 1)
   const hinMax = Math.max(...Object.values(hints), 1)
 
+  const typeToggleOptions = useMemo(() => {
+    const o: { id: MediaTab; label: string }[] = [{ id: 'film', label: 'Films' }]
+    if (FEATURES.enableSeries) o.push({ id: 'series', label: 'Séries' })
+    if (FEATURES.enableWiki) o.push({ id: 'wiki', label: 'Personnalités' })
+    o.push({ id: 'all', label: 'Tout' })
+    return o
+  }, [])
+
+  const attemptSlots = activeTab === 'wiki' ? [1, 2, 3] : [1, 2, 3, 4, 5]
+
   const SortIcon = ({ col }: { col: AnalyticsSort }) =>
     sort === col
       ? <ChevronUp size={13} className="inline ml-0.5 text-indigo-600" />
@@ -363,14 +375,13 @@ export function AnalyticsPage() {
         {/* ── Section 1 : Type de jeu ──────────────────────────────────────── */}
         <section>
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Type de jeu</h2>
+          <p className="text-xs text-gray-500 mb-2 max-w-3xl">
+            <strong>Tout</strong> agrège films, séries et personnalités sur la période (même périmètre que les graphiques et le classement).
+          </p>
           <SegmentedToggle
             value={activeTab}
             onChange={(v) => setActiveTab(v as MediaTab)}
-            options={[
-              { id: 'film', label: 'Films' },
-              { id: 'series', label: 'Séries' },
-              { id: 'wiki', label: 'Personnalités' },
-            ]}
+            options={typeToggleOptions}
           />
         </section>
 
@@ -459,7 +470,7 @@ export function AnalyticsPage() {
           {!analyticsLoading && !distErr && Object.keys(attempts).length === 0 && <p className="text-sm text-gray-400">Aucune donnée.</p>}
           {!analyticsLoading && (
             <div className="space-y-2">
-              {(activeTab === 'wiki' ? [1, 2, 3] : [1, 2, 3, 4, 5]).map((n) => (
+              {attemptSlots.map((n) => (
                 <HBar
                   key={n}
                   label={`${n} tentative${n > 1 ? 's' : ''}`}
@@ -525,7 +536,9 @@ export function AnalyticsPage() {
                     >
                       Date du défi<SortIcon col="challenge_date" />
                     </th>
-                    <th className="px-4 py-2.5 font-medium">{activeTab === 'film' ? 'Film' : activeTab === 'series' ? 'Série' : 'Personnalité'}</th>
+                    <th className="px-4 py-2.5 font-medium">
+                      {activeTab === 'all' ? 'Défi' : activeTab === 'film' ? 'Film' : activeTab === 'series' ? 'Série' : 'Personnalité'}
+                    </th>
                     <th className="px-4 py-2.5 font-medium">Fame</th>
                     <th
                       className="px-4 py-2.5 font-medium cursor-pointer hover:text-indigo-600 select-none"
@@ -572,11 +585,20 @@ export function AnalyticsPage() {
                           <span>{formatChallengeDate(item.challenge_date)}</span>
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 font-medium text-gray-800 max-w-[160px] truncate">
-                        {item.title}
-                        {item.media_type !== 'wiki' && item.year > 0 ? (
-                          <span className="ml-1 text-sm text-gray-400">{item.year}</span>
-                        ) : null}
+                      <td className="px-4 py-2.5 font-medium text-gray-800 max-w-[200px]">
+                        <span className="flex items-center gap-1.5 min-w-0">
+                          {activeTab === 'all' && (
+                            <span className="shrink-0 rounded px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-gray-100 text-gray-600">
+                              {item.media_type === 'film' ? 'Film' : item.media_type === 'series' ? 'Série' : 'Wiki'}
+                            </span>
+                          )}
+                          <span className="truncate">
+                            {item.title}
+                            {item.media_type !== 'wiki' && item.year > 0 ? (
+                              <span className="ml-1 text-sm text-gray-400">{item.year}</span>
+                            ) : null}
+                          </span>
+                        </span>
                       </td>
                       <td className="px-4 py-2.5"><Stars level={item.fame_level} /></td>
                       <td className="px-4 py-2.5 text-gray-700">{item.sessions}</td>
@@ -598,7 +620,13 @@ export function AnalyticsPage() {
                   {challenges.length === 0 && (
                     <tr>
                       <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-400">
-                        {activeTab === 'film' ? 'Aucun film trouvé.' : activeTab === 'series' ? 'Aucune série trouvée.' : 'Aucune personnalité trouvée.'}
+                        {activeTab === 'all'
+                          ? 'Aucun défi avec activité dans la période.'
+                          : activeTab === 'film'
+                            ? 'Aucun film trouvé.'
+                            : activeTab === 'series'
+                              ? 'Aucune série trouvée.'
+                              : 'Aucune personnalité trouvée.'}
                       </td>
                     </tr>
                   )}
