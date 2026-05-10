@@ -36,11 +36,12 @@ interface WinModalProps {
     hintsRevealed: number
   }
   onShare: () => void
+  onShareAll?: () => void
   onOpenStats?: () => void
   unplayedModes?: Array<{ type: GameMode; path: string }>
 }
 
-export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onOpenStats, unplayedModes }: WinModalProps) {
+export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShareAll, onOpenStats, unplayedModes }: WinModalProps) {
   const isWiki = mode === 'wiki'
   const modalTitleId = 'modal-title-win'
   const modalDescId = 'modal-desc'
@@ -120,6 +121,13 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onOpen
             Partager
           </Button>
         </div>
+
+        {onShareAll && (
+          <Button onClick={onShareAll} variant="secondary" size="md" className="w-full">
+            <Share2 size={15} />
+            Partager les 3 jeux 🎬📺🏛️
+          </Button>
+        )}
 
         {unplayedModes && unplayedModes.length > 0 && (
           <div className="w-full">

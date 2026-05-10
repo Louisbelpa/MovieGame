@@ -85,6 +85,27 @@ export function buildShareText(
   return `${header}\n${score} ${grid}\n\n${url}`
 }
 
+export interface AllShareGame {
+  mode: ShareGameMode
+  guesses: GuessEntry[]
+  won: boolean
+  maxAttempts: number
+}
+
+/** Format a combined share text for all 3 game modes */
+export function buildAllShareText(date: string, games: AllShareGame[]): string {
+  const base = PUBLIC_SITE_URL.replace(/\/$/, '')
+  const dateFr = new Date(date + 'T12:00:00Z').toLocaleDateString('fr-FR', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+  })
+  const lines = games.map((g) => {
+    const grid = buildShareGrid(g.guesses, g.mode)
+    const score = g.won ? `${g.guesses.length}/${g.maxAttempts}` : `X/${g.maxAttempts}`
+    return `${SHARE_CORRECT_EMOJI[g.mode]} ${shareLabelForMode(g.mode)} — ${score} ${grid}`
+  })
+  return `${BRAND_NAME} — ${dateFr}\n\n${lines.join('\n')}\n\n${base}`
+}
+
 /** Default empty stats */
 export function defaultStats(): GameStats {
   return {
