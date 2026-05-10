@@ -9,6 +9,16 @@ import { activeChallengeOrdinalByDate } from '../lib/dailyChallengeOrdinal.js';
 import { normalise, isGuessCorrect } from '../lib/matching.js';
 import { escapeHtml } from '../lib/utils.js';
 
+function parseAttempts(raw: string): AttemptEntry[] {
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error('not an array');
+    return parsed as AttemptEntry[];
+  } catch {
+    throw Object.assign(new Error('Corrupted session data'), { status: 500 });
+  }
+}
+
 const MAX_ATTEMPTS = parseInt(process.env.MAX_ATTEMPTS ?? '5', 10);
 const WIKI_MAX_ATTEMPTS = parseInt(process.env.WIKI_MAX_ATTEMPTS ?? '5', 10);
 const MAX_HINTS = 3;
@@ -251,7 +261,7 @@ export function buildChallengePayload(
 
   const schedule: string[] = (JSON.parse(challenge.hint_schedule) as string[]).filter(h => VALID_HINTS.has(h)).slice(0, MAX_HINTS);
   const hintsRevealed = Math.min(session.hints_revealed, MAX_HINTS);
-  const attempts: AttemptEntry[] = JSON.parse(session.attempts);
+  const attempts: AttemptEntry[] = parseAttempts(session.attempts);
 
   const hints = schedule.slice(0, hintsRevealed).map((type) => {
     switch (type) {
@@ -468,7 +478,7 @@ export function processGuess(
       throw Object.assign(new Error('Game already finished'), { status: 409 });
     }
 
-    const attempts: AttemptEntry[] = JSON.parse(session.attempts);
+    const attempts: AttemptEntry[] = parseAttempts(session.attempts);
 
     const challenge = db
       .prepare<[number], ChallengeRow>(`SELECT * FROM daily_challenges WHERE id = ?`)
@@ -561,7 +571,7 @@ export function getResult(sessionToken: string, challengeId: number) {
     .prepare<[number], ChallengeRow>(`SELECT * FROM daily_challenges WHERE id = ?`)
     .get(challengeId)!;
 
-  const attempts: AttemptEntry[] = JSON.parse(session.attempts);
+  const attempts: AttemptEntry[] = parseAttempts(session.attempts);
 
   if (challenge.series_id !== null) {
     const s = db
