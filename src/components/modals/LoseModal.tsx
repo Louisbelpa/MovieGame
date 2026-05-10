@@ -33,6 +33,7 @@ interface LoseModalProps {
     hintsRevealed: number
   }
   onShare: () => void
+  onShareAll?: () => void
   onOpenStats?: () => void
   unplayedModes?: Array<{ type: GameMode; path: string }>
 }
@@ -50,7 +51,7 @@ function getPersonTypeLabel(personType?: string): string {
   }
 }
 
-export function LoseModal({ isOpen, onClose, mode, result, stats, onShare, onOpenStats, unplayedModes }: LoseModalProps) {
+export function LoseModal({ isOpen, onClose, mode, result, stats, onShare, onShareAll, onOpenStats, unplayedModes }: LoseModalProps) {
   const isWiki = mode === 'wiki'
   const modalTitleId = 'modal-title'
   const modalDescId = 'modal-desc-lose'
@@ -131,6 +132,13 @@ export function LoseModal({ isOpen, onClose, mode, result, stats, onShare, onOpe
             Partager
           </Button>
         </div>
+
+        {onShareAll && (
+          <Button variant="secondary" size="md" onClick={onShareAll} className="w-full">
+            <Share2 size={15} />
+            Partager les 3 jeux 🎬📺🏛️
+          </Button>
+        )}
 
         {unplayedModes && unplayedModes.length > 0 && (
           <div className="w-full">

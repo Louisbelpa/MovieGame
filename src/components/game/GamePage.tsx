@@ -18,8 +18,8 @@ import type { WikiChallengePayload, WikiHintPayload, WikiVisibleProfile } from '
 import type { GuessEntry } from '@/types'
 import { useGameStore, getTodayParis } from '@/store/gameStore'
 import { useWikiStore } from '@/store/wikiStore'
-import { loadHistory } from '@/lib/storage'
-import { buildShareText } from '@/lib/utils'
+import { loadHistory, loadGameState } from '@/lib/storage'
+import { buildShareText, buildAllShareText, type AllShareGame } from '@/lib/utils'
 import { FEATURES } from '@/config/features'
 
 interface GamePageProps {
@@ -536,6 +536,26 @@ export function GamePage({ mode }: GamePageProps) {
           { type: 'wiki' as const, path: '/wiki', enabled: FEATURES.enableWiki },
         ]
         const unplayedModes = allModes.filter(m => m.enabled && m.type !== mode && !loadHistory(m.type)[today])
+
+        const buildOnShareAll = unplayedModes.length === 0 ? () => {
+          const enabledModes = allModes.filter(m => m.enabled)
+          const games: AllShareGame[] = enabledModes.flatMap((m) => {
+            if (m.type === mode) {
+              return [{ mode: m.type, guesses: guessesForTracker, won: status === 'won', maxAttempts: challenge.maxAttempts }]
+            }
+            const state = loadGameState(m.type)
+            if (!state) return []
+            const maxAttempts = state.status === 'won' ? 5 : state.guesses.length
+            return [{ mode: m.type, guesses: state.guesses, won: state.status === 'won', maxAttempts }]
+          })
+          const text = buildAllShareText(today, games)
+          if (navigator.share) {
+            void navigator.share({ text })
+          } else {
+            void navigator.clipboard.writeText(text)
+          }
+        } : undefined
+
         return (
           <>
       {status === 'won' && (
@@ -565,6 +585,7 @@ export function GamePage({ mode }: GamePageProps) {
               challenge.challengeNumber,
             )
           }}
+          onShareAll={buildOnShareAll}
           onOpenStats={() => openModal('stats')}
           unplayedModes={unplayedModes}
         />
@@ -596,6 +617,7 @@ export function GamePage({ mode }: GamePageProps) {
               challenge.challengeNumber,
             )
           }}
+          onShareAll={buildOnShareAll}
           onOpenStats={() => openModal('stats')}
           unplayedModes={unplayedModes}
         />
