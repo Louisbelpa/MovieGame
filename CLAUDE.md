@@ -37,7 +37,11 @@ Monorepo avec un **frontend** React/Vite à la racine et un **backend** Express/
 │   └── db/                   # schema.sql, migrate.ts, database.ts
     └── scripts/
         ├── seed.ts
-        └── reset.ts
+        ├── reset.ts
+        ├── backup.ts               # Sauvegarde SQLite
+        ├── fetch-backdrops.ts      # Télécharge les images TMDB en local
+        ├── backfill-wiki-persons.ts # Enrichit les fiches wiki existantes
+        └── check-wiki-parser.ts    # Debug parsing Wikipedia d'une fiche
 ```
 
 ## Commandes
@@ -59,13 +63,19 @@ npm run db:seed      # Films d'exemple + planning initial
 npm run dev          # Express sur http://localhost:3001
 ```
 
+### Tests
+```bash
+npm run test                    # Frontend (vitest, jsdom)
+cd backend && npm run test      # Backend (vitest)
+```
+
 ## Variables d'environnement clés
 
 ### Frontend (`/.env`)
 
 | Variable | Défaut | Description |
 |----------|--------|-------------|
-| `VITE_ENABLE_SERIES` | `true` | `false` = films only (UI/ routes séries masquées), `true` = films + séries — branding toujours `GuessToday` |
+| `VITE_ENABLE_SERIES` | `false` | `false` = films only (UI/ routes séries masquées), `true` = films + séries — branding toujours `GuessToday` |
 | `VITE_ENABLE_WIKI` | `true` | Active/désactive le mode WikiGuessr (route `/wiki`, tab Homepage) |
 | `VITE_API_URL` | *(vide)* | Préfixe API si le frontend n’est pas servi même origine que le backend |
 
@@ -209,6 +219,116 @@ Préfixe `/api/wiki/` — définies dans `wiki-challenge.ts`, enregistrées dans
 | `GET` | `/api/wiki/dates?days=` | Dates avec défi wiki actif (archive) |
 
 **Films / séries** — `GET /api/challenge/dates?days=&type=film|series` : idem pour l’archive ; `adjacent` filtre aussi `is_active = 1`.
+
+---
+
+---
+
+## Schéma base de données (SQLite)
+
+10 tables — toutes créées/mises à jour par `npm run db:migrate` (idempotent).
+
+| Table | Rôle | Champs clés |
+|-------|------|-------------|
+| `films` | Catalogue films | `title`, `title_aliases` (JSON), `year`, `director`, `genres`/`cast_members` (JSON), `image_url`, `image_blurred_url`, `tmdb_id`, `fame_level` 1–5, `hint_schedule` (JSON), `is_active` |
+| `series` | Catalogue séries | Idem + `creator`, `number_of_seasons`, `network`, `status`, `original_language` |
+| `wiki_persons` | Personnalités Wikipedia | `slug_fr`, `slug_en`, `name`, `person_type` (8 valeurs), `infobox_data` (JSON), `hint_schedule` (JSON sans préfixe), `photo_url` |
+| `daily_challenges` | Planning quotidien | `challenge_date` (YYYY-MM-DD), `media_type` (film/series/wiki), `film_id`/`series_id`/`wiki_person_id`, `is_active` (soft-delete), `challenge_number` |
+| `game_sessions` | Sessions jeu films/séries | `session_token`, `challenge_id`, `attempts` (JSON), `status`, `completed_at` |
+| `wiki_sessions` | Sessions jeu wiki | Même structure que `game_sessions` |
+| `active_admin_tokens` | Auth admin | `token_hash` (SHA-256), `expires_at`, `revoked_at` |
+| `global_stats` | Stats agrégées communauté | Compteurs wins/losses/attempts par challenge |
+| `audit_logs` | Traçabilité admin | `action`, `entity_type`, `entity_id`, `admin_user`, `details` (JSON) |
+| `challenge_reviews` | Modération défis | `challenge_id`, `status`, `notes` |
+
+**Colonnes JSON** — toujours lire/écrire comme strings JSON : `title_aliases`, `genres`, `cast_members`, `hint_schedule`, `infobox_data`, `attempts`.
+
+**`is_active = 0`** = soft-delete (jamais supprimé physiquement). Filtrer systématiquement dans les requêtes publiques.
+
+---
+
+## Types frontend clés (`src/types/index.ts`)
+
+```ts
+type GuessStatus = 'correct' | 'wrong' | 'skipped'
+type GameStatus  = 'idle' | 'playing' | 'won' | 'lost' | 'not_found'
+type HintType    = 'year' | 'genre' | 'director' | 'creator' | 'actor' | 'synopsis' | 'country'
+type MediaType   = 'film' | 'series' | 'wiki'
+
+// blurLevels: index 0 = max flou, index 5 = image nette
+// e.g. [24, 18, 12, 8, 4, 0]
+interface DailyChallenge { blurLevels: number[]; hints: Hint[]; ... }
+
+// Persisté en localStorage — challengeId sert à détecter le changement de jour
+interface PersistedGameState { challengeId: string; guesses: GuessEntry[]; status: GameStatus; blurIndex: number; ... }
+```
+
+**`image_blurred_url`** = version basse résolution optionnelle servie avant la révélation. Si absente, l'image principale est floutée via CSS.
+
+---
+
+## Feature flags (`src/config/features.ts`)
+
+```ts
+export const FEATURES = {
+  enableSeries: envFlag(VITE_ENABLE_SERIES, false),  // défaut: films only
+  enableWiki:   envFlag(VITE_ENABLE_WIKI,   true),   // défaut: wiki activé
+}
+export const BRAND_NAME     = 'GuessToday'
+export const PUBLIC_SITE_URL = VITE_PUBLIC_SITE_URL || 'https://guesstoday.fr'
+```
+
+Utiliser `BRAND_NAME` et `PUBLIC_SITE_URL` dans le frontend au lieu de strings en dur.
+
+---
+
+## Middleware backend (`backend/src/middleware/`)
+
+| Fichier | Rôle |
+|---------|------|
+| `adminAuth.ts` | Vérifie cookie `admin_token` → lookup `active_admin_tokens` (non révoqué, non expiré) |
+| `session.ts` | Cookie de session joueur (httpOnly, signé) |
+| `rateLimiter.ts` | 5 limiteurs : `API` (général), `GUESS` (soumissions), `SEARCH` (autocomplete), `ADMIN`, `LOGIN` (anti-bruteforce) |
+| `errorHandler.ts` | Catch-all Express → format JSON `{ error, message }` + log pino |
+| `auditLog.ts` | Log toutes les actions admin dans `audit_logs` |
+| `requestId.ts` | Injecte `X-Request-Id` dans chaque requête |
+
+---
+
+## Matching des guesses (`backend/src/lib/matching.ts`)
+
+Utilisé dans `challenge.service.ts` et `wiki-challenge.service.ts` pour valider les réponses :
+- Normalisation : minuscules, accents supprimés, ponctuation ignorée
+- Comparaison contre `title` + `title_aliases` (JSON array)
+- Distance de Levenshtein pour tolérance aux fautes (seuil configurable)
+- Ne jamais contourner ce module pour valider une réponse — risque de faux positifs/négatifs
+
+---
+
+## `hint_schedule` films/séries
+
+Même invariant que pour wiki : stocké en DB sans préfixe, max **3 indices révélés** en jeu.
+
+- Films : défaut `["year","director","cast"]`
+- Séries : défaut `["year","creator","cast"]`
+- L'admin peut personnaliser l'ordre par fiche
+
+---
+
+## Déploiement
+
+**Dockerfile** (3 stages) :
+1. `frontend-builder` — `npm run build` → `backend/public/`
+2. `backend-builder` — compile TypeScript, compile `better-sqlite3` (python3/make/g++ requis)
+3. `runtime` — Node 20 Alpine, `prune --omit=dev`, expose 3001
+
+**Railway** — `railway.json` + `railway.toml` à la racine. Volume `/data` pour DB + uploads en prod (`DATABASE_PATH=/data/moviegame.db`, `UPLOADS_DIRECTORY=/data/uploads`).
+
+**Build local complet** :
+```bash
+npm run build           # Frontend → backend/public/
+cd backend && npm run build  # Backend → backend/dist/
+```
 
 ---
 

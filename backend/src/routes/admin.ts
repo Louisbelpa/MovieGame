@@ -581,14 +581,12 @@ adminRouter.post(
       const adminUsername = process.env.ADMIN_USERNAME ?? '';
 
       const timingSafeEqual = (a: string, b: string): boolean => {
-        const bufA = Buffer.from(a);
-        const bufB = Buffer.from(b);
-        if (bufA.length !== bufB.length) {
-          // Still run timingSafeEqual on same-length buffers to avoid leaking length
-          crypto.timingSafeEqual(bufA, bufA);
-          return false;
-        }
-        return crypto.timingSafeEqual(bufA, bufB);
+        // Hash both strings to a fixed-length digest so comparison is always
+        // constant-time regardless of input length (avoids length side-channel).
+        const key = Buffer.alloc(32);
+        const ha = crypto.createHmac('sha256', key).update(a).digest();
+        const hb = crypto.createHmac('sha256', key).update(b).digest();
+        return crypto.timingSafeEqual(ha, hb);
       };
 
       // If ADMIN_USERNAME is configured, both fields are required
