@@ -78,6 +78,13 @@ function addMonths(yearMonth: string, delta: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+function mediaRefFromChallenge(ch: AdminChallenge): MediaRef {
+  if (ch.mediaType === 'film' && ch.film) return { filmId: ch.film.id }
+  if (ch.mediaType === 'series' && ch.series) return { seriesId: ch.series.id }
+  if (ch.mediaType === 'wiki' && ch.wiki) return { wikiPersonId: ch.wiki.id }
+  throw new Error('Invalid challenge state')
+}
+
 export function CalendarPage() {
   const [mediaType, setMediaType] = useState<'film' | 'series' | 'wiki'>('film')
   const [currentMonth, setCurrentMonth] = useState(getCurrentYearMonth)
@@ -221,13 +228,19 @@ export function CalendarPage() {
   async function handleDrop(targetDate: string) {
     if (!dragChallengeId || !dragSourceDate) return
     if (targetDate < todayISO) return
-    if (byDate[targetDate]) {
-      setDropError('Ce jour est déjà planifié')
-      setTimeout(() => setDropError(null), 3000)
-      return
-    }
+    const sourceChallenge = byDate[dragSourceDate]
+    const targetChallenge = byDate[targetDate]
     try {
-      await rescheduleChallenge(dragChallengeId, targetDate)
+      if (targetChallenge && sourceChallenge) {
+        const sourceRef = mediaRefFromChallenge(sourceChallenge)
+        const targetRef = mediaRefFromChallenge(targetChallenge)
+        await Promise.all([
+          updateChallenge(sourceChallenge.id, targetRef),
+          updateChallenge(targetChallenge.id, sourceRef),
+        ])
+      } else {
+        await rescheduleChallenge(dragChallengeId, targetDate)
+      }
       load(from, to, mediaType)
     } catch (err) {
       setDropError(err instanceof Error ? err.message : 'Erreur lors du déplacement')

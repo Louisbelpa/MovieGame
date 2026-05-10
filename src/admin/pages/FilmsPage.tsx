@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Plus, Search, Shuffle } from 'lucide-react'
+import { Plus, Search, Shuffle, Trash2, ToggleLeft, ToggleRight } from 'lucide-react'
 import {
   getFilms,
   createFilm,
@@ -27,47 +27,55 @@ type ModalState =
   | { type: 'create'; initial?: Partial<AdminFilm> }
   | { type: 'edit'; film: AdminFilm }
   | { type: 'delete'; film: AdminFilm }
+  | { type: 'bulkDelete'; ids: number[] }
   | { type: 'backdrops'; film: AdminFilm }
 
 export function FilmsPage() {
   const toast = useToast()
   const { modal, setModal, close } = useModal<ModalState>()
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('all')
-  const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [randomLoading, setRandomLoading] = useState(false)
   const [previewFilmId, setPreviewFilmId] = useState<number | null>(null)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
   const fetcher = useCallback(
     (opts: { page: number; limit: number; q: string }) =>
-      getFilms({
-        ...opts,
-        isActive: activeFilter === 'all' ? undefined : activeFilter === 'active',
-      }),
+      getFilms({ ...opts, isActive: activeFilter === 'all' ? undefined : activeFilter === 'active' }),
     [activeFilter],
   )
 
-  const { items: films, loading, error, page, pages, total, search, setSearch, setPage, reload } =
+  const { items: films, loading, error, page, pages, total, search, setSearch, setPage, reload, setItems } =
     useList(fetcher)
+
+  // Clear selection when list changes
+  useEffect(() => { setSelected(new Set()) }, [films])
 
   // Keyboard shortcuts: N = new, / = search focus
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-      if (e.key === 'n' || e.key === 'N') {
-        e.preventDefault()
-        setModal({ type: 'create' })
-      }
-      if (e.key === '/') {
-        e.preventDefault()
-        searchRef.current?.focus()
-      }
+      if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal({ type: 'create' }) }
+      if (e.key === '/') { e.preventDefault(); searchRef.current?.focus() }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [setModal])
+
+  function toggleSelect(id: number, checked: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      checked ? next.add(id) : next.delete(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll(checked: boolean) {
+    setSelected(checked ? new Set(films.map((f) => f.id)) : new Set())
+  }
 
   async function handleRandomFilm() {
     setRandomLoading(true)
@@ -118,27 +126,60 @@ export function FilmsPage() {
     }
   }
 
-  async function handleDelete() {
+  // Delete with undo: optimistic removal + 5s window to cancel
+  function handleDelete() {
     if (modal?.type !== 'delete') return
-    setDeleteLoading(true)
-    setDeleteError(null)
+    const film = modal.film
+    close()
+    setItems((prev) => prev.filter((f) => f.id !== film.id))
+
+    let cancelled = false
+    const onUndo = () => { cancelled = true; reload() }
+    toast.success(`« ${film.title} » supprimé`, { undo: onUndo })
+
+    setTimeout(async () => {
+      if (cancelled) return
+      try { await deleteFilm(film.id) }
+      catch { toast.error('Échec de la suppression'); reload() }
+    }, 5000)
+  }
+
+  // Bulk: activate / deactivate
+  async function handleBulkToggle(activate: boolean) {
+    if (selected.size === 0) return
+    setBulkLoading(true)
     try {
-      await deleteFilm(modal.film.id)
-      close()
+      await Promise.all([...selected].map((id) => updateFilm(id, { is_active: activate })))
+      toast.success(`${selected.size} film${selected.size > 1 ? 's' : ''} ${activate ? 'activé' : 'désactivé'}${selected.size > 1 ? 's' : ''}`)
+      setSelected(new Set())
       reload()
-      toast.success('Film supprimé')
-    } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Erreur')
+    } catch {
+      toast.error('Erreur lors de la mise à jour en lot')
     } finally {
-      setDeleteLoading(false)
+      setBulkLoading(false)
     }
   }
 
-  const filterLabel: Record<ActiveFilter, string> = {
-    all: 'Tous',
-    active: 'Actifs',
-    inactive: 'Inactifs',
+  // Bulk delete with undo
+  function handleBulkDeleteConfirm() {
+    if (modal?.type !== 'bulkDelete') return
+    const ids = modal.ids
+    close()
+    setItems((prev) => prev.filter((f) => !ids.includes(f.id)))
+
+    let cancelled = false
+    const onUndo = () => { cancelled = true; reload() }
+    toast.success(`${ids.length} film${ids.length > 1 ? 's' : ''} supprimé${ids.length > 1 ? 's' : ''}`, { undo: onUndo })
+
+    setTimeout(async () => {
+      if (cancelled) return
+      try { await Promise.all(ids.map((id) => deleteFilm(id))) }
+      catch { toast.error('Échec de la suppression en lot'); reload() }
+    }, 5000)
   }
+
+  const allSelected = films.length > 0 && selected.size === films.length
+  const filterLabel: Record<ActiveFilter, string> = { all: 'Tous', active: 'Actifs', inactive: 'Inactifs' }
 
   return (
     <AdminLayout>
@@ -162,12 +203,7 @@ export function FilmsPage() {
             <button
               key={f}
               onClick={() => setActiveFilter(f)}
-              className={[
-                'px-3 py-2 transition-colors',
-                activeFilter === f
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50',
-              ].join(' ')}
+              className={['px-3 py-2 transition-colors', activeFilter === f ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'].join(' ')}
             >
               {filterLabel[f]}
             </button>
@@ -198,8 +234,42 @@ export function FilmsPage() {
       </div>
 
       {error && (
-        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-          {error}
+        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">{error}</div>
+      )}
+
+      {/* Bulk action bar */}
+      {selected.size > 0 && (
+        <div className="mb-3 flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2.5">
+          <span className="text-sm font-medium text-indigo-800 flex-1">
+            {selected.size} film{selected.size > 1 ? 's' : ''} sélectionné{selected.size > 1 ? 's' : ''}
+          </span>
+          <button
+            onClick={() => handleBulkToggle(true)}
+            disabled={bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-white border border-emerald-300 rounded-lg hover:bg-emerald-50 transition-colors disabled:opacity-50"
+          >
+            <ToggleRight size={14} /> Activer
+          </button>
+          <button
+            onClick={() => handleBulkToggle(false)}
+            disabled={bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            <ToggleLeft size={14} /> Désactiver
+          </button>
+          <button
+            onClick={() => setModal({ type: 'bulkDelete', ids: [...selected] })}
+            disabled={bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-white border border-red-300 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+          >
+            <Trash2 size={14} /> Supprimer
+          </button>
+          <button
+            onClick={() => setSelected(new Set())}
+            className="text-xs text-indigo-500 hover:text-indigo-700 underline ml-1"
+          >
+            Annuler
+          </button>
         </div>
       )}
 
@@ -218,6 +288,14 @@ export function FilmsPage() {
             <table className="w-full min-w-[400px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100 text-left text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={(e) => toggleSelectAll(e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-300 text-indigo-600 accent-indigo-600"
+                    />
+                  </th>
                   <th className="px-3 py-3 w-20"></th>
                   <th className="px-3 py-3">Titre</th>
                   <th className="px-3 py-3 hidden sm:table-cell">Année</th>
@@ -231,6 +309,8 @@ export function FilmsPage() {
                   <FilmRow
                     key={film.id}
                     film={film}
+                    selected={selected.has(film.id)}
+                    onSelect={toggleSelect}
                     onEdit={(f) => setModal({ type: 'edit', film: f })}
                     onDelete={(f) => { setDeleteError(null); setModal({ type: 'delete', film: f }) }}
                     onBackdrops={(f) => setModal({ type: 'backdrops', film: f })}
@@ -249,21 +329,13 @@ export function FilmsPage() {
       {/* Modals */}
       {modal?.type === 'create' && (
         <Modal title="Ajouter un film" onClose={close}>
-          <FilmForm
-            initial={modal.initial}
-            onSubmit={handleCreate}
-            onCancel={close}
-          />
+          <FilmForm initial={modal.initial} onSubmit={handleCreate} onCancel={close} />
         </Modal>
       )}
 
       {modal?.type === 'edit' && (
         <Modal title="Modifier le film" onClose={close}>
-          <FilmForm
-            initial={modal.film}
-            onSubmit={handleEdit}
-            onCancel={close}
-          />
+          <FilmForm initial={modal.film} onSubmit={handleEdit} onCancel={close} />
         </Modal>
       )}
 
@@ -273,17 +345,23 @@ export function FilmsPage() {
           name={modal.film.title}
           onConfirm={handleDelete}
           onCancel={() => { close(); setDeleteError(null) }}
-          loading={deleteLoading}
+          loading={false}
           error={deleteError}
         />
       )}
 
-      {modal?.type === 'backdrops' && (
-        <BackdropPicker
-          filmId={modal.film.id}
-          onSelect={handleBackdropSelect}
-          onClose={close}
+      {modal?.type === 'bulkDelete' && (
+        <ConfirmDeleteModal
+          title={`Supprimer ${modal.ids.length} film${modal.ids.length > 1 ? 's' : ''}`}
+          name={`${modal.ids.length} film${modal.ids.length > 1 ? 's' : ''} sélectionné${modal.ids.length > 1 ? 's' : ''}`}
+          onConfirm={handleBulkDeleteConfirm}
+          onCancel={close}
+          loading={false}
         />
+      )}
+
+      {modal?.type === 'backdrops' && (
+        <BackdropPicker filmId={modal.film.id} onSelect={handleBackdropSelect} onClose={close} />
       )}
 
       <FilmSeriesGamePreviewModal

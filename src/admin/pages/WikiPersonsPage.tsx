@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
-import { Plus, Search, X, WandSparkles, ExternalLink, Trash2, Pencil, Shuffle, History, Loader2, Upload, Eye } from 'lucide-react'
+import { Plus, Search, WandSparkles, ExternalLink, Trash2, Pencil, Shuffle, History, Loader2, Upload, Eye } from 'lucide-react'
 import {
   getWikiPersons,
   createWikiPerson,
@@ -16,6 +16,8 @@ import {
 import { AdminLayout } from '../components/AdminLayout'
 import { AdminFormSection, AdminFormSubheading } from '../components/AdminFormSection'
 import { WikiGamePreviewModal, WikiGamePreviewOpenButton } from '../components/WikiGamePreviewModal'
+import { Modal, ConfirmDeleteModal } from '../components/Modal'
+import { useToast } from '../hooks/useToast'
 
 // Module-level pool — persists across modal open/close cycles
 const _wikiSlugPool: string[] = []
@@ -285,21 +287,6 @@ function parseSportInfobox(raw: Record<string, unknown>): SportInfoboxForm {
   }
 }
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl my-4 sm:my-8">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900 truncate pr-4">{title}</h2>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="px-4 sm:px-6 py-4 sm:py-5">{children}</div>
-      </div>
-    </div>
-  )
-}
 
 function WikiPersonForm({
   initial,
@@ -1176,16 +1163,17 @@ function WikiPersonListActions({
 }
 
 export function WikiPersonsPage() {
+  const toast = useToast()
   const [persons, setPersons] = useState<AdminWikiPerson[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [modal, setModal] = useState<ModalState>(null)
   const [deleting, setDeleting] = useState(false)
   const [randomLoading, setRandomLoading] = useState(false)
   const [uploadingWikiPhotoId, setUploadingWikiPhotoId] = useState<number | null>(null)
   const [listPreviewPersonId, setListPreviewPersonId] = useState<number | null>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
 
   async function handlePageRandom() {
     setRandomLoading(true)
@@ -1212,17 +1200,26 @@ export function WikiPersonsPage() {
     load()
   }, [load])
 
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal({ type: 'create' }) }
+      if (e.key === '/') { e.preventDefault(); searchRef.current?.focus() }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
+
   async function handleWikiPhotoUpload(person: AdminWikiPerson, file: File) {
     setUploadingWikiPhotoId(person.id)
-    setError(null)
     try {
       const url = await uploadImage(file)
       await updateWikiPerson(person.id, { photo_url: url })
-      setSuccess('Photo mise à jour.')
-      setTimeout(() => setSuccess(null), 3000)
+      toast.success('Photo mise à jour')
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur upload')
+      toast.error(err instanceof Error ? err.message : 'Erreur upload')
     } finally {
       setUploadingWikiPhotoId(null)
     }
@@ -1230,28 +1227,24 @@ export function WikiPersonsPage() {
 
   async function handleCreate(payload: WikiPersonPayload) {
     try {
-      setError(null)
-      setSuccess(null)
       await createWikiPerson(payload)
-      setSuccess('Fiche personnalité créée.')
+      toast.success('Fiche personnalité créée')
       setModal(null)
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur création')
+      throw err
     }
   }
 
   async function handleEdit(payload: WikiPersonPayload) {
     if (modal?.type !== 'edit') return
     try {
-      setError(null)
-      setSuccess(null)
       await updateWikiPerson(modal.person.id, payload)
-      setSuccess('Fiche personnalité mise à jour.')
+      toast.success('Fiche personnalité mise à jour')
       setModal(null)
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur mise à jour')
+      throw err
     }
   }
 
@@ -1259,14 +1252,12 @@ export function WikiPersonsPage() {
     if (modal?.type !== 'delete') return
     setDeleting(true)
     try {
-      setError(null)
-      setSuccess(null)
       await deleteWikiPerson(modal.person.id)
-      setSuccess('Fiche personnalité supprimée.')
+      toast.success('Fiche personnalité supprimée')
       setModal(null)
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur suppression')
+      toast.error(err instanceof Error ? err.message : 'Erreur suppression')
     } finally {
       setDeleting(false)
     }
@@ -1277,7 +1268,7 @@ export function WikiPersonsPage() {
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1 sm:max-w-sm">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher une personnalité..." className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg" />
+          <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher une personnalité… (/)" className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg" />
         </div>
         <div className="flex items-center gap-2 sm:ml-auto">
           <button
@@ -1291,14 +1282,13 @@ export function WikiPersonsPage() {
             }
             <span className="hidden sm:inline">Personnalité aléatoire</span>
           </button>
-          <button onClick={() => setModal({ type: 'create' })} className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+          <button onClick={() => setModal({ type: 'create' })} className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors" title="Nouvelle personnalité (N)">
             <Plus size={15} /> Ajouter
           </button>
         </div>
       </div>
 
       {error && <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">{error}</div>}
-      {success && <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-4 py-3 text-sm">{success}</div>}
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {loading ? (
@@ -1457,17 +1447,13 @@ export function WikiPersonsPage() {
         </Modal>
       )}
       {modal?.type === 'delete' && (
-        <Modal title="Supprimer la personnalité" onClose={() => setModal(null)}>
-          <p className="text-sm text-gray-600 mb-6">
-            Confirmer la suppression de <strong className="text-gray-900">« {modal.person.name} »</strong> ?
-          </p>
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setModal(null)} disabled={deleting} className="px-4 py-2 text-sm border rounded-lg disabled:opacity-50">Annuler</button>
-            <button onClick={handleDelete} disabled={deleting} className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50">
-              {deleting ? 'Suppression…' : 'Supprimer'}
-            </button>
-          </div>
-        </Modal>
+        <ConfirmDeleteModal
+          title="Supprimer la personnalité"
+          name={modal.person.name}
+          onConfirm={handleDelete}
+          onCancel={() => setModal(null)}
+          loading={deleting}
+        />
       )}
 
       <WikiGamePreviewModal
