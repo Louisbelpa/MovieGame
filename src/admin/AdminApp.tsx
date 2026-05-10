@@ -5,6 +5,7 @@
  */
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { ToastProvider } from './hooks/useToast'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { FilmsPage } from './pages/FilmsPage'
@@ -20,6 +21,7 @@ import { SettingsPage } from './pages/SettingsPage'
 
 export function AdminApp() {
   return (
+    <ToastProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/admin/login" element={<LoginPage />} />
@@ -38,5 +40,6 @@ export function AdminApp() {
         <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </BrowserRouter>
+    </ToastProvider>
   )
 }

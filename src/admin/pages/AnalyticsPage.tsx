@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from 'react'
-import { ChevronUp, ChevronDown, X } from 'lucide-react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import { ChevronUp, ChevronDown, X, Download } from 'lucide-react'
 import { AdminLayout } from '../components/AdminLayout'
 import { SegmentedToggle } from '../components/SegmentedToggle'
 import {
@@ -348,6 +348,32 @@ export function AnalyticsPage() {
     setSort(col)
   }
 
+  const exportCsv = useCallback(() => {
+    if (challenges.length === 0) return
+    const rows = [
+      ['Date', 'Titre', 'Type', 'Année', 'Fame', 'Parties', 'Victoires %', 'Moy. tentatives', 'Moy. indices'],
+      ...challenges.map((c) => [
+        challengeDateYmd(c.challenge_date),
+        `"${c.title.replace(/"/g, '""')}"`,
+        c.media_type === 'film' ? 'Film' : c.media_type === 'series' ? 'Série' : 'Wiki',
+        String(c.year ?? ''),
+        String(c.fame_level),
+        String(c.sessions),
+        String(c.win_rate),
+        String(c.avg_attempts.toFixed(1)),
+        String(c.avg_hints.toFixed(1)),
+      ]),
+    ]
+    const csv = rows.map((r) => r.join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `analytics-${activeTab}-${dateRange.from}-${dateRange.to}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [challenges, activeTab, dateRange])
+
   const attMax = Math.max(...Object.values(attempts), 1)
   const hinMax = Math.max(...Object.values(hints), 1)
 
@@ -515,13 +541,24 @@ export function AnalyticsPage() {
 
         {/* ── Section 7 : Classement défis ─────────────────────────────────── */}
         <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-gray-700">Classement des défis par difficulté</h2>
-            <p className="text-xs text-gray-500 mt-1">
-              Même <strong>période</strong> et type de jeu que ci-dessus. La colonne <strong>Date du défi</strong> est le jour planifié
-              (Paris). Tri par défaut du plus récent au plus ancien ; autres tris via les en-têtes. Sont listés les défis avec au moins
-              une partie commencée ou le défi du jour dans la fenêtre sans session encore.
-            </p>
+          <div className="px-4 py-3 border-b border-gray-100 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-gray-700">Classement des défis par difficulté</h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Même <strong>période</strong> et type de jeu que ci-dessus. La colonne <strong>Date du défi</strong> est le jour planifié
+                (Paris). Tri par défaut du plus récent au plus ancien ; autres tris via les en-têtes. Sont listés les défis avec au moins
+                une partie commencée ou le défi du jour dans la fenêtre sans session encore.
+              </p>
+            </div>
+            <button
+              onClick={exportCsv}
+              disabled={challenges.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-40 shrink-0"
+              title="Exporter en CSV"
+            >
+              <Download size={13} />
+              CSV
+            </button>
           </div>
           {challengesErr && <div className="p-4"><ErrorMsg msg={challengesErr} /></div>}
           {analyticsLoading && <Spinner />}

@@ -14,6 +14,8 @@ function getTodayStr(): string {
 
 interface FilmRowProps {
   film: AdminFilm
+  selected?: boolean
+  onSelect?: (id: number, checked: boolean) => void
   onEdit: (film: AdminFilm) => void
   onDelete: (film: AdminFilm) => void
   onBackdrops: (film: AdminFilm) => void
@@ -21,7 +23,7 @@ interface FilmRowProps {
   onPreview: (film: AdminFilm) => void
 }
 
-export function FilmRow({ film, onEdit, onDelete, onBackdrops, onUpload, onPreview }: FilmRowProps) {
+export function FilmRow({ film, selected, onSelect, onEdit, onDelete, onBackdrops, onUpload, onPreview }: FilmRowProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const today = getTodayStr()
   const pastDates = (film.used_dates ?? []).filter((d) => d <= today)
@@ -80,6 +82,14 @@ export function FilmRow({ film, onEdit, onDelete, onBackdrops, onUpload, onPrevi
       <tr className="sm:hidden border-b border-gray-100 last:border-0">
         <td className="px-3 py-3" colSpan={10}>
           <div className="flex items-center gap-3">
+            {onSelect && (
+              <input
+                type="checkbox"
+                checked={selected ?? false}
+                onChange={(e) => onSelect(film.id, e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-indigo-600 accent-indigo-600 shrink-0"
+              />
+            )}
             <div className="shrink-0">
               {film.image_url ? (
                 <img src={resolveThumb(film.image_url)} alt={film.title}
@@ -104,7 +114,17 @@ export function FilmRow({ film, onEdit, onDelete, onBackdrops, onUpload, onPrevi
       </tr>
 
       {/* Desktop row */}
-      <tr className="hidden sm:table-row hover:bg-gray-50 transition-colors group">
+      <tr className={`hidden sm:table-row hover:bg-gray-50 transition-colors group ${selected ? 'bg-indigo-50' : ''}`}>
+        {onSelect && (
+          <td className="px-3 py-3 w-8">
+            <input
+              type="checkbox"
+              checked={selected ?? false}
+              onChange={(e) => onSelect(film.id, e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-indigo-600 accent-indigo-600"
+            />
+          </td>
+        )}
         <td className="px-3 py-3 w-20">
           {film.image_url ? (
             <img src={resolveThumb(film.image_url)} alt={film.title}
