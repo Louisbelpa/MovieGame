@@ -144,8 +144,6 @@ export function createBaseGameStore<
     hasNext: payload.hasNextChallenge ?? false,
   })
 
-  let viewingDate: string | null = null
-
   return create<BaseGameState<TChallenge, TGuess> & BaseGameActions>()((set, get) => ({
     challenge: null,
     guesses: [],
@@ -156,7 +154,7 @@ export function createBaseGameStore<
     error: null,
     isGameOver: false,
     gameType: config.mediaType as 'film' | 'series' | 'wiki',
-    viewingDate,
+    viewingDate: null,
     hasPrev: false,
     hasNext: false,
     ui: {
@@ -169,16 +167,14 @@ export function createBaseGameStore<
     setGameType: (type) => set({ gameType: type }),
 
     initGame: async () => {
-      viewingDate = null
-      set({ isLoading: true, error: null, hasPrev: false, hasNext: false })
+      set({ isLoading: true, error: null, hasPrev: false, hasNext: false, viewingDate: null })
       try {
         const payload = await request<TPayload>('/today')
-        viewingDate = null
         set({
           ...mapPayloadToState(payload),
           isLoading: false,
           isSubmitting: false,
-          viewingDate,
+          viewingDate: null,
         })
       } catch (err) {
         const statusCode = (err as Error & { status?: number }).status
@@ -204,25 +200,25 @@ export function createBaseGameStore<
     },
 
     loadDate: async (date: string) => {
-      viewingDate = date
       set({
         isLoading: true,
         isSubmitting: false,
         error: null,
         hasPrev: false,
         hasNext: false,
+        viewingDate: date,
       })
       try {
         const payload = await request<TPayload>(`/date/${encodeURIComponent(date)}`)
         set({
           ...mapPayloadToState(payload),
           isLoading: false,
-          viewingDate,
+          viewingDate: date,
         })
       } catch (err) {
         const statusCode = (err as Error & { status?: number }).status
         if (statusCode === 404) {
-          const nav = await probeAdjacentNavigation(viewingDate)
+          const nav = await probeAdjacentNavigation(date)
           set({
             error: err instanceof Error ? err.message : 'Error',
             isLoading: false,
@@ -243,7 +239,7 @@ export function createBaseGameStore<
     },
 
     navigateDate: async (direction: 'prev' | 'next') => {
-      const currentDate = viewingDate ?? new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
+      const currentDate = get().viewingDate ?? new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
       set({ isLoading: true, error: null })
       try {
         const params = new URLSearchParams({ date: currentDate, direction })
@@ -277,7 +273,7 @@ export function createBaseGameStore<
           ...(payload.correct === false && { ui: { ...get().ui, shakeTrigger: get().ui.shakeTrigger + 1 } }),
         })
 
-        if (payload.challenge.isGameOver && viewingDate === null) {
+        if (payload.challenge.isGameOver && get().viewingDate === null) {
           const outcome = payload.challenge.outcome === 'won' ? 'won' : 'lost'
           const challengeDate = payload.challenge.date
           const type = get().gameType

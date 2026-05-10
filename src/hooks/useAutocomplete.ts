@@ -25,6 +25,9 @@ export function useAutocomplete<T>(
   const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Ref so the effect never needs searchFn as a dependency, avoiding spurious re-runs
+  const searchFnRef = useRef(searchFn)
+  searchFnRef.current = searchFn
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current)
@@ -45,7 +48,7 @@ export function useAutocomplete<T>(
       abortRef.current = controller
 
       try {
-        const results = await searchFn(query, limit)
+        const results = await searchFnRef.current(query, limit)
         if (!controller.signal.aborted) setSuggestions(results)
       } catch {
         if (!controller.signal.aborted) {
@@ -61,7 +64,7 @@ export function useAutocomplete<T>(
       if (timerRef.current) clearTimeout(timerRef.current)
       abortRef.current?.abort()
     }
-  }, [query, minLength, limit, debounceMs, searchFn])
+  }, [query, minLength, limit, debounceMs])
 
   return { suggestions, isLoading, error, clear: () => { setSuggestions([]); setError(null); setIsLoading(false) } }
 }

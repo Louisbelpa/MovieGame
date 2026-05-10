@@ -53,6 +53,9 @@ export function createApp(): express.Application {
     .map(toOrigin)
     .filter((o): o is string => Boolean(o));
   const allowedOriginsSet = new Set(allowedOrigins)
+  if (allowedOriginsSet.size === 0) {
+    logger.warn('CORS_ORIGIN is not set — all origins are allowed. Set this variable before deploying.');
+  }
 
   app.set('trust proxy', 1);
   app.use(requestIdMiddleware);
@@ -81,6 +84,9 @@ export function createApp(): express.Application {
   }));
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ limit: '1mb', extended: true }));
+  if (!process.env.COOKIE_SECRET) {
+    logger.warn('COOKIE_SECRET is not set — using insecure default. Set this variable before deploying.');
+  }
   app.use(cookieParser(process.env.COOKIE_SECRET ?? 'dev_secret'));
 
   // Static files before CORS — same-origin assets don't need CORS headers
@@ -113,9 +119,11 @@ export function createApp(): express.Application {
   }));
 
   app.use(sessionMiddleware);
+  const rateLimitMax = parseInt(process.env.API_RATE_LIMIT_MAX ?? '600', 10);
+  const rateLimitWindowMs = parseInt(process.env.API_RATE_LIMIT_WINDOW_MS ?? '60000', 10);
   app.use('/api', createRateLimiter({
-    max: parseInt(process.env.API_RATE_LIMIT_MAX ?? '600', 10),
-    windowMs: parseInt(process.env.API_RATE_LIMIT_WINDOW_MS ?? '60000', 10),
+    max: isNaN(rateLimitMax) ? 600 : rateLimitMax,
+    windowMs: isNaN(rateLimitWindowMs) ? 60000 : rateLimitWindowMs,
   }));
 
   app.use('/api/challenge', challengeRouter);
