@@ -882,7 +882,7 @@ adminRouter.get(
 
 // ─── Films CRUD ───────────────────────────────────────────────────────────────
 
-// GET /api/admin/films?page=1&limit=20
+// GET /api/admin/films?page=1&limit=20&q=title&is_active=true|false
 adminRouter.get(
   '/films',
   (req: Request, res: Response, next: NextFunction) => {
@@ -893,16 +893,31 @@ adminRouter.get(
         Math.max(1, parseInt((req.query.limit as string | undefined) ?? '20', 10))
       );
       const offset = (page - 1) * limit;
+      const q = (req.query.q as string | undefined)?.trim() ?? '';
+      const isActiveParam = req.query.is_active as string | undefined;
+
+      const conditions: string[] = [];
+      const filterArgs: (string | number)[] = [];
+      if (q) {
+        conditions.push(`(title LIKE '%' || ? || '%' OR director LIKE '%' || ? || '%')`);
+        filterArgs.push(q, q);
+      }
+      if (isActiveParam === 'true' || isActiveParam === '1') {
+        conditions.push('is_active = 1');
+      } else if (isActiveParam === 'false' || isActiveParam === '0') {
+        conditions.push('is_active = 0');
+      }
+      const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
       const total = (
-        db.prepare(`SELECT COUNT(*) as count FROM films`).get() as { count: number }
+        db.prepare(`SELECT COUNT(*) as count FROM films ${where}`).get(...filterArgs) as { count: number }
       ).count;
 
       const rows = db
-        .prepare<[number, number], FilmRow>(
-          `SELECT * FROM films ORDER BY created_at DESC LIMIT ? OFFSET ?`
+        .prepare<unknown[], FilmRow>(
+          `SELECT * FROM films ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
         )
-        .all(limit, offset);
+        .all(...filterArgs, limit, offset);
 
       res.json({
         data: rows.map((r) => formatFilm(r, getFilmUsedDates(r.id))),
@@ -2467,7 +2482,7 @@ adminRouter.get(
 
 // ─── Series CRUD ──────────────────────────────────────────────────────────────
 
-// GET /api/admin/series?page=1&limit=20
+// GET /api/admin/series?page=1&limit=20&q=title&is_active=true|false
 adminRouter.get(
   '/series',
   (req: Request, res: Response, next: NextFunction) => {
@@ -2478,16 +2493,31 @@ adminRouter.get(
         Math.max(1, parseInt((req.query.limit as string | undefined) ?? '20', 10))
       );
       const offset = (page - 1) * limit;
+      const q = (req.query.q as string | undefined)?.trim() ?? '';
+      const isActiveParam = req.query.is_active as string | undefined;
+
+      const conditions: string[] = [];
+      const filterArgs: (string | number)[] = [];
+      if (q) {
+        conditions.push(`(title LIKE '%' || ? || '%' OR creator LIKE '%' || ? || '%')`);
+        filterArgs.push(q, q);
+      }
+      if (isActiveParam === 'true' || isActiveParam === '1') {
+        conditions.push('is_active = 1');
+      } else if (isActiveParam === 'false' || isActiveParam === '0') {
+        conditions.push('is_active = 0');
+      }
+      const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
       const total = (
-        db.prepare(`SELECT COUNT(*) as count FROM series`).get() as { count: number }
+        db.prepare(`SELECT COUNT(*) as count FROM series ${where}`).get(...filterArgs) as { count: number }
       ).count;
 
       const rows = db
-        .prepare<[number, number], SeriesRow>(
-          `SELECT * FROM series ORDER BY created_at DESC LIMIT ? OFFSET ?`
+        .prepare<unknown[], SeriesRow>(
+          `SELECT * FROM series ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
         )
-        .all(limit, offset);
+        .all(...filterArgs, limit, offset);
 
       res.json({
         data: rows.map((r) => formatSeries(r, getSeriesUsedDates(r.id))),

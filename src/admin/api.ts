@@ -303,7 +303,7 @@ export async function getDashboard(): Promise<AdminDashboard> {
 
 // ─── Films ────────────────────────────────────────────────────────────────────
 
-export async function getFilms(opts: { page?: number; limit?: number; q?: string } = {}): Promise<{
+export async function getFilms(opts: { page?: number; limit?: number; q?: string; isActive?: boolean } = {}): Promise<{
   data: AdminFilm[]
   total: number
   page: number
@@ -314,6 +314,7 @@ export async function getFilms(opts: { page?: number; limit?: number; q?: string
   if (opts.page !== undefined) params.set('page', String(opts.page))
   if (opts.limit !== undefined) params.set('limit', String(opts.limit))
   if (opts.q !== undefined && opts.q !== '') params.set('q', opts.q)
+  if (opts.isActive !== undefined) params.set('is_active', String(opts.isActive))
   const qs = params.toString()
   const res = await request<{ data: AdminFilm[]; pagination: { total: number; page: number; limit: number; pages: number } }>(
     `/api/admin/films${qs ? `?${qs}` : ''}`
@@ -495,7 +496,7 @@ export async function deleteChangelogEntry(id: number): Promise<void> {
 
 // ─── Series ───────────────────────────────────────────────────────────────────
 
-export async function getSeries(opts: { page?: number; limit?: number; q?: string } = {}): Promise<{
+export async function getSeries(opts: { page?: number; limit?: number; q?: string; isActive?: boolean } = {}): Promise<{
   data: AdminSeries[]
   total: number
   page: number
@@ -506,6 +507,7 @@ export async function getSeries(opts: { page?: number; limit?: number; q?: strin
   if (opts.page !== undefined) params.set('page', String(opts.page))
   if (opts.limit !== undefined) params.set('limit', String(opts.limit))
   if (opts.q !== undefined && opts.q !== '') params.set('q', opts.q)
+  if (opts.isActive !== undefined) params.set('is_active', String(opts.isActive))
   const qs = params.toString()
   const res = await request<{ data: AdminSeries[]; pagination: { total: number; page: number; limit: number; pages: number } }>(
     `/api/admin/series${qs ? `?${qs}` : ''}`
