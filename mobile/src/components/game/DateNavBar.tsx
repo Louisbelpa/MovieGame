@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Svg, Rect, Path } from 'react-native-svg';
 import { colors, spacing, font } from '../../theme';
 import type { DailyChallenge } from '../../types';
 
@@ -13,9 +13,31 @@ interface Props {
   isLoading: boolean;
 }
 
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+function CalendarIcon() {
+  return (
+    <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+      <Rect x="3" y="5" width="18" height="16" rx="2" stroke={colors.gold} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M3 10h18M8 3v4M16 3v4" stroke={colors.gold} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function ChevronLeft({ disabled }: { disabled: boolean }) {
+  const c = disabled ? colors.textFaint : colors.text;
+  return (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      <Path d="M15 18l-6-6 6-6" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function ChevronRight({ disabled }: { disabled: boolean }) {
+  const c = disabled ? colors.textFaint : colors.text;
+  return (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      <Path d="M9 18l6-6-6-6" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
 }
 
 export function DateNavBar({ challenge, viewingDate, onPrev, onNext, onToday, isLoading }: Props) {
@@ -23,47 +45,49 @@ export function DateNavBar({ challenge, viewingDate, onPrev, onNext, onToday, is
   const canPrev = challenge.hasPrevChallenge;
   const canNext = challenge.hasNextChallenge;
 
+  const dateLabel = isPast
+    ? new Date(challenge.date + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })
+    : "Aujourd'hui";
+
   return (
     <View style={styles.row}>
       <Pressable
         onPress={onPrev}
         disabled={!canPrev || isLoading}
-        style={({ pressed }) => [styles.navBtn, (!canPrev || isLoading) && styles.disabled, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.navBtn, pressed && styles.pressed]}
         accessibilityLabel="Défi précédent"
       >
-        <Ionicons name="chevron-back" size={20} color={canPrev ? colors.text : colors.textMuted} />
+        <ChevronLeft disabled={!canPrev || isLoading} />
       </Pressable>
 
-      <View style={styles.center}>
-        <Text style={styles.dateText}>{formatDate(challenge.date)}</Text>
-        <Text style={styles.challengeNum}>Défi #{challenge.challengeNumber}</Text>
-        {isPast && (
-          <Pressable onPress={onToday} style={styles.todayBtn}>
-            <Text style={styles.todayText}>Revenir à aujourd'hui</Text>
-          </Pressable>
-        )}
-      </View>
+      <Pressable onPress={isPast ? onToday : undefined} style={styles.center}>
+        <View style={styles.dateRow}>
+          <CalendarIcon />
+          <Text style={[styles.dateText, isPast && styles.dateTextPast]}>{dateLabel}</Text>
+        </View>
+        {isPast && <Text style={styles.returnToday}>Revenir à aujourd'hui</Text>}
+      </Pressable>
 
       <Pressable
         onPress={onNext}
         disabled={!canNext || isLoading}
-        style={({ pressed }) => [styles.navBtn, (!canNext || isLoading) && styles.disabled, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.navBtn, pressed && styles.pressed, !canNext && styles.dimmed]}
         accessibilityLabel="Défi suivant"
       >
-        <Ionicons name="chevron-forward" size={20} color={canNext ? colors.text : colors.textMuted} />
+        <ChevronRight disabled={!canNext || isLoading} />
       </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 2 },
   navBtn: { padding: spacing.sm },
-  disabled: { opacity: 0.3 },
   pressed: { opacity: 0.6 },
+  dimmed: { opacity: 0.3 },
   center: { flex: 1, alignItems: 'center' },
-  dateText: { fontSize: font.base, color: colors.text, fontWeight: '500' },
-  challengeNum: { fontSize: font.sm, color: colors.textDim, marginTop: 2 },
-  todayBtn: { marginTop: spacing.xs },
-  todayText: { fontSize: font.sm, color: colors.gold },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dateText: { color: colors.gold, fontWeight: '500', fontSize: 13 },
+  dateTextPast: { color: colors.textDim },
+  returnToday: { fontSize: font.sm, color: colors.gold, marginTop: 2 },
 });

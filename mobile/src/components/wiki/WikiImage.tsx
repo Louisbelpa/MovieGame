@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
-import { Ionicons } from '@expo/vector-icons';
+import { Svg, Path, Circle } from 'react-native-svg';
 import { colors } from '../../theme';
 
 interface Props {
@@ -19,7 +19,10 @@ export function WikiImage({ photoUrl, attemptsUsed, maxAttempts }: Props) {
   if (!photoUrl) {
     return (
       <View style={[styles.container, styles.placeholder]}>
-        <Ionicons name="person-outline" size={64} color={colors.textMuted} />
+        <Svg width={64} height={64} viewBox="0 0 24 24" fill="none">
+          <Path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke={colors.textMuted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <Circle cx="12" cy="7" r="4" stroke={colors.textMuted} strokeWidth="1.5" />
+        </Svg>
       </View>
     );
   }

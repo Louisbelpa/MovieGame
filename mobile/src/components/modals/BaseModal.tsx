@@ -10,8 +10,18 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, radius, font } from '../../theme';
+import { Svg, Path, Line } from 'react-native-svg';
+import { GlassView } from '../ui/GlassView';
+import { colors, spacing, font } from '../../theme';
+
+function CloseIcon() {
+  return (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      <Line x1="18" y1="6" x2="6" y2="18" stroke={colors.textDim} strokeWidth="2" strokeLinecap="round" />
+      <Line x1="6" y1="6" x2="18" y2="18" stroke={colors.textDim} strokeWidth="2" strokeLinecap="round" />
+    </Svg>
+  );
+}
 
 interface Props {
   visible: boolean;
@@ -36,16 +46,21 @@ export function BaseModal({ visible, onClose, title, children, scrollable = true
         style={styles.kav}
       >
         <View style={[styles.container, { paddingBottom: insets.bottom + spacing.lg }]}>
-          <View style={styles.header}>
+          {/* Drag handle */}
+          <View style={styles.handle} />
+
+          {/* Header glass */}
+          <GlassView style={styles.header} intensity={60} specular={false}>
             <Text style={styles.title}>{title}</Text>
             <Pressable
               onPress={onClose}
               style={({ pressed }) => [styles.closeBtn, pressed && styles.pressed]}
               accessibilityLabel="Fermer"
+              hitSlop={10}
             >
-              <Ionicons name="close" size={22} color={colors.textDim} />
+              <CloseIcon />
             </Pressable>
-          </View>
+          </GlassView>
 
           {scrollable ? (
             <ScrollView
@@ -68,20 +83,35 @@ const styles = StyleSheet.create({
   kav: { flex: 1 },
   container: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.bg,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 4,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.10)',
   },
-  title: { fontSize: font.xl, fontWeight: '700', color: colors.text },
-  closeBtn: { padding: spacing.xs },
+  title: { fontSize: font.md, fontWeight: '700', color: colors.text },
+  closeBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   pressed: { opacity: 0.6 },
   body: { flex: 1 },
   bodyContent: { padding: spacing.lg, gap: spacing.lg },

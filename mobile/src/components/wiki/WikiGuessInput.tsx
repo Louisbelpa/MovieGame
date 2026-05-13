@@ -10,7 +10,7 @@ import {
   Keyboard,
   ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Svg, Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, radius, font } from '../../theme';
 import type { WikiSearchResult } from '../../types';
@@ -116,7 +116,9 @@ export function WikiGuessInput({
           {isSubmitting ? (
             <ActivityIndicator size="small" color={colors.bg} />
           ) : (
-            <Ionicons name="arrow-forward" size={20} color={colors.bg} />
+            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                <Path d="M5 12h14M12 5l7 7-7 7" stroke={colors.bg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
           )}
         </Pressable>
 
@@ -126,7 +128,10 @@ export function WikiGuessInput({
           style={({ pressed }) => [styles.skipBtn, pressed && styles.pressed, disabled && styles.disabled]}
           accessibilityLabel="Passer"
         >
-          <Ionicons name="play-skip-forward-outline" size={18} color={colors.textDim} />
+          <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+            <Path d="M5 4l10 8-10 8V4z" stroke={colors.textDim} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M19 5v14" stroke={colors.textDim} strokeWidth="1.8" strokeLinecap="round" />
+          </Svg>
         </Pressable>
       </View>
 

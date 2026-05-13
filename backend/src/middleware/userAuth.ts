@@ -1,9 +1,11 @@
 /**
  * userAuth.ts
  * Middleware that attaches a logged-in user to req.user when a valid
- * user_session cookie is present. Routes decide whether to require auth.
+ * user_session cookie or `Authorization: Bearer <session id>` is present.
+ * Routes decide whether to require auth.
  *
- * - Cookie: `user_session` (signed, httpOnly)
+ * - Cookie: `user_session` (signed, httpOnly) — unsigns to raw session row id
+ * - Bearer: same raw id (for native clients that cannot rely on cookie jars)
  * - Session row is validated against user_sessions (non-expired).
  * - req.user is null when not authenticated — no 401 emitted here.
  */
@@ -13,6 +15,8 @@ import db from '../db/database.js';
 
 export const USER_SESSION_COOKIE = 'user_session';
 
+const SESSION_ID_HEX = /^[0-9a-f]{64}$/i;
+
 interface UserSessionRow {
   id: number;
   email: string | null;
@@ -20,11 +24,27 @@ interface UserSessionRow {
   avatar_url: string | null;
 }
 
-export function userAuth(req: Request, _res: Response, next: NextFunction): void {
-  const sessionId = req.signedCookies?.[USER_SESSION_COOKIE] as string | undefined;
+function parseBearerSessionId(req: Request): string | undefined {
+  const raw = req.headers.authorization;
+  if (typeof raw !== 'string' || !raw.startsWith('Bearer ')) return undefined;
+  const token = raw.slice(7).trim();
+  if (!SESSION_ID_HEX.test(token)) return undefined;
+  return token;
+}
 
-  if (!sessionId || typeof sessionId !== 'string') {
-    req.user = null;
+export function userAuth(req: Request, _res: Response, next: NextFunction): void {
+  req.user = null;
+  req.userSessionId = undefined;
+
+  const cookieSession = req.signedCookies?.[USER_SESSION_COOKIE] as string | undefined;
+  const bearerSession = parseBearerSessionId(req);
+
+  const sessionId =
+    typeof cookieSession === 'string' && cookieSession.length > 0
+      ? cookieSession
+      : bearerSession;
+
+  if (!sessionId) {
     next();
     return;
   }
@@ -41,7 +61,6 @@ export function userAuth(req: Request, _res: Response, next: NextFunction): void
     .get(sessionId);
 
   if (!row) {
-    req.user = null;
     next();
     return;
   }
@@ -52,6 +71,7 @@ export function userAuth(req: Request, _res: Response, next: NextFunction): void
     displayName: row.display_name,
     avatarUrl: row.avatar_url,
   };
+  req.userSessionId = sessionId;
 
   next();
 }

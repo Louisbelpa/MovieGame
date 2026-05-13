@@ -1,14 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, radius, font } from '../../theme';
+import { View, Text, StyleSheet, ScrollView, Animated } from 'react-native';
+import { Svg, Rect, Path } from 'react-native-svg';
+import { colors, font } from '../../theme';
 import type { Hint } from '../../types';
-
-interface Props {
-  hints: Hint[];
-  hintsRevealed: number;
-  maxAttempts: number;
-}
 
 const HINT_LABELS: Record<string, string> = {
   year: 'Année',
@@ -25,73 +19,133 @@ function formatHintValue(hint: Hint): string {
   return String(hint.value);
 }
 
-interface HintCardProps {
-  hint: Hint;
-  index: number;
+function LockIcon() {
+  return (
+    <Svg width={10} height={10} viewBox="0 0 24 24" fill="none">
+      <Rect x="4" y="11" width="16" height="10" rx="2" stroke={colors.textFaint} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M8 11V7a4 4 0 0 1 8 0v4" stroke={colors.textFaint} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
 }
 
-function HintCard({ hint, index }: HintCardProps) {
+function HintChip({ hint, index }: { hint: Hint; index: number }) {
   const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(10)).current;
+  const scale = useRef(new Animated.Value(0.88)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 300, delay: index * 80, useNativeDriver: true }),
-      Animated.timing(translateY, { toValue: 0, duration: 300, delay: index * 80, useNativeDriver: true }),
+      Animated.spring(opacity, { toValue: 1, useNativeDriver: true, delay: index * 60 }),
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, delay: index * 60, friction: 7 }),
     ]).start();
   }, []);
 
   return (
-    <Animated.View style={[styles.card, { opacity, transform: [{ translateY }] }]}>
-      <View style={styles.cardHeader}>
-        <Ionicons name="bulb-outline" size={14} color={colors.gold} />
-        <Text style={styles.cardLabel}>{HINT_LABELS[hint.type] ?? hint.type}</Text>
-      </View>
-      <Text style={styles.cardValue}>{formatHintValue(hint)}</Text>
+    <Animated.View style={[styles.chip, styles.chipRevealed, { opacity, transform: [{ scale }] }]}>
+      <Text style={styles.chipLabel}>{HINT_LABELS[hint.type] ?? hint.type}</Text>
+      <Text style={styles.chipValue}>{formatHintValue(hint)}</Text>
     </Animated.View>
   );
 }
 
-export function HintPanel({ hints, hintsRevealed, maxAttempts }: Props) {
+function LockedChip() {
+  return (
+    <View style={[styles.chip, styles.chipLocked]}>
+      <LockIcon />
+      <Text style={styles.chipLockedText}>???</Text>
+    </View>
+  );
+}
+
+export function HintPanel({ hints, hintsRevealed, maxAttempts }: {
+  hints: Hint[];
+  hintsRevealed: number;
+  maxAttempts: number;
+}) {
   const visible = hints.slice(0, hintsRevealed);
-  const locked = maxAttempts - 1 - hintsRevealed;
+  const totalSlots = Math.min(hints.length, 3);
+  const lockedCount = Math.max(0, totalSlots - visible.length);
 
   return (
-    <View style={styles.container}>
-      {visible.map((hint, i) => (
-        <HintCard key={hint.type} hint={hint} index={i} />
-      ))}
-      {locked > 0 && Array.from({ length: Math.min(locked, 3) }).map((_, i) => (
-        <View key={`locked-${i}`} style={styles.lockedSlot}>
-          <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
-          <Text style={styles.lockedText}>Indice à venir</Text>
-        </View>
-      ))}
+    <View>
+      <Text style={styles.sectionLabel}>
+        Indices ({visible.length}/{totalSlots})
+      </Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chipRow}
+        keyboardShouldPersistTaps="handled"
+      >
+        {visible.map((h, i) => (
+          <HintChip key={h.type} hint={h} index={i} />
+        ))}
+        {Array.from({ length: lockedCount }).map((_, i) => (
+          <LockedChip key={`locked-${i}`} />
+        ))}
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { gap: spacing.sm },
-  card: {
-    backgroundColor: colors.surface2,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: '#2a2200',
+  sectionLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.textFaint,
+    textTransform: 'uppercase',
+    letterSpacing: 1.6,
+    marginBottom: 8,
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
-  cardLabel: { fontSize: font.sm, color: colors.gold, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  cardValue: { fontSize: font.md, color: colors.text, fontWeight: '500' },
-  lockedSlot: {
+  chipRow: {
+    gap: 8,
+    paddingRight: 4,
+  },
+  chip: {
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    flexDirection: 'column',
+    gap: 3,
+    minWidth: 90,
+  },
+  chipRevealed: {
+    backgroundColor: colors.surface2,
+    // Subtle top highlight
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.07)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  chipLocked: {
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.md,
+    gap: 6,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255,255,255,0.07)',
     borderStyle: 'dashed',
+    opacity: 0.4,
   },
-  lockedText: { fontSize: font.sm, color: colors.textMuted },
+  chipLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    color: colors.gold,
+  },
+  chipValue: {
+    fontSize: 13.5,
+    fontWeight: '500',
+    color: colors.text,
+  },
+  chipLockedText: {
+    fontSize: 12,
+    color: colors.textFaint,
+    letterSpacing: 2,
+  },
 });

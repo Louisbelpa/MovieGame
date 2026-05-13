@@ -1,4 +1,3 @@
-import { API_BASE_URL } from '../config/features';
 import type {
   DailyChallenge,
   GuessResult,
@@ -6,18 +5,10 @@ import type {
   GlobalStats,
   SearchResult,
 } from '../types';
+import { apiFetch } from './http';
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
-    credentials: 'include',
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw Object.assign(new Error(body.message ?? `HTTP ${res.status}`), { status: res.status });
-  }
-  return res.json() as Promise<T>;
+  return apiFetch<T>(path, init);
 }
 
 export const challengeApi = {

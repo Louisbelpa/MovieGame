@@ -1,6 +1,14 @@
 export type GuessStatus = 'correct' | 'wrong' | 'skipped';
 export type GameStatus = 'idle' | 'playing' | 'won' | 'lost' | 'not_found';
 export type MediaType = 'film' | 'series' | 'wiki';
+
+export interface User {
+  id: number;
+  email: string | null;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
 export type HintType =
   | 'year' | 'genre' | 'director' | 'creator' | 'actor'
   | 'synopsis' | 'country'

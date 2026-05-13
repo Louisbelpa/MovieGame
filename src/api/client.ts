@@ -19,10 +19,8 @@ async function request<T>(
   })
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    const err = new Error(
-      (body as { message?: string }).message ?? `HTTP ${res.status}`
-    )
+    const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string }
+    const err = new Error(body.message ?? body.error ?? `HTTP ${res.status}`)
     ;(err as Error & { status: number }).status = res.status
     throw err
   }
@@ -186,4 +184,57 @@ export function fetchChallengeCommunityStats(challengeId: number): Promise<Globa
 /** GET /api/challenge/adjacent – nearest scheduled challenge before or after a date */
 export function fetchAdjacentDate(date: string, direction: 'prev' | 'next', type: 'film' | 'series' = 'film'): Promise<{ date: string }> {
   return request<{ date: string }>(`/api/challenge/adjacent?date=${date}&direction=${direction}&type=${type}`)
+}
+
+// ─── Auth endpoints ───────────────────────────────────────────────────────────
+
+export interface UserPayload {
+  id: number
+  email: string | null
+  displayName: string
+  avatarUrl: string | null
+}
+
+export function authRegister(email: string, password: string, displayName: string): Promise<{ user: UserPayload }> {
+  return request<{ user: UserPayload }>('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ email, password, displayName }),
+  })
+}
+
+export function authLogin(email: string, password: string): Promise<{ user: UserPayload }> {
+  return request<{ user: UserPayload }>('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  })
+}
+
+export function authLogout(): Promise<void> {
+  return request<void>('/api/auth/logout', { method: 'POST' })
+}
+
+export function authGetMe(): Promise<{ user: UserPayload }> {
+  return request<{ user: UserPayload }>('/api/auth/me')
+}
+
+export function authUpdateProfile(data: { displayName?: string; avatarUrl?: string }): Promise<{ user: UserPayload }> {
+  return request<{ user: UserPayload }>('/api/auth/profile', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export interface ImportStatsData {
+  gamesPlayed: number
+  wins: number
+  currentStreak: number
+  maxStreak: number
+  distribution: Record<string, number>
+}
+
+export function authImportStats(stats: ImportStatsData): Promise<void> {
+  return request<void>('/api/auth/import-stats', {
+    method: 'POST',
+    body: JSON.stringify({ stats }),
+  })
 }

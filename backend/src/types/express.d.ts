@@ -9,6 +9,8 @@ declare global {
         displayName: string;
         avatarUrl: string | null;
       } | null;
+      /** Raw `user_sessions.id` when auth resolved (cookie or Bearer). */
+      userSessionId?: string;
     }
   }
 }

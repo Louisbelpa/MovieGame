@@ -9,6 +9,9 @@
  * PUT  /api/auth/profile       — Update display name / avatar
  * POST /api/auth/oauth/callback — OAuth login/register (client-verified token)
  * POST /api/auth/import-stats  — Merge localStorage stats into account
+ *
+ * Register / login / oauth responses include `sessionToken` (raw session id) for
+ * native clients; browsers rely on the httpOnly cookie and may ignore it.
  */
 
 import { Router, Request, Response } from 'express';
@@ -117,7 +120,7 @@ authRouter.post('/register', AUTH, async (req: Request, res: Response): Promise<
     .prepare<number, UserRow>(`SELECT id, email, display_name, avatar_url, password_hash, is_banned FROM users WHERE id = ?`)
     .get(userId)!;
 
-  res.status(201).json({ user: formatUser(user) });
+  res.status(201).json({ user: formatUser(user), sessionToken: sessionId });
 });
 
 /** POST /api/auth/login */
@@ -148,12 +151,12 @@ authRouter.post('/login', AUTH, async (req: Request, res: Response): Promise<voi
   const sessionId = createUserSession(user.id);
   setUserCookie(res, sessionId);
 
-  res.json({ user: formatUser(user) });
+  res.json({ user: formatUser(user), sessionToken: sessionId });
 });
 
 /** POST /api/auth/logout */
 authRouter.post('/logout', userAuth, (req: Request, res: Response): void => {
-  const sessionId = req.signedCookies?.[USER_SESSION_COOKIE] as string | undefined;
+  const sessionId = req.userSessionId;
   if (sessionId) {
     db.prepare(`DELETE FROM user_sessions WHERE id = ?`).run(sessionId);
   }
@@ -281,7 +284,7 @@ authRouter.post('/oauth/callback', AUTH, (req: Request, res: Response): void => 
   const sessionId = createUserSession(userId);
   setUserCookie(res, sessionId);
 
-  res.json({ user: formatUser(user) });
+  res.json({ user: formatUser(user), sessionToken: sessionId });
 });
 
 /** POST /api/auth/import-stats */

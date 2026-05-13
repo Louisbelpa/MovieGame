@@ -15,6 +15,8 @@ import { useWikiStore } from './store/wikiStore'
 import { fetchChallengeCommunityStats } from './api/client'
 import type { GlobalStatsPayload } from './api/client'
 import { loadStats } from './lib/storage'
+import { useAuthStore } from './store/authStore'
+import { AuthModal } from './components/modals/AuthModal'
 
 const EMPTY_GLOBAL_STATS: GlobalStatsPayload = {
   totalGames: 0,
@@ -168,15 +170,30 @@ export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       <BrowserRouter>
-        <Routes>
-          <Route path="/films/*" element={<GameLayout mode="film" />} />
-          {FEATURES.enableSeries && <Route path="/series/*" element={<GameLayout mode="series" />} />}
-          {FEATURES.enableWiki && <Route path="/wiki/*" element={<GameLayout mode="wiki" />} />}
-          <Route path="/" element={<Navigate to="/films" replace />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthShell>
+          <Routes>
+            <Route path="/films/*" element={<GameLayout mode="film" />} />
+            {FEATURES.enableSeries && <Route path="/series/*" element={<GameLayout mode="series" />} />}
+            {FEATURES.enableWiki && <Route path="/wiki/*" element={<GameLayout mode="wiki" />} />}
+            <Route path="/" element={<Navigate to="/films" replace />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthShell>
       </BrowserRouter>
     </MotionConfig>
+  )
+}
+
+function AuthShell({ children }: { children: React.ReactNode }) {
+  const fetchMe = useAuthStore((s) => s.fetchMe)
+  useEffect(() => {
+    void fetchMe()
+  }, [fetchMe])
+  return (
+    <>
+      {children}
+      <AuthModal />
+    </>
   )
 }
 

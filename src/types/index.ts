@@ -1,3 +1,17 @@
+// ─── Auth types ───────────────────────────────────────────────────────────────
+
+export interface User {
+  id: number
+  email: string | null
+  displayName: string
+  avatarUrl: string | null
+}
+
+export interface AuthState {
+  user: User | null
+  isLoading: boolean
+}
+
 // ─── Core domain types ──────────────────────────────────────────────────────
 
 export type GuessStatus = 'correct' | 'wrong' | 'skipped'

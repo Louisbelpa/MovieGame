@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Svg, Path, Circle, Rect } from 'react-native-svg';
 import { BaseModal } from './BaseModal';
+import { GlassView } from '../ui/GlassView';
 import { colors, spacing, radius, font } from '../../theme';
 
 interface Props {
@@ -10,20 +11,61 @@ interface Props {
   onSelectDate: (date: string) => void;
   fetchDates: () => Promise<string[]>;
   currentDate: string;
+  accentColor?: string;
 }
+
+function CheckIcon({ color }: { color: string }) {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Path d="M20 6L9 17l-5-5" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+function CalDayIcon({ color }: { color: string }) {
+  return (
+    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+      <Rect x="3" y="5" width="18" height="16" rx="2" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M3 10h18M8 3v4M16 3v4" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' });
+  return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+function formatDateShort(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 }
 
 function getTodayParis(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
 }
 
-export function ArchiveModal({ visible, onClose, onSelectDate, fetchDates, currentDate }: Props) {
+function groupByMonth(dates: string[]): { month: string; dates: string[] }[] {
+  const map = new Map<string, string[]>();
+  for (const d of dates) {
+    const month = d.slice(0, 7); // YYYY-MM
+    if (!map.has(month)) map.set(month, []);
+    map.get(month)!.push(d);
+  }
+  return Array.from(map.entries())
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([month, ds]) => ({ month, dates: ds }));
+}
+
+function formatMonth(monthStr: string): string {
+  const [year, month] = monthStr.split('-');
+  return new Date(Number(year), Number(month) - 1, 1)
+    .toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+}
+
+export function ArchiveModal({ visible, onClose, onSelectDate, fetchDates, currentDate, accentColor }: Props) {
   const [dates, setDates] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const accent = accentColor ?? colors.gold;
 
   useEffect(() => {
     if (!visible) return;
@@ -36,43 +78,77 @@ export function ArchiveModal({ visible, onClose, onSelectDate, fetchDates, curre
   const today = getTodayParis();
   const sorted = [...dates].sort((a, b) => b.localeCompare(a));
 
+  type FlatItem =
+    | { type: 'header'; month: string }
+    | { type: 'date'; date: string };
+
+  const flatData: FlatItem[] = [];
+  const groups = groupByMonth(sorted);
+  for (const g of groups) {
+    flatData.push({ type: 'header', month: g.month });
+    for (const d of g.dates) {
+      flatData.push({ type: 'date', date: d });
+    }
+  }
+
   return (
     <BaseModal visible={visible} onClose={onClose} title="Archives" scrollable={false}>
       {loading ? (
         <View style={styles.loading}>
-          <ActivityIndicator size="large" color={colors.gold} />
+          <ActivityIndicator size="large" color={accent} />
+          <Text style={styles.loadingText}>Chargement…</Text>
         </View>
       ) : (
         <FlatList
-          data={sorted}
-          keyExtractor={(item) => item}
+          data={flatData}
+          keyExtractor={(item) => item.type === 'header' ? `h-${item.month}` : item.date}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => {
-            const isToday = item === today;
-            const isCurrent = item === currentDate;
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item, index }) => {
+            if (item.type === 'header') {
+              return (
+                <View style={styles.monthHeader}>
+                  <Text style={styles.monthLabel}>{formatMonth(item.month)}</Text>
+                </View>
+              );
+            }
+            const d = item.date;
+            const isToday = d === today;
+            const isCurrent = d === currentDate;
+            const isFirst = index === 0 || flatData[index - 1]?.type === 'header';
+            const isLast = index === flatData.length - 1 || flatData[index + 1]?.type === 'header';
+
             return (
               <Pressable
                 style={({ pressed }) => [
-                  styles.dateItem,
-                  isCurrent && styles.dateItemActive,
-                  pressed && styles.dateItemPressed,
+                  styles.dateCell,
+                  isFirst && styles.dateCellFirst,
+                  isLast && styles.dateCellLast,
+                  isCurrent && { backgroundColor: `${accent}18` },
+                  pressed && styles.dateCellPressed,
                 ]}
                 onPress={() => {
-                  onSelectDate(item);
+                  onSelectDate(d);
                   onClose();
                 }}
               >
-                <View>
-                  <Text style={[styles.dateText, isCurrent && styles.dateTextActive]}>
-                    {isToday ? "Aujourd'hui" : formatDate(item)}
+                <View style={styles.dateCellLeft}>
+                  <Text style={[styles.dateMain, isCurrent && { color: accent }]}>
+                    {isToday ? "Aujourd'hui" : formatDate(d)}
                   </Text>
-                  <Text style={styles.dateISO}>{item}</Text>
+                  <Text style={styles.dateSub}>{formatDateShort(d)}</Text>
                 </View>
-                {isCurrent && <Ionicons name="checkmark" size={18} color={colors.gold} />}
+                {isCurrent && (
+                  <View style={[styles.checkBadge, { backgroundColor: `${accent}22` }]}>
+                    <CheckIcon color={accent} />
+                  </View>
+                )}
               </Pressable>
             );
           }}
-          showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={() => (
+            <View style={styles.separator} />
+          )}
         />
       )}
     </BaseModal>
@@ -80,20 +156,58 @@ export function ArchiveModal({ visible, onClose, onSelectDate, fetchDates, curre
 }
 
 const styles = StyleSheet.create({
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { paddingVertical: spacing.sm },
-  dateItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
+  loadingText: { fontSize: font.sm, color: colors.textDim },
+
+  list: { paddingBottom: spacing.xl },
+
+  monthHeader: {
     paddingHorizontal: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.sm,
   },
-  dateItemActive: { backgroundColor: '#1a1400' },
-  dateItemPressed: { backgroundColor: colors.surface2 },
-  dateText: { fontSize: font.md, color: colors.text, fontWeight: '500' },
-  dateTextActive: { color: colors.gold },
-  dateISO: { fontSize: font.sm, color: colors.textMuted, marginTop: 2 },
+  monthLabel: {
+    fontSize: font.sm,
+    fontWeight: '600',
+    color: colors.textFaint,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+
+  dateCell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 13,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surface,
+    marginHorizontal: spacing.lg,
+  },
+  dateCellFirst: {
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  dateCellLast: {
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  dateCellPressed: { opacity: 0.7 },
+
+  dateCellLeft: { gap: 2 },
+  dateMain: { fontSize: font.base, fontWeight: '500', color: colors.text },
+  dateSub: { fontSize: font.xs, color: colors.textFaint },
+
+  checkBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginHorizontal: spacing.lg,
+  },
 });

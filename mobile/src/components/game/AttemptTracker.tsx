@@ -1,39 +1,43 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, radius } from '../../theme';
+import { colors } from '../../theme';
 import type { GuessEntry } from '../../types';
 
 interface Props {
   attempts: GuessEntry[];
   maxAttempts: number;
+  accentColor?: string;
+  accentSoft?: string;
 }
 
-export function AttemptTracker({ attempts, maxAttempts }: Props) {
+export function AttemptTracker({
+  attempts,
+  maxAttempts,
+  accentColor = colors.films,
+  accentSoft = colors.filmsSoft,
+}: Props) {
   const slots = Array.from({ length: maxAttempts }, (_, i) => attempts[i] ?? null);
+  const current = attempts.length;
 
   return (
     <View style={styles.row} accessibilityLabel={`${attempts.length} sur ${maxAttempts} tentatives utilisées`}>
-      {slots.map((attempt, i) => (
-        <View
-          key={i}
-          style={[
-            styles.slot,
-            attempt?.correct && styles.slotCorrect,
-            attempt && !attempt.correct && styles.slotWrong,
-            !attempt && styles.slotEmpty,
-          ]}
-        >
-          {attempt?.correct && <Ionicons name="checkmark" size={14} color={colors.bg} />}
-          {attempt && !attempt.correct && (
-            <Ionicons
-              name={attempt.skipped ? 'remove' : 'close'}
-              size={14}
-              color={colors.white}
-            />
-          )}
-        </View>
-      ))}
+      {slots.map((attempt, i) => {
+        const isCorrect = attempt?.correct;
+        const isWrong = attempt && !attempt.correct;
+        const isCurrent = !attempt && i === current;
+        return (
+          <View
+            key={i}
+            style={[
+              styles.dot,
+              isCorrect && styles.dotCorrect,
+              isWrong && styles.dotWrong,
+              isCurrent && { backgroundColor: accentColor },
+              !attempt && !isCurrent && styles.dotEmpty,
+            ]}
+          />
+        );
+      })}
     </View>
   );
 }
@@ -41,28 +45,21 @@ export function AttemptTracker({ attempts, maxAttempts }: Props) {
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-  },
-  slot: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.sm,
+    gap: 6,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
   },
-  slotEmpty: {
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
   },
-  slotCorrect: {
-    borderColor: colors.green,
+  dotEmpty: {
+    backgroundColor: colors.borderStrong,
+  },
+  dotCorrect: {
     backgroundColor: colors.green,
   },
-  slotWrong: {
-    borderColor: colors.red,
+  dotWrong: {
     backgroundColor: colors.red,
   },
 });
