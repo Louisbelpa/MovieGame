@@ -226,6 +226,57 @@ const incremental: { name: string; sql: string }[] = [
     name: 'add_hint_schedule_to_series',
     sql: `ALTER TABLE series ADD COLUMN hint_schedule TEXT NOT NULL DEFAULT '["year","creator","cast"]'`,
   },
+  {
+    name: 'create_users',
+    sql: `CREATE TABLE IF NOT EXISTS users (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      email         TEXT UNIQUE,
+      password_hash TEXT,
+      display_name  TEXT NOT NULL,
+      avatar_url    TEXT,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      is_banned     INTEGER NOT NULL DEFAULT 0,
+      stats_games_played INTEGER DEFAULT 0,
+      stats_wins         INTEGER DEFAULT 0,
+      stats_streak       INTEGER DEFAULT 0,
+      stats_max_streak   INTEGER DEFAULT 0
+    )`,
+  },
+  {
+    name: 'create_oauth_accounts',
+    sql: `CREATE TABLE IF NOT EXISTS oauth_accounts (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      provider    TEXT NOT NULL,
+      provider_id TEXT NOT NULL,
+      UNIQUE(provider, provider_id)
+    )`,
+  },
+  {
+    name: 'create_user_sessions',
+    sql: `CREATE TABLE IF NOT EXISTS user_sessions (
+      id         TEXT PRIMARY KEY,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  },
+  {
+    name: 'create_user_sessions_idx_user_id',
+    sql: `CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions (user_id)`,
+  },
+  {
+    name: 'create_user_sessions_idx_expires_at',
+    sql: `CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions (expires_at)`,
+  },
+  {
+    name: 'add_user_id_to_game_sessions',
+    sql: `ALTER TABLE game_sessions ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL`,
+  },
+  {
+    name: 'add_user_id_to_wiki_sessions',
+    sql: `ALTER TABLE wiki_sessions ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL`,
+  },
 ]
 
 // Multi-statement migrations that need db.exec() rather than db.prepare().run()

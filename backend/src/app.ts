@@ -20,6 +20,8 @@ import { seriesRouter } from './routes/series.js';
 import { statsRouter } from './routes/stats.js';
 import { adminRouter } from './routes/admin.js';
 import { sessionMiddleware } from './middleware/session.js';
+import { userAuth } from './middleware/userAuth.js';
+import { authRouter } from './routes/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { createRateLimiter } from './middleware/rateLimiter.js';
@@ -113,6 +115,7 @@ export function createApp(): express.Application {
   }));
 
   app.use(sessionMiddleware);
+  app.use(userAuth);
   app.use('/api', createRateLimiter({
     max: parseInt(process.env.API_RATE_LIMIT_MAX ?? '600', 10),
     windowMs: parseInt(process.env.API_RATE_LIMIT_WINDOW_MS ?? '60000', 10),
@@ -124,6 +127,7 @@ export function createApp(): express.Application {
   app.use('/api/series', seriesRouter);
   app.use('/api/stats', statsRouter);
   app.use('/api/admin', adminRouter);
+  app.use('/api/auth', authRouter);
 
   app.get(
     '/health',

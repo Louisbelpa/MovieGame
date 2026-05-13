@@ -247,6 +247,50 @@ CREATE TABLE IF NOT EXISTS active_admin_tokens (
 CREATE INDEX IF NOT EXISTS idx_admin_tokens_hash ON active_admin_tokens (token_hash);
 
 -- ---------------------------------------------------------------------------
+-- users
+--   One row per registered player account.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS users (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  email         TEXT UNIQUE,
+  password_hash TEXT,
+  display_name  TEXT NOT NULL,
+  avatar_url    TEXT,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  is_banned     INTEGER NOT NULL DEFAULT 0,
+  stats_games_played INTEGER DEFAULT 0,
+  stats_wins         INTEGER DEFAULT 0,
+  stats_streak       INTEGER DEFAULT 0,
+  stats_max_streak   INTEGER DEFAULT 0
+);
+
+-- ---------------------------------------------------------------------------
+-- oauth_accounts
+--   Links a user to an OAuth provider identity.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS oauth_accounts (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  provider    TEXT NOT NULL,
+  provider_id TEXT NOT NULL,
+  UNIQUE(provider, provider_id)
+);
+
+-- ---------------------------------------------------------------------------
+-- user_sessions
+--   Revocable user sessions (30-day rolling).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_sessions (
+  id         TEXT PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id    ON user_sessions (user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions (expires_at);
+
+-- ---------------------------------------------------------------------------
 -- Trigger: update global_stats when a session is finished.
 -- wins_by_attempt JSON key is the number of attempts used (1-6).
 -- We use json_set to update only the matching bucket atomically.
