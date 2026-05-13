@@ -59,12 +59,6 @@ async function clearLocalStats(): Promise<void> {
   }
 }
 
-async function persistSessionFromAuth(data: { sessionToken?: string }): Promise<void> {
-  if (data.sessionToken && data.sessionToken.length > 0) {
-    await setUserSessionToken(data.sessionToken);
-  }
-}
-
 export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
   isLoading: false,
@@ -88,9 +82,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
   login: async (email, password) => {
     await clearUserSessionToken();
-    const data = await authLogin(email, password);
-    await persistSessionFromAuth(data);
-    set({ user: data.user });
+    const { user } = await authLogin(email, password);
+    set({ user });
     try {
       await authImportStats(await buildImportPayload());
       await clearLocalStats();
@@ -101,9 +94,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
   register: async (email, password, displayName) => {
     await clearUserSessionToken();
-    const data = await authRegister(email, password, displayName);
-    await persistSessionFromAuth(data);
-    set({ user: data.user });
+    const { user } = await authRegister(email, password, displayName);
+    set({ user });
     try {
       await authImportStats(await buildImportPayload());
       await clearLocalStats();
@@ -116,11 +108,9 @@ export const useAuthStore = create<AuthStore>((set) => ({
     try {
       await authLogout();
     } catch {
-      /* ignore */
-    } finally {
-      await clearUserSessionToken();
-      set({ user: null });
+      /* réseau ou session déjà invalide */
     }
+    set({ user: null });
   },
 
   updateProfile: async (data) => {
