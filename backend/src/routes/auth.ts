@@ -16,7 +16,7 @@ import bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
 import db from '../db/database.js';
 import { userAuth, requireUser, USER_SESSION_COOKIE } from '../middleware/userAuth.js';
-import { createRateLimiter } from '../middleware/rateLimiter.js';
+import { AUTH } from '../middleware/rateLimiter.js';
 
 export const authRouter = Router();
 
@@ -25,8 +25,6 @@ export const authRouter = Router();
 const BCRYPT_ROUNDS = 12;
 const SESSION_TTL_DAYS = 30;
 const COOKIE_MAX_AGE_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
-
-const authLimiter = createRateLimiter({ max: 10, windowMs: 15 * 60 * 1000 });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -74,7 +72,7 @@ function isValidEmail(email: string): boolean {
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 /** POST /api/auth/register */
-authRouter.post('/register', authLimiter, async (req: Request, res: Response): Promise<void> => {
+authRouter.post('/register', AUTH, async (req: Request, res: Response): Promise<void> => {
   const { email, password, displayName } = req.body as {
     email?: unknown;
     password?: unknown;
@@ -123,7 +121,7 @@ authRouter.post('/register', authLimiter, async (req: Request, res: Response): P
 });
 
 /** POST /api/auth/login */
-authRouter.post('/login', authLimiter, async (req: Request, res: Response): Promise<void> => {
+authRouter.post('/login', AUTH, async (req: Request, res: Response): Promise<void> => {
   const { email, password } = req.body as { email?: unknown; password?: unknown };
 
   if (typeof email !== 'string' || typeof password !== 'string') {
@@ -159,7 +157,13 @@ authRouter.post('/logout', userAuth, (req: Request, res: Response): void => {
   if (sessionId) {
     db.prepare(`DELETE FROM user_sessions WHERE id = ?`).run(sessionId);
   }
-  res.clearCookie(USER_SESSION_COOKIE);
+  res.clearCookie(USER_SESSION_COOKIE, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    signed: true,
+    path: '/',
+  });
   res.json({ ok: true });
 });
 
@@ -207,7 +211,7 @@ authRouter.put('/profile', userAuth, requireUser, (req: Request, res: Response):
 });
 
 /** POST /api/auth/oauth/callback */
-authRouter.post('/oauth/callback', authLimiter, (req: Request, res: Response): void => {
+authRouter.post('/oauth/callback', AUTH, (req: Request, res: Response): void => {
   const { provider, providerId, email, displayName, avatarUrl } = req.body as {
     provider?: unknown;
     providerId?: unknown;

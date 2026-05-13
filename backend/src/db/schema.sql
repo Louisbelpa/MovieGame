@@ -291,6 +291,30 @@ CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id    ON user_sessions (user_i
 CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions (expires_at);
 
 -- ---------------------------------------------------------------------------
+-- wiki_sessions
+--   Optional dedicated rows for Wiki mode (mirrors game_sessions). The live
+--   wiki API currently uses game_sessions; this table exists for parity and
+--   future use, with user_id from the start.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS wiki_sessions (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_token   TEXT NOT NULL,
+    challenge_id    INTEGER NOT NULL REFERENCES daily_challenges (id) ON DELETE CASCADE,
+    attempts        TEXT NOT NULL DEFAULT '[]',
+    hints_revealed  INTEGER NOT NULL DEFAULT 0,
+    outcome         TEXT CHECK (outcome IN ('won', 'lost')),
+    started_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    finished_at     TEXT,
+    user_id         INTEGER REFERENCES users (id) ON DELETE SET NULL,
+    UNIQUE (session_token, challenge_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wiki_sessions_token     ON wiki_sessions (session_token);
+CREATE INDEX IF NOT EXISTS idx_wiki_sessions_challenge ON wiki_sessions (challenge_id);
+CREATE INDEX IF NOT EXISTS idx_wiki_sessions_outcome     ON wiki_sessions (outcome);
+CREATE INDEX IF NOT EXISTS idx_wiki_sessions_user_id     ON wiki_sessions (user_id);
+
+-- ---------------------------------------------------------------------------
 -- Trigger: update global_stats when a session is finished.
 -- wins_by_attempt JSON key is the number of attempts used (1-6).
 -- We use json_set to update only the matching bucket atomically.

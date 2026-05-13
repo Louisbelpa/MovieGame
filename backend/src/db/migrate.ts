@@ -274,8 +274,35 @@ const incremental: { name: string; sql: string }[] = [
     sql: `ALTER TABLE game_sessions ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL`,
   },
   {
-    name: 'add_user_id_to_wiki_sessions',
-    sql: `ALTER TABLE wiki_sessions ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL`,
+    name: 'create_wiki_sessions',
+    sql: `CREATE TABLE IF NOT EXISTS wiki_sessions (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_token   TEXT NOT NULL,
+      challenge_id    INTEGER NOT NULL REFERENCES daily_challenges (id) ON DELETE CASCADE,
+      attempts        TEXT NOT NULL DEFAULT '[]',
+      hints_revealed  INTEGER NOT NULL DEFAULT 0,
+      outcome         TEXT CHECK (outcome IN ('won', 'lost')),
+      started_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      finished_at     TEXT,
+      user_id         INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      UNIQUE (session_token, challenge_id)
+    )`,
+  },
+  {
+    name: 'create_wiki_sessions_idx_token',
+    sql: `CREATE INDEX IF NOT EXISTS idx_wiki_sessions_token ON wiki_sessions (session_token)`,
+  },
+  {
+    name: 'create_wiki_sessions_idx_challenge',
+    sql: `CREATE INDEX IF NOT EXISTS idx_wiki_sessions_challenge ON wiki_sessions (challenge_id)`,
+  },
+  {
+    name: 'create_wiki_sessions_idx_outcome',
+    sql: `CREATE INDEX IF NOT EXISTS idx_wiki_sessions_outcome ON wiki_sessions (outcome)`,
+  },
+  {
+    name: 'create_wiki_sessions_idx_user_id',
+    sql: `CREATE INDEX IF NOT EXISTS idx_wiki_sessions_user_id ON wiki_sessions (user_id)`,
   },
 ]
 
