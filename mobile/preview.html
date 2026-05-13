@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GuessToday Mobile — Aperçu UI</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface2: #1e1e1e;
+    --border: #2a2a2a;
+    --gold: #f5c518;
+    --gold-dim: #b8911a;
+    --text: #f0f0f0;
+    --text-dim: #8a8a8a;
+    --text-muted: #555;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --radius: 10px;
+  }
+
+  body {
+    background: #111;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    gap: 48px;
+    min-height: 100vh;
+  }
+
+  h1 {
+    color: var(--gold);
+    font-size: 22px;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: 0.5px;
+  }
+
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 13px;
+    text-align: center;
+    margin-top: 6px;
+  }
+
+  .screens-row {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  .screen-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .screen-label {
+    color: var(--text-dim);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+  }
+
+  /* ── Phone frame ── */
+  .phone {
+    width: 375px;
+    min-height: 812px;
+    background: var(--bg);
+    border-radius: 44px;
+    border: 8px solid #1c1c1e;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.7), inset 0 0 0 1px #2a2a2a;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Status bar */
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 24px 6px;
+    background: var(--bg);
+  }
+  .status-time { color: var(--text); font-size: 15px; font-weight: 600; }
+  .status-icons { display: flex; gap: 6px; align-items: center; }
+  .status-icons svg { color: var(--text); }
+
+  /* App header */
+  .app-header {
+    background: var(--bg);
+    padding: 8px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .app-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 0.5px;
+  }
+
+  /* Mode tabs */
+  .mode-tabs {
+    display: flex;
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 2px;
+    gap: 0;
+  }
+  .mode-tab {
+    padding: 5px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mode-tab.active {
+    background: var(--gold);
+    color: #000;
+  }
+
+  /* Scroll content */
+  .scroll-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scrollbar-width: none;
+  }
+  .scroll-content::-webkit-scrollbar { display: none; }
+
+  /* Date nav */
+  .date-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
+  }
+  .nav-btn {
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 18px;
+  }
+  .nav-btn.disabled { opacity: 0.25; }
+  .date-center { text-align: center; }
+  .date-text { font-size: 14px; color: var(--text); font-weight: 500; }
+  .challenge-num { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+
+  /* Movie image */
+  .movie-image {
+    width: 100%;
+    aspect-ratio: 16/9;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    background: var(--surface2);
+  }
+  .movie-image img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .blur-overlay {
+    position: absolute;
+    inset: 0;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    background: rgba(0,0,0,0.15);
+  }
+  .blur-overlay.medium {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .blur-overlay.none {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: none;
+  }
+
+  /* Attempt tracker */
+  .attempt-tracker {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 4px 0;
+  }
+  .attempt-slot {
+    width: 32px; height: 32px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .attempt-slot.correct { background: var(--green); border-color: var(--green); }
+  .attempt-slot.wrong { background: var(--red); border-color: var(--red); }
+  .attempt-slot.skip { background: #3a3a3a; border-color: #3a3a3a; }
+
+  /* Guess input */
+  .guess-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .guess-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    color: var(--text-muted);
+    font-size: 15px;
+    font-family: inherit;
+  }
+  .submit-btn {
+    width: 48px; height: 48px;
+    background: var(--gold);
+    border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .skip-btn {
+    width: 48px; height: 48px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    cursor: pointer;
+    flex-shrink: 0;
+    color: var(--text-dim);
+  }
+
+  /* Suggestions dropdown */
+  .suggestions {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-top: -4px;
+  }
+  .suggestion-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .suggestion-item:last-child { border-bottom: none; }
+  .suggestion-item:hover { background: var(--surface); }
+  .sug-title { font-size: 14px; color: var(--text); }
+  .sug-year { font-size: 12px; color: var(--text-dim); }
+
+  /* Hint panel */
+  .hints { display: flex; flex-direction: column; gap: 8px; }
+  .hint-card {
+    background: var(--surface2);
+    border: 1px solid #2a2200;
+    border-radius: var(--radius);
+    padding: 12px;
+  }
+  .hint-header {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 4px;
+  }
+  .hint-dot { width: 10px; height: 10px; background: var(--gold); border-radius: 50%; }
+  .hint-label {
+    font-size: 11px;
+    color: var(--gold);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .hint-value { font-size: 15px; color: var(--text); font-weight: 500; }
+  .hint-locked {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  /* Actions row */
+  .actions-row {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    padding: 8px 0;
+  }
+  .action-btn {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 11px;
+  }
+  .action-btn:hover { background: var(--surface2); }
+  .action-icon { font-size: 20px; }
+
+  /* Bottom tab bar */
+  .tab-bar {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    padding: 8px 0 20px;
+  }
+  .tab-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    padding: 4px 0;
+  }
+  .tab-icon { font-size: 22px; color: var(--text-muted); }
+  .tab-icon.active { color: var(--gold); }
+  .tab-label { font-size: 10px; color: var(--text-muted); }
+  .tab-label.active { color: var(--gold); }
+
+  /* ─── Modal overlay ─── */
+  .modal-phone .scroll-content {
+    filter: brightness(0.4);
+  }
+  .modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    z-index: 10;
+    border-radius: 36px;
+    overflow: hidden;
+  }
+  .modal-sheet {
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    padding: 0 0 32px;
+    max-height: 85%;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-handle {
+    width: 40px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 10px auto;
+  }
+  .modal-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 20px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-title { font-size: 18px; font-weight: 700; color: var(--text); }
+  .modal-close {
+    width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-dim);
+    font-size: 20px;
+    cursor: pointer;
+    border-radius: 50%;
+  }
+  .modal-body { padding: 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 20px; }
+
+  /* Win modal content */
+  .win-celebration {
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    padding: 16px 0;
+  }
+  .trophy { font-size: 52px; }
+  .win-title { font-size: 24px; font-weight: 700; color: var(--text); }
+  .win-attempts { font-size: 17px; color: var(--gold); }
+  .emoji-grid { font-size: 26px; letter-spacing: 4px; text-align: center; }
+  .modal-btn {
+    padding: 14px;
+    border-radius: var(--radius);
+    text-align: center;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .modal-btn.primary { background: var(--gold); color: #000; }
+  .modal-btn.secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    margin-top: 8px;
+  }
+
+  /* Stats modal */
+  .stats-row {
+    display: flex;
+    justify-content: space-around;
+  }
+  .stat-box { text-align: center; }
+  .stat-val { font-size: 26px; font-weight: 700; color: var(--gold); }
+  .stat-lbl { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+  .dist-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 6px;
+  }
+  .dist-num { font-size: 13px; color: var(--text-dim); width: 16px; text-align: center; }
+  .dist-bar-wrap {
+    flex: 1; height: 22px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .dist-bar {
+    height: 100%;
+    background: var(--gold);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+  .dist-count { font-size: 12px; color: var(--text-dim); width: 20px; text-align: right; }
+
+  /* Wiki screen */
+  .wiki-avatar {
+    width: 130px; height: 130px;
+    border-radius: 65px;
+    overflow: hidden;
+    margin: 0 auto;
+    background: var(--surface2);
+    position: relative;
+  }
+  .wiki-avatar img {
+    width: 100%; height: 100%; object-fit: cover;
+  }
+  .wiki-avatar .blur-overlay {
+    border-radius: 65px;
+  }
+  .person-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #1a1400;
+    border: 1px solid #2a2200;
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 12px;
+    color: var(--gold);
+    font-weight: 600;
+  }
+
+  /* Scrollbar hidden */
+  * { scrollbar-width: none; }
+  *::-webkit-scrollbar { display: none; }
+
+  /* Responsive */
+  @media (max-width: 860px) {
+    .phone { width: 340px; }
+    .screens-row { gap: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<div>
+  <h1>GuessToday — Aperçu Mobile</h1>
+  <p class="subtitle">Expo React Native · iOS &amp; Android · Thème sombre</p>
+</div>
+
+<div class="screens-row">
+
+  <!-- ══════════════ SCREEN 1 : Game en cours ══════════════ -->
+  <div class="screen-wrapper">
+    <div class="screen-label">Jeu en cours — Films</div>
+    <div class="phone">
+      <!-- Status bar -->
+      <div class="status-bar">
+        <span class="status-time">9:41</span>
+        <div class="status-icons">
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><rect x="0" y="3" width="3" height="9" rx="1"/><rect x="4.5" y="2" width="3" height="10" rx="1"/><rect x="9" y="0" width="3" height="12" rx="1"/><rect x="13.5" y="1" width="2" height="11" rx="1"/></svg>
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><path d="M8 2.5C10.2 2.5 12.2 3.4 13.7 4.9L15.1 3.5C13.2 1.6 10.7.5 8 .5S2.8 1.6.9 3.5L2.3 4.9C3.8 3.4 5.8 2.5 8 2.5zm0 3c1.4 0 2.7.5 3.7 1.4L13.1 5.6C11.7 4.3 9.9 3.5 8 3.5s-3.7.8-5.1 2.1L4.3 7C5.3 6 6.6 5.5 8 5.5zm0 3c.8 0 1.5.3 2 .8L11.5 8C10.6 7.1 9.4 6.5 8 6.5s-2.6.6-3.5 1.5L6 9.3c.5-.5 1.2-.8 2-.8zm0 3a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/></svg>
+          <svg width="25" height="12" viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="22" height="10" rx="2.5" stroke="currentColor" stroke-width="1" fill="none" opacity="0.35"/><rect x="1" y="2" width="17" height="8" rx="1.5" fill="currentColor"/><path d="M23 4.5v3a1.5 1.5 0 000-3z"/></svg>
+        </div>
+      </div>
+
+      <!-- Header -->
+      <div class="app-header">
+        <div class="app-title">GuessToday</div>
+        <div class="mode-tabs">
+          <div class="mode-tab active">Films</div>
+          <div class="mode-tab">Séries</div>
+        </div>
+      </div>
+
+      <!-- Scroll -->
+      <div class="scroll-content">
+        <!-- Date nav -->
+        <div class="date-nav">
+          <div class="nav-btn">‹</div>
+          <div class="date-center">
+            <div class="date-text">13 mai 2026</div>
+            <div class="challenge-num">Défi #142</div>
+          </div>
+          <div class="nav-btn disabled">›</div>
+        </div>
+
+        <!-- Image floutée -->
+        <div class="movie-image">
+          <img src="https://image.tmdb.org/t/p/w780/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg" alt="film" />
+          <div class="blur-overlay"></div>
+        </div>
+
+        <!-- Attempt tracker -->
+        <div class="attempt-tracker">
+          <div class="attempt-slot wrong">✕</div>
+          <div class="attempt-slot skip">—</div>
+          <div class="attempt-slot"></div>
+          <div class="attempt-slot"></div>
+          <div class="attempt-slot"></div>
+          <div class="attempt-slot"></div>
+        </div>
+
+        <!-- Guess input -->
+        <div>
+          <div class="guess-row">
+            <input class="guess-input" placeholder="Entrez un titre de film…" style="outline:none; border:1px solid #444" />
+            <div class="submit-btn">→</div>
+            <div class="skip-btn">⏭</div>
+          </div>
+          <!-- Dropdown suggestions -->
+          <div class="suggestions" style="margin-top: 6px;">
+            <div class="suggestion-item" style="background: var(--surface);">
+              <span class="sug-title">The Shawshank Redemption</span>
+              <span class="sug-year">1994</span>
+            </div>
+            <div class="suggestion-item">
+              <span class="sug-title">Schindler's List</span>
+              <span class="sug-year">1993</span>
+            </div>
+            <div class="suggestion-item">
+              <span class="sug-title">Shutter Island</span>
+              <span class="sug-year">2010</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hint panel -->
+        <div class="hints">
+          <div class="hint-card">
+            <div class="hint-header">
+              <div class="hint-dot"></div>
+              <span class="hint-label">Année</span>
+            </div>
+            <div class="hint-value">1999</div>
+          </div>
+          <div class="hint-locked">
+            🔒 Indice à venir
+          </div>
+          <div class="hint-locked">
+            🔒 Indice à venir
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="actions-row">
+          <div class="action-btn">
+            <span class="action-icon">📊</span>
+            <span>Stats</span>
+          </div>
+          <div class="action-btn">
+            <span class="action-icon">📅</span>
+            <span>Archives</span>
+          </div>
+          <div class="action-btn">
+            <span class="action-icon">❓</span>
+            <span>Règles</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab bar -->
+      <div class="tab-bar">
+        <div class="tab-item">
+          <span class="tab-icon active">🎬</span>
+          <span class="tab-label active">Films</span>
+        </div>
+        <div class="tab-item">
+          <span class="tab-icon">🌐</span>
+          <span class="tab-label">WikiGuessr</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SCREEN 2 : Win modal ══════════════ -->
+  <div class="screen-wrapper">
+    <div class="screen-label">Victoire !</div>
+    <div class="phone modal-phone">
+      <div class="status-bar">
+        <span class="status-time">9:41</span>
+        <div class="status-icons" style="opacity:.5">📶 🔋</div>
+      </div>
+      <div class="app-header"><div class="app-title">GuessToday</div></div>
+
+      <div class="scroll-content" style="filter:brightness(.35);">
+        <div class="date-nav">
+          <div class="nav-btn">‹</div>
+          <div class="date-center"><div class="date-text">13 mai 2026</div></div>
+          <div class="nav-btn disabled">›</div>
+        </div>
+        <div class="movie-image">
+          <img src="https://image.tmdb.org/t/p/w780/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg" alt="film" />
+        </div>
+        <div class="attempt-tracker">
+          <div class="attempt-slot wrong">✕</div>
+          <div class="attempt-slot skip">—</div>
+          <div class="attempt-slot correct">✓</div>
+          <div class="attempt-slot"></div>
+          <div class="attempt-slot"></div>
+          <div class="attempt-slot"></div>
+        </div>
+      </div>
+
+      <!-- Modal win -->
+      <div class="modal-overlay">
+        <div class="modal-sheet">
+          <div class="modal-handle"></div>
+          <div class="modal-header">
+            <span class="modal-title">Bravo ! 🎉</span>
+            <span class="modal-close">×</span>
+          </div>
+          <div class="modal-body">
+            <div class="win-celebration">
+              <div class="trophy">🏆</div>
+              <div class="win-title">Film trouvé !</div>
+              <div class="win-attempts">En 3 tentatives</div>
+            </div>
+            <div style="text-align:center;">
+              <div class="emoji-grid">🔴⬛🟢</div>
+            </div>
+            <div>
+              <div class="modal-btn primary">Partager</div>
+              <div class="modal-btn secondary">Fermer</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-bar">
+        <div class="tab-item"><span class="tab-icon active">🎬</span><span class="tab-label active">Films</span></div>
+        <div class="tab-item"><span class="tab-icon">🌐</span><span class="tab-label">WikiGuessr</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SCREEN 3 : Stats modal ══════════════ -->
+  <div class="screen-wrapper">
+    <div class="screen-label">Statistiques</div>
+    <div class="phone modal-phone">
+      <div class="status-bar"><span class="status-time">9:41</span></div>
+      <div class="app-header"><div class="app-title">GuessToday</div></div>
+      <div class="scroll-content" style="filter:brightness(.35);">
+        <div class="date-nav"><div class="nav-btn">‹</div><div class="date-center"><div class="date-text">13 mai 2026</div></div><div class="nav-btn disabled">›</div></div>
+        <div class="movie-image"><img src="https://image.tmdb.org/t/p/w780/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg" alt="film" /></div>
+        <div class="attempt-tracker">
+          <div class="attempt-slot correct">✓</div>
+          <div class="attempt-slot wrong">✕</div>
+          <div class="attempt-slot wrong">✕</div>
+          <div class="attempt-slot"></div><div class="attempt-slot"></div><div class="attempt-slot"></div>
+        </div>
+      </div>
+
+      <div class="modal-overlay">
+        <div class="modal-sheet" style="max-height: 90%;">
+          <div class="modal-handle"></div>
+          <div class="modal-header">
+            <span class="modal-title">Statistiques — Films</span>
+            <span class="modal-close">×</span>
+          </div>
+          <div class="modal-body">
+            <div class="stats-row">
+              <div class="stat-box"><div class="stat-val">47</div><div class="stat-lbl">Parties</div></div>
+              <div class="stat-box"><div class="stat-val">78%</div><div class="stat-lbl">Victoires</div></div>
+              <div class="stat-box"><div class="stat-val">5</div><div class="stat-lbl">Série en cours</div></div>
+              <div class="stat-box"><div class="stat-val">12</div><div class="stat-lbl">Meilleure série</div></div>
+            </div>
+
+            <div>
+              <div style="font-size:14px; font-weight:600; color:var(--text); margin-bottom:10px;">Distribution des tentatives</div>
+              <div class="dist-row"><span class="dist-num">1</span><div class="dist-bar-wrap"><div class="dist-bar" style="width:15%"></div></div><span class="dist-count">7</span></div>
+              <div class="dist-row"><span class="dist-num">2</span><div class="dist-bar-wrap"><div class="dist-bar" style="width:38%"></div></div><span class="dist-count">18</span></div>
+              <div class="dist-row"><span class="dist-num">3</span><div class="dist-bar-wrap"><div class="dist-bar" style="width:100%"></div></div><span class="dist-count">47</span></div>
+              <div class="dist-row"><span class="dist-num">4</span><div class="dist-bar-wrap"><div class="dist-bar" style="width:32%"></div></div><span class="dist-count">15</span></div>
+              <div class="dist-row"><span class="dist-num">5</span><div class="dist-bar-wrap"><div class="dist-bar" style="width:8%"></div></div><span class="dist-count">4</span></div>
+              <div class="dist-row"><span class="dist-num">6</span><div class="dist-bar-wrap"><div class="dist-bar" style="width:4%"></div></div><span class="dist-count">2</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-bar">
+        <div class="tab-item"><span class="tab-icon active">🎬</span><span class="tab-label active">Films</span></div>
+        <div class="tab-item"><span class="tab-icon">🌐</span><span class="tab-label">WikiGuessr</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SCREEN 4 : WikiGuessr ══════════════ -->
+  <div class="screen-wrapper">
+    <div class="screen-label">WikiGuessr</div>
+    <div class="phone">
+      <div class="status-bar">
+        <span class="status-time">9:41</span>
+        <div class="status-icons">📶 🔋</div>
+      </div>
+
+      <div class="app-header">
+        <div class="app-title" style="color: var(--text);">WikiGuessr</div>
+      </div>
+
+      <div class="scroll-content">
+        <!-- Header -->
+        <div style="display:flex; justify-content:space-between; align-items:center; padding: 4px 0;">
+          <div>
+            <div class="date-text">13 mai 2026</div>
+            <div class="challenge-num">WikiGuessr #58</div>
+          </div>
+          <div style="display:flex; gap:4px;">
+            <div class="nav-btn disabled" style="background:var(--surface2); border-radius:8px; border:1px solid var(--border);">‹</div>
+            <div class="nav-btn disabled" style="background:var(--surface2); border-radius:8px; border:1px solid var(--border);">›</div>
+          </div>
+        </div>
+
+        <!-- Wiki avatar -->
+        <div class="wiki-avatar">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Barack_Obama_presidential_portrait.jpg/400px-Barack_Obama_presidential_portrait.jpg" alt="personnalité" />
+          <div class="blur-overlay medium"></div>
+        </div>
+
+        <!-- Attempt tracker -->
+        <div class="attempt-tracker">
+          <div class="attempt-slot wrong">✕</div>
+          <div class="attempt-slot"></div>
+          <div class="attempt-slot"></div>
+          <div class="attempt-slot"></div>
+          <div class="attempt-slot"></div>
+        </div>
+
+        <!-- Guess input -->
+        <div class="guess-row">
+          <input class="guess-input" placeholder="Entrez un nom de personnalité…" style="outline:none; border:1px solid #444" />
+          <div class="submit-btn">→</div>
+          <div class="skip-btn">⏭</div>
+        </div>
+
+        <!-- Wiki hint panel -->
+        <div class="hints">
+          <div style="display:inline-block;">
+            <div class="person-badge">👤 Personnalité politique</div>
+          </div>
+
+          <div class="hint-card">
+            <div class="hint-header">
+              <div class="hint-dot"></div>
+              <span class="hint-label">Nationalité</span>
+            </div>
+            <div class="hint-value">Américaine</div>
+          </div>
+
+          <div class="hint-locked">🔒 Indice à venir</div>
+          <div class="hint-locked">🔒 Indice à venir</div>
+          <div class="hint-locked">🔒 Indice à venir</div>
+        </div>
+
+        <!-- Actions -->
+        <div class="actions-row">
+          <div class="action-btn"><span class="action-icon">📊</span><span>Stats</span></div>
+          <div class="action-btn"><span class="action-icon">📅</span><span>Archives</span></div>
+          <div class="action-btn"><span class="action-icon">❓</span><span>Règles</span></div>
+        </div>
+      </div>
+
+      <div class="tab-bar">
+        <div class="tab-item"><span class="tab-icon">🎬</span><span class="tab-label">Films</span></div>
+        <div class="tab-item"><span class="tab-icon active">🌐</span><span class="tab-label active">WikiGuessr</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="text-align:center; color: var(--text-dim, #555); font-size:12px; margin-top: 8px; max-width: 900px;">
+  Aperçu statique — composants React Native réels : <code style="background:#1e1e1e; color:#f5c518; padding: 2px 6px; border-radius:4px;">Modal · FlatList · TextInput · Animated · Pressable · BlurView · Share</code>
+</div>
+
+</body>
+</html>
