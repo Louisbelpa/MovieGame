@@ -18,6 +18,7 @@ import { AnalyticsPage } from './pages/AnalyticsPage'
 import { WikiPersonsPage } from './pages/WikiPersonsPage'
 import { WikiPrefetchPoolPage } from './pages/WikiPrefetchPoolPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { UsersPage } from './pages/UsersPage'
 
 export function AdminApp() {
   return (
@@ -26,6 +27,7 @@ export function AdminApp() {
       <Routes>
         <Route path="/admin/login" element={<LoginPage />} />
         <Route path="/admin" element={<DashboardPage />} />
+        <Route path="/admin/users" element={<UsersPage />} />
         <Route path="/admin/films" element={<FilmsPage />} />
         <Route path="/admin/series" element={<SeriesPage />} />
         <Route path="/admin/calendar" element={<CalendarPage />} />

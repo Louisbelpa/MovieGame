@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Share2, Trophy, BarChart2, ExternalLink, Film, Tv, Landmark } from 'lucide-react'
+import { Share2, Trophy, BarChart2, ExternalLink, Film, Tv, Landmark, Flame, UserCircle, Users } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { useAuthStore } from '@/store/authStore'
+import { useAuthModal } from '@/components/modals/AuthModal'
+import { loadStats } from '@/lib/storage'
 
 type GameMode = 'film' | 'series' | 'wiki'
 
@@ -45,6 +48,10 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShar
   const isWiki = mode === 'wiki'
   const modalTitleId = 'modal-title-win'
   const modalDescId = 'modal-desc'
+  const user = useAuthStore((s) => s.user)
+  const { open: openAuth } = useAuthModal()
+  const statsType = mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : 'film'
+  const currentStreak = isOpen ? loadStats(statsType).currentStreak : 0
   const tmdbUrl = !isWiki && result.tmdbId
     ? `https://www.themoviedb.org/${mode === 'series' ? 'tv' : 'movie'}/${result.tmdbId}`
     : null
@@ -149,6 +156,37 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShar
                 )
               })}
             </div>
+          </div>
+        )}
+
+        {user && (
+          <a href="/friends" className="w-full">
+            <Button variant="secondary" size="md" className="w-full">
+              <Users size={15} />
+              Voir les scores de mes amis
+            </Button>
+          </a>
+        )}
+
+        {!user && currentStreak > 0 && (
+          <div className="w-full rounded-xl border border-film-gold/30 bg-film-gold/8 p-3 flex items-center gap-3">
+            <div className="shrink-0 w-8 h-8 rounded-full bg-film-gold/15 flex items-center justify-center">
+              <Flame size={15} className="text-film-gold" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-film-text">
+                Série en cours : {currentStreak} 🔥
+              </p>
+              <p className="text-xs text-film-text-dim">Sauvegarde-la sur un compte gratuit.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { onClose(); openAuth('register') }}
+              className="shrink-0 text-xs font-semibold text-film-gold hover:underline cursor-pointer whitespace-nowrap flex items-center gap-1"
+            >
+              <UserCircle size={13} />
+              Sauvegarder
+            </button>
           </div>
         )}
 

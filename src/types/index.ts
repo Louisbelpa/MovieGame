@@ -5,6 +5,7 @@ export interface User {
   email: string | null
   displayName: string
   avatarUrl: string | null
+  emailVerified: boolean
 }
 
 export interface AuthState {

@@ -193,6 +193,7 @@ export interface UserPayload {
   email: string | null
   displayName: string
   avatarUrl: string | null
+  emailVerified: boolean
 }
 
 export function authRegister(email: string, password: string, displayName: string): Promise<{ user: UserPayload }> {
@@ -237,4 +238,98 @@ export function authImportStats(stats: ImportStatsData): Promise<void> {
     method: 'POST',
     body: JSON.stringify({ stats }),
   })
+}
+
+export function authChallengeResult(challengeId: number, won: boolean, attemptsUsed: number): Promise<void> {
+  return request<void>('/api/auth/challenge-result', {
+    method: 'POST',
+    body: JSON.stringify({ challengeId, won, attemptsUsed }),
+  })
+}
+
+export function authForgotPassword(email: string): Promise<void> {
+  return request<void>('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+}
+
+export function authResetPassword(token: string, password: string): Promise<void> {
+  return request<void>('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  })
+}
+
+export function authVerifyEmail(token: string): Promise<void> {
+  return request<void>(`/api/auth/verify-email?token=${encodeURIComponent(token)}`)
+}
+
+export function authSendVerificationEmail(): Promise<void> {
+  return request<void>('/api/auth/verify-email/send', { method: 'POST' })
+}
+
+export function authChangePassword(currentPassword: string, newPassword: string): Promise<void> {
+  return request<void>('/api/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  })
+}
+
+export function authAppleSignIn(identityToken: string, displayName?: string): Promise<{ user: UserPayload }> {
+  return request<{ user: UserPayload }>('/api/auth/apple', {
+    method: 'POST',
+    body: JSON.stringify({ identityToken, displayName }),
+  })
+}
+
+// ─── Friends ──────────────────────────────────────────────────────────────────
+
+export interface FriendScore {
+  attemptsUsed: number
+  won: boolean
+  completedAt: string
+}
+
+export interface FriendEntry {
+  id: number
+  displayName: string
+  streak: number
+  isMe: boolean
+  scores: {
+    film: FriendScore | null
+    series: FriendScore | null
+    wiki: FriendScore | null
+  }
+}
+
+export interface PendingEntry {
+  id: number
+  displayName: string
+  direction: 'incoming' | 'outgoing'
+}
+
+export interface FriendsResponse {
+  date: string
+  today: string
+  myCode: string | null
+  friends: FriendEntry[]
+  pending: PendingEntry[]
+}
+
+export function friendsGetAll(date?: string): Promise<FriendsResponse> {
+  const qs = date ? `?date=${encodeURIComponent(date)}` : ''
+  return request<FriendsResponse>(`/api/friends${qs}`)
+}
+
+export function friendsAdd(code: string): Promise<{ ok: boolean }> {
+  return request('/api/friends/add', { method: 'POST', body: JSON.stringify({ code }) })
+}
+
+export function friendsAccept(userId: number): Promise<{ ok: boolean }> {
+  return request('/api/friends/accept', { method: 'POST', body: JSON.stringify({ userId }) })
+}
+
+export function friendsRemove(userId: number): Promise<{ ok: boolean }> {
+  return request(`/api/friends/${userId}`, { method: 'DELETE' })
 }

@@ -304,6 +304,76 @@ const incremental: { name: string; sql: string }[] = [
     name: 'create_wiki_sessions_idx_user_id',
     sql: `CREATE INDEX IF NOT EXISTS idx_wiki_sessions_user_id ON wiki_sessions (user_id)`,
   },
+  {
+    name: 'add_email_verified_to_users',
+    sql: `ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0`,
+  },
+  {
+    name: 'create_password_reset_tokens',
+    sql: `CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      used_at    TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  },
+  {
+    name: 'create_password_reset_tokens_idx',
+    sql: `CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash ON password_reset_tokens (token_hash)`,
+  },
+  {
+    name: 'create_email_verification_tokens',
+    sql: `CREATE TABLE IF NOT EXISTS email_verification_tokens (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      used_at    TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  },
+  {
+    name: 'create_email_verification_tokens_idx',
+    sql: `CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_hash ON email_verification_tokens (token_hash)`,
+  },
+  {
+    name: 'create_user_challenge_results',
+    sql: `CREATE TABLE IF NOT EXISTS user_challenge_results (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      challenge_id INTEGER NOT NULL REFERENCES daily_challenges(id) ON DELETE CASCADE,
+      media_type   TEXT NOT NULL,
+      attempts_used INTEGER NOT NULL,
+      won          INTEGER NOT NULL DEFAULT 0,
+      completed_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(user_id, challenge_id)
+    )`,
+  },
+  {
+    name: 'create_user_challenge_results_idx_user_id',
+    sql: `CREATE INDEX IF NOT EXISTS idx_ucr_user_id ON user_challenge_results (user_id, completed_at DESC)`,
+  },
+  {
+    name: 'add_friend_code_to_users',
+    sql: `ALTER TABLE users ADD COLUMN friend_code TEXT`,
+  },
+  {
+    name: 'create_friendships',
+    sql: `CREATE TABLE IF NOT EXISTS friendships (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    requester_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    addressee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status       TEXT NOT NULL CHECK(status IN ('pending','accepted')) DEFAULT 'pending',
+    created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+    UNIQUE(requester_id, addressee_id)
+  )`,
+  },
+  {
+    name: 'create_friendships_idx',
+    sql: `CREATE INDEX IF NOT EXISTS idx_friendships_addressee ON friendships (addressee_id, status)`,
+  },
 ]
 
 // Multi-statement migrations that need db.exec() rather than db.prepare().run()

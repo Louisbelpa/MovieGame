@@ -24,6 +24,7 @@ export interface StatsModalProps {
     gamesPlayed: number
     winRate: number
   }
+  personalDistribution?: Record<1 | 2 | 3 | 4 | 5, number>
 }
 
 export function StatsModal({
@@ -33,6 +34,7 @@ export function StatsModal({
   communityDateLabel,
   globalStats,
   personalStats,
+  personalDistribution,
 }: StatsModalProps) {
   const modalTitle = getModalTitle(mode)
   const modalDescId = 'modal-desc'
@@ -51,6 +53,19 @@ export function StatsModal({
           <StatCell value={personalStats.currentStreak} label="Série" />
           <StatCell value={personalStats.maxStreak} label="Max série" />
         </div>
+
+        {personalDistribution && (
+          <div>
+            <p className="text-sm font-semibold text-film-text-dim uppercase tracking-wider mb-3">
+              Ma distribution
+            </p>
+            <DistributionChart
+              distribution={Object.fromEntries(
+                ([1, 2, 3, 4, 5] as const).map((k) => [String(k), personalDistribution[k] ?? 0])
+              )}
+            />
+          </div>
+        )}
 
         <div>
           <p className={`text-sm font-semibold text-film-text-dim uppercase tracking-wider ${communityDateLabel ? 'mb-1' : 'mb-3'}`}>

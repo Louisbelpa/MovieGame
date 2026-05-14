@@ -17,6 +17,11 @@ import type { GlobalStatsPayload } from './api/client'
 import { loadStats } from './lib/storage'
 import { useAuthStore } from './store/authStore'
 import { AuthModal } from './components/modals/AuthModal'
+import { ResetPasswordPage } from './components/ResetPasswordPage'
+import { VerifyEmailPage } from './components/VerifyEmailPage'
+import { FriendsPage } from './components/FriendsPage'
+import { ProfilePage } from './components/ProfilePage'
+import { EmailVerificationBanner } from './components/EmailVerificationBanner'
 
 const EMPTY_GLOBAL_STATS: GlobalStatsPayload = {
   totalGames: 0,
@@ -77,6 +82,7 @@ function GameModals({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
         communityDateLabel={communityDateLabel}
         globalStats={globalStats}
         personalStats={personalStats}
+        personalDistribution={personalStatsRaw.guessDistribution}
       />
     </Suspense>
   )
@@ -131,6 +137,7 @@ function WikiModals() {
         communityDateLabel={communityDateLabel}
         globalStats={globalStats}
         personalStats={personalStats}
+        personalDistribution={personalStatsRaw.guessDistribution}
       />
     </Suspense>
   )
@@ -175,6 +182,10 @@ export default function App() {
             <Route path="/films/*" element={<GameLayout mode="film" />} />
             {FEATURES.enableSeries && <Route path="/series/*" element={<GameLayout mode="series" />} />}
             {FEATURES.enableWiki && <Route path="/wiki/*" element={<GameLayout mode="wiki" />} />}
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/friends" element={<FriendsPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/" element={<Navigate to="/films" replace />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
@@ -191,6 +202,7 @@ function AuthShell({ children }: { children: React.ReactNode }) {
   }, [fetchMe])
   return (
     <>
+      <EmailVerificationBanner />
       {children}
       <AuthModal />
     </>

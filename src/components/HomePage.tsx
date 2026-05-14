@@ -1,10 +1,11 @@
-import type { ReactNode } from 'react'
-import { Film, Tv, Sparkles, Eye, Keyboard, Lightbulb, Landmark } from 'lucide-react'
+import { Film, Tv, Landmark, UserCircle, Users, LogIn, Flame, ChevronRight } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Footer } from '@/components/layout/Footer'
+import { AuthModal, useAuthModal } from '@/components/modals/AuthModal'
 import { FEATURES, BRAND_NAME } from '@/config/features'
-import { hasReturningFilmPlayerActivity } from '@/lib/storage'
+import { useAuthStore } from '@/store/authStore'
+import { loadStats } from '@/lib/storage'
 import {
   NewModesAnnouncementModal,
   NEW_MODES_ANNOUNCEMENT_STORAGE_KEY,
@@ -13,16 +14,201 @@ import {
 
 type IconPhase = 'film' | 'tv' | 'wiki'
 
+// ─── Top bar ──────────────────────────────────────────────────────────────────
+
+function TopBar({ iconPhase }: { iconPhase: IconPhase }) {
+  const user = useAuthStore((s) => s.user)
+  const { open: openAuth } = useAuthModal()
+  const initial = user?.displayName.charAt(0).toUpperCase()
+
+  return (
+    <header className="w-full max-w-2xl mx-auto flex items-center justify-between py-5 px-1">
+      <div className="flex items-center gap-2">
+        <span className="relative w-[18px] h-[18px] inline-flex items-center justify-center shrink-0" aria-hidden>
+          <AnimatePresence mode="wait">
+            <motion.span
+              key={iconPhase}
+              initial={{ y: 6, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -6, opacity: 0 }}
+              transition={{ duration: 0.28, ease: 'easeOut' }}
+              className="absolute inset-0 inline-flex items-center justify-center text-film-gold"
+            >
+              {iconPhase === 'tv' ? <Tv size={16} /> : iconPhase === 'wiki' ? <Landmark size={16} /> : <Film size={16} />}
+            </motion.span>
+          </AnimatePresence>
+        </span>
+        <span className="font-title text-xl font-bold text-gradient-gold">{BRAND_NAME}</span>
+      </div>
+      {user ? (
+        <a
+          href="/profile"
+          className="flex items-center gap-2 rounded-full border border-film-border bg-white/[0.04] hover:bg-white/[0.07] px-3 py-1.5 text-sm transition-colors"
+        >
+          <span className="w-6 h-6 rounded-full bg-film-gold/20 border border-film-gold/40 flex items-center justify-center text-xs font-bold text-film-gold">
+            {initial}
+          </span>
+          <span className="text-film-text font-medium max-w-[120px] truncate">{user.displayName}</span>
+        </a>
+      ) : (
+        <button
+          type="button"
+          onClick={() => openAuth('login')}
+          className="flex items-center gap-1.5 rounded-full border border-film-border bg-white/[0.03] hover:bg-white/[0.06] px-3 py-1.5 text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
+        >
+          <LogIn size={14} />
+          Se connecter
+        </button>
+      )}
+    </header>
+  )
+}
+
+// ─── Game card ────────────────────────────────────────────────────────────────
+
+interface GameCardProps {
+  href: string
+  icon: React.ReactElement
+  title: string
+  description: string
+  label: string
+  accentColor: string
+  accentSoft: string
+  accentRing: string
+  disabled?: boolean
+  badge?: string
+}
+
+function GameCard({ href, icon, title, description, label, accentColor, accentSoft, accentRing, disabled, badge }: GameCardProps) {
+  const Tag = disabled ? 'div' : 'a'
+  return (
+    <Tag
+      {...(!disabled ? { href } : {})}
+      className={`group relative flex flex-col rounded-2xl border p-6 sm:p-7 transition-all duration-200 ${
+        disabled
+          ? 'opacity-75 cursor-default'
+          : 'cursor-pointer hover:scale-[1.015]'
+      }`}
+      style={{
+        borderColor: accentRing,
+        background: `linear-gradient(135deg, ${accentSoft} 0%, transparent 60%)`,
+        boxShadow: `0 0 0 1px ${accentRing}, 0 12px 28px rgba(10,12,24,0.35)`,
+      }}
+    >
+      {badge && !disabled && (
+        <span
+          className="absolute top-3 right-3 text-[11px] font-semibold px-2 py-0.5 rounded-full"
+          style={{ background: accentSoft, color: accentColor, border: `1px solid ${accentRing}` }}
+        >
+          {badge}
+        </span>
+      )}
+
+      <div
+        className="w-14 h-14 rounded-xl flex items-center justify-center mb-4"
+        style={{ background: accentSoft }}
+      >
+        {icon}
+      </div>
+
+      <div className="flex-1">
+        <p className="font-semibold text-film-text text-xl leading-tight">{title}</p>
+        <p className="text-film-text-dim text-sm mt-2 leading-relaxed">{description}</p>
+      </div>
+
+      <p
+        className="text-sm font-medium mt-5 transition-colors"
+        style={{ color: disabled ? accentColor : accentColor }}
+      >
+        {disabled ? 'Bientôt disponible' : label}
+      </p>
+    </Tag>
+  )
+}
+
+// ─── Account nudge (guest only) ───────────────────────────────────────────────
+
+function AccountNudge() {
+  const user = useAuthStore((s) => s.user)
+  const { open: openAuth } = useAuthModal()
+
+  const filmStreak = loadStats('film').currentStreak
+  const wikiStreak = loadStats('wiki').currentStreak
+  const streak = Math.max(filmStreak, wikiStreak)
+
+  if (user) return null
+
+  return (
+    <div className="w-full max-w-2xl mx-auto mt-6 flex items-center justify-between gap-3 rounded-xl border border-film-border bg-white/[0.02] px-4 py-3">
+      <div className="flex items-center gap-2.5 min-w-0">
+        {streak > 0 ? (
+          <>
+            <Flame size={16} className="text-amber-400 shrink-0" />
+            <p className="text-sm text-film-text-dim truncate">
+              Série de <strong className="text-film-text">{streak}</strong> jour{streak > 1 ? 's' : ''} — sauvegarde-la sur un compte gratuit.
+            </p>
+          </>
+        ) : (
+          <>
+            <UserCircle size={16} className="text-film-text-dim/60 shrink-0" />
+            <p className="text-sm text-film-text-dim">Jouez sans compte ou créez-en un pour sauvegarder vos stats.</p>
+          </>
+        )}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          type="button"
+          onClick={() => openAuth('register')}
+          className="text-xs font-semibold text-film-gold hover:underline cursor-pointer whitespace-nowrap"
+        >
+          Créer un compte
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Friends quick-access (logged in only) ────────────────────────────────────
+
+function FriendsRow() {
+  const user = useAuthStore((s) => s.user)
+  if (!user) return null
+
+  return (
+    <div className="w-full max-w-2xl mx-auto mt-4">
+      <a
+        href="/friends"
+        className="group flex items-center gap-3 rounded-xl border border-film-border bg-white/[0.02] hover:bg-white/[0.04] px-4 py-3 transition-colors"
+      >
+        <div className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center shrink-0">
+          <Users size={15} className="text-film-text-dim group-hover:text-film-text transition-colors" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-film-text-dim group-hover:text-film-text transition-colors">
+            Scores de mes amis
+          </p>
+        </div>
+        <ChevronRight size={14} className="text-film-text-dim/40 group-hover:text-film-text-dim transition-colors" />
+      </a>
+    </div>
+  )
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export function HomePage() {
   const [iconPhase, setIconPhase] = useState<IconPhase>('film')
   const [announcementVariant, setAnnouncementVariant] = useState<NewModesAnnouncementVariant | null>(null)
   const [showNewBadge, setShowNewBadge] = useState(false)
+  const fetchMe = useAuthStore((s) => s.fetchMe)
+
+  useEffect(() => { void fetchMe() }, [fetchMe])
 
   useEffect(() => {
     try {
       if (localStorage.getItem(NEW_MODES_ANNOUNCEMENT_STORAGE_KEY)) return
+      const { hasReturningFilmPlayerActivity } = require('@/lib/storage')
       if (!hasReturningFilmPlayerActivity()) return
-
       if (FEATURES.enableSeries && FEATURES.enableWiki) setAnnouncementVariant('both')
       else if (FEATURES.enableSeries) setAnnouncementVariant('series')
       else if (FEATURES.enableWiki) setAnnouncementVariant('wiki')
@@ -36,193 +222,114 @@ export function HomePage() {
       : (FEATURES.enableSeries ? ['film', 'tv'] : ['film'])
     if (modes.length < 2) return
     let i = 0
-    const id = window.setInterval(() => {
-      i = (i + 1) % modes.length
-      setIconPhase(modes[i])
-    }, 2800)
+    const id = window.setInterval(() => { i = (i + 1) % modes.length; setIconPhase(modes[i]) }, 2800)
     return () => window.clearInterval(id)
   }, [])
 
   return (
     <div className="min-h-dvh flex flex-col bg-film-black text-film-text px-4 relative overflow-hidden">
+      {/* Ambient glow */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'radial-gradient(clamp(30rem, 48vw, 56rem) clamp(20rem, 34vw, 38rem) at 10% 6%, rgba(245, 197, 66, 0.18), transparent 62%), radial-gradient(clamp(28rem, 46vw, 54rem) clamp(18rem, 32vw, 36rem) at 92% 78%, rgba(245, 197, 66, 0.16), transparent 64%)',
+            'radial-gradient(clamp(30rem, 48vw, 56rem) clamp(20rem, 34vw, 38rem) at 10% 6%, rgba(245,197,66,0.12), transparent 62%), radial-gradient(clamp(28rem, 46vw, 54rem) clamp(18rem, 32vw, 36rem) at 92% 78%, rgba(245,197,66,0.10), transparent 64%)',
         }}
       />
 
-      <div className="flex-1 w-full max-w-5xl mx-auto py-10 sm:py-14 relative">
-        <div className="text-center mb-10">
-          <div className="flex justify-center mb-4">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs text-film-gold border border-film-gold/30 bg-film-gold/10">
-              <Sparkles size={12} />
+      <div className="flex-1 w-full relative">
+        <TopBar iconPhase={iconPhase} />
+
+        <div className="max-w-4xl mx-auto pb-12">
+          {/* Hero */}
+          <div className="text-center mb-10 mt-6">
+            <span className="inline-block rounded-full border border-film-gold/25 bg-film-gold/[0.07] px-3.5 py-1 text-[11px] font-semibold uppercase tracking-widest text-film-gold/75 mb-5">
               Défi quotidien
             </span>
-          </div>
-          <div className="inline-flex items-center gap-2 sm:gap-2.5 mb-3">
-            <span className="relative w-6 h-6 inline-flex items-center justify-center" aria-hidden>
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={iconPhase}
-                  initial={{ y: 10, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: -10, opacity: 0 }}
-                  transition={{ duration: 0.35, ease: 'easeOut' }}
-                  className="absolute inset-0 inline-flex items-center justify-center"
-                  style={{ color: 'var(--film-gold, #f5c542)' }}
-                >
-                  {iconPhase === 'tv' ? <Tv size={20} /> : iconPhase === 'wiki' ? <Landmark size={20} /> : <Film size={20} />}
-                </motion.span>
-              </AnimatePresence>
-            </span>
-
-            <h1 className="font-title text-5xl sm:text-6xl font-bold text-gradient-gold tracking-tight">
-              {BRAND_NAME}
+            <h1 className="text-[1.65rem] font-bold text-film-text leading-tight tracking-tight mb-3">
+              À toi de trouver
             </h1>
+            <p className="text-film-text-dim text-sm max-w-xs mx-auto leading-relaxed">
+              {FEATURES.enableWiki
+                ? 'Une image ou un profil. 5 tentatives.\nDes indices dévoilés à chaque erreur.'
+                : 'Une image. 5 tentatives. Des indices dévoilés à chaque erreur.'}
+            </p>
           </div>
-          <p className="text-film-text-dim text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
-            {FEATURES.enableWiki
-              ? 'Devinez le film, la série ou la personnalité du jour.'
-              : FEATURES.enableSeries
-                ? 'Devinez le film ou la série du jour.'
-                : 'Devinez le film du jour.'}
-          </p>
-          <p className="text-film-text-dim text-sm sm:text-base max-w-xl mx-auto leading-relaxed mt-1">
-            {FEATURES.enableWiki
-              ? 'Des indices progressifs se débloquent à chaque erreur. Trois modes de jeu, un défi par jour.'
-              : 'Une image, 5 tentatives, des indices qui se débloquent à chaque erreur.'}
-          </p>
-        </div>
 
-        <div className="grid gap-4 w-full max-w-4xl mx-auto mb-8 sm:grid-cols-3">
-          <a
-            href="/films"
-            className="group rounded-2xl border border-[#5a95ea] bg-gradient-to-br from-[#4d8ee8]/30 via-[#4d8ee8]/18 to-transparent p-6 sm:p-7 hover:from-[#4d8ee8]/40 hover:via-[#4d8ee8]/22 transition-all duration-200 cursor-pointer shadow-[0_0_0_1px_rgba(77,142,232,0.15),0_12px_28px_rgba(10,12,24,0.35)]"
-            style={{
-              borderColor: 'var(--sg-films)',
-            }}
-          >
-            <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-4"
-              style={{ background: 'rgba(77, 142, 232, 0.20)' }}>
-              <Film size={28} style={{ color: 'var(--sg-films)' }} />
-            </div>
-            <div>
-              <p className="font-semibold text-film-text text-xl">Mode Films</p>
-              <p className="text-film-text-dim text-sm mt-1">
-                Chaque jour, devinez un film à partir d'une image en 5 tentatives, avec des indices qui se débloquent au fil de la partie.
-              </p>
-              <p className="text-sm font-medium mt-4 text-[#8fb8f3] group-hover:text-[#a8c7f8] transition-colors">Jouer en mode Films</p>
-            </div>
-          </a>
-
-          {FEATURES.enableSeries ? (
-            <a
-              href="/series"
-              className="group relative rounded-2xl border border-[#33bc97] bg-gradient-to-br from-[#1eb088]/28 via-[#1eb088]/14 to-transparent p-6 sm:p-7 hover:from-[#1eb088]/36 hover:via-[#1eb088]/20 transition-all duration-200 cursor-pointer shadow-[0_0_0_1px_rgba(30,176,136,0.12),0_12px_28px_rgba(10,12,24,0.35)]"
-              style={{
-                borderColor: 'var(--sg-series)',
-              }}
-            >
-              {showNewBadge && (
-                <span className="absolute top-3 right-3 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#1eb088]/20 text-[#7ad2b8] border border-[#1eb088]/30">
-                  Nouveau
-                </span>
-              )}
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-4"
-                style={{ background: 'rgba(30, 176, 136, 0.20)' }}>
-                <Tv size={28} style={{ color: 'var(--sg-series)' }} />
-              </div>
-              <div>
-                <p className="font-semibold text-film-text text-xl">Mode Séries</p>
-                <p className="text-film-text-dim text-sm mt-1">
-                  Le même principe côté séries : une image, 5 tentatives, et des indices progressifs pour trouver le bon titre.
-                </p>
-                <p className="text-sm font-medium mt-4 text-[#7ad2b8] group-hover:text-[#93dfca] transition-colors">Jouer en mode Séries</p>
-              </div>
-            </a>
-          ) : (
-            <div
-              className="rounded-2xl border border-[#2c8f76] bg-gradient-to-br from-[#1eb088]/16 via-[#1eb088]/8 to-transparent p-6 sm:p-7 opacity-80 shadow-[0_0_0_1px_rgba(30,176,136,0.08),0_12px_28px_rgba(10,12,24,0.30)]"
-              aria-disabled="true"
-            >
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-4"
-                style={{ background: 'rgba(30, 176, 136, 0.16)' }}>
-                <Tv size={28} style={{ color: 'var(--sg-series)' }} />
-              </div>
-              <div>
-                <p className="font-semibold text-film-text text-xl">Mode Séries</p>
-                <p className="text-film-text-dim text-sm mt-1">
-                  Le mode Séries arrive bientôt. Le temps de compléter le catalogue.
-                </p>
-                <p className="text-sm font-medium mt-4 text-[#7ad2b8]">Bientôt disponible</p>
-              </div>
-            </div>
-          )}
-
-          {FEATURES.enableWiki ? (
-            <a
-              href="/wiki"
-              className="group relative rounded-2xl border border-[#9a7cf6] bg-gradient-to-br from-[#8b5cf6]/26 via-[#8b5cf6]/14 to-transparent p-6 sm:p-7 hover:from-[#8b5cf6]/34 hover:via-[#8b5cf6]/20 transition-all duration-200 cursor-pointer shadow-[0_0_0_1px_rgba(139,92,246,0.12),0_12px_28px_rgba(10,12,24,0.35)]"
-            >
-              {showNewBadge && (
-                <span className="absolute top-3 right-3 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#8b5cf6]/20 text-[#c4b5fd] border border-[#8b5cf6]/30">
-                  Nouveau
-                </span>
-              )}
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-4" style={{ background: 'rgba(139, 92, 246, 0.20)' }}>
-                <Landmark size={28} style={{ color: '#c4b5fd' }} />
-              </div>
-              <div>
-                <p className="font-semibold text-film-text text-xl">Personnalités</p>
-                <p className="text-film-text-dim text-sm mt-1">
-                  Devinez la personnalité du jour grâce à des indices progressifs (sources Wikipédia / Wikidata).
-                </p>
-                <p className="text-sm font-medium mt-4 text-[#c4b5fd] group-hover:text-[#d7ccff] transition-colors">Jouer en mode Personnalités</p>
-              </div>
-            </a>
-          ) : (
-            <div
-              className="rounded-2xl border border-[#6d58ab] bg-gradient-to-br from-[#8b5cf6]/16 via-[#8b5cf6]/8 to-transparent p-6 sm:p-7 opacity-80 shadow-[0_0_0_1px_rgba(139,92,246,0.08),0_12px_28px_rgba(10,12,24,0.30)]"
-              aria-disabled="true"
-            >
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-4" style={{ background: 'rgba(139, 92, 246, 0.16)' }}>
-                <Landmark size={28} style={{ color: '#c4b5fd' }} />
-              </div>
-              <div>
-                <p className="font-semibold text-film-text text-xl">Personnalités</p>
-                <p className="text-film-text-dim text-sm mt-1">
-                  Le mode Personnalités arrive bientôt. Le temps de finaliser le catalogue.
-                </p>
-                <p className="text-sm font-medium mt-4 text-[#c4b5fd]">Bientôt disponible</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <section className="max-w-3xl mx-auto">
-          <p className="text-sm font-semibold uppercase tracking-wider text-film-text-dim mb-3">Comment jouer</p>
-          <div className="grid sm:grid-cols-3 gap-3">
-            <HowToCard
-              icon={<Eye size={15} className="text-film-gold" />}
-              title="1. Observez les indices"
-              description={FEATURES.enableWiki ? "Une image (films/séries) ou un profil (personnalité) s'affiche." : "Regardez l'image du jour et repérez les détails utiles."}
+          {/* Game cards */}
+          <div className={`grid gap-4 ${FEATURES.enableSeries || FEATURES.enableWiki ? 'sm:grid-cols-3' : ''}`}>
+            <GameCard
+              href="/films"
+              icon={<Film size={28} style={{ color: '#8fb8f3' }} />}
+              title="Mode Films"
+              description="Chaque jour, devinez un film à partir d'une image en 5 tentatives, avec des indices qui se débloquent au fil de la partie."
+              label="Jouer en mode Films"
+              accentColor="#8fb8f3"
+              accentSoft="rgba(77,142,232,0.20)"
+              accentRing="rgba(77,142,232,0.30)"
             />
-            <HowToCard
-              icon={<Keyboard size={15} className="text-film-gold" />}
-              title="2. Faites une proposition"
-              description={FEATURES.enableWiki ? "Entrez un titre ou un nom. Chaque mode a son propre compteur de tentatives." : "Entrez un titre de film ou de série. Vous avez 5 tentatives."}
-            />
-            <HowToCard
-              icon={<Lightbulb size={15} className="text-film-gold" />}
-              title="3. Exploitez les indices"
-              description="Chaque mauvaise réponse débloque un nouvel indice pour vous aider."
-            />
+
+            {FEATURES.enableSeries ? (
+              <GameCard
+                href="/series"
+                icon={<Tv size={28} style={{ color: '#7ad2b8' }} />}
+                title="Mode Séries"
+                description="Le même principe côté séries : une image, 5 tentatives, et des indices progressifs pour trouver le bon titre."
+                label="Jouer en mode Séries"
+                accentColor="#7ad2b8"
+                accentSoft="rgba(30,176,136,0.20)"
+                accentRing="rgba(30,176,136,0.28)"
+                badge={showNewBadge ? 'Nouveau' : undefined}
+              />
+            ) : (
+              <GameCard
+                href="/series"
+                icon={<Tv size={28} style={{ color: '#7ad2b8' }} />}
+                title="Mode Séries"
+                description="Le mode Séries arrive bientôt. Le temps de compléter le catalogue."
+                label="Bientôt"
+                accentColor="#7ad2b8"
+                accentSoft="rgba(30,176,136,0.10)"
+                accentRing="rgba(30,176,136,0.18)"
+                disabled
+              />
+            )}
+
+            {FEATURES.enableWiki ? (
+              <GameCard
+                href="/wiki"
+                icon={<Landmark size={28} style={{ color: '#c4b5fd' }} />}
+                title="Personnalités"
+                description="Devinez la personnalité du jour grâce à des indices progressifs tirés de sa biographie et carrière."
+                label="Jouer en mode Personnalités"
+                accentColor="#c4b5fd"
+                accentSoft="rgba(139,92,246,0.20)"
+                accentRing="rgba(139,92,246,0.28)"
+                badge={showNewBadge ? 'Nouveau' : undefined}
+              />
+            ) : (
+              <GameCard
+                href="/wiki"
+                icon={<Landmark size={28} style={{ color: '#c4b5fd' }} />}
+                title="Personnalités"
+                description="Le mode Personnalités arrive bientôt. Le temps de finaliser le catalogue."
+                label="Bientôt"
+                accentColor="#c4b5fd"
+                accentSoft="rgba(139,92,246,0.10)"
+                accentRing="rgba(139,92,246,0.18)"
+                disabled
+              />
+            )}
           </div>
-        </section>
+
+          {/* Account nudge / friends row */}
+          <AccountNudge />
+          <FriendsRow />
+        </div>
       </div>
+
       <Footer />
+      <AuthModal />
 
       {announcementVariant && (
         <NewModesAnnouncementModal
@@ -231,26 +338,6 @@ export function HomePage() {
           variant={announcementVariant}
         />
       )}
-    </div>
-  )
-}
-
-function HowToCard({
-  icon,
-  title,
-  description,
-}: {
-  icon: ReactNode
-  title: string
-  description: string
-}) {
-  return (
-    <div className="film-border rounded-xl p-4">
-      <div className="flex items-center gap-2 mb-2">
-        {icon}
-        <p className="font-semibold text-film-text text-sm">{title}</p>
-      </div>
-      <p className="text-film-text-dim text-sm">{description}</p>
     </div>
   )
 }

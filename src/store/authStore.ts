@@ -12,6 +12,7 @@ import {
   authGetMe,
   authUpdateProfile,
   authImportStats,
+  authAppleSignIn,
 } from '@/api/client'
 import { loadStats, saveStats } from '@/lib/storage'
 import { defaultStats } from '@/lib/utils'
@@ -23,6 +24,7 @@ interface AuthStore {
   fetchMe: () => Promise<void>
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, displayName: string) => Promise<void>
+  loginWithApple: (identityToken: string, displayName?: string) => Promise<void>
   logout: () => Promise<void>
   updateProfile: (data: { displayName?: string; avatarUrl?: string }) => Promise<void>
 }
@@ -53,7 +55,7 @@ function clearLocalStats() {
 
 export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
-  isLoading: false,
+  isLoading: true,
 
   fetchMe: async () => {
     set({ isLoading: true })
@@ -79,6 +81,17 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
   register: async (email, password, displayName) => {
     const { user } = await authRegister(email, password, displayName)
+    set({ user })
+    try {
+      await authImportStats(buildImportPayload())
+      clearLocalStats()
+    } catch {
+      // import failure is non-blocking
+    }
+  },
+
+  loginWithApple: async (identityToken, displayName) => {
+    const { user } = await authAppleSignIn(identityToken, displayName)
     set({ user })
     try {
       await authImportStats(buildImportPayload())

@@ -5,7 +5,7 @@
  */
 
 import { useRef } from 'react'
-import { HelpCircle, BarChart2, Film, CalendarDays, Tv, Home, Landmark, LogIn, LogOut } from 'lucide-react'
+import { HelpCircle, BarChart2, Film, CalendarDays, Tv, Home, Landmark, LogIn } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useGameStore } from '@/store/gameStore'
 import { useWikiStore } from '@/store/wikiStore'
@@ -21,7 +21,6 @@ export function Header({ mode }: HeaderProps) {
   const isWiki = mode === 'wiki'
 
   const user = useAuthStore((s) => s.user)
-  const logout = useAuthStore((s) => s.logout)
   const { open: openAuthModal } = useAuthModal()
 
   const gameOpenModal = useGameStore((s) => s.openModal)
@@ -102,19 +101,14 @@ export function Header({ mode }: HeaderProps) {
         {/* Right: compte + archives + stats */}
         <div className="flex items-center gap-1">
           {user ? (
-            <>
-              <span className="hidden sm:inline max-w-[7rem] truncate text-xs text-film-text-dim font-medium" title={user.displayName}>
-                {user.displayName}
-              </span>
-              <button
-                type="button"
-                onClick={() => void logout()}
-                aria-label="Déconnexion"
-                className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
-              >
-                <LogOut size={20} aria-hidden />
-              </button>
-            </>
+            <a
+              href="/profile"
+              aria-label={`Profil de ${user.displayName}`}
+              title={user.displayName}
+              className="w-8 h-8 rounded-full bg-film-gold/20 border border-film-gold/40 text-sm font-bold text-film-gold flex items-center justify-center hover:bg-film-gold/30 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+            >
+              {user.displayName.charAt(0).toUpperCase()}
+            </a>
           ) : (
             <button
               type="button"

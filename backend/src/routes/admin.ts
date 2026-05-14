@@ -878,6 +878,182 @@ adminRouter.get(
   }
 );
 
+// ─── Player accounts (users) ─────────────────────────────────────────────────
+
+function escapeLikeUserSearch(q: string): string {
+  return q.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
+// GET /api/admin/users?page=1&limit=20&q=&banned=all|1|0
+adminRouter.get(
+  '/users',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const page = Math.max(1, parseInt((req.query.page as string | undefined) ?? '1', 10));
+      const limit = Math.min(
+        100,
+        Math.max(1, parseInt((req.query.limit as string | undefined) ?? '20', 10))
+      );
+      const offset = (page - 1) * limit;
+      const qRaw = (req.query.q as string | undefined)?.trim() ?? '';
+      const bannedParam = (req.query.banned as string | undefined)?.trim().toLowerCase() ?? 'all';
+
+      const conditions: string[] = [];
+      const filterArgs: string[] = [];
+
+      if (qRaw) {
+        const esc = escapeLikeUserSearch(qRaw);
+        conditions.push(
+          `(lower(u.email) LIKE '%' || lower(?) || '%' ESCAPE '\\' OR lower(u.display_name) LIKE '%' || lower(?) || '%' ESCAPE '\\')`
+        );
+        filterArgs.push(esc, esc);
+      }
+      if (bannedParam === '1' || bannedParam === 'true' || bannedParam === 'banned') {
+        conditions.push('u.is_banned = 1');
+      } else if (bannedParam === '0' || bannedParam === 'false' || bannedParam === 'active') {
+        conditions.push('u.is_banned = 0');
+      }
+
+      const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+      const total = (
+        db.prepare(`SELECT COUNT(*) as count FROM users u ${where}`).get(...filterArgs) as { count: number }
+      ).count;
+
+      type UserListRow = {
+        id: number;
+        email: string | null;
+        display_name: string;
+        avatar_url: string | null;
+        created_at: string;
+        is_banned: number;
+        stats_games_played: number | null;
+        stats_wins: number | null;
+        stats_streak: number | null;
+        stats_max_streak: number | null;
+        oauth_count: number;
+        active_sessions: number;
+      };
+
+      const rows = db
+        .prepare<unknown[], UserListRow>(
+          `SELECT u.id, u.email, u.display_name, u.avatar_url, u.created_at, u.is_banned,
+                  u.stats_games_played, u.stats_wins, u.stats_streak, u.stats_max_streak,
+                  (SELECT COUNT(*) FROM oauth_accounts o WHERE o.user_id = u.id) AS oauth_count,
+                  (SELECT COUNT(*) FROM user_sessions s
+                     WHERE s.user_id = u.id AND datetime(s.expires_at) > datetime('now')) AS active_sessions
+           FROM users u
+           ${where}
+           ORDER BY u.id DESC
+           LIMIT ? OFFSET ?`
+        )
+        .all(...filterArgs, limit, offset);
+
+      res.json({
+        data: rows.map((r) => ({
+          id: r.id,
+          email: r.email,
+          displayName: r.display_name,
+          avatarUrl: r.avatar_url,
+          createdAt: r.created_at,
+          isBanned: Boolean(r.is_banned),
+          statsGamesPlayed: r.stats_games_played ?? 0,
+          statsWins: r.stats_wins ?? 0,
+          statsStreak: r.stats_streak ?? 0,
+          statsMaxStreak: r.stats_max_streak ?? 0,
+          oauthCount: r.oauth_count,
+          activeSessions: r.active_sessions,
+        })),
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// PATCH /api/admin/users/:id  { "isBanned": true|false }
+adminRouter.patch(
+  '/users/:id',
+  strictAdminLimiter,
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id ?? '', 10);
+      if (!Number.isFinite(id) || id < 1) {
+        res.status(400).json({ error: 'Invalid user id' });
+        return;
+      }
+      const body = req.body as { isBanned?: unknown };
+      if (typeof body.isBanned !== 'boolean') {
+        res.status(400).json({ error: 'Field "isBanned" (boolean) is required' });
+        return;
+      }
+
+      const row = db.prepare<number, { id: number }>(`SELECT id FROM users WHERE id = ?`).get(id);
+      if (!row) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      const banned = body.isBanned ? 1 : 0;
+      db.prepare(`UPDATE users SET is_banned = ? WHERE id = ?`).run(banned, id);
+
+      if (banned) {
+        db.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).run(id);
+      }
+
+      logAuditEvent(body.isBanned ? 'user.ban' : 'user.unban', { userId: id });
+
+      const u = db
+        .prepare<number, {
+          id: number;
+          email: string | null;
+          display_name: string;
+          avatar_url: string | null;
+          created_at: string;
+          is_banned: number;
+          stats_games_played: number | null;
+          stats_wins: number | null;
+          stats_streak: number | null;
+          stats_max_streak: number | null;
+        }>(
+          `SELECT id, email, display_name, avatar_url, created_at, is_banned,
+                  stats_games_played, stats_wins, stats_streak, stats_max_streak
+           FROM users WHERE id = ?`
+        )
+        .get(id)!;
+
+      const oauthCount = (
+        db.prepare<number, { c: number }>(`SELECT COUNT(*) as c FROM oauth_accounts WHERE user_id = ?`).get(id) as {
+          c: number;
+        }
+      ).c;
+
+      res.json({
+        id: u.id,
+        email: u.email,
+        displayName: u.display_name,
+        avatarUrl: u.avatar_url,
+        createdAt: u.created_at,
+        isBanned: Boolean(u.is_banned),
+        statsGamesPlayed: u.stats_games_played ?? 0,
+        statsWins: u.stats_wins ?? 0,
+        statsStreak: u.stats_streak ?? 0,
+        statsMaxStreak: u.stats_max_streak ?? 0,
+        oauthCount,
+        activeSessions: 0,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // ─── Films CRUD ───────────────────────────────────────────────────────────────
 
 // GET /api/admin/films?page=1&limit=20&q=title&is_active=true|false

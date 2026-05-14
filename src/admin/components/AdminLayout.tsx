@@ -6,11 +6,12 @@
 
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Film, Tv, Calendar, LayoutDashboard, LogOut, Menu, X, ScrollText, Upload, ShieldAlert, BarChart2, Landmark, Database, Settings, ExternalLink } from 'lucide-react'
+import { Film, Tv, Calendar, LayoutDashboard, LogOut, Menu, X, ScrollText, Upload, ShieldAlert, BarChart2, Landmark, Database, Settings, ExternalLink, Users } from 'lucide-react'
 import { adminLogout } from '../api'
 
 const navItems = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { to: '/admin/users', label: 'Utilisateurs', icon: Users, exact: false },
   { to: '/admin/analytics', label: 'Analytiques', icon: BarChart2, exact: false },
   { to: '/admin/films', label: 'Films', icon: Film, exact: false },
   { to: '/admin/series', label: 'Séries', icon: Tv, exact: false },

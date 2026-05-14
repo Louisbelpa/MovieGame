@@ -22,6 +22,7 @@ import { adminRouter } from './routes/admin.js';
 import { sessionMiddleware } from './middleware/session.js';
 import { userAuth } from './middleware/userAuth.js';
 import { authRouter } from './routes/auth.js';
+import { friendsRouter } from './routes/friends.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { createRateLimiter } from './middleware/rateLimiter.js';
@@ -128,6 +129,7 @@ export function createApp(): express.Application {
   app.use('/api/stats', statsRouter);
   app.use('/api/admin', adminRouter);
   app.use('/api/auth', authRouter);
+  app.use('/api/friends', friendsRouter);
 
   app.get(
     '/health',
