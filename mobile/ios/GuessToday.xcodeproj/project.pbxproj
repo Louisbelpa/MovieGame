@@ -1,0 +1,461 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0DDE2CC9166E33E994B4DD60 /* HintCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7271D978D4554CA16BB369E /* HintCard.swift */; };
+		18EC40BFB41C632075F2C349 /* GuessTodayApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3E48B553933BCFA5426BE2 /* GuessTodayApp.swift */; };
+		215FE53674B866740ACFC4C7 /* BlurImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 669A6B2A1898DA17D7EF4C5D /* BlurImageView.swift */; };
+		396D1C7F2CE340A116B6202D /* GameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A55C5ABEF0087158E61972D0 /* GameView.swift */; };
+		482A64E02CB7FF32938F094D /* FriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B0997D679B5BFECEA4268F9 /* FriendsView.swift */; };
+		4E21D13FE8A29BFDD6FC44C6 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1489878DBF383B642A4C2C44 /* HomeView.swift */; };
+		6B2B0C1AC42CA4EFAA643772 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26FAF04863D7FAE2F5896718 /* Theme.swift */; };
+		8584240025E56C21ACC4F3AA /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2818C9F3B5B1FB2826C5754C /* AuthViewModel.swift */; };
+		87141A846891D68B791D9770 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBA083E1E76D11C4369073F1 /* LoginView.swift */; };
+		89BE70339B96F40672B8B7D2 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 565589AFD7C4ABC773E28ABC /* KeychainHelper.swift */; };
+		8F11792D8949988007FC63BC /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6981034D971942DFB8FDCE36 /* Models.swift */; };
+		91A1DA56D104EA77C6177582 /* GameViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9FACF96EFCC3BF794C39A2E /* GameViewModel.swift */; };
+		B75BB78043CCBBAE41A1BB5B /* ArchiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0814D34E725430D4C3BB56E1 /* ArchiveView.swift */; };
+		BDD65EFC54FE1582A74255EC /* GuessRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C21B31109C71115D699DFD40 /* GuessRow.swift */; };
+		CE2AE652BEC03E7B6886EE24 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2D0422A581B887044FC86C5 /* RootView.swift */; };
+		D3DC4D2946F6A9F2B7FBEAD7 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95B867BABC0E98F0EFF8DC2E /* APIClient.swift */; };
+		E0F638D9C426552779486FB2 /* SearchDropdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = B848C94AEF8F0C1CE0E25077 /* SearchDropdown.swift */; };
+		F5A485111D769D4E33CCD1C3 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B34FCEA47684C53E1FA646 /* ProfileView.swift */; };
+		FB4DD40892EDF6F4A0AFEEC2 /* WinSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F48940404497EB781A593914 /* WinSheet.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0814D34E725430D4C3BB56E1 /* ArchiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveView.swift; sourceTree = "<group>"; };
+		1489878DBF383B642A4C2C44 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		211724C3FEF93290803711F3 /* GuessToday.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = GuessToday.entitlements; sourceTree = "<group>"; };
+		26FAF04863D7FAE2F5896718 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		2818C9F3B5B1FB2826C5754C /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
+		2B3E48B553933BCFA5426BE2 /* GuessTodayApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuessTodayApp.swift; sourceTree = "<group>"; };
+		4B0997D679B5BFECEA4268F9 /* FriendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsView.swift; sourceTree = "<group>"; };
+		565589AFD7C4ABC773E28ABC /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
+		669A6B2A1898DA17D7EF4C5D /* BlurImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlurImageView.swift; sourceTree = "<group>"; };
+		6981034D971942DFB8FDCE36 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		8F1C3C3D173A0AA0322FB2B0 /* GuessToday.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GuessToday.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		95B867BABC0E98F0EFF8DC2E /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		A55C5ABEF0087158E61972D0 /* GameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameView.swift; sourceTree = "<group>"; };
+		A7271D978D4554CA16BB369E /* HintCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HintCard.swift; sourceTree = "<group>"; };
+		A90D00E135137A7F92D816E7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		B848C94AEF8F0C1CE0E25077 /* SearchDropdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchDropdown.swift; sourceTree = "<group>"; };
+		B9B34FCEA47684C53E1FA646 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		C21B31109C71115D699DFD40 /* GuessRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuessRow.swift; sourceTree = "<group>"; };
+		D2D0422A581B887044FC86C5 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		F48940404497EB781A593914 /* WinSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WinSheet.swift; sourceTree = "<group>"; };
+		F9FACF96EFCC3BF794C39A2E /* GameViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameViewModel.swift; sourceTree = "<group>"; };
+		FBA083E1E76D11C4369073F1 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0959854AC6FC11BB1C4DBF3E /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				2818C9F3B5B1FB2826C5754C /* AuthViewModel.swift */,
+				FBA083E1E76D11C4369073F1 /* LoginView.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		30E426C848D31CF5F377B12E /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				554BEBC2A9C4F8E1CD25CDC5 /* Archive */,
+				0959854AC6FC11BB1C4DBF3E /* Auth */,
+				9F475F875C8A2F6AEE005FF1 /* Friends */,
+				71E72EFFBF8B399E3C11899D /* Game */,
+				4D8A201C793DFC749349B278 /* Home */,
+				B6F8BE518ADA93EF6111CDFD /* Profile */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		4D8A201C793DFC749349B278 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				1489878DBF383B642A4C2C44 /* HomeView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		554BEBC2A9C4F8E1CD25CDC5 /* Archive */ = {
+			isa = PBXGroup;
+			children = (
+				0814D34E725430D4C3BB56E1 /* ArchiveView.swift */,
+			);
+			path = Archive;
+			sourceTree = "<group>";
+		};
+		71E72EFFBF8B399E3C11899D /* Game */ = {
+			isa = PBXGroup;
+			children = (
+				A55C5ABEF0087158E61972D0 /* GameView.swift */,
+				F9FACF96EFCC3BF794C39A2E /* GameViewModel.swift */,
+				F48940404497EB781A593914 /* WinSheet.swift */,
+			);
+			path = Game;
+			sourceTree = "<group>";
+		};
+		9C277FAAB1EB1EE9923D872E /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				669A6B2A1898DA17D7EF4C5D /* BlurImageView.swift */,
+				C21B31109C71115D699DFD40 /* GuessRow.swift */,
+				A7271D978D4554CA16BB369E /* HintCard.swift */,
+				B848C94AEF8F0C1CE0E25077 /* SearchDropdown.swift */,
+				26FAF04863D7FAE2F5896718 /* Theme.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		9C9CD96C3A2D309F88CD66EC /* GuessToday */ = {
+			isa = PBXGroup;
+			children = (
+				AC4CFC469466BF20BF5C40F9 /* App */,
+				30E426C848D31CF5F377B12E /* Features */,
+				B7CE14A3305024CCBD620647 /* Networking */,
+				9C277FAAB1EB1EE9923D872E /* UI */,
+			);
+			path = GuessToday;
+			sourceTree = "<group>";
+		};
+		9F475F875C8A2F6AEE005FF1 /* Friends */ = {
+			isa = PBXGroup;
+			children = (
+				4B0997D679B5BFECEA4268F9 /* FriendsView.swift */,
+			);
+			path = Friends;
+			sourceTree = "<group>";
+		};
+		AC4CFC469466BF20BF5C40F9 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				211724C3FEF93290803711F3 /* GuessToday.entitlements */,
+				2B3E48B553933BCFA5426BE2 /* GuessTodayApp.swift */,
+				A90D00E135137A7F92D816E7 /* Info.plist */,
+				D2D0422A581B887044FC86C5 /* RootView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		B6F8BE518ADA93EF6111CDFD /* Profile */ = {
+			isa = PBXGroup;
+			children = (
+				B9B34FCEA47684C53E1FA646 /* ProfileView.swift */,
+			);
+			path = Profile;
+			sourceTree = "<group>";
+		};
+		B7CE14A3305024CCBD620647 /* Networking */ = {
+			isa = PBXGroup;
+			children = (
+				95B867BABC0E98F0EFF8DC2E /* APIClient.swift */,
+				565589AFD7C4ABC773E28ABC /* KeychainHelper.swift */,
+				6981034D971942DFB8FDCE36 /* Models.swift */,
+			);
+			path = Networking;
+			sourceTree = "<group>";
+		};
+		C2BA60BD0A9719ACF8229CAD = {
+			isa = PBXGroup;
+			children = (
+				9C9CD96C3A2D309F88CD66EC /* GuessToday */,
+				D57D32F2BB02D9DBAF18FBF9 /* Products */,
+			);
+			indentWidth = 4;
+			sourceTree = "<group>";
+			tabWidth = 4;
+		};
+		D57D32F2BB02D9DBAF18FBF9 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				8F1C3C3D173A0AA0322FB2B0 /* GuessToday.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		B2DB7ABA332F8A48BB9E909A /* GuessToday */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0441031D1202A2F2862F7AB3 /* Build configuration list for PBXNativeTarget "GuessToday" */;
+			buildPhases = (
+				8D3E4D837777E37BBE4B63AD /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GuessToday;
+			packageProductDependencies = (
+			);
+			productName = GuessToday;
+			productReference = 8F1C3C3D173A0AA0322FB2B0 /* GuessToday.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D68D4C5E7A87519A5E79C27A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					B2DB7ABA332F8A48BB9E909A = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = DC01BDCBC9DC11AE0E7F2D09 /* Build configuration list for PBXProject "GuessToday" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = C2BA60BD0A9719ACF8229CAD;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = D57D32F2BB02D9DBAF18FBF9 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B2DB7ABA332F8A48BB9E909A /* GuessToday */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		8D3E4D837777E37BBE4B63AD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D3DC4D2946F6A9F2B7FBEAD7 /* APIClient.swift in Sources */,
+				B75BB78043CCBBAE41A1BB5B /* ArchiveView.swift in Sources */,
+				8584240025E56C21ACC4F3AA /* AuthViewModel.swift in Sources */,
+				215FE53674B866740ACFC4C7 /* BlurImageView.swift in Sources */,
+				482A64E02CB7FF32938F094D /* FriendsView.swift in Sources */,
+				396D1C7F2CE340A116B6202D /* GameView.swift in Sources */,
+				91A1DA56D104EA77C6177582 /* GameViewModel.swift in Sources */,
+				BDD65EFC54FE1582A74255EC /* GuessRow.swift in Sources */,
+				18EC40BFB41C632075F2C349 /* GuessTodayApp.swift in Sources */,
+				0DDE2CC9166E33E994B4DD60 /* HintCard.swift in Sources */,
+				4E21D13FE8A29BFDD6FC44C6 /* HomeView.swift in Sources */,
+				89BE70339B96F40672B8B7D2 /* KeychainHelper.swift in Sources */,
+				87141A846891D68B791D9770 /* LoginView.swift in Sources */,
+				8F11792D8949988007FC63BC /* Models.swift in Sources */,
+				F5A485111D769D4E33CCD1C3 /* ProfileView.swift in Sources */,
+				CE2AE652BEC03E7B6886EE24 /* RootView.swift in Sources */,
+				E0F638D9C426552779486FB2 /* SearchDropdown.swift in Sources */,
+				6B2B0C1AC42CA4EFAA643772 /* Theme.swift in Sources */,
+				FB4DD40892EDF6F4A0AFEEC2 /* WinSheet.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		0BB51DEBF7305F8388BCA010 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = GuessToday/App/GuessToday.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = Z5JH565RAL;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = GuessToday/App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = fr.guesstoday.app;
+				SDKROOT = iphoneos;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.10;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		305E4E2D8B82E203038A56D7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		71B2F605F02B00A3D79DD4EA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		B3F6748F0FE064D10485014D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = GuessToday/App/GuessToday.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = Z5JH565RAL;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = GuessToday/App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = fr.guesstoday.app;
+				SDKROOT = iphoneos;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.10;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0441031D1202A2F2862F7AB3 /* Build configuration list for PBXNativeTarget "GuessToday" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B3F6748F0FE064D10485014D /* Debug */,
+				0BB51DEBF7305F8388BCA010 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		DC01BDCBC9DC11AE0E7F2D09 /* Build configuration list for PBXProject "GuessToday" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				305E4E2D8B82E203038A56D7 /* Debug */,
+				71B2F605F02B00A3D79DD4EA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = D68D4C5E7A87519A5E79C27A /* Project object */;
+}

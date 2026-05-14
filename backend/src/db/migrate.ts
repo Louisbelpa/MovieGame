@@ -597,6 +597,17 @@ for (const { name, sql } of multiStatement) {
 
 const postMultiStatementIncremental: { name: string; sql: string }[] = [
   {
+    name: 'create_push_tokens',
+    sql: `CREATE TABLE IF NOT EXISTS push_tokens (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token      TEXT    NOT NULL,
+      platform   TEXT    NOT NULL CHECK (platform IN ('ios', 'android')),
+      created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(user_id, platform)
+    )`,
+  },
+  {
     name: 'repair_daily_challenges_is_active_after_table_recreate',
     sql: `ALTER TABLE daily_challenges ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))`,
   },

@@ -299,15 +299,6 @@ export function ProfilePage() {
             </div>
           </div>
 
-          {/* Logout */}
-          <button
-            type="button"
-            onClick={() => void handleLogout()}
-            className="flex items-center gap-2 text-sm text-film-text-dim hover:text-film-red transition-colors cursor-pointer w-fit"
-          >
-            <LogOut size={16} />
-            Se déconnecter
-          </button>
         </div>
 
         {/* ── Stats card ── */}
@@ -369,6 +360,144 @@ export function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* ── Friends card ── */}
+        <a
+          href="/friends"
+          className="group rounded-xl border border-film-border bg-white/[0.03] hover:bg-white/[0.05] p-5 flex items-center gap-4 transition-colors"
+        >
+          <div className="w-10 h-10 rounded-lg bg-white/[0.05] flex items-center justify-center shrink-0">
+            <Users size={18} className="text-film-text-dim group-hover:text-film-text transition-colors" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-film-text">Scores de mes amis</p>
+            <p className="text-sm text-film-text-dim mt-0.5">Compare tes résultats avec tes amis</p>
+          </div>
+          <ChevronRight size={16} className="text-film-text-dim/40 group-hover:text-film-text-dim transition-colors shrink-0" />
+        </a>
+
+        {/* ── Security card ── */}
+        {user.email && (
+          <div className="rounded-xl border border-film-border bg-white/[0.03] overflow-hidden">
+            <button
+              type="button"
+              onClick={() => { setPwOpen((v) => !v); setPwError(null); setPwSuccess(false) }}
+              className="w-full flex items-center gap-4 p-5 hover:bg-white/[0.03] transition-colors cursor-pointer"
+            >
+              <div className="w-10 h-10 rounded-lg bg-white/[0.05] flex items-center justify-center shrink-0">
+                <Lock size={18} className="text-film-text-dim" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="font-semibold text-film-text">Changer le mot de passe</p>
+                <p className="text-sm text-film-text-dim mt-0.5">Modifier ton mot de passe de connexion</p>
+              </div>
+              <ChevronRight
+                size={16}
+                className={`text-film-text-dim/40 shrink-0 transition-transform ${pwOpen ? 'rotate-90' : ''}`}
+              />
+            </button>
+
+            {pwOpen && (
+              <div className="border-t border-film-border px-5 pb-5 pt-4 flex flex-col gap-3">
+                {pwSuccess ? (
+                  <p className="text-sm text-film-green text-center py-2">Mot de passe mis à jour ✓</p>
+                ) : (
+                  <>
+                    {/* Mot de passe actuel */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs text-film-text-dim uppercase tracking-wide">Mot de passe actuel</label>
+                      <div className="relative">
+                        <input
+                          type={pwShowCurrent ? 'text' : 'password'}
+                          value={pwCurrent}
+                          onChange={(e) => setPwCurrent(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full rounded-lg border border-film-border bg-film-gray px-3 py-2 pr-10 text-sm text-film-text focus:outline-none focus:border-film-gold focus:ring-1 focus:ring-film-gold"
+                          disabled={pwLoading}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPwShowCurrent((v) => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-film-text-dim hover:text-film-text cursor-pointer"
+                          tabIndex={-1}
+                        >
+                          {pwShowCurrent ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Nouveau mot de passe */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs text-film-text-dim uppercase tracking-wide">Nouveau mot de passe</label>
+                      <div className="relative">
+                        <input
+                          type={pwShowNew ? 'text' : 'password'}
+                          value={pwNew}
+                          onChange={(e) => setPwNew(e.target.value)}
+                          placeholder="8 caractères minimum"
+                          className="w-full rounded-lg border border-film-border bg-film-gray px-3 py-2 pr-10 text-sm text-film-text focus:outline-none focus:border-film-gold focus:ring-1 focus:ring-film-gold"
+                          disabled={pwLoading}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPwShowNew((v) => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-film-text-dim hover:text-film-text cursor-pointer"
+                          tabIndex={-1}
+                        >
+                          {pwShowNew ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Confirmation */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs text-film-text-dim uppercase tracking-wide">Confirmer le nouveau mot de passe</label>
+                      <input
+                        type="password"
+                        value={pwConfirm}
+                        onChange={(e) => setPwConfirm(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') void handleChangePassword() }}
+                        placeholder="••••••••"
+                        className="w-full rounded-lg border border-film-border bg-film-gray px-3 py-2 text-sm text-film-text focus:outline-none focus:border-film-gold focus:ring-1 focus:ring-film-gold"
+                        disabled={pwLoading}
+                      />
+                    </div>
+
+                    {pwError && <p className="text-sm text-film-red">{pwError}</p>}
+
+                    <div className="flex gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => void handleChangePassword()}
+                        disabled={pwLoading || !pwCurrent || !pwNew || !pwConfirm}
+                        className="flex-1 rounded-lg bg-film-gold text-film-black font-semibold text-sm py-2.5 hover:opacity-90 disabled:opacity-40 transition-opacity cursor-pointer disabled:cursor-default"
+                      >
+                        {pwLoading ? 'Enregistrement…' : 'Mettre à jour'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setPwOpen(false); setPwError(null); setPwCurrent(''); setPwNew(''); setPwConfirm('') }}
+                        className="px-4 rounded-lg border border-film-border text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Logout ── */}
+        <button
+          type="button"
+          onClick={() => void handleLogout()}
+          className="flex items-center gap-2 text-sm text-film-text-dim hover:text-film-red transition-colors cursor-pointer w-fit mx-auto pb-4"
+        >
+          <LogOut size={16} />
+          Se déconnecter
+        </button>
 
       </div>
     </div>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.GuessToday" parent="android:Theme.Material.NoTitleBar">
+        <item name="android:windowBackground">@color/film_black</item>
+        <item name="android:statusBarColor">@color/film_black</item>
+        <item name="android:navigationBarColor">@color/film_surface</item>
+    </style>
+</resources>

@@ -22,6 +22,7 @@ import db from '../db/database.js';
 import { userAuth, requireUser, USER_SESSION_COOKIE } from '../middleware/userAuth.js';
 import { AUTH } from '../middleware/rateLimiter.js';
 import { sendPasswordResetEmail, sendVerificationEmail } from '../lib/email.js';
+import { registerPushToken } from '../services/push-notification.service.js';
 
 export const authRouter = Router();
 
@@ -720,4 +721,19 @@ authRouter.post('/apple', AUTH, async (req: Request, res: Response): Promise<voi
   const sessionId = createUserSession(userId);
   setUserCookie(res, sessionId);
   res.status(201).json({ user: formatUser(user), sessionToken: sessionId });
+});
+
+/** POST /api/auth/push-token — Register a push notification token */
+authRouter.post('/push-token', userAuth, requireUser, (req: Request, res: Response): void => {
+  const { token, platform } = req.body as { token?: unknown; platform?: unknown };
+  if (typeof token !== 'string' || !token) {
+    res.status(400).json({ error: 'token required' });
+    return;
+  }
+  if (platform !== 'ios' && platform !== 'android') {
+    res.status(400).json({ error: 'platform must be ios or android' });
+    return;
+  }
+  registerPushToken(req.user!.id, token, platform);
+  res.json({ ok: true });
 });
