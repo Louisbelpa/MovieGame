@@ -11,7 +11,6 @@ import {
   Flame,
   Plus,
   Share2,
-  X,
   Trophy,
   Film,
   Tv,
@@ -674,7 +673,7 @@ export function FriendsPage() {
             <p className="text-film-text-dim text-sm">Impossible de charger les amis.</p>
             <button
               type="button"
-              onClick={load}
+              onClick={() => void reload()}
               className="text-sm text-film-gold hover:underline cursor-pointer"
             >
               Réessayer

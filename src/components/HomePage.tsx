@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { AuthModal, useAuthModal } from '@/components/modals/AuthModal'
 import { FEATURES, BRAND_NAME } from '@/config/features'
 import { useAuthStore } from '@/store/authStore'
-import { loadStats } from '@/lib/storage'
+import { loadStats, hasReturningFilmPlayerActivity } from '@/lib/storage'
 import {
   NewModesAnnouncementModal,
   NEW_MODES_ANNOUNCEMENT_STORAGE_KEY,
@@ -207,7 +207,6 @@ export function HomePage() {
   useEffect(() => {
     try {
       if (localStorage.getItem(NEW_MODES_ANNOUNCEMENT_STORAGE_KEY)) return
-      const { hasReturningFilmPlayerActivity } = require('@/lib/storage')
       if (!hasReturningFilmPlayerActivity()) return
       if (FEATURES.enableSeries && FEATURES.enableWiki) setAnnouncementVariant('both')
       else if (FEATURES.enableSeries) setAnnouncementVariant('series')
