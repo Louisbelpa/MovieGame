@@ -77,8 +77,10 @@ export function createApp(): express.Application {
       directives: {
         defaultSrc: ["'self'"],
         imgSrc: ["'self'", 'https://image.tmdb.org', 'https://upload.wikimedia.org', 'data:'],
-        scriptSrc: ["'self'"],
+        scriptSrc: ["'self'", 'https://appleid.cdn-apple.com'],
         styleSrc: ["'self'", "'unsafe-inline'"],
+        connectSrc: ["'self'", 'https://appleid.apple.com', 'https://idmsa.apple.com'],
+        frameSrc: ["'self'", 'https://appleid.apple.com'],
       },
     },
   }));
