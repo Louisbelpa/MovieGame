@@ -65,6 +65,7 @@ final class APIClient {
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("ios", forHTTPHeaderField: "X-Platform")
 
         if let token = sessionToken {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -206,6 +207,42 @@ extension APIClient {
         sessionToken = nil
     }
 
+    func uploadAvatar(imageData: Data) async throws -> User {
+        guard let url = URL(string: Self.baseURL + "/api/auth/avatar") else {
+            throw APIError.invalidURL
+        }
+        let boundary = UUID().uuidString
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        if let token = sessionToken {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"avatar\"; filename=\"avatar.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        req.httpBody = body
+
+        let (data, response): (Data, URLResponse)
+        do { (data, response) = try await urlSession.data(for: req) }
+        catch { throw APIError.networkError(error) }
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.networkError(URLError(.badServerResponse))
+        }
+        if !(200..<300).contains(http.statusCode) {
+            let msg = (try? decoder.decode(APIErrorResponse.self, from: data))?.displayMessage
+                ?? HTTPURLResponse.localizedString(forStatusCode: http.statusCode)
+            throw APIError.httpError(statusCode: http.statusCode, message: msg)
+        }
+        struct Resp: Decodable { let user: User }
+        do { return try decoder.decode(Resp.self, from: data).user }
+        catch { throw APIError.decodingError(error) }
+    }
+
     func updateProfile(displayName: String? = nil, avatarUrl: String? = nil) async throws -> User {
         struct Body: Encodable { let displayName: String?; let avatarUrl: String? }
         struct Resp: Codable { let user: User }
@@ -221,6 +258,23 @@ extension APIClient {
     func forgotPassword(email: String) async throws {
         struct Body: Encodable { let email: String }
         try await requestVoid("/api/auth/forgot-password", method: "POST", body: Body(email: email))
+    }
+
+    func appleSignIn(identityToken: String, displayName: String?) async throws -> AuthResponse {
+        struct Body: Encodable { let identityToken: String; let displayName: String? }
+        let r: AuthResponse = try await request("/api/auth/apple", method: "POST", body: Body(identityToken: identityToken, displayName: displayName))
+        sessionToken = r.sessionToken
+        return r
+    }
+
+    func gameHistory(type: String) async throws -> [String: String] {
+        struct Resp: Decodable { let history: [String: String] }
+        let r: Resp = try await request("/api/auth/history?type=\(type)", requiresAuth: true)
+        return r.history
+    }
+
+    func resendVerificationEmail() async throws {
+        try await requestVoid("/api/auth/verify-email/send", method: "POST")
     }
 
     func registerPushToken(_ token: String) async throws {
@@ -252,9 +306,45 @@ extension APIClient {
     }
 }
 
+// MARK: - Stats Endpoints
+
+extension APIClient {
+    func serverStats(type: String) async throws -> ServerStats {
+        try await request("/api/auth/stats?type=\(type)", requiresAuth: true)
+    }
+
+    func importStats(_ stats: LocalStats, for mode: GameMode) async throws {
+        struct Body: Encodable {
+            let stats: StatsPayload
+            struct StatsPayload: Encodable {
+                let gamesPlayed: Int
+                let wins: Int
+                let currentStreak: Int
+                let maxStreak: Int
+                let distribution: [String: Int]
+            }
+        }
+        try await requestVoid(
+            "/api/auth/import-stats",
+            method: "POST",
+            body: Body(stats: .init(
+                gamesPlayed: stats.gamesPlayed,
+                wins: stats.wins,
+                currentStreak: stats.currentStreak,
+                maxStreak: stats.maxStreak,
+                distribution: stats.distribution
+            ))
+        )
+    }
+}
+
 // MARK: - Friends Endpoints
 
 extension APIClient {
+    func friendsLeaderboard() async throws -> LeaderboardPayload {
+        try await request("/api/friends/leaderboard", requiresAuth: true)
+    }
+
     func friends(date: String? = nil) async throws -> FriendsPayload {
         var path = "/api/friends"
         if let date { path += "?date=\(date)" }

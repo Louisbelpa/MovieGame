@@ -16,12 +16,108 @@ import {
   Eye,
   EyeOff,
   ChevronRight,
+  Camera,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
-import { authSendVerificationEmail, authChangePassword } from '@/api/client'
+import type { ServerStatsMap } from '@/store/authStore'
+import { authSendVerificationEmail, authChangePassword, authUploadAvatar } from '@/api/client'
 import { loadStats } from '@/lib/storage'
 import { FEATURES } from '@/config/features'
 import type { GameStats } from '@/types'
+
+// ─── Achievements ─────────────────────────────────────────────────────────────
+
+interface Achievement {
+  id: string
+  title: string
+  description: string
+  hint: string
+  icon: string
+  color: string
+  earned: boolean
+  progress?: { current: number; target: number }
+}
+
+function buildAchievements(serverStats: ServerStatsMap): Achievement[] {
+  const film   = serverStats.film   ?? { wins: loadStats('film').gamesWon,   gamesPlayed: loadStats('film').gamesPlayed,   maxStreak: loadStats('film').maxStreak,   distribution: Object.fromEntries(Object.entries(loadStats('film').guessDistribution).map(([k,v]) => [k, v])) }
+  const series = serverStats.series ?? { wins: loadStats('series').gamesWon, gamesPlayed: loadStats('series').gamesPlayed, maxStreak: loadStats('series').maxStreak, distribution: Object.fromEntries(Object.entries(loadStats('series').guessDistribution).map(([k,v]) => [k, v])) }
+  const wiki   = serverStats.wiki   ?? { wins: loadStats('wiki').gamesWon,   gamesPlayed: loadStats('wiki').gamesPlayed,   maxStreak: loadStats('wiki').maxStreak,   distribution: Object.fromEntries(Object.entries(loadStats('wiki').guessDistribution).map(([k,v]) => [k, v])) }
+
+  const totalWins   = film.wins + series.wins + wiki.wins
+  const totalPlayed = film.gamesPlayed + series.gamesPlayed + wiki.gamesPlayed
+  const maxStreak   = Math.max(film.maxStreak, series.maxStreak, wiki.maxStreak)
+  const firstGuess  = (film.distribution['1'] ?? 0) + (series.distribution['1'] ?? 0) + (wiki.distribution['1'] ?? 0)
+
+  return [
+    { id: 'first_win',   title: 'Première victoire',  description: 'Gagner une partie',               hint: 'Trouve la réponse correcte dans n\'importe quel mode.',                                                  icon: '⭐', color: '#d4a842', earned: totalWins >= 1,   progress: totalWins >= 1   ? undefined : { current: totalWins,   target: 1   } },
+    { id: 'speed_run',   title: 'Coup de maître',      description: 'Trouver du premier essai',        hint: 'Propose la bonne réponse dès le premier essai sans aucun indice.',                                      icon: '⚡', color: '#f59e0b', earned: firstGuess >= 1,  progress: firstGuess >= 1  ? undefined : { current: firstGuess,  target: 1   } },
+    { id: 'plays_10',    title: 'Habitué',             description: '10 parties jouées',               hint: 'Joue 10 parties au total, peu importe le mode ou le résultat.',                                         icon: '🎮', color: '#22c55e', earned: totalPlayed >= 10, progress: totalPlayed >= 10? undefined : { current: totalPlayed, target: 10  } },
+    { id: 'streak_7',    title: 'Série de feu',        description: '7 jours consécutifs',             hint: 'Gagne une partie chaque jour pendant 7 jours d\'affilée. Un seul mode suffit par jour.',                icon: '🔥', color: '#f97316', earned: maxStreak >= 7,   progress: maxStreak >= 7   ? undefined : { current: maxStreak,   target: 7   } },
+    { id: 'streak_30',   title: 'Invincible',          description: '30 jours consécutifs',            hint: 'Gagne une partie chaque jour pendant 30 jours sans interruption.',                                      icon: '👑', color: '#d4a842', earned: maxStreak >= 30,  progress: maxStreak >= 30  ? undefined : { current: maxStreak,   target: 30  } },
+    { id: 'wins_50',     title: 'Cinéphile',           description: '50 victoires au total',           hint: 'Accumule 50 victoires en tout, tous modes confondus.',                                                  icon: '🏆', color: '#d4a842', earned: totalWins >= 50,  progress: totalWins >= 50  ? undefined : { current: totalWins,   target: 50  } },
+    { id: 'wins_100',    title: 'Légende',             description: '100 victoires au total',          hint: 'Atteins 100 victoires cumulées. Une récompense réservée aux joueurs les plus assidus.',                 icon: '🥇', color: '#8b6ff0', earned: totalWins >= 100, progress: totalWins >= 100 ? undefined : { current: totalWins,   target: 100 } },
+    { id: 'film_master', title: 'Maître du 7e art',    description: '50 films trouvés',                hint: 'Trouve 50 films dans le mode Films.',                                                                   icon: '🎬', color: '#d4a842', earned: film.wins >= 50,  progress: film.wins >= 50  ? undefined : { current: film.wins,   target: 50  } },
+    { id: 'wiki_master', title: 'Encyclopédiste',      description: '50 personnalités trouvées',       hint: 'Identifie 50 personnalités dans le mode Personnalités.',                                                icon: '🧠', color: '#22c55e', earned: wiki.wins >= 50,  progress: wiki.wins >= 50  ? undefined : { current: wiki.wins,   target: 50  } },
+  ]
+}
+
+function AchievementsSection({ serverStats }: { serverStats: ServerStatsMap }) {
+  const achievements = useMemo(() => buildAchievements(serverStats), [serverStats])
+  const earned = achievements.filter((a) => a.earned)
+  const locked = achievements.filter((a) => !a.earned)
+  const [hinted, setHinted] = useState<string | null>(null)
+
+  return (
+    <div className="rounded-xl border border-film-border bg-white/[0.03] p-5 flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wider text-film-text-dim">Succès</p>
+        <span className="text-xs text-film-text-dim">{earned.length}/{achievements.length}</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        {earned.map((a) => (
+          <div
+            key={a.id}
+            title={`${a.title} — ${a.description}`}
+            className="flex flex-col items-center gap-1.5 rounded-xl border p-3 text-center transition-colors"
+            style={{ borderColor: `${a.color}40`, background: `${a.color}12` }}
+          >
+            <span className="text-2xl leading-none">{a.icon}</span>
+            <span className="text-xs font-semibold text-film-text leading-tight">{a.title}</span>
+            <span className="text-[10px] text-film-text-dim leading-tight">{a.description}</span>
+          </div>
+        ))}
+        {locked.map((a) => (
+          <button
+            key={a.id}
+            type="button"
+            onClick={() => setHinted(hinted === a.id ? null : a.id)}
+            className="flex flex-col items-center gap-1.5 rounded-xl border border-film-border/40 bg-white/[0.015] p-3 text-center cursor-pointer hover:bg-white/[0.03] transition-colors w-full"
+          >
+            <Lock size={20} className="text-film-text-dim/30" />
+            <span className="text-xs font-medium text-film-text-dim/50 leading-tight">{a.title}</span>
+            {a.progress && a.progress.current > 0 && (
+              <div className="w-full mt-1">
+                <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-film-text-dim/25 transition-all"
+                    style={{ width: `${Math.min(100, (a.progress.current / a.progress.target) * 100)}%` }}
+                  />
+                </div>
+                <span className="text-[9px] text-film-text-dim/40 mt-0.5 block tabular-nums">
+                  {a.progress.current}/{a.progress.target}
+                </span>
+              </div>
+            )}
+            {hinted === a.id && (
+              <span className="text-[10px] text-film-text-dim leading-tight mt-0.5">{a.hint}</span>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 type TabMode = 'film' | 'series' | 'wiki'
 
@@ -82,6 +178,8 @@ export function ProfilePage() {
   const isLoading = useAuthStore((s) => s.isLoading)
   const logout = useAuthStore((s) => s.logout)
   const updateProfile = useAuthStore((s) => s.updateProfile)
+  const setUser = useAuthStore((s) => s.setUser)
+  const serverStats = useAuthStore((s) => s.serverStats)
 
   // Redirect only once auth check is done and user is not logged in
   useEffect(() => {
@@ -94,6 +192,8 @@ export function ProfilePage() {
 
   const [verifySent, setVerifySent] = useState(false)
   const [verifyCooldown, setVerifyCooldown] = useState(0)
+
+  const [avatarLoading, setAvatarLoading] = useState(false)
 
   const [pwOpen, setPwOpen] = useState(false)
   const [pwCurrent, setPwCurrent] = useState('')
@@ -112,14 +212,25 @@ export function ProfilePage() {
   ]
   const [activeTab, setActiveTab] = useState<TabMode>('film')
 
-  const stats: GameStats = useMemo(() => loadStats(activeTab), [activeTab])
+  const localStats: GameStats = useMemo(() => loadStats(activeTab), [activeTab])
+  const sv = serverStats[activeTab]
+
+  // Prefer server stats when available (multi-device sync)
+  const stats = {
+    gamesPlayed:   sv?.gamesPlayed   ?? localStats.gamesPlayed,
+    gamesWon:      sv?.wins          ?? localStats.gamesWon,
+    currentStreak: sv?.currentStreak ?? localStats.currentStreak,
+    maxStreak:     sv?.maxStreak     ?? localStats.maxStreak,
+    guessDistribution: sv
+      ? Object.fromEntries(([1,2,3,4,5] as const).map((k) => [k, sv.distribution[String(k)] ?? 0])) as Record<1|2|3|4|5, number>
+      : localStats.guessDistribution,
+  }
 
   const winRate =
     stats.gamesPlayed > 0
       ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100)
       : 0
 
-  // distribution as Record<string, number> for the chart
   const distAsString: Record<string, number> = Object.fromEntries(
     ([1, 2, 3, 4, 5] as const).map((k) => [String(k), stats.guessDistribution[k] ?? 0])
   )
@@ -131,6 +242,21 @@ export function ProfilePage() {
   )
 
   const initial = user.displayName.charAt(0).toUpperCase()
+
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAvatarLoading(true)
+    try {
+      const { user: updated } = await authUploadAvatar(file)
+      setUser(updated)
+    } catch {
+      // ignore upload errors silently
+    } finally {
+      setAvatarLoading(false)
+      e.target.value = ''
+    }
+  }
 
   function startEdit() {
     setNameInput(user!.displayName)
@@ -223,10 +349,34 @@ export function ProfilePage() {
         {/* ── Profile card ── */}
         <div className="rounded-xl border border-film-border bg-white/[0.03] p-5 flex flex-col gap-4">
           <div className="flex items-center gap-4">
-            {/* Avatar */}
-            <div className="w-16 h-16 rounded-full bg-film-gold/20 border border-film-gold/40 flex items-center justify-center text-2xl font-bold text-film-gold flex-shrink-0">
-              {initial}
-            </div>
+            {/* Avatar — click to upload */}
+            <label className="relative group cursor-pointer flex-shrink-0" title="Changer la photo de profil">
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                onChange={handleAvatarUpload}
+                disabled={avatarLoading}
+              />
+              {user.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.displayName}
+                  className="w-16 h-16 rounded-full object-cover border border-film-gold/40"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-film-gold/20 border border-film-gold/40 flex items-center justify-center text-2xl font-bold text-film-gold">
+                  {initial}
+                </div>
+              )}
+              <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                {avatarLoading ? (
+                  <div className="w-4 h-4 rounded-full border-2 border-film-gold border-t-transparent animate-spin" />
+                ) : (
+                  <Camera size={16} className="text-white" />
+                )}
+              </div>
+            </label>
 
             {/* Name + email */}
             <div className="flex-1 min-w-0">
@@ -360,6 +510,9 @@ export function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* ── Achievements ── */}
+        <AchievementsSection serverStats={serverStats} />
 
         {/* ── Friends card ── */}
         <a

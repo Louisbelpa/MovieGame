@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 struct LoginView: View {
     @Environment(AuthViewModel.self) var auth
@@ -20,10 +21,16 @@ struct LoginView: View {
                     VStack(spacing: Theme.spacing24) {
                         // Logo / title
                         VStack(spacing: Theme.spacing8) {
-                            Text("GuessToday")
-                                .font(.custom("Georgia", size: 28))
-                                .fontWeight(.bold)
-                                .foregroundColor(Theme.gold)
+                            HStack(spacing: 10) {
+                                ApertureIconView(size: 30)
+                                (
+                                    Text("Guess")
+                                        .font(.custom("Fraunces", size: 28)).fontWeight(.medium).foregroundColor(Theme.text)
+                                    + Text("today")
+                                        .font(.custom("Fraunces", size: 28)).italic()
+                                        .foregroundStyle(LinearGradient(colors: [Color(hex: "#f0c870"), Color(hex: "#8a5e1f")], startPoint: .top, endPoint: .bottom))
+                                )
+                            }
                             Text("Connectez-vous pour sauvegarder vos stats")
                                 .font(.system(size: 14))
                                 .foregroundColor(Theme.textDim)
@@ -61,9 +68,32 @@ struct LoginView: View {
                             .foregroundColor(Theme.textDim)
                         }
 
-                        Divider()
-                            .background(Theme.border)
-                            .padding(.horizontal, Theme.spacing16)
+                        // Apple Sign In
+                        SignInWithAppleButton(.signIn) { request in
+                            request.requestedScopes = [.fullName, .email]
+                        } onCompletion: { result in
+                            guard case .success(let authorization) = result,
+                                  let cred = authorization.credential as? ASAuthorizationAppleIDCredential,
+                                  let tokenData = cred.identityToken,
+                                  let token = String(data: tokenData, encoding: .utf8) else { return }
+                            let name = [cred.fullName?.givenName, cred.fullName?.familyName]
+                                .compactMap { $0 }.joined(separator: " ")
+                            Task { await loginWithApple(token: token, name: name.isEmpty ? nil : name) }
+                        }
+                        .signInWithAppleButtonStyle(.white)
+                        .frame(height: 50)
+                        .cornerRadius(Theme.radiusM)
+                        .padding(.horizontal, Theme.spacing16)
+
+                        HStack {
+                            VStack { Divider().background(Theme.border) }
+                            Text("ou")
+                                .font(.system(size: 12))
+                                .foregroundColor(Theme.muted)
+                                .fixedSize()
+                            VStack { Divider().background(Theme.border) }
+                        }
+                        .padding(.horizontal, Theme.spacing16)
 
                         Button("Créer un compte") {
                             showRegister = true
@@ -91,6 +121,20 @@ struct LoginView: View {
             .sheet(isPresented: $showForgotPassword) {
                 ForgotPasswordView()
             }
+        }
+    }
+
+    private func loginWithApple(token: String, name: String?) async {
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+        do {
+            try await auth.loginWithApple(identityToken: token, displayName: name)
+            dismiss()
+        } catch let e as APIError {
+            error = e.localizedDescription
+        } catch {
+            self.error = error.localizedDescription
         }
     }
 
@@ -135,6 +179,9 @@ struct RegisterView: View {
                             .foregroundColor(Theme.textDim)
                     }
                     .padding(.top, Theme.spacing24)
+
+                    WebDataTransferNotice()
+                        .padding(.horizontal, Theme.spacing16)
 
                     VStack(spacing: Theme.spacing12) {
                         AuthTextField(placeholder: "Pseudo", text: $displayName, contentType: .name)
@@ -265,6 +312,51 @@ struct ForgotPasswordView: View {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+}
+
+// MARK: - Web data transfer notice
+
+struct WebDataTransferNotice: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.spacing12) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 13))
+                    .foregroundColor(Theme.amber)
+                Text("Vous avez joué sur guesstoday.fr ?")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Theme.amber)
+            }
+
+            (
+                Text("Vos statistiques sont sauvegardées dans le navigateur. Pour ne pas les perdre, ")
+                + Text("créez d'abord votre compte sur le site")
+                    .fontWeight(.semibold)
+                + Text(" — vos données seront automatiquement transférées. Revenez ensuite vous connecter ici.")
+            )
+            .font(.system(size: 13))
+            .foregroundColor(Theme.text.opacity(0.85))
+            .lineSpacing(3)
+
+            Link(destination: URL(string: "https://guesstoday.fr?auth=register")!) {
+                HStack(spacing: 5) {
+                    Text("Aller sur guesstoday.fr")
+                        .font(.system(size: 13, weight: .semibold))
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundColor(Theme.gold)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Theme.spacing16)
+        .background(Theme.amber.opacity(0.07))
+        .cornerRadius(Theme.radiusM)
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.radiusM)
+                .stroke(Theme.amber.opacity(0.3), lineWidth: 1)
+        )
     }
 }
 

@@ -6,8 +6,14 @@ final class ArchiveViewModel {
     var filmDates: [String] = []
     var seriesDates: [String] = []
     var wikiDates: [String] = []
+    // Server history per mode (date → "won"|"lost"), nil = not loaded yet
+    private var serverHistory: [String: [String: String]] = [:]
     var isLoading = false
-    var selectedMode: GameMode = .film
+    var selectedMode: GameMode
+
+    init(initialMode: GameMode = .film) {
+        self.selectedMode = initialMode
+    }
 
     var displayedDates: [String] {
         switch selectedMode {
@@ -17,8 +23,10 @@ final class ArchiveViewModel {
         }
     }
 
-    // History from UserDefaults
     func outcome(for date: String, mode: GameMode) -> String? {
+        // Server history takes priority (covers all devices + web)
+        if let srv = serverHistory[mode.statsKey]?[date] { return srv }
+        // Fallback to local UserDefaults
         let key = "history_\(mode.statsKey)"
         guard let data = UserDefaults.standard.dictionary(forKey: key) as? [String: String] else { return nil }
         return data[date]
@@ -33,6 +41,22 @@ final class ArchiveViewModel {
         seriesDates = (try? await series) ?? []
         wikiDates   = (try? await wiki) ?? []
         isLoading = false
+        // Fetch server history in background (non-blocking)
+        Task { await loadServerHistory() }
+    }
+
+    private func loadServerHistory() async {
+        await withTaskGroup(of: (String, [String: String]).self) { group in
+            for type in ["film", "series", "wiki"] {
+                group.addTask {
+                    let h = (try? await APIClient.shared.gameHistory(type: type)) ?? [:]
+                    return (type, h)
+                }
+            }
+            for await (type, history) in group {
+                serverHistory[type] = history
+            }
+        }
     }
 
     private func loadFilmDates() async throws -> [String] {
@@ -72,9 +96,15 @@ final class ArchiveViewModel {
 }
 
 struct ArchiveView: View {
-    @State private var vm = ArchiveViewModel()
+    var initialMode: GameMode = .film
+    @State private var vm: ArchiveViewModel
     @State private var selectedDate: String?
     @State private var showGame = false
+
+    init(initialMode: GameMode = .film) {
+        self.initialMode = initialMode
+        _vm = State(initialValue: ArchiveViewModel(initialMode: initialMode))
+    }
 
     var body: some View {
         NavigationStack {
@@ -136,10 +166,8 @@ struct ArchiveView: View {
             .toolbarBackground(Theme.background, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .task { await vm.load() }
-            .sheet(isPresented: $showGame) {
-                if let date = selectedDate {
-                    ArchivedGameView(date: date, mode: vm.selectedMode)
-                }
+            .navigationDestination(isPresented: $showGame) {
+                GameView(mode: vm.selectedMode, initialDate: selectedDate ?? "")
             }
         }
     }
@@ -199,21 +227,3 @@ private struct ArchiveDateRow: View {
     }
 }
 
-// Archived game presented as a modal
-struct ArchivedGameView: View {
-    let date: String
-    let mode: GameMode
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            GameView(mode: mode, initialDate: date)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("Fermer") { dismiss() }
-                            .foregroundColor(Theme.textDim)
-                    }
-                }
-        }
-    }
-}

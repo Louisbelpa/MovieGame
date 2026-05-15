@@ -39,15 +39,36 @@ function GameModals({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
   const [globalStats, setGlobalStats] = useState<GlobalStatsPayload>(EMPTY_GLOBAL_STATS)
 
   const statsType = mode === 'series' ? 'series' : 'film'
+  const serverStatsForMode = useAuthStore((s) => s.serverStats[statsType])
   const personalStatsRaw = useMemo(() => loadStats(statsType), [statsType, ui.modalType, ui.isModalOpen])
-  const personalStats = useMemo(() => ({
-    currentStreak: personalStatsRaw.currentStreak,
-    maxStreak: personalStatsRaw.maxStreak,
-    gamesPlayed: personalStatsRaw.gamesPlayed,
-    winRate: personalStatsRaw.gamesPlayed > 0
-      ? Math.round((personalStatsRaw.gamesWon / personalStatsRaw.gamesPlayed) * 100)
-      : 0,
-  }), [personalStatsRaw])
+  const personalStats = useMemo(() => {
+    if (serverStatsForMode) {
+      return {
+        currentStreak: serverStatsForMode.currentStreak,
+        maxStreak: serverStatsForMode.maxStreak,
+        gamesPlayed: serverStatsForMode.gamesPlayed,
+        winRate: serverStatsForMode.gamesPlayed > 0
+          ? Math.round((serverStatsForMode.wins / serverStatsForMode.gamesPlayed) * 100)
+          : 0,
+      }
+    }
+    return {
+      currentStreak: personalStatsRaw.currentStreak,
+      maxStreak: personalStatsRaw.maxStreak,
+      gamesPlayed: personalStatsRaw.gamesPlayed,
+      winRate: personalStatsRaw.gamesPlayed > 0
+        ? Math.round((personalStatsRaw.gamesWon / personalStatsRaw.gamesPlayed) * 100)
+        : 0,
+    }
+  }, [serverStatsForMode, personalStatsRaw])
+  const personalDistribution = useMemo(() => {
+    if (serverStatsForMode) {
+      return Object.fromEntries(
+        ([1, 2, 3, 4, 5] as const).map((k) => [k, serverStatsForMode.distribution[String(k)] ?? 0])
+      ) as Record<1 | 2 | 3 | 4 | 5, number>
+    }
+    return personalStatsRaw.guessDistribution
+  }, [serverStatsForMode, personalStatsRaw])
 
   const communityDateLabel =
     challenge?.date != null
@@ -82,7 +103,7 @@ function GameModals({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
         communityDateLabel={communityDateLabel}
         globalStats={globalStats}
         personalStats={personalStats}
-        personalDistribution={personalStatsRaw.guessDistribution}
+        personalDistribution={personalDistribution}
       />
     </Suspense>
   )
@@ -94,15 +115,36 @@ function WikiModals() {
   const challenge = useWikiStore((s) => s.challenge)
   const [globalStats, setGlobalStats] = useState<GlobalStatsPayload>(EMPTY_GLOBAL_STATS)
 
+  const serverStatsWiki = useAuthStore((s) => s.serverStats.wiki)
   const personalStatsRaw = useMemo(() => loadStats('wiki'), [ui.modalType, ui.isModalOpen])
-  const personalStats = useMemo(() => ({
-    currentStreak: personalStatsRaw.currentStreak,
-    maxStreak: personalStatsRaw.maxStreak,
-    gamesPlayed: personalStatsRaw.gamesPlayed,
-    winRate: personalStatsRaw.gamesPlayed > 0
-      ? Math.round((personalStatsRaw.gamesWon / personalStatsRaw.gamesPlayed) * 100)
-      : 0,
-  }), [personalStatsRaw])
+  const personalStats = useMemo(() => {
+    if (serverStatsWiki) {
+      return {
+        currentStreak: serverStatsWiki.currentStreak,
+        maxStreak: serverStatsWiki.maxStreak,
+        gamesPlayed: serverStatsWiki.gamesPlayed,
+        winRate: serverStatsWiki.gamesPlayed > 0
+          ? Math.round((serverStatsWiki.wins / serverStatsWiki.gamesPlayed) * 100)
+          : 0,
+      }
+    }
+    return {
+      currentStreak: personalStatsRaw.currentStreak,
+      maxStreak: personalStatsRaw.maxStreak,
+      gamesPlayed: personalStatsRaw.gamesPlayed,
+      winRate: personalStatsRaw.gamesPlayed > 0
+        ? Math.round((personalStatsRaw.gamesWon / personalStatsRaw.gamesPlayed) * 100)
+        : 0,
+    }
+  }, [serverStatsWiki, personalStatsRaw])
+  const personalDistributionWiki = useMemo(() => {
+    if (serverStatsWiki) {
+      return Object.fromEntries(
+        ([1, 2, 3, 4, 5] as const).map((k) => [k, serverStatsWiki.distribution[String(k)] ?? 0])
+      ) as Record<1 | 2 | 3 | 4 | 5, number>
+    }
+    return personalStatsRaw.guessDistribution
+  }, [serverStatsWiki, personalStatsRaw])
 
   const communityDateLabel =
     challenge?.date != null
@@ -137,7 +179,7 @@ function WikiModals() {
         communityDateLabel={communityDateLabel}
         globalStats={globalStats}
         personalStats={personalStats}
-        personalDistribution={personalStatsRaw.guessDistribution}
+        personalDistribution={personalDistributionWiki}
       />
     </Suspense>
   )

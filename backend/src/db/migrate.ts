@@ -615,6 +615,27 @@ const postMultiStatementIncremental: { name: string; sql: string }[] = [
     name: 'repair_daily_challenges_idx_is_active_after_recreate',
     sql: `CREATE INDEX IF NOT EXISTS idx_daily_challenges_is_active ON daily_challenges (is_active)`,
   },
+  { name: 'add_import_film_played',      sql: `ALTER TABLE users ADD COLUMN import_film_played      INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_film_wins',        sql: `ALTER TABLE users ADD COLUMN import_film_wins        INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_film_streak',      sql: `ALTER TABLE users ADD COLUMN import_film_streak      INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_film_max_streak',  sql: `ALTER TABLE users ADD COLUMN import_film_max_streak  INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_series_played',    sql: `ALTER TABLE users ADD COLUMN import_series_played    INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_series_wins',      sql: `ALTER TABLE users ADD COLUMN import_series_wins      INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_series_streak',    sql: `ALTER TABLE users ADD COLUMN import_series_streak    INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_series_max_streak',sql: `ALTER TABLE users ADD COLUMN import_series_max_streak INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_wiki_played',      sql: `ALTER TABLE users ADD COLUMN import_wiki_played      INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_wiki_wins',        sql: `ALTER TABLE users ADD COLUMN import_wiki_wins        INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_wiki_streak',      sql: `ALTER TABLE users ADD COLUMN import_wiki_streak      INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_wiki_max_streak',  sql: `ALTER TABLE users ADD COLUMN import_wiki_max_streak  INTEGER NOT NULL DEFAULT 0` },
+  {
+    name: 'create_user_platforms',
+    sql: `CREATE TABLE IF NOT EXISTS user_platforms (
+      user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      platform     TEXT    NOT NULL CHECK (platform IN ('ios', 'android', 'web')),
+      last_seen_at TEXT    NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, platform)
+    )`,
+  },
 ]
 
 for (const { name, sql } of postMultiStatementIncremental) {

@@ -304,8 +304,22 @@ function AppleSignInButton({ onSuccess }: { onSuccess: () => void }) {
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
 export function AuthModal() {
-  const { isOpen, initialTab, close } = useAuthModal()
+  const { isOpen, initialTab, open, close } = useAuthModal()
   const [tab, setTab] = useState<AuthTab>('login')
+
+  // Open directly to register if URL contains ?auth=register
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const authParam = params.get('auth')
+    if (authParam === 'register' || authParam === 'login') {
+      open(authParam)
+      // Clean up the URL without reload
+      params.delete('auth')
+      const newSearch = params.toString()
+      const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash
+      window.history.replaceState(null, '', newUrl)
+    }
+  }, [open])
 
   useEffect(() => {
     if (isOpen) setTab(initialTab)

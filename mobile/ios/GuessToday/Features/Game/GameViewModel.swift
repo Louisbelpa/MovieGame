@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Combine
 
 enum GameMode {
     case film, series, wiki
@@ -29,36 +30,36 @@ enum GameMode {
     }
 }
 
-@Observable
 @MainActor
-final class GameViewModel {
+final class GameViewModel: ObservableObject {
     let mode: GameMode
 
     // Challenge state
-    var challenge: ChallengePayload?
-    var filmResult: ChallengeResult?
-    var wikiResult: WikiResult?
+    @Published var challenge: ChallengePayload?
+    @Published var filmResult: ChallengeResult?
+    @Published var wikiResult: WikiResult?
 
     // UI state
-    var isLoading = false
-    var error: String?
-    var inputText = ""
-    var searchResults: [SearchResultItem] = []
-    var isSearching = false
-    var previousHintsRevealed = 0
+    @Published var isLoading = false
+    @Published var error: String?
+    @Published var inputText = ""
+    @Published var searchResults: [SearchResultItem] = []
+    @Published var isSearching = false
+    @Published var previousHintsRevealed = 0
 
     // Game outcome sheet
-    var showWinSheet = false
-    var showLoseSheet = false
+    @Published var showWinSheet = false
+    @Published var showLoseSheet = false
 
     // Date navigation
-    var viewingDate: String?
+    @Published var viewingDate: String?
+    @Published var notFound = false
 
     // Shake animation trigger
-    var shakeAmount: Double = 0
+    @Published var shakeAmount: Double = 0
 
     // Flash feedback color (green = correct, red = wrong)
-    var flashColor: Color? = nil
+    @Published var flashColor: Color? = nil
 
     // Haptic feedback
     private let haptic = UIImpactFeedbackGenerator(style: .medium)
@@ -84,7 +85,9 @@ final class GameViewModel {
 
     private func fetchChallenge(date: String?) async {
         isLoading = true
+        challenge = nil  // force view remount so stale HintCard @State doesn't linger
         error = nil
+        notFound = false
         filmResult = nil
         wikiResult = nil
         inputText = ""
@@ -113,7 +116,11 @@ final class GameViewModel {
                 }
             }
         } catch let e as APIError {
-            error = e.localizedDescription
+            if case .httpError(let code, _) = e, code == 404 {
+                notFound = true
+            } else {
+                error = e.localizedDescription
+            }
         } catch {
             self.error = error.localizedDescription
         }
@@ -135,22 +142,25 @@ final class GameViewModel {
                 ? try await APIClient.shared.submitWikiGuess(challengeId: c.challengeId, guess: guess)
                 : try await APIClient.shared.submitGuess(challengeId: c.challengeId, guess: guess)
 
-            challenge = response.payload
+            challenge = response.challenge
 
             if response.correct {
                 successHaptic.notificationOccurred(.success)
+                SoundManager.shared.playSuccess()
                 triggerFlash(.green)
-                await fetchResult(challengeId: response.payload.challengeId)
+                await fetchResult(challengeId: response.challenge.challengeId)
                 showWinSheet = true
-                recordStats(won: true, attemptsUsed: response.payload.attemptsUsed)
+                recordStats(won: true, attemptsUsed: response.challenge.attemptsUsed)
             } else {
                 haptic.impactOccurred()
+                SoundManager.shared.playError()
                 triggerShake()
                 triggerFlash(.red)
-                if response.payload.isGameOver {
-                    await fetchResult(challengeId: response.payload.challengeId)
+                if response.challenge.isGameOver {
+                    await fetchResult(challengeId: response.challenge.challengeId)
+                    SoundManager.shared.playLose()
                     showLoseSheet = true
-                    recordStats(won: false, attemptsUsed: response.payload.attemptsUsed)
+                    recordStats(won: false, attemptsUsed: response.challenge.attemptsUsed)
                 }
             }
         } catch let e as APIError {
@@ -210,18 +220,22 @@ final class GameViewModel {
     // MARK: - Navigation
 
     func navigatePrev() async {
-        guard let c = challenge, c.hasPrevChallenge else { return }
+        let refDate = challenge?.date ?? viewingDate ?? todayParis()
+        let canPrev = challenge?.hasPrevChallenge ?? true
+        guard canPrev else { return }
         do {
-            if let prevDate = try await APIClient.shared.adjacentDate(date: c.date, direction: "prev", type: mode == .wiki ? "wiki" : mode.apiType) {
+            if let prevDate = try await APIClient.shared.adjacentDate(date: refDate, direction: "prev", type: mode == .wiki ? "wiki" : mode.apiType) {
                 await loadDate(prevDate)
             }
         } catch {}
     }
 
     func navigateNext() async {
-        guard let c = challenge, c.hasNextChallenge, c.isPastChallenge else { return }
+        let refDate = challenge?.date ?? viewingDate ?? todayParis()
+        let canNext = challenge.map { $0.hasNextChallenge && $0.isPastChallenge } ?? (refDate < todayParis())
+        guard canNext else { return }
         do {
-            if let nextDate = try await APIClient.shared.adjacentDate(date: c.date, direction: "next", type: mode == .wiki ? "wiki" : mode.apiType) {
+            if let nextDate = try await APIClient.shared.adjacentDate(date: refDate, direction: "next", type: mode == .wiki ? "wiki" : mode.apiType) {
                 await loadDate(nextDate)
             }
         } catch {}
@@ -258,31 +272,75 @@ final class GameViewModel {
     // MARK: - Stats
 
     private func recordStats(won: Bool, attemptsUsed: Int) {
+        recordHistory(won: won)
         var stats = loadStats()
         stats.gamesPlayed += 1
+        let today = todayParis()
         if won {
             stats.wins += 1
-            stats.currentStreak += 1
+            // Streak: consecutive days won (Paris timezone)
+            if stats.lastWonDate == today {
+                // already counted today (e.g. second game mode) — don't double-increment
+            } else if stats.lastWonDate == yesterdayParis() {
+                stats.currentStreak += 1
+            } else {
+                stats.currentStreak = 1
+            }
+            stats.lastWonDate = today
             stats.maxStreak = max(stats.maxStreak, stats.currentStreak)
-            let key = "\(attemptsUsed)"
-            stats.distribution[key, default: 0] += 1
+            stats.distribution["\(attemptsUsed)", default: 0] += 1
+            triggerMilestoneHaptic(for: stats.currentStreak)
         } else {
-            stats.currentStreak = 0
+            // Loss today breaks the streak only if they haven't won today
+            if stats.lastWonDate != today {
+                stats.currentStreak = 0
+            }
         }
         saveStats(stats)
+        Task { await StatsManager.shared.refreshFromServer() }
+    }
+
+    private func recordHistory(won: Bool) {
+        let date = todayParis()
+        let key = "history_\(mode.statsKey)"
+        var history = (UserDefaults.standard.dictionary(forKey: key) as? [String: String]) ?? [:]
+        history[date] = won ? "won" : "lost"
+        UserDefaults.standard.set(history, forKey: key)
+    }
+
+    private func todayParis() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = TimeZone(identifier: "Europe/Paris")
+        return f.string(from: Date())
+    }
+
+    private func yesterdayParis() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = TimeZone(identifier: "Europe/Paris")
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
+        return f.string(from: yesterday)
+    }
+
+    private func triggerMilestoneHaptic(for streak: Int) {
+        guard streak == 7 || streak == 30 || streak == 100 else { return }
+        let gen = UINotificationFeedbackGenerator()
+        Task {
+            gen.notificationOccurred(.success)
+            try? await Task.sleep(for: .milliseconds(180))
+            gen.notificationOccurred(.success)
+            try? await Task.sleep(for: .milliseconds(180))
+            gen.notificationOccurred(.success)
+        }
     }
 
     func loadStats() -> LocalStats {
-        guard let data = UserDefaults.standard.data(forKey: "stats_\(mode.statsKey)"),
-              let stats = try? JSONDecoder().decode(LocalStats.self, from: data) else {
-            return LocalStats()
-        }
-        return stats
+        StatsManager.shared.stats(for: mode)
     }
 
     private func saveStats(_ stats: LocalStats) {
-        guard let data = try? JSONEncoder().encode(stats) else { return }
-        UserDefaults.standard.set(data, forKey: "stats_\(mode.statsKey)")
+        StatsManager.shared.save(stats, for: mode)
     }
 
     // MARK: - Private helpers

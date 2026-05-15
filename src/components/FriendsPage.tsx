@@ -14,10 +14,12 @@ import {
   Trophy,
   Film,
   Tv,
-  Globe,
+  Landmark,
   ChevronLeft,
   ChevronRight,
   Calendar,
+  Medal,
+  Target,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useAuthModal } from '@/components/modals/AuthModal'
@@ -26,10 +28,12 @@ import {
   friendsAdd,
   friendsAccept,
   friendsRemove,
+  friendsGetLeaderboard,
   type FriendEntry,
   type FriendScore,
   type PendingEntry,
   type FriendsResponse,
+  type LeaderboardEntry,
 } from '@/api/client'
 import { FEATURES } from '@/config/features'
 import { Footer } from '@/components/layout/Footer'
@@ -334,7 +338,7 @@ function LeaderboardRow({
         <div className="flex items-center gap-3 shrink-0">
           <ScoreBadge score={entry.scores.film} icon={Film} />
           {FEATURES.enableSeries && <ScoreBadge score={entry.scores.series} icon={Tv} />}
-          {FEATURES.enableWiki && <ScoreBadge score={entry.scores.wiki} icon={Globe} />}
+          {FEATURES.enableWiki && <ScoreBadge score={entry.scores.wiki} icon={Landmark} />}
         </div>
 
         {/* Chevron */}
@@ -356,7 +360,7 @@ function LeaderboardRow({
               <ScoreCard score={entry.scores.series} label="Séries" icon={Tv} accent="#1eb088" />
             )}
             {FEATURES.enableWiki && (
-              <ScoreCard score={entry.scores.wiki} label="Perso." icon={Globe} accent="#9b7de8" />
+              <ScoreCard score={entry.scores.wiki} label="Perso." icon={Landmark} accent="#9b7de8" />
             )}
           </div>
           {!entry.isMe && (
@@ -440,6 +444,162 @@ function PendingSection({
   )
 }
 
+// ─── Global leaderboard ───────────────────────────────────────────────────────
+
+function Avatar({ entry, size = 32 }: { entry: LeaderboardEntry; size?: number }) {
+  const style = { width: size, height: size }
+  if (entry.avatarUrl) {
+    return (
+      <img
+        src={entry.avatarUrl}
+        alt={entry.displayName}
+        className="rounded-full object-cover border border-film-gold/30 shrink-0"
+        style={style}
+      />
+    )
+  }
+  return (
+    <span
+      className="rounded-full bg-film-gold/20 border border-film-gold/30 flex items-center justify-center font-bold text-film-gold shrink-0"
+      style={{ ...style, fontSize: size * 0.38 }}
+    >
+      {entry.displayName.charAt(0).toUpperCase()}
+    </span>
+  )
+}
+
+const MEDAL = ['🥇', '🥈', '🥉']
+const PODIUM_HEIGHT = ['h-24', 'h-16', 'h-12']
+const PODIUM_ORDER = [1, 0, 2] // silver left, gold center, bronze right
+
+function Podium({ top3 }: { top3: LeaderboardEntry[] }) {
+  return (
+    <div className="flex items-end justify-center gap-2 pt-4 pb-2">
+      {PODIUM_ORDER.map((i) => {
+        const e = top3[i]
+        if (!e) return <div key={i} className="flex-1" />
+        const isGold = i === 0
+        return (
+          <div key={e.id} className="flex-1 flex flex-col items-center gap-1.5">
+            <span className="text-xl">{MEDAL[i]}</span>
+            <Avatar entry={e} size={isGold ? 48 : 40} />
+            <span className={`text-xs font-semibold text-center leading-tight truncate w-full text-center ${e.isMe ? 'text-film-gold' : 'text-film-text'}`}>
+              {e.isMe ? 'Toi' : e.displayName}
+            </span>
+            <span className="text-[10px] text-film-text-dim">{e.totalWins} victoire{e.totalWins !== 1 ? 's' : ''}</span>
+            <div className={`w-full rounded-t-lg ${isGold ? 'bg-film-gold/20 border-t border-x border-film-gold/30' : 'bg-white/[0.04] border-t border-x border-film-border/40'} ${PODIUM_HEIGHT[i]}`} />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function GlobalLeaderboardTable({ entries }: { entries: LeaderboardEntry[] }) {
+  const [sortKey, setSortKey] = useState<'totalWins' | 'winRate' | 'currentStreak'>('totalWins')
+
+  const sorted = [...entries].sort((a, b) => {
+    if (sortKey === 'winRate') return b.winRate - a.winRate || b.totalWins - a.totalWins
+    if (sortKey === 'currentStreak') return b.currentStreak - a.currentStreak || b.totalWins - a.totalWins
+    return b.totalWins - a.totalWins || b.winRate - a.winRate
+  })
+
+  const SortBtn = ({ k, label }: { k: typeof sortKey; label: string }) => (
+    <button
+      type="button"
+      onClick={() => setSortKey(k)}
+      className={`text-[10px] font-semibold px-2 py-0.5 rounded transition-colors cursor-pointer ${sortKey === k ? 'bg-film-gold/20 text-film-gold' : 'text-film-text-dim hover:text-film-text'}`}
+    >
+      {label}
+    </button>
+  )
+
+  return (
+    <div className="flex flex-col gap-2">
+      {/* Sort controls */}
+      <div className="flex items-center gap-1 justify-end">
+        <span className="text-[10px] text-film-text-dim mr-1">Trier par</span>
+        <SortBtn k="totalWins" label="Victoires" />
+        <SortBtn k="winRate" label="% victoire" />
+        <SortBtn k="currentStreak" label="Série" />
+      </div>
+
+      {/* Header */}
+      <div className="grid grid-cols-[1.5rem_1fr_2rem_2rem_2rem_3rem_2rem] gap-x-2 px-3 text-[10px] text-film-text-dim/60 font-semibold uppercase tracking-wider">
+        <span>#</span>
+        <span>Joueur</span>
+        <span className="text-center"><Film size={9} className="inline" /></span>
+        {FEATURES.enableSeries && <span className="text-center"><Tv size={9} className="inline" /></span>}
+        {FEATURES.enableWiki && <span className="text-center"><Landmark size={9} className="inline" /></span>}
+        <span className="text-center"><Target size={9} className="inline" /></span>
+        <span className="text-center"><Flame size={9} className="inline" /></span>
+      </div>
+
+      {sorted.map((e, idx) => (
+        <div
+          key={e.id}
+          className={`group grid grid-cols-[1.5rem_1fr_2rem_2rem_2rem_3rem_2rem] gap-x-2 items-center px-3 py-2.5 rounded-xl border transition-colors ${
+            e.isMe
+              ? 'bg-film-gold/8 border-film-gold/25'
+              : 'border-transparent hover:border-film-border/50 hover:bg-white/[0.02]'
+          }`}
+        >
+          <span className="text-xs font-bold text-film-text-dim text-center">
+            {idx < 3 ? MEDAL[idx] : idx + 1}
+          </span>
+          <div className="flex items-center gap-2 min-w-0">
+            <Avatar entry={e} size={24} />
+            <span className={`text-sm font-medium truncate ${e.isMe ? 'text-film-gold' : 'text-film-text'}`}>
+              {e.isMe ? 'Toi' : e.displayName}
+            </span>
+          </div>
+          <span className="text-xs font-semibold text-center text-film-gold">{e.filmWins}</span>
+          {FEATURES.enableSeries && <span className="text-xs font-semibold text-center text-purple-400">{e.seriesWins}</span>}
+          {FEATURES.enableWiki && <span className="text-xs font-semibold text-center text-film-green">{e.wikiWins}</span>}
+          <span className="text-xs font-semibold text-center text-film-text-dim">
+            {e.totalPlayed > 0 ? `${Math.round(e.winRate * 100)}%` : '—'}
+          </span>
+          <span className={`text-xs font-semibold text-center ${e.currentStreak > 0 ? 'text-orange-400' : 'text-film-text-dim/40'}`}>
+            {e.currentStreak > 0 ? `🔥${e.currentStreak}` : '—'}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function GlobalLeaderboard() {
+  const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    friendsGetLeaderboard()
+      .then((r) => setEntries(r.leaderboard))
+      .catch(() => setEntries([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <Spinner />
+
+  if (!entries || entries.length <= 1) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-10 text-center">
+        <Trophy size={32} className="text-film-text-dim" />
+        <p className="text-film-text-dim text-sm">Ajoutez des amis pour voir le classement global.</p>
+      </div>
+    )
+  }
+
+  const top3 = entries.slice(0, 3)
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Podium top3={top3} />
+      <GlobalLeaderboardTable entries={entries} />
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 function getTodayLocal(): string {
@@ -461,6 +621,7 @@ export function FriendsPage() {
   const user = useAuthStore((s) => s.user)
   const { open: openAuth } = useAuthModal()
 
+  const [tab, setTab] = useState<'today' | 'global'>('today')
   const [data, setData] = useState<FriendsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState<string>(getTodayLocal)
@@ -592,71 +753,6 @@ export function FriendsPage() {
               <AddFriendForm onAdded={reload} />
             </div>
 
-            {/* Date navigator */}
-            <div className="flex items-center gap-2 rounded-xl border border-film-border bg-white/[0.02] px-3 py-2">
-              <button
-                type="button"
-                onClick={() => goDay(-1)}
-                className="flex items-center justify-center w-7 h-7 rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors cursor-pointer"
-                aria-label="Jour précédent"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <div className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium text-film-text">
-                <Calendar size={13} className="text-film-text-dim" />
-                <span className="capitalize">{formatDateLabel(selectedDate, today)}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => goDay(1)}
-                disabled={isToday}
-                className="flex items-center justify-center w-7 h-7 rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-25 disabled:cursor-default"
-                aria-label="Jour suivant"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-
-            {/* Leaderboard */}
-            {ranked.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 py-10 text-center">
-                <Users size={32} className="text-film-text-dim" />
-                <p className="text-film-text-dim text-sm">
-                  Aucun ami pour l'instant.
-                </p>
-                {data.myCode && (
-                  <p className="text-xs text-film-text-dim max-w-xs">
-                    Partage ton code{' '}
-                    <span className="font-mono font-semibold text-film-gold">
-                      {data.myCode}
-                    </span>{' '}
-                    pour inviter des amis.
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-film-text-dim">
-                    Classement
-                  </p>
-                  <div className="flex items-center gap-3 text-[10px] text-film-text-dim/60">
-                    <span className="flex items-center gap-1"><Film size={9} /> Films</span>
-                    {FEATURES.enableSeries && <span className="flex items-center gap-1"><Tv size={9} /> Séries</span>}
-                    {FEATURES.enableWiki && <span className="flex items-center gap-1"><Globe size={9} /> Wiki</span>}
-                  </div>
-                </div>
-                {ranked.map((entry, idx) => (
-                  <LeaderboardRow
-                    key={entry.id}
-                    rank={idx + 1}
-                    entry={entry}
-                    onRemove={(id) => void handleRemove(id)}
-                  />
-                ))}
-              </div>
-            )}
-
             {/* Pending */}
             <PendingSection
               pending={data.pending}
@@ -664,6 +760,77 @@ export function FriendsPage() {
               onDecline={(id) => void handleDecline(id)}
               onCancel={(id) => void handleCancel(id)}
             />
+
+            {/* Tab switcher */}
+            <div className="flex rounded-xl border border-film-border overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setTab('today')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${tab === 'today' ? 'bg-film-gold/15 text-film-gold' : 'text-film-text-dim hover:text-film-text hover:bg-white/5'}`}
+              >
+                <Calendar size={13} />
+                Aujourd'hui
+              </button>
+              <div className="w-px bg-film-border" />
+              <button
+                type="button"
+                onClick={() => setTab('global')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${tab === 'global' ? 'bg-film-gold/15 text-film-gold' : 'text-film-text-dim hover:text-film-text hover:bg-white/5'}`}
+              >
+                <Medal size={13} />
+                Classement
+              </button>
+            </div>
+
+            {/* Today tab */}
+            {tab === 'today' && (
+              <>
+                {/* Date navigator */}
+                <div className="flex items-center gap-2 rounded-xl border border-film-border bg-white/[0.02] px-3 py-2">
+                  <button type="button" onClick={() => goDay(-1)} className="flex items-center justify-center w-7 h-7 rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors cursor-pointer" aria-label="Jour précédent">
+                    <ChevronLeft size={16} />
+                  </button>
+                  <div className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium text-film-text">
+                    <Calendar size={13} className="text-film-text-dim" />
+                    <span className="capitalize">{formatDateLabel(selectedDate, today)}</span>
+                  </div>
+                  <button type="button" onClick={() => goDay(1)} disabled={isToday} className="flex items-center justify-center w-7 h-7 rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-25 disabled:cursor-default" aria-label="Jour suivant">
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+
+                {ranked.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 py-10 text-center">
+                    <Users size={32} className="text-film-text-dim" />
+                    <p className="text-film-text-dim text-sm">Aucun ami pour l'instant.</p>
+                    {data.myCode && (
+                      <p className="text-xs text-film-text-dim max-w-xs">
+                        Partage ton code <span className="font-mono font-semibold text-film-gold">{data.myCode}</span> pour inviter des amis.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-film-text-dim">Classement du jour</p>
+                      <div className="flex items-center gap-3 text-[10px] text-film-text-dim/60">
+                        <span className="flex items-center gap-1"><Film size={9} /> Films</span>
+                        {FEATURES.enableSeries && <span className="flex items-center gap-1"><Tv size={9} /> Séries</span>}
+                        {FEATURES.enableWiki && <span className="flex items-center gap-1"><Landmark size={9} /> Wiki</span>}
+                      </div>
+                    </div>
+                    {ranked.map((entry, idx) => (
+                      <LeaderboardRow key={entry.id} rank={idx + 1} entry={entry} onRemove={(id) => void handleRemove(id)} />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Global tab */}
+            {tab === 'global' && (
+              <GlobalLeaderboard />
+            )}
           </div>
         )}
 

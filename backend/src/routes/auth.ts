@@ -17,12 +17,17 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { randomBytes, createHash } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import multer from 'multer';
 import appleSignin from 'apple-signin-auth';
 import db from '../db/database.js';
 import { userAuth, requireUser, USER_SESSION_COOKIE } from '../middleware/userAuth.js';
 import { AUTH } from '../middleware/rateLimiter.js';
 import { sendPasswordResetEmail, sendVerificationEmail } from '../lib/email.js';
 import { registerPushToken } from '../services/push-notification.service.js';
+import { getUploadsAbsDir } from '../config/uploads.js';
 
 export const authRouter = Router();
 
@@ -232,6 +237,51 @@ authRouter.put('/profile', userAuth, requireUser, (req: Request, res: Response):
     .prepare<number, UserRow>(
       `SELECT id, email, display_name, avatar_url, password_hash, is_banned, email_verified FROM users WHERE id = ?`
     )
+    .get(userId)!;
+
+  res.json({ user: formatUser(updated) });
+});
+
+/** POST /api/auth/avatar — multipart image upload */
+const avatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      const dir = path.join(getUploadsAbsDir(), 'avatars');
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+      cb(null, `${randomUUID()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only JPEG, PNG and WebP images are allowed'));
+  },
+});
+
+authRouter.post('/avatar', userAuth, requireUser, avatarUpload.single('avatar'), (req: Request, res: Response): void => {
+  if (!req.file) {
+    res.status(400).json({ error: 'No file uploaded' });
+    return;
+  }
+
+  const userId = req.user!.id;
+  const newUrl = `/uploads/avatars/${req.file.filename}`;
+
+  // Delete previous local avatar if present
+  const prev = db.prepare<number, { avatar_url: string | null }>(`SELECT avatar_url FROM users WHERE id = ?`).get(userId);
+  if (prev?.avatar_url?.startsWith('/uploads/avatars/')) {
+    const old = path.join(getUploadsAbsDir(), prev.avatar_url.replace('/uploads/', ''));
+    fs.unlink(old, () => {});
+  }
+
+  db.prepare(`UPDATE users SET avatar_url = ? WHERE id = ?`).run(newUrl, userId);
+
+  const updated = db
+    .prepare<number, UserRow>(`SELECT id, email, display_name, avatar_url, password_hash, is_banned, email_verified FROM users WHERE id = ?`)
     .get(userId)!;
 
   res.json({ user: formatUser(updated) });
@@ -548,9 +598,122 @@ authRouter.get('/history', userAuth, requireUser, (req: Request, res: Response):
   });
 });
 
+/** GET /api/auth/history?type=film|series|wiki — returns { history: { "YYYY-MM-DD": "won"|"lost" } } */
+authRouter.get('/history', userAuth, requireUser, (req: Request, res: Response): void => {
+  const userId = req.user!.id;
+  const type   = String(req.query.type ?? '');
+  const validTypes = ['film', 'series', 'wiki'] as const;
+  if (!validTypes.includes(type as never)) {
+    res.status(400).json({ error: 'type must be film, series or wiki' });
+    return;
+  }
+
+  interface Row { challenge_date: string; won: number }
+  const rows = db
+    .prepare<[number, string], Row>(`
+      SELECT dc.challenge_date, r.won
+      FROM user_challenge_results r
+      JOIN daily_challenges dc ON dc.id = r.challenge_id
+      WHERE r.user_id = ? AND r.media_type = ?
+      ORDER BY dc.challenge_date DESC
+    `)
+    .all(userId, type);
+
+  const history: Record<string, 'won' | 'lost'> = {}
+  for (const row of rows) {
+    history[row.challenge_date] = row.won === 1 ? 'won' : 'lost'
+  }
+  res.json({ history });
+});
+
+/** GET /api/auth/stats?type=film|series|wiki — compute stats from user_challenge_results */
+authRouter.get('/stats', userAuth, requireUser, (req: Request, res: Response): void => {
+  const userId = req.user!.id;
+  const type   = String(req.query.type ?? '');
+  const validTypes = ['film', 'series', 'wiki'] as const;
+
+  const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+  const yd = new Date(); yd.setDate(yd.getDate() - 1);
+  const yesterdayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(yd);
+
+  interface ResultRow { challenge_date: string; attempts_used: number; won: number }
+  type ImportRow = Record<string, number>;
+
+  const computeStats = (mediaType: 'film' | 'series' | 'wiki') => {
+    const rows = db
+      .prepare<[number, string], ResultRow>(`
+        SELECT dc.challenge_date, r.attempts_used, r.won
+        FROM user_challenge_results r
+        JOIN daily_challenges dc ON dc.id = r.challenge_id
+        WHERE r.user_id = ? AND r.media_type = ?
+        ORDER BY dc.challenge_date DESC
+      `)
+      .all(userId, mediaType);
+
+    const gamesPlayed = rows.length;
+    const wins = rows.filter((r) => r.won === 1).length;
+
+    const distribution: Record<string, number> = {};
+    for (const row of rows) {
+      if (row.won === 1) {
+        const key = String(row.attempts_used);
+        distribution[key] = (distribution[key] ?? 0) + 1;
+      }
+    }
+
+    const wonDates = [...new Set(rows.filter((r) => r.won === 1).map((r) => r.challenge_date))].sort().reverse();
+
+    let currentStreak = 0;
+    if (wonDates.length > 0 && (wonDates[0] === todayParis || wonDates[0] === yesterdayParis)) {
+      currentStreak = 1;
+      for (let i = 1; i < wonDates.length; i++) {
+        const diff = Math.round((new Date(wonDates[i - 1]).getTime() - new Date(wonDates[i]).getTime()) / 86400000);
+        if (diff === 1) { currentStreak++; } else { break; }
+      }
+    }
+
+    const wonAsc = [...wonDates].reverse();
+    let maxStreak = 0, tempStreak = 0;
+    for (let i = 0; i < wonAsc.length; i++) {
+      if (i === 0) { tempStreak = 1; } else {
+        const diff = Math.round((new Date(wonAsc[i]).getTime() - new Date(wonAsc[i - 1]).getTime()) / 86400000);
+        tempStreak = diff === 1 ? tempStreak + 1 : 1;
+      }
+      maxStreak = Math.max(maxStreak, tempStreak);
+    }
+
+    // Merge with per-mode import floor (stats imported from local storage at login)
+    const col = (f: string) => `import_${mediaType}_${f}`;
+    const imp = db
+      .prepare<number, ImportRow>(
+        `SELECT ${col('played')}, ${col('wins')}, ${col('streak')}, ${col('max_streak')} FROM users WHERE id = ?`
+      )
+      .get(userId);
+
+    return {
+      gamesPlayed:   Math.max(gamesPlayed,   imp?.[col('played')]     ?? 0),
+      wins:          Math.max(wins,           imp?.[col('wins')]       ?? 0),
+      currentStreak: Math.max(currentStreak,  imp?.[col('streak')]     ?? 0),
+      maxStreak:     Math.max(maxStreak,      imp?.[col('max_streak')] ?? 0),
+      distribution,
+    };
+  };
+
+  if (type && (validTypes as readonly string[]).includes(type)) {
+    res.json(computeStats(type as 'film' | 'series' | 'wiki'));
+  } else {
+    res.json({
+      film:   computeStats('film'),
+      series: computeStats('series'),
+      wiki:   computeStats('wiki'),
+    });
+  }
+});
+
 /** POST /api/auth/import-stats */
 authRouter.post('/import-stats', userAuth, requireUser, (req: Request, res: Response): void => {
-  const { stats } = req.body as {
+  const { type, stats } = req.body as {
+    type?: unknown;
     stats?: {
       gamesPlayed?: unknown;
       wins?: unknown;
@@ -564,6 +727,9 @@ authRouter.post('/import-stats', userAuth, requireUser, (req: Request, res: Resp
     res.status(400).json({ error: 'Invalid stats payload' });
     return;
   }
+
+  const validTypes = ['film', 'series', 'wiki'] as const;
+  const mode = validTypes.includes(type as never) ? (type as 'film' | 'series' | 'wiki') : null;
 
   const toInt = (v: unknown): number => {
     const n = Number(v);
@@ -579,37 +745,65 @@ authRouter.post('/import-stats', userAuth, requireUser, (req: Request, res: Resp
 
   const userId = req.user!.id;
 
-  interface StatsRow {
-    stats_games_played: number;
-    stats_wins: number;
-    stats_streak: number;
-    stats_max_streak: number;
+  if (mode) {
+    // Per-mode import — idempotent merge into import_<mode>_* columns
+    type ImportRow = Record<string, number>;
+    const col = (f: string) => `import_${mode}_${f}`;
+    const current = db
+      .prepare<number, ImportRow>(
+        `SELECT ${col('played')}, ${col('wins')}, ${col('streak')}, ${col('max_streak')} FROM users WHERE id = ?`
+      )
+      .get(userId)!;
+
+    const merged = {
+      played:     Math.max(current[col('played')]     ?? 0, incoming.gamesPlayed),
+      wins:       Math.max(current[col('wins')]       ?? 0, incoming.wins),
+      streak:     Math.max(current[col('streak')]     ?? 0, incoming.currentStreak),
+      max_streak: Math.max(current[col('max_streak')] ?? 0, incoming.maxStreak),
+    };
+
+    db.prepare(
+      `UPDATE users
+       SET ${col('played')}     = ?,
+           ${col('wins')}       = ?,
+           ${col('streak')}     = ?,
+           ${col('max_streak')} = ?
+       WHERE id = ?`
+    ).run(merged.played, merged.wins, merged.streak, merged.max_streak, userId);
+
+    res.json({ ok: true });
+  } else {
+    // Legacy fallback (no type): write to global stats_* columns
+    interface StatsRow {
+      stats_games_played: number;
+      stats_wins: number;
+      stats_streak: number;
+      stats_max_streak: number;
+    }
+    const current = db
+      .prepare<number, StatsRow>(
+        `SELECT stats_games_played, stats_wins, stats_streak, stats_max_streak FROM users WHERE id = ?`
+      )
+      .get(userId)!;
+
+    const merged = {
+      gamesPlayed: Math.max(current.stats_games_played ?? 0, incoming.gamesPlayed),
+      wins:        Math.max(current.stats_wins         ?? 0, incoming.wins),
+      streak:      Math.max(current.stats_streak       ?? 0, incoming.currentStreak),
+      maxStreak:   Math.max(current.stats_max_streak   ?? 0, incoming.maxStreak),
+    };
+
+    db.prepare(
+      `UPDATE users
+       SET stats_games_played = ?,
+           stats_wins         = ?,
+           stats_streak       = ?,
+           stats_max_streak   = ?
+       WHERE id = ?`
+    ).run(merged.gamesPlayed, merged.wins, merged.streak, merged.maxStreak, userId);
+
+    res.json({ ok: true });
   }
-
-  const current = db
-    .prepare<number, StatsRow>(
-      `SELECT stats_games_played, stats_wins, stats_streak, stats_max_streak FROM users WHERE id = ?`
-    )
-    .get(userId)!;
-
-  // Idempotent merge: only update if incoming values are larger
-  const merged = {
-    gamesPlayed: Math.max(current.stats_games_played ?? 0, incoming.gamesPlayed),
-    wins: Math.max(current.stats_wins ?? 0, incoming.wins),
-    streak: Math.max(current.stats_streak ?? 0, incoming.currentStreak),
-    maxStreak: Math.max(current.stats_max_streak ?? 0, incoming.maxStreak),
-  };
-
-  db.prepare(
-    `UPDATE users
-     SET stats_games_played = ?,
-         stats_wins         = ?,
-         stats_streak       = ?,
-         stats_max_streak   = ?
-     WHERE id = ?`
-  ).run(merged.gamesPlayed, merged.wins, merged.streak, merged.maxStreak, userId);
-
-  res.json({ ok: true, stats: merged });
 });
 
 /** POST /api/auth/apple */

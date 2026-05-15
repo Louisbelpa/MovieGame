@@ -3,6 +3,7 @@ import SwiftUI
 struct HintCard: View {
     let hint: HintItem
     let isNew: Bool
+    var staggerDelay: Double = 0
 
     @State private var appeared = false
 
@@ -38,7 +39,7 @@ struct HintCard: View {
         .scaleEffect(appeared ? 1 : 0.92)
         .opacity(appeared ? 1 : 0)
         .onAppear {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.7).delay(staggerDelay)) {
                 appeared = true
             }
         }
@@ -78,16 +79,37 @@ struct HintsGrid: View {
         max(0, hintsAvailable - hintsRevealed)
     }
 
+    private var regularIndices: [Int] { hints.indices.filter { !hints[$0].isSynopsis } }
+    private var synopsisIndices: [Int] { hints.indices.filter { hints[$0].isSynopsis } }
+
     var body: some View {
-        LazyVGrid(
-            columns: [GridItem(.flexible()), GridItem(.flexible())],
-            spacing: Theme.spacing8
-        ) {
-            ForEach(hints.indices, id: \.self) { i in
-                HintCard(hint: hints[i], isNew: i >= previousRevealCount)
+        VStack(spacing: Theme.spacing8) {
+            if !regularIndices.isEmpty || lockedCount > 0 {
+                LazyVGrid(
+                    columns: [GridItem(.flexible()), GridItem(.flexible())],
+                    spacing: Theme.spacing8
+                ) {
+                    ForEach(regularIndices, id: \.self) { i in
+                        let isNew = i >= previousRevealCount
+                        HintCard(
+                            hint: hints[i],
+                            isNew: isNew,
+                            staggerDelay: isNew ? Double(i - previousRevealCount) * 0.09 : 0
+                        )
+                    }
+                    ForEach(0..<lockedCount, id: \.self) { i in
+                        LockedHintCard(index: hintsRevealed + i)
+                    }
+                }
             }
-            ForEach(0..<lockedCount, id: \.self) { i in
-                LockedHintCard(index: hintsRevealed + i)
+
+            ForEach(synopsisIndices, id: \.self) { i in
+                let isNew = i >= previousRevealCount
+                HintCard(
+                    hint: hints[i],
+                    isNew: isNew,
+                    staggerDelay: isNew ? Double(i - previousRevealCount) * 0.09 : 0
+                )
             }
         }
     }

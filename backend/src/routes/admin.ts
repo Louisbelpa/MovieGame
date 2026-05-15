@@ -2144,6 +2144,101 @@ adminRouter.get(
   }
 );
 
+// GET /api/admin/stats/social — utilisateurs, plateformes, achievements, social
+adminRouter.get(
+  '/stats/social',
+  (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      // ── Users ──────────────────────────────────────────────────────────────
+      const { total_users } = db.prepare<[], { total_users: number }>(
+        `SELECT COUNT(*) AS total_users FROM users`
+      ).get()!;
+
+      const { new_7d } = db.prepare<[], { new_7d: number }>(
+        `SELECT COUNT(*) AS new_7d FROM users WHERE created_at >= datetime('now','-7 days')`
+      ).get()!;
+
+      const { new_30d } = db.prepare<[], { new_30d: number }>(
+        `SELECT COUNT(*) AS new_30d FROM users WHERE created_at >= datetime('now','-30 days')`
+      ).get()!;
+
+      const { apple_users } = db.prepare<[], { apple_users: number }>(
+        `SELECT COUNT(DISTINCT user_id) AS apple_users FROM oauth_accounts WHERE provider = 'apple'`
+      ).get()!;
+
+      // ── Platforms (user_platforms = tous les users connectés, pas seulement push) ──
+      const platformRows = db.prepare<[], { platform: string; count: number }>(
+        `SELECT platform, COUNT(DISTINCT user_id) AS count FROM user_platforms GROUP BY platform`
+      ).all();
+
+      const platforms: Record<string, number> = { ios: 0, android: 0, web: 0 };
+      for (const r of platformRows) platforms[r.platform] = r.count;
+
+      // ── Achievements (approximated from users stats columns) ───────────────
+      const achRow = db.prepare<[], {
+        first_win: number; plays_10: number; streak_7: number; streak_30: number;
+        wins_50: number; wins_100: number;
+      }>(`
+        SELECT
+          COUNT(CASE WHEN stats_wins >= 1   THEN 1 END) AS first_win,
+          COUNT(CASE WHEN stats_games_played >= 10 THEN 1 END) AS plays_10,
+          COUNT(CASE WHEN stats_max_streak >= 7  THEN 1 END) AS streak_7,
+          COUNT(CASE WHEN stats_max_streak >= 30 THEN 1 END) AS streak_30,
+          COUNT(CASE WHEN stats_wins >= 50  THEN 1 END) AS wins_50,
+          COUNT(CASE WHEN stats_wins >= 100 THEN 1 END) AS wins_100
+        FROM users
+      `).get()!;
+
+      // ── Social / Friends ───────────────────────────────────────────────────
+      const friendRow = db.prepare<[], {
+        total: number; accepted: number; pending: number; last_7d: number;
+      }>(`
+        SELECT
+          COUNT(*)                                        AS total,
+          COUNT(CASE WHEN status = 'accepted' THEN 1 END) AS accepted,
+          COUNT(CASE WHEN status = 'pending'  THEN 1 END) AS pending,
+          COUNT(CASE WHEN created_at >= datetime('now','-7 days') THEN 1 END) AS last_7d
+        FROM friendships
+      `).get()!;
+
+      const { users_with_friends } = db.prepare<[], { users_with_friends: number }>(`
+        SELECT COUNT(DISTINCT uid) AS users_with_friends FROM (
+          SELECT requester_id AS uid FROM friendships WHERE status = 'accepted'
+          UNION
+          SELECT addressee_id AS uid FROM friendships WHERE status = 'accepted'
+        )
+      `).get()!;
+
+      res.json({
+        users: {
+          total: total_users,
+          new7d: new_7d,
+          new30d: new_30d,
+          appleSignIn: apple_users,
+        },
+        platforms,
+        achievements: {
+          first_win:  achRow.first_win,
+          plays_10:   achRow.plays_10,
+          streak_7:   achRow.streak_7,
+          streak_30:  achRow.streak_30,
+          wins_50:    achRow.wins_50,
+          wins_100:   achRow.wins_100,
+        },
+        social: {
+          totalFriendships:    friendRow.total,
+          acceptedFriendships: friendRow.accepted,
+          pendingInvitations:  friendRow.pending,
+          friendshipsLast7d:   friendRow.last_7d,
+          usersWithFriends:    users_with_friends,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // ─── TMDB Search by title ─────────────────────────────────────────────────────
 
 // GET /api/admin/tmdb/search?q=title

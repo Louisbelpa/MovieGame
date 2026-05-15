@@ -174,6 +174,76 @@ friendsRouter.delete('/:userId', AUTH, userAuth, requireUser, (req: Request, res
   res.json({ ok: true });
 });
 
+/** GET /api/friends/leaderboard */
+friendsRouter.get('/leaderboard', apiLimiter, userAuth, requireUser, (req: Request, res: Response): void => {
+  const me = req.user!.id;
+
+  interface FriendRow { id: number; display_name: string; avatar_url: string | null; stats_streak: number; stats_max_streak: number; }
+
+  const accepted = db
+    .prepare<[number, number, number], FriendRow>(
+      `SELECT u.id, u.display_name, u.avatar_url, u.stats_streak, u.stats_max_streak
+       FROM friendships f
+       JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
+       WHERE (f.requester_id = ? OR f.addressee_id = ?) AND f.status = 'accepted'`
+    )
+    .all(me, me, me);
+
+  const meRow = db
+    .prepare<number, FriendRow>(`SELECT id, display_name, avatar_url, stats_streak, stats_max_streak FROM users WHERE id = ?`)
+    .get(me)!;
+
+  const allUsers: (FriendRow & { isMe: boolean })[] = [
+    { ...meRow, isMe: true },
+    ...accepted.map((f) => ({ ...f, isMe: false })),
+  ];
+
+  interface WinsRow { user_id: number; media_type: string; wins: number; played: number; }
+
+  const userIds = allUsers.map((u) => u.id);
+  const winsData = userIds.length > 0
+    ? (db.prepare(
+        `SELECT ucr.user_id, dc.media_type,
+                COUNT(*) as played,
+                SUM(CASE WHEN ucr.won = 1 THEN 1 ELSE 0 END) as wins
+         FROM user_challenge_results ucr
+         JOIN daily_challenges dc ON dc.id = ucr.challenge_id
+         WHERE ucr.user_id IN (${userIds.map(() => '?').join(',')})
+           AND dc.is_active = 1
+         GROUP BY ucr.user_id, dc.media_type`
+      ).all(...userIds) as WinsRow[])
+    : [];
+
+  const entries = allUsers.map((u) => {
+    const rows = winsData.filter((r) => r.user_id === u.id);
+    const filmWins   = rows.find((r) => r.media_type === 'film')?.wins ?? 0;
+    const seriesWins = rows.find((r) => r.media_type === 'series')?.wins ?? 0;
+    const wikiWins   = rows.find((r) => r.media_type === 'wiki')?.wins ?? 0;
+    const totalWins  = filmWins + seriesWins + wikiWins;
+    const totalPlayed = rows.reduce((s, r) => s + r.played, 0);
+    return {
+      id: u.id,
+      displayName: u.display_name,
+      avatarUrl: u.avatar_url,
+      isMe: u.isMe,
+      totalWins,
+      totalPlayed,
+      winRate: totalPlayed > 0 ? Math.round((totalWins / totalPlayed) * 100) / 100 : 0,
+      filmWins,
+      seriesWins,
+      wikiWins,
+      currentStreak: u.stats_streak ?? 0,
+      maxStreak: u.stats_max_streak ?? 0,
+    };
+  });
+
+  // Sort by totalWins desc, then winRate desc
+  entries.sort((a, b) => b.totalWins - a.totalWins || b.winRate - a.winRate);
+  const leaderboard = entries.map((e, i) => ({ ...e, rank: i + 1 }));
+
+  res.json({ leaderboard });
+});
+
 /** GET /api/friends */
 friendsRouter.get('/', apiLimiter, userAuth, requireUser, (req: Request, res: Response): void => {
   const me = req.user!.id;

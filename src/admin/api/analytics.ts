@@ -113,3 +113,20 @@ export async function getHintsDistribution(
   if (mediaType !== 'all') params.set('mediaType', mediaType)
   return request<Record<string, number>>(`/api/admin/analytics/hints-distribution?${params}`)
 }
+
+export interface SocialStats {
+  users: { total: number; new7d: number; new30d: number; appleSignIn: number }
+  platforms: { ios: number; android: number; web: number }
+  achievements: {
+    first_win: number; plays_10: number; streak_7: number
+    streak_30: number; wins_50: number; wins_100: number
+  }
+  social: {
+    totalFriendships: number; acceptedFriendships: number
+    pendingInvitations: number; friendshipsLast7d: number; usersWithFriends: number
+  }
+}
+
+export async function getSocialStats(): Promise<SocialStats> {
+  return request<SocialStats>('/api/admin/stats/social')
+}

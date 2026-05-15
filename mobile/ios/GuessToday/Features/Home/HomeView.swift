@@ -33,22 +33,23 @@ final class HomeViewModel {
         defer { isLoading = false }
         await withTaskGroup(of: (GameMode, DailyChallengeStatus?).self) { group in
             for mode in [GameMode.film, .series, .wiki] {
-                let stats = Self.loadStats(mode: mode)
                 group.addTask {
                     do {
                         let payload: ChallengePayload = mode == .wiki
                             ? try await APIClient.shared.todayWikiChallenge()
                             : try await APIClient.shared.todayChallenge(type: mode.apiType)
+                        // Read stats from shared manager on main actor after API call
+                        let s = await StatsManager.shared.stats(for: mode)
                         return (mode, DailyChallengeStatus(
                             mode: mode,
                             challengeNumber: payload.challengeNumber,
                             outcome: payload.outcome,
                             attemptsUsed: payload.attemptsUsed,
                             maxAttempts: payload.maxAttempts,
-                            streak: stats.currentStreak,
-                            wins: stats.wins,
-                            gamesPlayed: stats.gamesPlayed,
-                            maxStreak: stats.maxStreak
+                            streak: s.currentStreak,
+                            wins: s.wins,
+                            gamesPlayed: s.gamesPlayed,
+                            maxStreak: s.maxStreak
                         ))
                     } catch {
                         return (mode, nil)
@@ -61,12 +62,23 @@ final class HomeViewModel {
         }
     }
 
-    private static func loadStats(mode: GameMode) -> LocalStats {
-        guard let data = UserDefaults.standard.data(forKey: "stats_\(mode.statsKey)"),
-              let stats = try? JSONDecoder().decode(LocalStats.self, from: data) else {
-            return LocalStats()
+    /// Refresh only the local stats portion (no API call) — used when stats change reactively.
+    func refreshStats() {
+        for mode in [GameMode.film, GameMode.series, GameMode.wiki] {
+            guard var existing = statuses[mode] else { continue }
+            let s = StatsManager.shared.stats(for: mode)
+            statuses[mode] = DailyChallengeStatus(
+                mode: existing.mode,
+                challengeNumber: existing.challengeNumber,
+                outcome: existing.outcome,
+                attemptsUsed: existing.attemptsUsed,
+                maxAttempts: existing.maxAttempts,
+                streak: s.currentStreak,
+                wins: s.wins,
+                gamesPlayed: s.gamesPlayed,
+                maxStreak: s.maxStreak
+            )
         }
-        return stats
     }
 
     var completedToday: Int { statuses.values.filter(\.isPlayed).count }
@@ -84,7 +96,7 @@ final class HomeViewModel {
 struct HomeView: View {
     @State private var vm = HomeViewModel()
     @State private var selectedMode: GameMode? = nil
-    @Namespace private var heroNamespace
+    private var statsManager: StatsManager { StatsManager.shared }
 
     var body: some View {
         NavigationStack {
@@ -112,8 +124,7 @@ struct HomeView: View {
                                 DayChallengeCard(
                                     mode: mode,
                                     status: vm.statuses[mode],
-                                    isLoading: vm.isLoading,
-                                    namespace: heroNamespace
+                                    isLoading: vm.isLoading
                                 ) {
                                     selectedMode = mode
                                 }
@@ -147,15 +158,13 @@ struct HomeView: View {
             }
             .navigationBarHidden(true)
             .navigationDestination(item: $selectedMode) { mode in
-                if #available(iOS 18.0, *) {
-                    GameView(mode: mode)
-                        .navigationTransition(.zoom(sourceID: mode, in: heroNamespace))
-                } else {
-                    GameView(mode: mode)
-                }
+                GameView(mode: mode)
             }
         }
-        .task { await vm.load() }
+        .onAppear { Task { await vm.load() } }
+        .onChange(of: statsManager.filmStats.gamesPlayed) { _, _ in vm.refreshStats() }
+        .onChange(of: statsManager.seriesStats.gamesPlayed) { _, _ in vm.refreshStats() }
+        .onChange(of: statsManager.wikiStats.gamesPlayed) { _, _ in vm.refreshStats() }
     }
 }
 
@@ -170,26 +179,41 @@ private struct HomeHeader: View {
     }
 
     var body: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(alignment: .center) {
+            // Aperture lockup
+            HStack(spacing: 8) {
+                ApertureIconView(size: 22)
+                (
+                    Text("Guess")
+                        .font(.custom("Fraunces", size: 20))
+                        .fontWeight(.medium)
+                        .foregroundColor(Theme.text)
+                    + Text("today")
+                        .font(.custom("Fraunces", size: 20))
+                        .italic()
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color(hex: "#f0c870"), Color(hex: "#8a5e1f")],
+                                startPoint: .top, endPoint: .bottom
+                            )
+                        )
+                )
+            }
+
+            Spacer()
+
+            // Date — right
+            VStack(alignment: .trailing, spacing: 2) {
                 Text(weekday)
                     .font(.system(size: 12, weight: .semibold))
                     .tracking(1.5)
                     .foregroundColor(Theme.textDim)
                     .textCase(.uppercase)
                 Text(dayMonth)
-                    .font(.custom("Georgia", size: 28))
+                    .font(.custom("Fraunces", size: 22))
                     .fontWeight(.bold)
                     .foregroundColor(Theme.text)
             }
-            Spacer()
-            Text("GT")
-                .font(.custom("Georgia", size: 20))
-                .fontWeight(.bold)
-                .foregroundColor(Theme.gold)
-                .frame(width: 40, height: 40)
-                .background(Theme.gold.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
         }
         .padding(.horizontal, Theme.spacing16)
     }
@@ -362,7 +386,6 @@ private struct DayChallengeCard: View {
     let mode: GameMode
     let status: DailyChallengeStatus?
     let isLoading: Bool
-    let namespace: Namespace.ID
     let onTap: () -> Void
 
     private var isCompleted: Bool { status?.isPlayed == true }
@@ -377,7 +400,6 @@ private struct DayChallengeCard: View {
                     .frame(width: 44, height: 44)
                     .background(modeColor.opacity(isCompleted ? 0.07 : 0.12))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .modifier(HeroSourceModifier(id: mode, namespace: namespace))
 
                 // Labels
                 VStack(alignment: .leading, spacing: 4) {
@@ -444,7 +466,6 @@ private struct DayChallengeCard: View {
             )
         }
         .buttonStyle(CardPressStyle())
-        .opacity(isCompleted ? 0.72 : 1.0)
         .animation(.easeInOut(duration: 0.25), value: status?.outcome)
     }
 
@@ -495,7 +516,7 @@ private struct DayChallengeCard: View {
         switch mode {
         case .film:   return "film"
         case .series: return "tv"
-        case .wiki:   return "person.text.rectangle"
+        case .wiki:   return "building.columns"
         }
     }
 
@@ -548,17 +569,3 @@ private struct AttemptsBar: View {
     }
 }
 
-// MARK: - iOS 18 hero transition helper
-
-private struct HeroSourceModifier: ViewModifier {
-    let id: GameMode
-    let namespace: Namespace.ID
-
-    func body(content: Content) -> some View {
-        if #available(iOS 18.0, *) {
-            content.matchedTransitionSource(id: id, in: namespace)
-        } else {
-            content
-        }
-    }
-}

@@ -296,6 +296,7 @@ export function createBaseGameStore<
               outcome === 'won',
               payload.challenge.attempts.length,
             )
+            void useAuthStore.getState().refreshServerStats()
           }
         }
       } catch (err) {

@@ -6,6 +6,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { guessLimiter } from '../middleware/rateLimiter.js';
+import { userAuth } from '../middleware/userAuth.js';
 import db from '../db/database.js';
 import {
   getTodayChallenge,
@@ -78,6 +79,7 @@ challengeRouter.get(
 challengeRouter.post(
   '/guess',
   guessLimiter,
+  userAuth,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sessionToken = res.locals.sessionToken as string;
@@ -99,6 +101,24 @@ challengeRouter.post(
       const result = processGuess(sessionToken, challenge.id, guess.trim());
       const session = getOrCreateSession(sessionToken, challenge.id);
       const payload = buildChallengePayload(challenge, session);
+
+      // Auto-record to user_challenge_results when game ends and user is logged in
+      if (req.user && result.outcome) {
+        interface MediaRow { media_type: string }
+        const row = db
+          .prepare<number, MediaRow>('SELECT media_type FROM daily_challenges WHERE id = ?')
+          .get(challenge.id);
+        if (row) {
+          db.prepare(`
+            INSERT INTO user_challenge_results (user_id, challenge_id, media_type, attempts_used, won)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, challenge_id) DO UPDATE SET
+              attempts_used = excluded.attempts_used,
+              won           = excluded.won,
+              completed_at  = datetime('now')
+          `).run(req.user.id, challenge.id, row.media_type, payload.attemptsUsed, result.outcome === 'won' ? 1 : 0);
+        }
+      }
 
       res.json({
         correct: result.correct,

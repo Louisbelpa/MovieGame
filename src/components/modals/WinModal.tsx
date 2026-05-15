@@ -159,25 +159,20 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShar
           </div>
         )}
 
-        {user && (
-          <a href="/friends" className="w-full">
-            <Button variant="secondary" size="md" className="w-full">
-              <Users size={15} />
-              Voir les scores de mes amis
-            </Button>
-          </a>
-        )}
-
-        {!user && currentStreak > 0 && (
+        {!user && (
           <div className="w-full rounded-xl border border-film-gold/30 bg-film-gold/8 p-3 flex items-center gap-3">
             <div className="shrink-0 w-8 h-8 rounded-full bg-film-gold/15 flex items-center justify-center">
               <Flame size={15} className="text-film-gold" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-film-text">
-                Série en cours : {currentStreak} 🔥
+                {stats.attemptsUsed === 1
+                  ? 'Coup de maître ! Sauvegarde cette performance.'
+                  : currentStreak >= 3
+                    ? `Série de ${currentStreak} jours 🔥 — ne la perds pas.`
+                    : 'Sauvegarde tes stats sur un compte gratuit.'}
               </p>
-              <p className="text-xs text-film-text-dim">Sauvegarde-la sur un compte gratuit.</p>
+              <p className="text-xs text-film-text-dim">Gratuit · synchronisé sur tous tes appareils.</p>
             </div>
             <button
               type="button"
@@ -185,9 +180,18 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShar
               className="shrink-0 text-xs font-semibold text-film-gold hover:underline cursor-pointer whitespace-nowrap flex items-center gap-1"
             >
               <UserCircle size={13} />
-              Sauvegarder
+              Créer un compte
             </button>
           </div>
+        )}
+
+        {user && (
+          <a href="/friends" className="w-full">
+            <Button variant="secondary" size="md" className="w-full">
+              <Users size={15} />
+              Voir les scores de mes amis
+            </Button>
+          </a>
         )}
 
         <p className="text-xs text-film-text-dim">

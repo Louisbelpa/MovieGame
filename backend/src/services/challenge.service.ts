@@ -236,7 +236,8 @@ export function buildChallengePayload(
   if (isSeries) {
     const s = db
       .prepare<[number], SeriesRow>(`SELECT * FROM series WHERE id = ?`)
-      .get(challenge.series_id!)!;
+      .get(challenge.series_id!);
+    if (!s) throw Object.assign(new Error(`Series ${challenge.series_id} not found for challenge ${challenge.id}`), { status: 404 });
     title_aliases = s.title_aliases;
     year = s.year;
     genres = s.genres;
@@ -248,7 +249,8 @@ export function buildChallengePayload(
   } else {
     const film = db
       .prepare<[number], FilmRow>(`SELECT * FROM films WHERE id = ?`)
-      .get(challenge.film_id!)!;
+      .get(challenge.film_id!);
+    if (!film) throw Object.assign(new Error(`Film ${challenge.film_id} not found for challenge ${challenge.id}`), { status: 404 });
     title_aliases = film.title_aliases;
     year = film.year;
     genres = film.genres;

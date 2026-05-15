@@ -5,13 +5,13 @@
  */
 
 import { useRef } from 'react'
-import { HelpCircle, BarChart2, Film, CalendarDays, Tv, Home, Landmark, LogIn } from 'lucide-react'
+import { HelpCircle, BarChart2, CalendarDays, Home, LogIn } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useGameStore } from '@/store/gameStore'
 import { useWikiStore } from '@/store/wikiStore'
-import { BRAND_NAME } from '@/config/features'
 import { useAuthStore } from '@/store/authStore'
 import { useAuthModal } from '@/components/modals/AuthModal'
+import { ApertureIcon } from '@/components/ui/ApertureIcon'
 
 interface HeaderProps {
   mode: 'film' | 'series' | 'wiki'
@@ -21,6 +21,7 @@ export function Header({ mode }: HeaderProps) {
   const isWiki = mode === 'wiki'
 
   const user = useAuthStore((s) => s.user)
+  const isLoading = useAuthStore((s) => s.isLoading)
   const { open: openAuthModal } = useAuthModal()
 
   const gameOpenModal = useGameStore((s) => s.openModal)
@@ -29,7 +30,6 @@ export function Header({ mode }: HeaderProps) {
 
   const gameChallenge = useGameStore((s) => s.challenge)
   const wikiChallenge = useWikiStore((s) => s.challenge)
-  const gameType = useGameStore((s) => s.gameType)
 
   const lastNumberRef = useRef<number | null>(null)
   const prevModeRef = useRef(mode)
@@ -40,12 +40,6 @@ export function Header({ mode }: HeaderProps) {
   if (!isWiki && gameChallenge?.challengeNumber) lastNumberRef.current = gameChallenge.challengeNumber
   if (isWiki && wikiChallenge?.challengeNumber) lastNumberRef.current = wikiChallenge.challengeNumber
   const displayNumber = lastNumberRef.current
-
-  const icon = isWiki
-    ? <Landmark size={22} className="text-film-gold" aria-hidden />
-    : mode === 'series' || gameType === 'series'
-      ? <Tv size={22} className="text-film-gold" aria-hidden />
-      : <Film size={22} className="text-film-gold" aria-hidden />
 
   return (
     <header className="sticky top-0 z-30 w-full border-b border-film-border bg-film-black/90 backdrop-blur-md">
@@ -72,12 +66,13 @@ export function Header({ mode }: HeaderProps) {
         <div className="flex items-center gap-2">
           <a
             href="/"
-            aria-label={`Accueil ${BRAND_NAME}`}
+            aria-label="Accueil GuessToday"
             className="inline-flex items-center gap-2 rounded-lg px-1 -mx-1 min-h-[44px] text-film-text hover:bg-film-gray/60 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
           >
-            {icon}
-            <span className="font-title text-xl font-bold text-gradient-gold tracking-tight">
-              {BRAND_NAME}
+            <ApertureIcon size={22} />
+            <span className="font-title text-xl leading-none tracking-tight">
+              <span className="font-[500] text-film-text">Guess</span>
+              <span className="italic font-[600] text-gradient-gold">today</span>
             </span>
           </a>
           {displayNumber && (
@@ -100,14 +95,20 @@ export function Header({ mode }: HeaderProps) {
 
         {/* Right: compte + archives + stats */}
         <div className="flex items-center gap-1">
-          {user ? (
+          {isLoading ? (
+            <div className="w-8 h-8 rounded-full bg-film-gold/10 animate-pulse" />
+          ) : user ? (
             <a
               href="/profile"
               aria-label={`Profil de ${user.displayName}`}
               title={user.displayName}
-              className="w-8 h-8 rounded-full bg-film-gold/20 border border-film-gold/40 text-sm font-bold text-film-gold flex items-center justify-center hover:bg-film-gold/30 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+              className="w-8 h-8 rounded-full overflow-hidden bg-film-gold/20 border border-film-gold/40 text-sm font-bold text-film-gold flex items-center justify-center hover:opacity-80 transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
             >
-              {user.displayName.charAt(0).toUpperCase()}
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />
+              ) : (
+                user.displayName.charAt(0).toUpperCase()
+              )}
             </a>
           ) : (
             <button

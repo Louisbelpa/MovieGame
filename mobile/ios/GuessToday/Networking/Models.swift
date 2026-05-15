@@ -28,7 +28,12 @@ struct ChallengePayload: Codable {
     let profile: WikiProfile?
 
     var isWiki: Bool { mediaType == "wiki" }
-    var displayImageUrl: String? { isWiki ? photoUrl : imageUrl }
+    var displayImageUrl: String? {
+        let raw = isWiki ? photoUrl : imageUrl
+        guard let raw else { return nil }
+        if raw.hasPrefix("/") { return APIClient.baseURL + raw }
+        return raw
+    }
     var isFinished: Bool { isGameOver }
     var won: Bool { outcome == "won" }
     var lost: Bool { outcome == "lost" }
@@ -130,7 +135,7 @@ struct GuessResponse: Codable {
     let correct: Bool
     let outcome: String?
     let attemptsLeft: Int
-    let payload: ChallengePayload
+    let challenge: ChallengePayload
 }
 
 // MARK: - Wiki Profile
@@ -196,6 +201,10 @@ struct ChallengeResult: Codable {
     let tmdbId: Int?
     let status: String?
     let mediaType: String
+
+    var resolvedImageUrl: String {
+        imageUrl.hasPrefix("/") ? APIClient.baseURL + imageUrl : imageUrl
+    }
 }
 
 struct WikiResult: Codable {
@@ -204,6 +213,11 @@ struct WikiResult: Codable {
     let bio: String?
     let photoUrl: String?
     let wikipediaUrl: String?
+
+    var resolvedPhotoUrl: String? {
+        guard let p = photoUrl else { return nil }
+        return p.hasPrefix("/") ? APIClient.baseURL + p : p
+    }
 }
 
 // MARK: - Auth
@@ -243,6 +257,27 @@ struct SearchResultItem: Codable {
     }
 }
 
+// MARK: - Server stats
+
+struct ServerStats: Codable {
+    let gamesPlayed: Int
+    let wins: Int
+    let currentStreak: Int
+    let maxStreak: Int
+    let distribution: [String: Int]
+
+    func toLocalStats() -> LocalStats {
+        LocalStats(
+            gamesPlayed: gamesPlayed,
+            wins: wins,
+            currentStreak: currentStreak,
+            maxStreak: maxStreak,
+            distribution: distribution,
+            lastWonDate: nil
+        )
+    }
+}
+
 // MARK: - Stats (local tracking)
 
 struct LocalStats: Codable {
@@ -251,6 +286,7 @@ struct LocalStats: Codable {
     var currentStreak: Int = 0
     var maxStreak: Int = 0
     var distribution: [String: Int] = [:]
+    var lastWonDate: String? = nil  // "yyyy-MM-dd" Paris timezone
 
     var winRate: Double {
         guard gamesPlayed > 0 else { return 0 }
@@ -308,6 +344,26 @@ struct PendingFriendEntry: Codable, Identifiable {
 struct AddFriendBody: Encodable { let code: String }
 struct AcceptFriendBody: Encodable { let userId: Int }
 
+struct LeaderboardEntry: Codable, Identifiable {
+    let id: Int
+    let displayName: String
+    let avatarUrl: String?
+    let isMe: Bool
+    let rank: Int
+    let totalWins: Int
+    let totalPlayed: Int
+    let winRate: Double
+    let filmWins: Int
+    let seriesWins: Int
+    let wikiWins: Int
+    let currentStreak: Int
+    let maxStreak: Int
+}
+
+struct LeaderboardPayload: Codable {
+    let leaderboard: [LeaderboardEntry]
+}
+
 // MARK: - Archive
 
 struct DatesPayload: Codable {
@@ -325,6 +381,36 @@ struct APIErrorResponse: Codable {
     let message: String?
 
     var displayMessage: String {
-        message ?? error ?? "Une erreur est survenue"
+        let raw = message ?? error ?? ""
+        return Self.translate(raw)
+    }
+
+    private static func translate(_ raw: String) -> String {
+        switch raw.lowercased().trimmingCharacters(in: .whitespaces) {
+        case "invalid credentials":
+            return "Email ou mot de passe incorrect."
+        case "email already registered":
+            return "Cette adresse e-mail est déjà utilisée."
+        case "invalid email address":
+            return "Adresse e-mail invalide."
+        case "password must be at least 8 characters":
+            return "Le mot de passe doit contenir au moins 8 caractères."
+        case "display name is required":
+            return "Le nom d'affichage est requis."
+        case "email and password are required":
+            return "L'e-mail et le mot de passe sont requis."
+        case "not authenticated":
+            return "Connexion requise."
+        case "display name cannot be empty":
+            return "Le nom d'affichage ne peut pas être vide."
+        case "invalid apple identity token":
+            return "Connexion Apple invalide. Réessaie."
+        case "account suspended":
+            return "Ce compte a été suspendu."
+        case "too many requests", "rate limit exceeded":
+            return "Trop de tentatives. Réessaie dans quelques minutes."
+        default:
+            return raw.isEmpty ? "Une erreur est survenue." : raw
+        }
     }
 }

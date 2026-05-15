@@ -1,53 +1,49 @@
-import { Film, Tv, Landmark, UserCircle, Users, LogIn, Flame, ChevronRight } from 'lucide-react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { UserCircle, Users, LogIn, Flame, ChevronRight, CheckCircle2, XCircle, Film, Tv, Landmark } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Footer } from '@/components/layout/Footer'
 import { AuthModal, useAuthModal } from '@/components/modals/AuthModal'
-import { FEATURES, BRAND_NAME } from '@/config/features'
+import { FEATURES } from '@/config/features'
 import { useAuthStore } from '@/store/authStore'
-import { loadStats, hasReturningFilmPlayerActivity } from '@/lib/storage'
+import { loadStats, loadHistory, hasReturningFilmPlayerActivity } from '@/lib/storage'
+import { friendsGetAll } from '@/api/client'
+import { ApertureIcon } from '@/components/ui/ApertureIcon'
 import {
   NewModesAnnouncementModal,
   NEW_MODES_ANNOUNCEMENT_STORAGE_KEY,
   type NewModesAnnouncementVariant,
 } from '@/components/modals/NewModesAnnouncementModal'
 
-type IconPhase = 'film' | 'tv' | 'wiki'
-
 // ─── Top bar ──────────────────────────────────────────────────────────────────
 
-function TopBar({ iconPhase }: { iconPhase: IconPhase }) {
+function TopBar() {
   const user = useAuthStore((s) => s.user)
+  const isLoading = useAuthStore((s) => s.isLoading)
   const { open: openAuth } = useAuthModal()
   const initial = user?.displayName.charAt(0).toUpperCase()
 
   return (
     <header className="w-full max-w-2xl mx-auto flex items-center justify-between py-5 px-1">
-      <div className="flex items-center gap-2">
-        <span className="relative w-[18px] h-[18px] inline-flex items-center justify-center shrink-0" aria-hidden>
-          <AnimatePresence mode="wait">
-            <motion.span
-              key={iconPhase}
-              initial={{ y: 6, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -6, opacity: 0 }}
-              transition={{ duration: 0.28, ease: 'easeOut' }}
-              className="absolute inset-0 inline-flex items-center justify-center text-film-gold"
-            >
-              {iconPhase === 'tv' ? <Tv size={16} /> : iconPhase === 'wiki' ? <Landmark size={16} /> : <Film size={16} />}
-            </motion.span>
-          </AnimatePresence>
+      <div className="flex items-center gap-2.5">
+        <ApertureIcon size={22} />
+        <span className="font-title text-xl leading-none">
+          <span className="font-[500] text-film-text">Guess</span>
+          <span className="italic font-[600] text-gradient-gold">today</span>
         </span>
-        <span className="font-title text-xl font-bold text-gradient-gold">{BRAND_NAME}</span>
       </div>
-      {user ? (
+      {isLoading ? (
+        <div className="w-24 h-8 rounded-full bg-white/[0.04] animate-pulse" />
+      ) : user ? (
         <a
           href="/profile"
           className="flex items-center gap-2 rounded-full border border-film-border bg-white/[0.04] hover:bg-white/[0.07] px-3 py-1.5 text-sm transition-colors"
         >
-          <span className="w-6 h-6 rounded-full bg-film-gold/20 border border-film-gold/40 flex items-center justify-center text-xs font-bold text-film-gold">
-            {initial}
-          </span>
+          {user.avatarUrl ? (
+            <img src={user.avatarUrl} alt={user.displayName} className="w-6 h-6 rounded-full object-cover border border-film-gold/40" />
+          ) : (
+            <span className="w-6 h-6 rounded-full bg-film-gold/20 border border-film-gold/40 flex items-center justify-center text-xs font-bold text-film-gold">
+              {initial}
+            </span>
+          )}
           <span className="text-film-text font-medium max-w-[120px] truncate">{user.displayName}</span>
         </a>
       ) : (
@@ -77,9 +73,10 @@ interface GameCardProps {
   accentRing: string
   disabled?: boolean
   badge?: string
+  todayStatus?: 'won' | 'lost' | null
 }
 
-function GameCard({ href, icon, title, description, label, accentColor, accentSoft, accentRing, disabled, badge }: GameCardProps) {
+function GameCard({ href, icon, title, description, label, accentColor, accentSoft, accentRing, disabled, badge, todayStatus }: GameCardProps) {
   const Tag = disabled ? 'div' : 'a'
   return (
     <Tag
@@ -90,12 +87,19 @@ function GameCard({ href, icon, title, description, label, accentColor, accentSo
           : 'cursor-pointer hover:scale-[1.015]'
       }`}
       style={{
-        borderColor: accentRing,
+        borderColor: todayStatus === 'won' ? 'rgba(34,197,94,0.4)' : todayStatus === 'lost' ? 'rgba(239,68,68,0.35)' : accentRing,
         background: `linear-gradient(135deg, ${accentSoft} 0%, transparent 60%)`,
-        boxShadow: `0 0 0 1px ${accentRing}, 0 12px 28px rgba(10,12,24,0.35)`,
+        boxShadow: `0 0 0 1px ${todayStatus === 'won' ? 'rgba(34,197,94,0.4)' : todayStatus === 'lost' ? 'rgba(239,68,68,0.35)' : accentRing}, 0 12px 28px rgba(10,12,24,0.35)`,
       }}
     >
-      {badge && !disabled && (
+      {todayStatus && !disabled && (
+        <span className="absolute top-3 right-3">
+          {todayStatus === 'won'
+            ? <CheckCircle2 size={18} className="text-film-green" />
+            : <XCircle size={18} className="text-film-red/70" />}
+        </span>
+      )}
+      {badge && !disabled && !todayStatus && (
         <span
           className="absolute top-3 right-3 text-[11px] font-semibold px-2 py-0.5 rounded-full"
           style={{ background: accentSoft, color: accentColor, border: `1px solid ${accentRing}` }}
@@ -172,6 +176,13 @@ function AccountNudge() {
 
 function FriendsRow() {
   const user = useAuthStore((s) => s.user)
+  const [pendingCount, setPendingCount] = useState(0)
+
+  useEffect(() => {
+    if (!user) return
+    friendsGetAll().then((r) => setPendingCount(r.pending.length)).catch(() => {})
+  }, [user])
+
   if (!user) return null
 
   return (
@@ -188,6 +199,11 @@ function FriendsRow() {
             Scores de mes amis
           </p>
         </div>
+        {pendingCount > 0 && (
+          <span className="min-w-[18px] h-[18px] rounded-full bg-film-gold text-film-black text-[10px] font-bold flex items-center justify-center px-1 shrink-0">
+            {pendingCount}
+          </span>
+        )}
         <ChevronRight size={14} className="text-film-text-dim/40 group-hover:text-film-text-dim transition-colors" />
       </a>
     </div>
@@ -196,11 +212,19 @@ function FriendsRow() {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+function getTodayParis(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
+}
+
 export function HomePage() {
-  const [iconPhase, setIconPhase] = useState<IconPhase>('film')
   const [announcementVariant, setAnnouncementVariant] = useState<NewModesAnnouncementVariant | null>(null)
   const [showNewBadge, setShowNewBadge] = useState(false)
   const fetchMe = useAuthStore((s) => s.fetchMe)
+
+  const today = getTodayParis()
+  const filmStatus = loadHistory('film')[today] ?? null
+  const seriesStatus = loadHistory('series')[today] ?? null
+  const wikiStatus = loadHistory('wiki')[today] ?? null
 
   useEffect(() => { void fetchMe() }, [fetchMe])
 
@@ -215,16 +239,6 @@ export function HomePage() {
     } catch {}
   }, [])
 
-  useEffect(() => {
-    const modes: IconPhase[] = FEATURES.enableWiki
-      ? (FEATURES.enableSeries ? ['film', 'tv', 'wiki'] : ['film', 'wiki'])
-      : (FEATURES.enableSeries ? ['film', 'tv'] : ['film'])
-    if (modes.length < 2) return
-    let i = 0
-    const id = window.setInterval(() => { i = (i + 1) % modes.length; setIconPhase(modes[i]) }, 2800)
-    return () => window.clearInterval(id)
-  }, [])
-
   return (
     <div className="min-h-dvh flex flex-col bg-film-black text-film-text px-4 relative overflow-hidden">
       {/* Ambient glow */}
@@ -237,7 +251,7 @@ export function HomePage() {
       />
 
       <div className="flex-1 w-full relative">
-        <TopBar iconPhase={iconPhase} />
+        <TopBar />
 
         <div className="max-w-4xl mx-auto pb-12">
           {/* Hero */}
@@ -266,6 +280,7 @@ export function HomePage() {
               accentColor="#8fb8f3"
               accentSoft="rgba(77,142,232,0.20)"
               accentRing="rgba(77,142,232,0.30)"
+              todayStatus={filmStatus}
             />
 
             {FEATURES.enableSeries ? (
@@ -279,6 +294,7 @@ export function HomePage() {
                 accentSoft="rgba(30,176,136,0.20)"
                 accentRing="rgba(30,176,136,0.28)"
                 badge={showNewBadge ? 'Nouveau' : undefined}
+                todayStatus={seriesStatus}
               />
             ) : (
               <GameCard
@@ -305,6 +321,7 @@ export function HomePage() {
                 accentSoft="rgba(139,92,246,0.20)"
                 accentRing="rgba(139,92,246,0.28)"
                 badge={showNewBadge ? 'Nouveau' : undefined}
+                todayStatus={wikiStatus}
               />
             ) : (
               <GameCard

@@ -73,6 +73,20 @@ export function userAuth(req: Request, _res: Response, next: NextFunction): void
   };
   req.userSessionId = sessionId;
 
+  // Track platform — X-Platform: ios | android | web
+  const platform = req.headers['x-platform'];
+  if (platform === 'ios' || platform === 'android' || platform === 'web') {
+    try {
+      db.prepare(
+        `INSERT INTO user_platforms (user_id, platform, last_seen_at)
+         VALUES (?, ?, datetime('now'))
+         ON CONFLICT (user_id, platform) DO UPDATE SET last_seen_at = excluded.last_seen_at`
+      ).run(row.id, platform);
+    } catch {
+      // non-blocking — table may not exist yet before migration
+    }
+  }
+
   next();
 }
 

@@ -1,15 +1,14 @@
 import Foundation
-import AuthenticationServices
 
 @Observable
-final class AuthViewModel: NSObject {
+@MainActor
+final class AuthViewModel {
     var user: User?
     var isCheckingSession = true
     var isLoading = false
     var error: String?
 
-    override init() {
-        super.init()
+    init() {
         Task { await checkSession() }
     }
 
@@ -19,6 +18,9 @@ final class AuthViewModel: NSObject {
         isCheckingSession = true
         do {
             user = try await APIClient.shared.me()
+            if user != nil {
+                Task { await StatsManager.shared.refreshFromServer() }
+            }
         } catch {}
         isCheckingSession = false
     }
@@ -30,6 +32,7 @@ final class AuthViewModel: NSObject {
         do {
             let r = try await APIClient.shared.login(email: email, password: password)
             user = r.user
+            Task { await StatsManager.shared.importLocalToServer() }
         } catch let e as APIError {
             error = e.localizedDescription
             throw e
@@ -43,6 +46,7 @@ final class AuthViewModel: NSObject {
         do {
             let r = try await APIClient.shared.register(email: email, password: password, displayName: displayName)
             user = r.user
+            Task { await StatsManager.shared.importLocalToServer() }
         } catch let e as APIError {
             error = e.localizedDescription
             throw e
@@ -54,68 +58,26 @@ final class AuthViewModel: NSObject {
         user = nil
     }
 
-    func updateProfile(displayName: String) async throws {
-        let updated = try await APIClient.shared.updateProfile(displayName: displayName)
+    func updateProfile(displayName: String? = nil, avatarUrl: String? = nil) async throws {
+        let updated = try await APIClient.shared.updateProfile(displayName: displayName, avatarUrl: avatarUrl)
         user = updated
     }
 
     func changePassword(current: String, new: String) async throws {
         try await APIClient.shared.changePassword(current: current, new: new)
     }
-}
 
-// MARK: - Sign in with Apple
-
-extension AuthViewModel: ASAuthorizationControllerDelegate {
-    func signInWithApple(on viewController: UIViewController) {
-        let provider = ASAuthorizationAppleIDProvider()
-        let request = provider.createRequest()
-        request.requestedScopes = [.fullName, .email]
-
-        let controller = ASAuthorizationController(authorizationRequests: [request])
-        controller.delegate = self
-        controller.presentationContextProvider = viewController as? ASAuthorizationControllerPresentationContextProviding
-        controller.performRequests()
-    }
-
-    nonisolated func authorizationController(
-        controller: ASAuthorizationController,
-        didCompleteWithAuthorization authorization: ASAuthorization
-    ) {
-        guard let cred = authorization.credential as? ASAuthorizationAppleIDCredential,
-              let tokenData = cred.identityToken,
-              let token = String(data: tokenData, encoding: .utf8) else { return }
-
-        let name = [cred.fullName?.givenName, cred.fullName?.familyName]
-            .compactMap { $0 }
-            .joined(separator: " ")
-
-        Task { @MainActor in
-            await appleLogin(token: token, email: cred.email, displayName: name.isEmpty ? nil : name)
-        }
-    }
-
-    nonisolated func authorizationController(
-        controller: ASAuthorizationController,
-        didCompleteWithError error: Error
-    ) {
-        // User cancelled or error — no action needed
-    }
-
-    @MainActor
-    private func appleLogin(token: String, email: String?, displayName: String?) async {
+    func loginWithApple(identityToken: String, displayName: String?) async throws {
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
         do {
-            // The backend supports OAuth via /api/auth/oauth/callback
-            // Here we use the Apple-specific endpoint
-            struct AppleBody: Encodable {
-                let provider: String
-                let providerId: String
-                let email: String?
-                let displayName: String?
-                let avatarUrl: String?
-            }
-            // Using the apple endpoint /api/auth/apple
-            // The backend handles it via the OAuth callback
-        } catch {}
+            let r = try await APIClient.shared.appleSignIn(identityToken: identityToken, displayName: displayName)
+            user = r.user
+            Task { await StatsManager.shared.importLocalToServer() }
+        } catch let e as APIError {
+            error = e.localizedDescription
+            throw e
+        }
     }
 }

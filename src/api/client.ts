@@ -225,6 +225,21 @@ export function authUpdateProfile(data: { displayName?: string; avatarUrl?: stri
   })
 }
 
+export async function authUploadAvatar(file: File): Promise<{ user: UserPayload }> {
+  const form = new FormData()
+  form.append('avatar', file)
+  const res = await fetch(`${BASE_URL}/api/auth/avatar`, {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string }
+    throw new Error(body.message ?? body.error ?? `HTTP ${res.status}`)
+  }
+  return res.json() as Promise<{ user: UserPayload }>
+}
+
 export interface ImportStatsData {
   gamesPlayed: number
   wins: number
@@ -233,10 +248,22 @@ export interface ImportStatsData {
   distribution: Record<string, number>
 }
 
-export function authImportStats(stats: ImportStatsData): Promise<void> {
+export interface ServerStatsData {
+  gamesPlayed: number
+  wins: number
+  currentStreak: number
+  maxStreak: number
+  distribution: Record<string, number>
+}
+
+export function authGetStats(type: 'film' | 'series' | 'wiki'): Promise<ServerStatsData> {
+  return request<ServerStatsData>(`/api/auth/stats?type=${type}`)
+}
+
+export function authImportStats(type: 'film' | 'series' | 'wiki', stats: ImportStatsData): Promise<void> {
   return request<void>('/api/auth/import-stats', {
     method: 'POST',
-    body: JSON.stringify({ stats }),
+    body: JSON.stringify({ type, stats }),
   })
 }
 
@@ -332,4 +359,24 @@ export function friendsAccept(userId: number): Promise<{ ok: boolean }> {
 
 export function friendsRemove(userId: number): Promise<{ ok: boolean }> {
   return request(`/api/friends/${userId}`, { method: 'DELETE' })
+}
+
+export interface LeaderboardEntry {
+  id: number
+  displayName: string
+  avatarUrl: string | null
+  isMe: boolean
+  rank: number
+  totalWins: number
+  totalPlayed: number
+  winRate: number
+  filmWins: number
+  seriesWins: number
+  wikiWins: number
+  currentStreak: number
+  maxStreak: number
+}
+
+export function friendsGetLeaderboard(): Promise<{ leaderboard: LeaderboardEntry[] }> {
+  return request('/api/friends/leaderboard')
 }
