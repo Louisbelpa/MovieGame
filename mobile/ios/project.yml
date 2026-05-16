@@ -14,6 +14,11 @@ options:
   indentWidth: 4
   tabWidth: 4
 
+configs:
+  Debug: debug
+  NRT: debug
+  Release: release
+
 targets:
   GuessToday:
     type: application
@@ -39,12 +44,19 @@ targets:
         DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
         SWIFT_OPTIMIZATION_LEVEL: "-Onone"
       configs:
+        NRT:
+          SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+          OTHER_SWIFT_FLAGS: "-DNRT"
+          PRODUCT_BUNDLE_IDENTIFIER: fr.guesstoday.app.nrt
+          DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
         Release:
           SWIFT_OPTIMIZATION_LEVEL: "-O"
     entitlements:
       path: GuessToday/App/GuessToday.entitlements
       properties:
         aps-environment: development
+        com.apple.developer.associated-domains:
+          - applinks:moviegame-staging.up.railway.app
     info:
       path: GuessToday/App/Info.plist
       properties:
@@ -64,9 +76,38 @@ targets:
         UILaunchScreen:
           UIColorName: ""
           UIImageName: ""
+        UIAppFonts:
+          - Fraunces-Medium.ttf
+          - Fraunces-MediumItalic.ttf
+          - Inter-Regular.ttf
+          - Inter-Medium.ttf
+          - Inter-SemiBold.ttf
+          - Inter-Bold.ttf
         # Google Sign-In URL scheme — set GOOGLE_REVERSED_CLIENT_ID in Build Settings
         # e.g. com.googleusercontent.apps.YOUR_CLIENT_ID_REVERSED
         CFBundleURLTypes:
           - CFBundleTypeRole: Editor
             CFBundleURLSchemes:
               - $(GOOGLE_REVERSED_CLIENT_ID)
+          - CFBundleTypeRole: Editor
+            CFBundleURLName: fr.guesstoday.app
+            CFBundleURLSchemes:
+              - NRT
+
+schemes:
+  GuessToday:
+    build:
+      targets:
+        GuessToday: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  GuessToday NRT:
+    build:
+      targets:
+        GuessToday: all
+    run:
+      config: NRT
+    archive:
+      config: Release

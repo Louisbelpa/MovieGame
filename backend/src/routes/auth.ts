@@ -28,6 +28,7 @@ import { AUTH, apiLimiter } from '../middleware/rateLimiter.js';
 import { sendPasswordResetEmail, sendVerificationEmail } from '../lib/email.js';
 import { registerPushToken } from '../services/push-notification.service.js';
 import { getUploadsAbsDir } from '../config/uploads.js';
+import { linkAnonymousGameSessionsToUser } from '../services/game-session.service.js';
 
 export const authRouter = Router();
 
@@ -68,6 +69,11 @@ function setUserCookie(res: Response, sessionId: string): void {
     secure: process.env.NODE_ENV === 'production',
     maxAge: COOKIE_MAX_AGE_MS,
   });
+}
+
+function linkGameSessionsAfterAuth(res: Response, userId: number): void {
+  const mgToken = res.locals.sessionToken as string | undefined;
+  if (mgToken) linkAnonymousGameSessionsToUser(mgToken, userId);
 }
 
 function formatUser(row: UserRow) {
@@ -136,6 +142,7 @@ authRouter.post('/register', AUTH, async (req: Request, res: Response): Promise<
   const userId = result.lastInsertRowid as number;
   const sessionId = createUserSession(userId);
   setUserCookie(res, sessionId);
+  linkGameSessionsAfterAuth(res, userId);
 
   const user = db
     .prepare<number, UserRow>(`SELECT id, email, display_name, avatar_url, password_hash, is_banned, email_verified FROM users WHERE id = ?`)
@@ -179,6 +186,7 @@ authRouter.post('/login', AUTH, async (req: Request, res: Response): Promise<voi
 
   const sessionId = createUserSession(user.id);
   setUserCookie(res, sessionId);
+  linkGameSessionsAfterAuth(res, user.id);
 
   res.json({ user: formatUser(user), sessionToken: sessionId });
 });
@@ -392,6 +400,7 @@ authRouter.post('/oauth/callback', AUTH, (req: Request, res: Response): void => 
 
   const sessionId = createUserSession(userId);
   setUserCookie(res, sessionId);
+  linkGameSessionsAfterAuth(res, userId);
 
   res.json({ user: formatUser(user), sessionToken: sessionId });
 });
@@ -857,6 +866,7 @@ authRouter.post('/apple', AUTH, async (req: Request, res: Response): Promise<voi
 
     const sessionId = createUserSession(user.id);
     setUserCookie(res, sessionId);
+    linkGameSessionsAfterAuth(res, user.id);
     res.json({ user: formatUser(user), sessionToken: sessionId });
     return;
   }
@@ -896,6 +906,7 @@ authRouter.post('/apple', AUTH, async (req: Request, res: Response): Promise<voi
 
       const sessionId = createUserSession(userId);
       setUserCookie(res, sessionId);
+      linkGameSessionsAfterAuth(res, userId);
       res.json({ user: formatUser(user), sessionToken: sessionId });
       return;
     }
@@ -920,6 +931,7 @@ authRouter.post('/apple', AUTH, async (req: Request, res: Response): Promise<voi
 
   const sessionId = createUserSession(userId);
   setUserCookie(res, sessionId);
+  linkGameSessionsAfterAuth(res, userId);
   res.status(201).json({ user: formatUser(user), sessionToken: sessionId });
 });
 

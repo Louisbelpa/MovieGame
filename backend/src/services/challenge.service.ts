@@ -8,6 +8,11 @@ import db from '../db/database.js';
 import { activeChallengeOrdinalByDate } from '../lib/dailyChallengeOrdinal.js';
 import { normalise, isGuessCorrect } from '../lib/matching.js';
 import { escapeHtml } from '../lib/utils.js';
+import {
+  getOrCreateGameSession,
+  findGameSession,
+  type GameSessionRow,
+} from './game-session.service.js';
 
 function parseAttempts(raw: string): AttemptEntry[] {
   try {
@@ -98,16 +103,7 @@ interface ChallengeRow {
   media_type?: 'film' | 'series' | 'wiki';
 }
 
-interface SessionRow {
-  id: number;
-  session_token: string;
-  challenge_id: number;
-  attempts: string;
-  hints_revealed: number;
-  outcome: 'won' | 'lost' | null;
-  started_at: string;
-  finished_at: string | null;
-}
+type SessionRow = GameSessionRow;
 
 interface AttemptEntry {
   guess: string;
@@ -185,32 +181,13 @@ export function getChallengeByDate(date: string, type: 'film' | 'series' = 'film
   return row;
 }
 
-/**
- * Get or create a game session for the given token + challenge.
- * Never returns the film answer.
- */
+/** Get or create a game session (anonymous cookie and/or logged-in user). */
 export function getOrCreateSession(
   sessionToken: string,
-  challengeId: number
+  challengeId: number,
+  userId?: number
 ): SessionRow {
-  const existing = db
-    .prepare<[string, number], SessionRow>(
-      `SELECT * FROM game_sessions WHERE session_token = ? AND challenge_id = ?`
-    )
-    .get(sessionToken, challengeId);
-
-  if (existing) return existing;
-
-  db.prepare(
-    `INSERT INTO game_sessions (session_token, challenge_id)
-     VALUES (?, ?)`
-  ).run(sessionToken, challengeId);
-
-  return db
-    .prepare<[string, number], SessionRow>(
-      `SELECT * FROM game_sessions WHERE session_token = ? AND challenge_id = ?`
-    )
-    .get(sessionToken, challengeId)!;
+  return getOrCreateGameSession(sessionToken, challengeId, userId);
 }
 
 /**
@@ -466,7 +443,8 @@ export function buildFilmSeriesDraftPreviewPayload(body: FilmSeriesDraftPreviewI
 export function processGuess(
   sessionToken: string,
   challengeId: number,
-  rawGuess: string
+  rawGuess: string,
+  userId?: number
 ): {
   correct: boolean;
   outcome: 'won' | 'lost' | null;
@@ -474,7 +452,7 @@ export function processGuess(
   nextHintUnlocked: boolean;
 } {
   return db.transaction(() => {
-    const session = getOrCreateSession(sessionToken, challengeId);
+    const session = getOrCreateSession(sessionToken, challengeId, userId);
 
     if (session.outcome !== null) {
       throw Object.assign(new Error('Game already finished'), { status: 409 });
@@ -533,15 +511,16 @@ export function processGuess(
 
     db.prepare(
       `UPDATE game_sessions
-       SET attempts = ?, hints_revealed = ?, outcome = ?, finished_at = ?
-       WHERE session_token = ? AND challenge_id = ?`
+       SET attempts = ?, hints_revealed = ?, outcome = ?, finished_at = ?,
+           user_id = COALESCE(user_id, ?)
+       WHERE id = ?`
     ).run(
       JSON.stringify(attempts),
       newHintsRevealed,
       newOutcome,
       newOutcome ? new Date().toISOString() : null,
-      sessionToken,
-      challengeId
+      userId ?? null,
+      session.id
     );
 
     return {
@@ -557,12 +536,8 @@ export function processGuess(
  * Get the final result payload (only allowed when game is over).
  * This is the ONLY endpoint that ever reveals film.title.
  */
-export function getResult(sessionToken: string, challengeId: number) {
-  const session = db
-    .prepare<[string, number], SessionRow>(
-      `SELECT * FROM game_sessions WHERE session_token = ? AND challenge_id = ?`
-    )
-    .get(sessionToken, challengeId);
+export function getResult(sessionToken: string, challengeId: number, userId?: number) {
+  const session = findGameSession(sessionToken, challengeId, userId);
 
   if (!session) throw Object.assign(new Error('No session found'), { status: 404 });
   if (session.outcome === null) {

@@ -170,7 +170,7 @@ private struct GuestFriendsView: View {
 
             VStack(spacing: Theme.spacing12) {
                 Text("Défiez vos amis")
-                    .font(.custom("Georgia", size: 24))
+                    .font(Theme.fraunces(size: 24))
                     .fontWeight(.bold)
                     .foregroundColor(Theme.text)
 

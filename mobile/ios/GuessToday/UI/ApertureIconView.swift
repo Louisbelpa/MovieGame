@@ -102,8 +102,8 @@ struct ApertureLockup: View {
     var body: some View {
         HStack(spacing: 8) {
             ApertureIconView(size: iconSize)
-            Text("Guess").font(.custom("Fraunces", size: fontSize)).fontWeight(.medium).foregroundColor(Theme.text)
-            + Text("today").font(.custom("Fraunces", size: fontSize)).italic().foregroundStyle(
+            Text("Guess").font(Theme.fraunces(size: fontSize)).foregroundColor(Theme.text)
+            + Text("today").font(Theme.fraunces(size: fontSize, italic: true)).foregroundStyle(
                 LinearGradient(colors: [Color(hex: "#f0c870"), Color(hex: "#8a5e1f")],
                                startPoint: .top, endPoint: .bottom)
             )

@@ -13,11 +13,10 @@ struct DailyChallengeStatus {
     let gamesPlayed: Int
     let maxStreak: Int
 
-    var isPlayed: Bool  { outcome != nil }
-    var isWon: Bool     { outcome == "won" }
-    var isLost: Bool    { outcome == "lost" }
+    var isPlayed: Bool     { outcome != nil }
+    var isWon: Bool        { outcome == "won" }
+    var isLost: Bool       { outcome == "lost" }
     var isInProgress: Bool { outcome == nil && attemptsUsed > 0 }
-    var winRate: Double { gamesPlayed > 0 ? Double(wins) / Double(gamesPlayed) : 0 }
 }
 
 // MARK: - ViewModel
@@ -26,11 +25,19 @@ struct DailyChallengeStatus {
 @MainActor
 final class HomeViewModel {
     var statuses: [GameMode: DailyChallengeStatus] = [:]
+    var friendsPlayedCount: Int? = nil
     var isLoading = false
 
     func load() async {
         isLoading = true
         defer { isLoading = false }
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await self.loadStatuses() }
+            group.addTask { await self.loadFriends() }
+        }
+    }
+
+    private func loadStatuses() async {
         await withTaskGroup(of: (GameMode, DailyChallengeStatus?).self) { group in
             for mode in [GameMode.film, .series, .wiki] {
                 group.addTask {
@@ -38,7 +45,6 @@ final class HomeViewModel {
                         let payload: ChallengePayload = mode == .wiki
                             ? try await APIClient.shared.todayWikiChallenge()
                             : try await APIClient.shared.todayChallenge(type: mode.apiType)
-                        // Read stats from shared manager on main actor after API call
                         let s = await StatsManager.shared.stats(for: mode)
                         return (mode, DailyChallengeStatus(
                             mode: mode,
@@ -62,10 +68,19 @@ final class HomeViewModel {
         }
     }
 
-    /// Refresh only the local stats portion (no API call) — used when stats change reactively.
+    private func loadFriends() async {
+        let today = todayParis()
+        if let payload = try? await APIClient.shared.friends(date: today) {
+            let played = payload.friends.filter { entry in
+                entry.scores.film != nil || entry.scores.series != nil || entry.scores.wiki != nil
+            }.count
+            friendsPlayedCount = played > 0 ? played : nil
+        }
+    }
+
     func refreshStats() {
-        for mode in [GameMode.film, GameMode.series, GameMode.wiki] {
-            guard var existing = statuses[mode] else { continue }
+        for mode in [GameMode.film, .series, .wiki] {
+            guard let existing = statuses[mode] else { continue }
             let s = StatsManager.shared.stats(for: mode)
             statuses[mode] = DailyChallengeStatus(
                 mode: existing.mode,
@@ -82,12 +97,15 @@ final class HomeViewModel {
     }
 
     var completedToday: Int { statuses.values.filter(\.isPlayed).count }
-    var bestStreak: Int     { statuses.values.map(\.streak).max() ?? 0 }
-    var totalPlayed: Int    { statuses.values.map(\.gamesPlayed).reduce(0, +) }
-    var totalWins: Int      { statuses.values.map(\.wins).reduce(0, +) }
+    var currentStreak: Int  { statuses.values.map(\.streak).max() ?? 0 }
     var globalMaxStreak: Int { statuses.values.map(\.maxStreak).max() ?? 0 }
-    var overallWinRate: Double {
-        totalPlayed > 0 ? Double(totalWins) / Double(totalPlayed) : 0
+
+    private func todayParis() -> String {
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_CA")
+        fmt.timeZone = TimeZone(identifier: "Europe/Paris")
+        fmt.dateFormat = "yyyy-MM-dd"
+        return fmt.string(from: Date())
     }
 }
 
@@ -104,54 +122,55 @@ struct HomeView: View {
                 Theme.background.ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 0) {
-                        // Header
+                    VStack(spacing: Theme.spacing16) {
+
+                        // 1. Header
                         HomeHeader()
-                            .padding(.bottom, Theme.spacing16)
+                            .padding(.horizontal, Theme.spacing16)
+                            .padding(.top, Theme.spacing8)
 
-                        // Streak pill + progress
-                        HStack(alignment: .center) {
-                            StreakPill(streak: vm.bestStreak, isLoading: vm.isLoading)
-                            Spacer()
-                            DayProgressDots(completed: vm.completedToday, isLoading: vm.isLoading)
-                        }
+                        // 2. Streak banner
+                        StreakBanner(
+                            streak: vm.currentStreak,
+                            maxStreak: vm.globalMaxStreak,
+                            isLoading: vm.isLoading
+                        )
                         .padding(.horizontal, Theme.spacing16)
-                        .padding(.bottom, Theme.spacing16)
 
-                        // Challenge cards
-                        VStack(spacing: Theme.spacing12) {
+                        // 3. Défis du jour
+                        VStack(spacing: Theme.spacing8) {
+                            // Section header
+                            HStack {
+                                Text("Défis du jour")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(Theme.textDim)
+                                Spacer()
+                                CompletionBadge(completed: vm.completedToday, isLoading: vm.isLoading)
+                            }
+                            .padding(.horizontal, Theme.spacing16)
+
                             ForEach([GameMode.film, .series, .wiki], id: \.title) { mode in
                                 DayChallengeCard(
                                     mode: mode,
                                     status: vm.statuses[mode],
                                     isLoading: vm.isLoading
-                                ) {
-                                    selectedMode = mode
-                                }
+                                ) { selectedMode = mode }
+                                .padding(.horizontal, Theme.spacing16)
                             }
                         }
-                        .padding(.horizontal, Theme.spacing16)
-                        .padding(.bottom, Theme.spacing16)
 
-                        // Countdown
+                        // 4. Countdown
                         MidnightCountdown()
                             .padding(.horizontal, Theme.spacing16)
-                            .padding(.bottom, Theme.spacing16)
 
-                        // Stats
-                        if !vm.isLoading {
-                            HomeStatsRow(
-                                played: vm.totalPlayed,
-                                winRate: vm.overallWinRate,
-                                maxStreak: vm.globalMaxStreak
-                            )
-                            .padding(.horizontal, Theme.spacing16)
-                            .transition(.opacity)
+                        // 5. Friends snippet
+                        if let count = vm.friendsPlayedCount {
+                            FriendsSnippet(count: count)
+                                .padding(.horizontal, Theme.spacing16)
                         }
 
                         Spacer(minLength: Theme.spacing24)
                     }
-                    .padding(.top, Theme.spacing8)
                     .animation(.easeInOut(duration: 0.3), value: vm.isLoading)
                 }
                 .refreshable { await vm.load() }
@@ -162,17 +181,17 @@ struct HomeView: View {
             }
         }
         .onAppear { Task { await vm.load() } }
-        .onChange(of: statsManager.filmStats.gamesPlayed) { _, _ in vm.refreshStats() }
+        .onChange(of: statsManager.filmStats.gamesPlayed)   { _, _ in vm.refreshStats() }
         .onChange(of: statsManager.seriesStats.gamesPlayed) { _, _ in vm.refreshStats() }
-        .onChange(of: statsManager.wikiStats.gamesPlayed) { _, _ in vm.refreshStats() }
+        .onChange(of: statsManager.wikiStats.gamesPlayed)   { _, _ in vm.refreshStats() }
     }
 }
 
-// MARK: - Header
+// MARK: - 1. Header
 
 private struct HomeHeader: View {
     private var weekday: String {
-        Date().formatted(.dateTime.weekday(.wide).locale(Locale(identifier: "fr_FR"))).capitalized
+        Date().formatted(.dateTime.weekday(.wide).locale(Locale(identifier: "fr_FR"))).uppercased()
     }
     private var dayMonth: String {
         Date().formatted(.dateTime.day().month(.wide).locale(Locale(identifier: "fr_FR"))).capitalized
@@ -180,20 +199,18 @@ private struct HomeHeader: View {
 
     var body: some View {
         HStack(alignment: .center) {
-            // Aperture lockup
-            HStack(spacing: 8) {
+            // Wordmark
+            HStack(spacing: 7) {
                 ApertureIconView(size: 22)
                 (
                     Text("Guess")
-                        .font(.custom("Fraunces", size: 20))
-                        .fontWeight(.medium)
+                        .font(Theme.fraunces(size: 20))
                         .foregroundColor(Theme.text)
                     + Text("today")
-                        .font(.custom("Fraunces", size: 20))
-                        .italic()
+                        .font(Theme.fraunces(size: 20, italic: true))
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [Color(hex: "#f0c870"), Color(hex: "#8a5e1f")],
+                                colors: [Color(hex: "#e8c06a"), Color(hex: "#d4a64a"), Color(hex: "#a07030")],
                                 startPoint: .top, endPoint: .bottom
                             )
                         )
@@ -202,117 +219,324 @@ private struct HomeHeader: View {
 
             Spacer()
 
-            // Date — right
-            VStack(alignment: .trailing, spacing: 2) {
+            // Date
+            VStack(alignment: .trailing, spacing: 1) {
                 Text(weekday)
-                    .font(.system(size: 12, weight: .semibold))
-                    .tracking(1.5)
-                    .foregroundColor(Theme.textDim)
-                    .textCase(.uppercase)
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.2)
+                    .foregroundColor(Theme.muted)
                 Text(dayMonth)
-                    .font(.custom("Fraunces", size: 22))
-                    .fontWeight(.bold)
-                    .foregroundColor(Theme.text)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(Theme.textDim)
             }
         }
-        .padding(.horizontal, Theme.spacing16)
     }
 }
 
-// MARK: - Streak pill
+// MARK: - 2. Streak banner
 
-private struct StreakPill: View {
+private struct StreakBanner: View {
     let streak: Int
+    let maxStreak: Int
     let isLoading: Bool
 
     var body: some View {
-        HStack(spacing: 6) {
-            Text("🔥")
-                .font(.system(size: 13))
-            if isLoading {
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Theme.surfaceAlt)
-                    .frame(width: 80, height: 10)
-                    .shimmer()
-            } else {
-                Text(streak > 0 ? "\(streak) jour\(streak > 1 ? "s" : "") · série active" : "Lance ta série !")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(streak > 0 ? Theme.gold : Theme.textDim)
+        HStack(alignment: .center, spacing: 0) {
+            // Left: streak
+            VStack(alignment: .leading, spacing: 4) {
+                Text(streak > 0 ? "🔥 Série en cours" : "🎬 Commence ta série !")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.5)
+                    .foregroundColor(streak > 0 ? Color(hex: "#f59e0b").opacity(0.85) : Theme.textDim)
+
+                if isLoading {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.white.opacity(0.08))
+                        .frame(width: 80, height: 36)
+                        .shimmer()
+                } else if streak > 0 {
+                    HStack(alignment: .lastTextBaseline, spacing: 4) {
+                        Text("\(streak)")
+                            .font(.system(size: 40, weight: .bold, design: .rounded))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color(hex: "#e8c06a"), Color(hex: "#d4a64a")],
+                                    startPoint: .top, endPoint: .bottom
+                                )
+                            )
+                        Text("jour\(streak > 1 ? "s" : "")")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(Theme.textDim)
+                            .padding(.bottom, 4)
+                    }
+                } else {
+                    Text("Joue aujourd'hui pour\ndémarrer une série !")
+                        .font(.system(size: 13))
+                        .foregroundColor(Theme.textDim)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Spacer()
+
+            // Right: record
+            if maxStreak > 0 {
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text("RECORD")
+                        .font(.system(size: 9, weight: .semibold))
+                        .tracking(1.5)
+                        .foregroundColor(Theme.muted)
+                    HStack(alignment: .lastTextBaseline, spacing: 3) {
+                        Text("\(maxStreak)")
+                            .font(.system(size: 26, weight: .bold))
+                            .foregroundColor(Theme.gold)
+                        Text("j")
+                            .font(.system(size: 13))
+                            .foregroundColor(Theme.muted)
+                            .padding(.bottom, 2)
+                    }
+                }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
+        .padding(.horizontal, Theme.spacing20)
+        .padding(.vertical, Theme.spacing16)
         .background(
-            Capsule()
-                .fill(streak > 0 ? Theme.gold.opacity(0.1) : Theme.surface)
-                .overlay(
-                    Capsule().stroke(
-                        streak > 0 ? Theme.gold.opacity(0.3) : Theme.border,
+            ZStack {
+                RoundedRectangle(cornerRadius: Theme.radiusL)
+                    .fill(
+                        LinearGradient(
+                            colors: streak > 0
+                                ? [Color(hex: "#2a1a08"), Color(hex: "#1a1208")]
+                                : [Theme.surface, Theme.surfaceAlt],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                RoundedRectangle(cornerRadius: Theme.radiusL)
+                    .stroke(
+                        streak > 0
+                            ? Color(hex: "#f59e0b").opacity(0.2)
+                            : Theme.border,
                         lineWidth: 1
                     )
-                )
+            }
         )
     }
 }
 
-// MARK: - Day progress dots
+// MARK: - 3a. Completion badge
 
-private struct DayProgressDots: View {
+private struct CompletionBadge: View {
     let completed: Int
     let isLoading: Bool
 
     var body: some View {
-        HStack(spacing: 6) {
-            Text(completed == 3 ? "Tous complétés" : "\(completed)/3")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(completed == 3 ? Theme.green : Theme.textDim)
-            HStack(spacing: 5) {
-                ForEach(0..<3) { i in
-                    Circle()
-                        .fill(dotColor(i))
-                        .frame(width: 8, height: 8)
-                        .scaleEffect(isLoading ? 0.8 : 1)
-                        .animation(.spring(response: 0.3).delay(Double(i) * 0.05), value: completed)
+        HStack(spacing: 5) {
+            if isLoading {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Theme.surfaceAlt)
+                    .frame(width: 32, height: 10)
+                    .shimmer()
+            } else {
+                Text("\(completed)/3")
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundColor(completed == 3 ? Theme.green : Theme.textDim)
+                if completed == 3 {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(Theme.green)
                 }
             }
         }
     }
+}
 
-    private func dotColor(_ index: Int) -> Color {
-        guard !isLoading else { return Theme.surfaceAlt }
-        return index < completed ? Theme.green : Theme.surfaceAlt
+// MARK: - 3b. Challenge card
+
+private struct DayChallengeCard: View {
+    let mode: GameMode
+    let status: DailyChallengeStatus?
+    let isLoading: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: Theme.spacing16) {
+
+                // Icon
+                Image(systemName: modeIcon)
+                    .font(.system(size: 18))
+                    .foregroundColor(modeColor)
+                    .frame(width: 42, height: 42)
+                    .background(modeColor.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                // Content
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(mode.title.uppercased())
+                            .font(.system(size: 10, weight: .semibold))
+                            .tracking(1)
+                            .foregroundColor(Theme.muted)
+                        if let n = status?.challengeNumber {
+                            Text("#\(n)")
+                                .font(.system(size: 10))
+                                .foregroundColor(Theme.muted.opacity(0.55))
+                        }
+                    }
+
+                    if isLoading && status == nil {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Theme.surfaceAlt)
+                            .frame(width: 100, height: 12)
+                            .shimmer()
+                    } else if let s = status {
+                        Text(mainLabel(s))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(mainLabelColor(s))
+                    } else {
+                        Text("À jouer")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(Theme.textDim)
+                    }
+                }
+
+                Spacer()
+
+                // Right CTA or outcome
+                if let s = status {
+                    outcomeView(s)
+                } else if !isLoading {
+                    playButton
+                } else {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Theme.surfaceAlt)
+                        .frame(width: 60, height: 30)
+                        .shimmer()
+                }
+            }
+            .padding(Theme.spacing16)
+            .background(cardBackground)
+            .cornerRadius(14)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14).stroke(cardBorder, lineWidth: 1)
+            )
+        }
+        .buttonStyle(CardPressStyle())
+    }
+
+    // MARK: Subviews
+
+    @ViewBuilder
+    private func outcomeView(_ s: DailyChallengeStatus) -> some View {
+        if s.isWon {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(Theme.green)
+                .font(.system(size: 22))
+                .symbolEffect(.bounce, value: s.isWon)
+        } else if s.isLost {
+            Image(systemName: "xmark.circle.fill")
+                .foregroundColor(Theme.red.opacity(0.8))
+                .font(.system(size: 22))
+        } else {
+            Image(systemName: "clock")
+                .foregroundColor(Theme.gold.opacity(0.7))
+                .font(.system(size: 20))
+        }
+    }
+
+    private var playButton: some View {
+        HStack(spacing: 4) {
+            Text("Jouer")
+                .font(.system(size: 13, weight: .semibold))
+            Image(systemName: "arrow.right")
+                .font(.system(size: 11, weight: .bold))
+        }
+        .foregroundColor(modeColor)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(modeColor.opacity(0.12))
+        .cornerRadius(8)
+    }
+
+    // MARK: Helpers
+
+    private func mainLabel(_ s: DailyChallengeStatus) -> String {
+        if s.isWon  { return "Gagné en \(s.attemptsUsed)/\(s.maxAttempts)" }
+        if s.isLost { return "Pas trouvé" }
+        if s.isInProgress { return "En cours…" }
+        return "À jouer"
+    }
+
+    private func mainLabelColor(_ s: DailyChallengeStatus) -> Color {
+        if s.isWon  { return Theme.green }
+        if s.isLost { return Theme.red }
+        if s.isInProgress { return Theme.gold }
+        return Theme.textDim
+    }
+
+    private var cardBackground: some View {
+        Group {
+            if let s = status {
+                if s.isWon  { Color(hex: "#0f2318") }
+                else if s.isLost { Color(hex: "#1f1010") }
+                else { Theme.surface }
+            } else {
+                Theme.surface
+            }
+        }
+    }
+
+    private var cardBorder: Color {
+        guard let s = status else { return Theme.border }
+        if s.isWon  { return Theme.green.opacity(0.3) }
+        if s.isLost { return Theme.red.opacity(0.2) }
+        return Theme.border
+    }
+
+    private var modeColor: Color {
+        switch mode {
+        case .film:   return Theme.modeFilm
+        case .series: return Theme.modeSeries
+        case .wiki:   return Theme.modeWiki
+        }
+    }
+
+    private var modeIcon: String {
+        switch mode {
+        case .film:   return "film"
+        case .series: return "tv"
+        case .wiki:   return "building.columns"
+        }
     }
 }
 
-// MARK: - Midnight countdown
+// MARK: - 4. Countdown
 
 private struct MidnightCountdown: View {
     @State private var timeRemaining = ""
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        HStack(spacing: Theme.spacing8) {
-            Image(systemName: "clock")
-                .font(.system(size: 12))
-                .foregroundColor(Theme.muted)
+        VStack(spacing: 6) {
             Text("Prochain défi dans")
-                .font(.system(size: 12))
-                .foregroundColor(Theme.textDim)
-            Spacer()
+                .font(.system(size: 11, weight: .medium))
+                .tracking(0.5)
+                .foregroundColor(Theme.muted)
             Text(timeRemaining)
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
-                .foregroundColor(Theme.text)
+                .font(.system(size: 28, weight: .bold, design: .monospaced))
+                .foregroundColor(Theme.text.opacity(0.7))
         }
-        .padding(.horizontal, Theme.spacing16)
-        .padding(.vertical, Theme.spacing12)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Theme.spacing16)
         .background(Theme.surface)
         .cornerRadius(Theme.radiusM)
         .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(Theme.border, lineWidth: 1))
-        .onReceive(timer) { _ in timeRemaining = secondsUntilMidnight() }
-        .onAppear { timeRemaining = secondsUntilMidnight() }
+        .onReceive(timer) { _ in timeRemaining = countdown() }
+        .onAppear { timeRemaining = countdown() }
     }
 
-    private func secondsUntilMidnight() -> String {
+    private func countdown() -> String {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "Europe/Paris") ?? .current
         let now = Date()
@@ -327,245 +551,31 @@ private struct MidnightCountdown: View {
     }
 }
 
-// MARK: - Stats row
+// MARK: - 5. Friends snippet
 
-private struct HomeStatsRow: View {
-    let played: Int
-    let winRate: Double
-    let maxStreak: Int
+private struct FriendsSnippet: View {
+    let count: Int
 
     var body: some View {
-        HStack(spacing: 0) {
-            HomeStatCell(
-                value: played > 0 ? "\(played)" : "–",
-                label: "parties",
-                color: played > 0 ? Theme.text : Theme.muted
-            )
-            Divider().frame(height: 28).background(Theme.border)
-            HomeStatCell(
-                value: played > 0 ? "\(Int(winRate * 100))%" : "–",
-                label: "victoires",
-                color: played > 0 ? (winRate > 0.7 ? Theme.green : Theme.text) : Theme.muted
-            )
-            Divider().frame(height: 28).background(Theme.border)
-            HomeStatCell(
-                value: maxStreak > 0 ? "\(maxStreak) 🔥" : "–",
-                label: "record",
-                color: maxStreak > 0 ? Theme.gold : Theme.muted
-            )
-        }
-        .padding(.vertical, 14)
-        .background(Theme.surface)
-        .cornerRadius(Theme.radiusM)
-        .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(Theme.border, lineWidth: 1))
-    }
-}
-
-private struct HomeStatCell: View {
-    let value: String
-    let label: String
-    let color: Color
-
-    var body: some View {
-        VStack(spacing: 3) {
-            Text(value)
-                .font(.system(size: 18, weight: .bold))
-                .foregroundColor(color)
-            Text(label)
-                .font(.system(size: 10, weight: .medium))
-                .tracking(0.5)
-                .foregroundColor(Theme.muted)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-// MARK: - Challenge card
-
-private struct DayChallengeCard: View {
-    let mode: GameMode
-    let status: DailyChallengeStatus?
-    let isLoading: Bool
-    let onTap: () -> Void
-
-    private var isCompleted: Bool { status?.isPlayed == true }
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: Theme.spacing16) {
-                // Mode icon
-                Image(systemName: modeIcon)
-                    .font(.system(size: 20))
-                    .foregroundColor(modeColor)
-                    .frame(width: 44, height: 44)
-                    .background(modeColor.opacity(isCompleted ? 0.07 : 0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                // Labels
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Text(mode.title.uppercased())
-                            .font(.system(size: 11, weight: .semibold))
-                            .tracking(1)
-                            .foregroundColor(isCompleted ? Theme.muted : Theme.textDim)
-                        if let s = status {
-                            Text("#\(s.challengeNumber)")
-                                .font(.system(size: 11))
-                                .foregroundColor(Theme.muted.opacity(0.6))
-                        }
-                    }
-
-                    if isLoading && status == nil {
-                        VStack(alignment: .leading, spacing: 5) {
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(Theme.surfaceAlt)
-                                .frame(width: 110, height: 11)
-                                .shimmer()
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(Theme.surfaceAlt)
-                                .frame(width: 70, height: 9)
-                                .shimmer()
-                        }
-                    } else if let s = status {
-                        Text(statusLabel(s))
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(statusTextColor(s))
-
-                        // Attempts bar — only when in progress
-                        if s.isInProgress {
-                            AttemptsBar(used: s.attemptsUsed, max: s.maxAttempts)
-                                .padding(.top, 1)
-                        }
-                    } else {
-                        Text("Non joué")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(Theme.textDim)
-                    }
-                }
-
+        NavigationLink(destination: FriendsView()) {
+            HStack(spacing: Theme.spacing12) {
+                Image(systemName: "person.2.fill")
+                    .font(.system(size: 15))
+                    .foregroundColor(Theme.textDim)
+                Text("\(count) ami\(count > 1 ? "s" : "") ont déjà joué aujourd'hui")
+                    .font(.system(size: 14))
+                    .foregroundColor(Theme.textDim)
                 Spacer()
-
-                // Right side: outcome OR CTA
-                if let s = status {
-                    outcomeOrStreak(s)
-                } else if isLoading {
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(Theme.surfaceAlt)
-                        .frame(width: 32, height: 10)
-                        .shimmer()
-                } else {
-                    ctaLabel
-                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Theme.muted)
             }
-            .padding(Theme.spacing16)
+            .padding(.horizontal, Theme.spacing16)
+            .padding(.vertical, Theme.spacing12)
             .background(Theme.surface)
-            .cornerRadius(14)
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(borderColor, lineWidth: 1)
-            )
+            .cornerRadius(Theme.radiusM)
+            .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(Theme.border, lineWidth: 1))
         }
-        .buttonStyle(CardPressStyle())
-        .animation(.easeInOut(duration: 0.25), value: status?.outcome)
-    }
-
-    // MARK: Helpers
-
-    @ViewBuilder
-    private func outcomeOrStreak(_ s: DailyChallengeStatus) -> some View {
-        VStack(alignment: .trailing, spacing: 4) {
-            if s.isWon {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(Theme.green)
-                    .font(.system(size: 20))
-                    .symbolEffect(.bounce, value: s.isWon)
-            } else if s.isLost {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundColor(Theme.red)
-                    .font(.system(size: 20))
-                    .symbolEffect(.bounce, value: s.isLost)
-            } else {
-                // In progress: show streak + clock
-                Image(systemName: "clock.fill")
-                    .foregroundColor(Theme.gold)
-                    .font(.system(size: 18))
-            }
-            // Streak
-            HStack(spacing: 2) {
-                Text("🔥")
-                    .font(.system(size: 11))
-                Text(s.streak > 0 ? "\(s.streak)" : "–")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(s.streak > 0 ? Theme.gold : Theme.muted)
-            }
-        }
-    }
-
-    private var ctaLabel: some View {
-        HStack(spacing: 3) {
-            Text("Jouer")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(Theme.gold)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(Theme.gold)
-        }
-    }
-
-    private var modeIcon: String {
-        switch mode {
-        case .film:   return "film"
-        case .series: return "tv"
-        case .wiki:   return "building.columns"
-        }
-    }
-
-    private var modeColor: Color {
-        switch mode {
-        case .film:   return Theme.gold
-        case .series: return Color(hex: "#8b6ff0")
-        case .wiki:   return Theme.green
-        }
-    }
-
-    private var borderColor: Color {
-        guard let s = status else { return Theme.border }
-        if s.isWon  { return Theme.green.opacity(0.3) }
-        if s.isLost { return Theme.red.opacity(0.2) }
-        if s.isInProgress { return Theme.gold.opacity(0.25) }
-        return Theme.border
-    }
-
-    private func statusLabel(_ s: DailyChallengeStatus) -> String {
-        if s.isWon  { return "Trouvé en \(s.attemptsUsed) essai\(s.attemptsUsed > 1 ? "s" : "")" }
-        if s.isLost { return "Non trouvé" }
-        if s.isInProgress { return "En cours…" }
-        return "Non joué"
-    }
-
-    private func statusTextColor(_ s: DailyChallengeStatus) -> Color {
-        if s.isWon  { return Theme.green }
-        if s.isLost { return Theme.red }
-        if s.isInProgress { return Theme.gold }
-        return Theme.textDim
+        .buttonStyle(.plain)
     }
 }
-
-// MARK: - Attempts bar (for in-progress)
-
-private struct AttemptsBar: View {
-    let used: Int
-    let max: Int
-
-    var body: some View {
-        HStack(spacing: 3) {
-            ForEach(0..<max, id: \.self) { i in
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(i < used ? Theme.gold.opacity(0.8) : Theme.surfaceAlt)
-                    .frame(height: 3)
-            }
-        }
-        .frame(width: 72)
-    }
-}
-

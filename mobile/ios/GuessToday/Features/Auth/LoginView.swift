@@ -27,9 +27,9 @@ struct LoginView: View {
                                 ApertureIconView(size: 30)
                                 (
                                     Text("Guess")
-                                        .font(.custom("Fraunces", size: 28)).fontWeight(.medium).foregroundColor(Theme.text)
+                                        .font(Theme.fraunces(size: 28)).foregroundColor(Theme.text)
                                     + Text("today")
-                                        .font(.custom("Fraunces", size: 28)).italic()
+                                        .font(Theme.fraunces(size: 28, italic: true))
                                         .foregroundStyle(LinearGradient(colors: [Color(hex: "#f0c870"), Color(hex: "#8a5e1f")], startPoint: .top, endPoint: .bottom))
                                 )
                             }
@@ -195,7 +195,7 @@ struct RegisterView: View {
                 VStack(spacing: Theme.spacing24) {
                     VStack(spacing: Theme.spacing8) {
                         Text("Créer un compte")
-                            .font(.custom("Georgia", size: 24))
+                            .font(Theme.fraunces(size: 24))
                             .fontWeight(.bold)
                             .foregroundColor(Theme.text)
                         Text("Sauvegardez vos stats et défiez vos amis")

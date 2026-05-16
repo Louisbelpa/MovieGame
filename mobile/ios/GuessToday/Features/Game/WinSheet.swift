@@ -250,7 +250,7 @@ private struct WinHeaderView: View {
                 .opacity(appeared ? 1 : 0)
 
             Text("Bravo !")
-                .font(.custom("Georgia", size: 26))
+                .font(Theme.fraunces(size: 26))
                 .fontWeight(.bold)
                 .foregroundColor(Theme.gold)
                 .opacity(appeared ? 1 : 0)
@@ -295,7 +295,7 @@ private struct LoseHeaderView: View {
             .rotationEffect(.degrees(shake ? -4 : 0))
 
             Text("Pas cette fois")
-                .font(.custom("Georgia", size: 26))
+                .font(Theme.fraunces(size: 26))
                 .fontWeight(.bold)
                 .foregroundColor(Theme.red)
                 .opacity(appeared ? 1 : 0)
@@ -336,7 +336,7 @@ struct FilmResultCard: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(result.title)
-                        .font(.custom("Georgia", size: 18))
+                        .font(Theme.fraunces(size: 18))
                         .fontWeight(.semibold)
                         .foregroundColor(Theme.text)
 
@@ -399,7 +399,7 @@ struct WikiResultCard: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(result.name)
-                        .font(.custom("Georgia", size: 18))
+                        .font(Theme.fraunces(size: 18))
                         .fontWeight(.semibold)
                         .foregroundColor(Theme.text)
 
@@ -469,7 +469,7 @@ struct StatBox: View {
     var body: some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(.custom("Georgia", size: 28))
+                .font(Theme.fraunces(size: 28))
                 .fontWeight(.bold)
                 .foregroundStyle(
                     LinearGradient(
@@ -580,8 +580,8 @@ struct ShareResultCard: View {
             HStack {
                 ApertureIconView(size: 28, showBackground: true, cornerRadius: 8)
                 (
-                    Text("Guess").font(.custom("Fraunces", size: 14)).fontWeight(.medium).foregroundColor(Theme.text)
-                    + Text("today").font(.custom("Fraunces", size: 14)).italic()
+                    Text("Guess").font(Theme.fraunces(size: 14)).foregroundColor(Theme.text)
+                    + Text("today").font(Theme.fraunces(size: 14, italic: true))
                         .foregroundStyle(LinearGradient(colors: [Color(hex: "#f0c870"), Color(hex: "#8a5e1f")], startPoint: .top, endPoint: .bottom))
                 )
                 Spacer()
@@ -596,7 +596,7 @@ struct ShareResultCard: View {
             // Result
             VStack(spacing: Theme.spacing12) {
                 Text(resultTitle)
-                    .font(.custom("Georgia", size: 20))
+                    .font(Theme.fraunces(size: 20))
                     .fontWeight(.semibold)
                     .foregroundColor(Theme.text)
                     .multilineTextAlignment(.center)

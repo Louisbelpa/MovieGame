@@ -640,6 +640,22 @@ const postMultiStatementIncremental: { name: string; sql: string }[] = [
       PRIMARY KEY (user_id, platform)
     )`,
   },
+  {
+    name: 'create_idx_sessions_user_challenge',
+    sql: `CREATE INDEX IF NOT EXISTS idx_sessions_user_challenge ON game_sessions (user_id, challenge_id)`,
+  },
+  {
+    name: 'backfill_game_sessions_user_id_from_ucr',
+    sql: `UPDATE game_sessions
+      SET user_id = (
+        SELECT ucr.user_id FROM user_challenge_results ucr
+        WHERE ucr.challenge_id = game_sessions.challenge_id
+          AND ucr.won = CASE WHEN game_sessions.outcome = 'won' THEN 1 ELSE 0 END
+          AND ucr.attempts_used = json_array_length(game_sessions.attempts)
+        LIMIT 1
+      )
+      WHERE user_id IS NULL AND outcome IS NOT NULL`,
+  },
 ]
 
 for (const { name, sql } of postMultiStatementIncremental) {

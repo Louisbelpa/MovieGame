@@ -109,10 +109,37 @@ CREATE INDEX IF NOT EXISTS idx_daily_challenges_series_id      ON daily_challeng
 CREATE INDEX IF NOT EXISTS idx_daily_challenges_wiki_person_id ON daily_challenges (wiki_person_id);
 CREATE INDEX IF NOT EXISTS idx_daily_challenges_media_type     ON daily_challenges (media_type);
 
+CREATE TABLE IF NOT EXISTS users (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  email         TEXT UNIQUE,
+  display_name  TEXT NOT NULL DEFAULT 'Test',
+  avatar_url    TEXT,
+  password_hash TEXT,
+  is_banned     INTEGER NOT NULL DEFAULT 0,
+  email_verified INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+  id         TEXT PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_challenge_results (
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  challenge_id  INTEGER NOT NULL REFERENCES daily_challenges (id) ON DELETE CASCADE,
+  media_type    TEXT NOT NULL,
+  attempts_used INTEGER NOT NULL,
+  won           INTEGER NOT NULL,
+  completed_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(user_id, challenge_id)
+);
+
 CREATE TABLE IF NOT EXISTS game_sessions (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   session_token   TEXT NOT NULL,
   challenge_id    INTEGER NOT NULL REFERENCES daily_challenges (id) ON DELETE CASCADE,
+  user_id         INTEGER REFERENCES users (id) ON DELETE SET NULL,
   attempts        TEXT NOT NULL DEFAULT '[]',
   hints_revealed  INTEGER NOT NULL DEFAULT 0,
   outcome         TEXT CHECK (outcome IN ('won', 'lost')),
@@ -124,6 +151,7 @@ CREATE TABLE IF NOT EXISTS game_sessions (
 CREATE INDEX IF NOT EXISTS idx_sessions_token     ON game_sessions (session_token);
 CREATE INDEX IF NOT EXISTS idx_sessions_challenge ON game_sessions (challenge_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_outcome   ON game_sessions (outcome);
+CREATE INDEX IF NOT EXISTS idx_sessions_user_challenge ON game_sessions (user_id, challenge_id);
 
 CREATE TABLE IF NOT EXISTS global_stats (
   id              INTEGER PRIMARY KEY CHECK (id = 1),
@@ -224,6 +252,9 @@ afterEach(() => {
   // Delete in FK-safe order (children before parents)
   db.exec(`
     DELETE FROM game_sessions;
+    DELETE FROM user_challenge_results;
+    DELETE FROM user_sessions;
+    DELETE FROM users;
     DELETE FROM active_admin_tokens;
     DELETE FROM audit_logs;
     DELETE FROM daily_challenges;

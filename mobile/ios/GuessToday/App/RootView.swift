@@ -221,12 +221,10 @@ struct SplashView: View {
                 // Wordmark
                 HStack(spacing: 4) {
                     Text("Guess")
-                        .font(.custom("Fraunces", size: 30))
-                        .fontWeight(.medium)
+                        .font(Theme.fraunces(size: 30))
                         .foregroundColor(Theme.text)
                     Text("today")
-                        .font(.custom("Fraunces", size: 30))
-                        .italic()
+                        .font(Theme.fraunces(size: 30, italic: true))
                         .foregroundStyle(LinearGradient(
                             colors: [Color(hex: "#f5d870"), Color(hex: "#8a5e1f")],
                             startPoint: .top,

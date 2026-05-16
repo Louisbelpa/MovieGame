@@ -33,7 +33,7 @@ struct RulesSheet: View {
                                 .textCase(.uppercase)
                                 .tracking(1.2)
                             Text(mode.title)
-                                .font(.custom("Georgia", size: 26))
+                                .font(Theme.fraunces(size: 26))
                                 .fontWeight(.bold)
                                 .foregroundColor(Theme.text)
                         }

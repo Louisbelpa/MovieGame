@@ -22,8 +22,9 @@ final class APIClient {
     static let shared = APIClient()
     private init() {}
 
-    // Update this URL for your environment
-    #if DEBUG
+    #if NRT
+    static let baseURL = "https://moviegame-staging.up.railway.app"
+    #elseif DEBUG
     static let baseURL = "http://192.168.1.14:3001"
     #else
     static let baseURL = "https://guesstoday.fr"

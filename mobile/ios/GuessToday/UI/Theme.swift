@@ -1,24 +1,46 @@
 import SwiftUI
 
 enum Theme {
-    // MARK: - Colours (mirrored from web CSS variables)
-    static let background   = Color(hex: "#16161f")  // film-black
-    static let surface      = Color(hex: "#20202e")  // film-dark
-    static let surfaceAlt   = Color(hex: "#28283a")  // film-gray
-    static let border       = Color(hex: "#3a3a52")  // film-border
-    static let muted        = Color(hex: "#56566e")  // film-muted
-    static let text         = Color(hex: "#f0ebe4")  // film-text
-    static let textDim      = Color(hex: "#a09898")  // film-text-dim
-    static let gold         = Color(hex: "#d4a842")  // film-gold
-    static let goldLight    = Color(hex: "#f0c060")  // film-gold-light
-    static let green        = Color(hex: "#4caf78")  // film-green
-    static let red          = Color(hex: "#e05050")  // film-red
-    static let amber        = Color(hex: "#e09040")  // film-amber
+    // MARK: - Base colours (mirrored from web CSS variables)
+    static let background   = Color(hex: "#0a0d12")  // --color-film-black
+    static let surface      = Color(hex: "#0e1219")  // --color-film-dark
+    static let surfaceAlt   = Color(hex: "#161c25")  // --color-film-gray
+    static let border       = Color(hex: "#1e2738")  // --color-film-border
+    static let muted        = Color(hex: "#5f6772")  // --color-film-muted
+    static let text         = Color(hex: "#e8eaed")  // --color-film-text
+    static let textDim      = Color(hex: "#9aa3ad")  // --color-film-text-dim
+    static let gold         = Color(hex: "#d4a64a")  // --color-film-gold
+    static let goldLight    = Color(hex: "#e8b95c")  // --color-film-gold-light
+    static let green        = Color(hex: "#4cb078")  // --color-film-green
+    static let red          = Color(hex: "#d4604a")  // --color-film-red
+    static let amber        = Color(hex: "#e09040")  // --color-film-amber
 
-    // MARK: - Typography
-    static let titleFont: Font    = .custom("Georgia", size: 22)
-    static let bodyFont: Font     = .system(size: 15)
-    static let captionFont: Font  = .system(size: 12)
+    // MARK: - Mode colours
+    static let modeFilm     = Color(hex: "#d4a64a")  // --sg-films
+    static let modeSeries   = Color(hex: "#6b7cff")  // --sg-series
+    static let modeWiki     = Color(hex: "#e85788")  // --sg-wiki
+
+    // MARK: - Gold gradient (matches web linear-gradient(180deg, #e8c06a, #d4a64a, #a07030))
+    static let goldGradient = LinearGradient(
+        colors: [Color(hex: "#e8c06a"), Color(hex: "#d4a64a"), Color(hex: "#a07030")],
+        startPoint: .top,
+        endPoint: .bottom
+    )
+
+    // MARK: - Typography (Fraunces = display/serif titles, Inter = body/UI)
+    static func fraunces(size: CGFloat, italic: Bool = false) -> Font {
+        italic
+            ? .custom("Fraunces-MediumItalic", size: size)
+            : .custom("Fraunces-Medium", size: size)
+    }
+    static func inter(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        switch weight {
+        case .medium:    return .custom("Inter-Medium",   size: size)
+        case .semibold:  return .custom("Inter-SemiBold", size: size)
+        case .bold:      return .custom("Inter-Bold",     size: size)
+        default:         return .custom("Inter-Regular",  size: size)
+        }
+    }
 
     // MARK: - Spacing
     static let spacing4: CGFloat  = 4
@@ -74,7 +96,10 @@ struct PrimaryButtonStyle: ButtonStyle {
         .foregroundColor(Theme.background)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .background(configuration.isPressed ? Theme.goldLight : Theme.gold)
+        .background(
+            Theme.goldGradient
+                .opacity(configuration.isPressed ? 0.85 : 1)
+        )
         .cornerRadius(Theme.radiusM)
         .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
@@ -113,7 +138,7 @@ struct ShimmerModifier: ViewModifier {
                     LinearGradient(
                         stops: [
                             .init(color: .clear, location: phase - 0.3),
-                            .init(color: .white.opacity(0.1), location: phase),
+                            .init(color: .white.opacity(0.08), location: phase),
                             .init(color: .clear, location: phase + 0.3),
                         ],
                         startPoint: .leading,
@@ -134,4 +159,72 @@ struct ShimmerModifier: ViewModifier {
 extension View {
     func cardStyle() -> some View { modifier(CardStyle()) }
     func shimmer() -> some View { modifier(ShimmerModifier()) }
+}
+
+// MARK: - Mode Atmosphere
+
+struct ModeAtmosphere: View {
+    let mode: GameMode
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                // Top radial halo (mode-coloured glow at 20% from top)
+                RadialGradient(
+                    gradient: Gradient(colors: [haloColor.opacity(0.07), .clear]),
+                    center: UnitPoint(x: 0.5, y: 0.2),
+                    startRadius: 0,
+                    endRadius: geo.size.width * 0.65
+                )
+
+                // Texture overlay (Canvas drawn, no UIKit dependency)
+                Canvas { ctx, size in
+                    switch mode {
+                    case .film:
+                        // Horizontal scan lines — argentique film grain
+                        var y: CGFloat = 0
+                        while y < size.height {
+                            var path = Path()
+                            path.move(to: CGPoint(x: 0, y: y + 2))
+                            path.addLine(to: CGPoint(x: size.width, y: y + 2))
+                            ctx.stroke(path, with: .color(.black.opacity(0.22)), lineWidth: 1)
+                            y += 3
+                        }
+                    case .series:
+                        // CRT scanlines — slightly wider spacing
+                        var y: CGFloat = 0
+                        while y < size.height {
+                            var path = Path()
+                            path.move(to: CGPoint(x: 0, y: y + 3))
+                            path.addLine(to: CGPoint(x: size.width, y: y + 3))
+                            ctx.stroke(path, with: .color(.black.opacity(0.15)), lineWidth: 1)
+                            y += 4
+                        }
+                    case .wiki:
+                        // Halftone dot grid — press/newspaper feel
+                        let spacing: CGFloat = 6
+                        var x: CGFloat = 0
+                        while x < size.width {
+                            var y: CGFloat = 0
+                            while y < size.height {
+                                let dot = Path(ellipseIn: CGRect(x: x, y: y, width: 1, height: 1))
+                                ctx.fill(dot, with: .color(haloColor.opacity(0.055)))
+                                y += spacing
+                            }
+                            x += spacing
+                        }
+                    }
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    private var haloColor: Color {
+        switch mode {
+        case .film:   return Theme.modeFilm
+        case .series: return Theme.modeSeries
+        case .wiki:   return Theme.modeWiki
+        }
+    }
 }

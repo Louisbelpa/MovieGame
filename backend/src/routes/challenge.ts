@@ -17,6 +17,7 @@ import {
   processGuess,
   getResult,
 } from '../services/challenge.service.js';
+import { attachUserToGameSession } from '../services/game-session.service.js';
 
 export const challengeRouter = Router();
 
@@ -29,7 +30,7 @@ challengeRouter.get(
       const sessionToken = res.locals.sessionToken as string;
       const type = (req.query.type === 'series' ? 'series' : 'film') as 'film' | 'series';
       const challenge = getTodayChallenge(type);
-      const session = getOrCreateSession(sessionToken, challenge.id);
+      const session = getOrCreateSession(sessionToken, challenge.id, req.user?.id);
       const payload = buildChallengePayload(challenge, session);
       res.json(payload);
     } catch (err) {
@@ -62,7 +63,7 @@ challengeRouter.get(
       const sessionToken = res.locals.sessionToken as string;
       const type = (req.query.type === 'series' ? 'series' : 'film') as 'film' | 'series';
       const challenge = getChallengeByDate(date, type);
-      const session = getOrCreateSession(sessionToken, challenge.id);
+      const session = getOrCreateSession(sessionToken, challenge.id, req.user?.id);
       const payload = buildChallengePayload(challenge, session);
       res.json(payload);
     } catch (err) {
@@ -98,8 +99,9 @@ challengeRouter.post(
         ? getChallengeById(bodyChallId)
         : getTodayChallenge();
 
-      const result = processGuess(sessionToken, challenge.id, guess.trim());
-      const session = getOrCreateSession(sessionToken, challenge.id);
+      const userId = req.user?.id;
+      const result = processGuess(sessionToken, challenge.id, guess.trim(), userId);
+      const session = getOrCreateSession(sessionToken, challenge.id, userId);
       const payload = buildChallengePayload(challenge, session);
 
       // Auto-record to user_challenge_results when game ends and user is logged in
@@ -117,6 +119,7 @@ challengeRouter.post(
               won           = excluded.won,
               completed_at  = datetime('now')
           `).run(req.user.id, challenge.id, row.media_type, payload.attemptsUsed, result.outcome === 'won' ? 1 : 0);
+          attachUserToGameSession(sessionToken, challenge.id, req.user.id);
         }
       }
 
@@ -155,7 +158,7 @@ challengeRouter.get(
         challengeId = getTodayChallenge().id;
       }
 
-      const result = getResult(sessionToken, challengeId);
+      const result = getResult(sessionToken, challengeId, req.user?.id);
       res.json(result);
     } catch (err) {
       next(err);

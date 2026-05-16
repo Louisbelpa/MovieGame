@@ -145,7 +145,7 @@ struct OnboardingView: View {
                             .fill(p.accentColor.opacity(0.12))
                             .frame(width: 120, height: 120)
                         Text(logoText)
-                            .font(.custom("Georgia", size: 52))
+                            .font(Theme.fraunces(size: 52))
                             .fontWeight(.bold)
                             .foregroundColor(p.accentColor)
                     }
@@ -175,7 +175,7 @@ struct OnboardingView: View {
             } else {
                 VStack(spacing: 14) {
                     Text(p.title)
-                        .font(.custom("Georgia", size: 28))
+                        .font(Theme.fraunces(size: 28))
                         .fontWeight(.bold)
                         .foregroundColor(Theme.text)
                         .multilineTextAlignment(.center)
@@ -256,7 +256,7 @@ private struct WebTransferPageContent: View {
 
             VStack(spacing: 10) {
                 Text("Vous jouiez sur le site ?")
-                    .font(.custom("Georgia", size: 26))
+                    .font(Theme.fraunces(size: 26))
                     .fontWeight(.bold)
                     .foregroundColor(Theme.text)
                     .multilineTextAlignment(.center)

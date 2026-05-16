@@ -157,7 +157,7 @@ private struct LoggedInProfileView: View {
                         }
                         HStack(spacing: 6) {
                             Text(user.displayName)
-                                .font(.custom("Georgia", size: 22))
+                                .font(Theme.fraunces(size: 22))
                                 .fontWeight(.semibold)
                                 .foregroundColor(Theme.text)
                             Button { showEditName = true } label: {
@@ -678,7 +678,7 @@ private struct AchievementDetailSheet: View {
                     // Title + description
                     VStack(spacing: 8) {
                         Text(achievement.title)
-                            .font(.custom("Georgia", size: 22))
+                            .font(Theme.fraunces(size: 22))
                             .fontWeight(.bold)
                             .foregroundColor(Theme.text)
                             .multilineTextAlignment(.center)

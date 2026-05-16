@@ -21,6 +21,7 @@ struct GameView: View {
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
+            ModeAtmosphere(mode: mode).ignoresSafeArea()
 
             if vm.isLoading && vm.challenge == nil {
                 ProgressView()
@@ -786,7 +787,7 @@ private struct GameResultBanner: View {
 
             if !title.isEmpty {
                 Text(title)
-                    .font(.custom("Georgia", size: 20))
+                    .font(Theme.fraunces(size: 20))
                     .fontWeight(.bold)
                     .foregroundColor(Theme.text)
             }

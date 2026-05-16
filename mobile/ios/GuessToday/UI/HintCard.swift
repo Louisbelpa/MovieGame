@@ -50,14 +50,28 @@ struct LockedHintCard: View {
     let index: Int
 
     var body: some View {
-        RoundedRectangle(cornerRadius: Theme.radiusM)
-            .stroke(Theme.border.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
-            .frame(minHeight: 52)
-            .overlay(
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 11))
-                    .foregroundColor(Theme.muted.opacity(0.45))
-            )
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Indice \(index)")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(.white.opacity(0.25))
+                .textCase(.uppercase)
+                .tracking(0.8)
+            Spacer(minLength: 4)
+            Image(systemName: "lock.fill")
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.30))
+        }
+        .padding(Theme.spacing12)
+        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+        .background(Color.clear)
+        .cornerRadius(Theme.radiusM)
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.radiusM)
+                .stroke(
+                    Color.white.opacity(0.18),
+                    style: StrokeStyle(lineWidth: 1, dash: [5, 4])
+                )
+        )
     }
 }
 

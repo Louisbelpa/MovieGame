@@ -18,6 +18,7 @@ import {
   searchWikiPersons,
   getWikiGlobalStats,
 } from '../services/wiki-challenge.service.js'
+import { attachUserToGameSession } from '../services/game-session.service.js'
 
 export const wikiChallengeRouter = Router()
 
@@ -27,7 +28,7 @@ wikiChallengeRouter.get('/today', async (req: Request, res: Response, next: Next
   try {
     const sessionToken = res.locals.sessionToken as string
     const challenge = getTodayWikiChallenge()
-    const session = getOrCreateWikiSession(sessionToken, challenge.id)
+    const session = getOrCreateWikiSession(sessionToken, challenge.id, req.user?.id)
     res.json(buildWikiChallengePayload(challenge, session))
   } catch (err) {
     next(err)
@@ -50,7 +51,7 @@ wikiChallengeRouter.get('/date/:date', async (req: Request, res: Response, next:
     }
     const sessionToken = res.locals.sessionToken as string
     const challenge = getWikiChallengeByDate(date)
-    const session = getOrCreateWikiSession(sessionToken, challenge.id)
+    const session = getOrCreateWikiSession(sessionToken, challenge.id, req.user?.id)
     res.json(buildWikiChallengePayload(challenge, session))
   } catch (err) {
     next(err)
@@ -77,8 +78,9 @@ wikiChallengeRouter.post('/guess', guessLimiter, userAuth, async (req: Request, 
       ? getWikiChallengeById(bodyChallId)
       : getTodayWikiChallenge()
 
-    const result = processWikiGuess(sessionToken, challenge.id, guess.trim())
-    const session = getOrCreateWikiSession(sessionToken, challenge.id)
+    const userId = req.user?.id
+    const result = processWikiGuess(sessionToken, challenge.id, guess.trim(), userId)
+    const session = getOrCreateWikiSession(sessionToken, challenge.id, userId)
     const payload = buildWikiChallengePayload(challenge, session)
 
     // Auto-record to user_challenge_results when game ends and user is logged in
@@ -91,6 +93,7 @@ wikiChallengeRouter.post('/guess', guessLimiter, userAuth, async (req: Request, 
           won           = excluded.won,
           completed_at  = datetime('now')
       `).run(req.user.id, challenge.id, payload.attemptsUsed, result.outcome === 'won' ? 1 : 0)
+      attachUserToGameSession(sessionToken, challenge.id, req.user.id)
     }
 
     res.json({
@@ -117,7 +120,7 @@ wikiChallengeRouter.get('/result', async (req: Request, res: Response, next: Nex
     } else {
       challengeId = getTodayWikiChallenge().id
     }
-    res.json(getWikiResult(sessionToken, challengeId))
+    res.json(getWikiResult(sessionToken, challengeId, req.user?.id))
   } catch (err) {
     next(err)
   }
