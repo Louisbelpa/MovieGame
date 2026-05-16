@@ -44,6 +44,22 @@ struct BlurImageView: View {
             RoundedRectangle(cornerRadius: Theme.radiusM)
                 .stroke(Theme.border, lineWidth: 1)
         )
+        .overlay(alignment: .topLeading) {
+            if !isWiki {
+                HStack(spacing: 4) {
+                    Image(systemName: "clapperboard")
+                        .font(.system(size: 9, weight: .medium))
+                    Text("Scène")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .foregroundColor(Theme.textDim)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(.ultraThinMaterial)
+                .cornerRadius(6)
+                .padding(8)
+            }
+        }
     }
 }
 

@@ -67,6 +67,7 @@ struct WinSheet: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(Theme.muted)
                     }
+                    .accessibilityLabel("Fermer")
                 }
             }
         }
@@ -139,6 +140,7 @@ struct LoseSheet: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(Theme.muted)
                     }
+                    .accessibilityLabel("Fermer")
                 }
             }
         }
@@ -364,9 +366,9 @@ struct FilmResultCard: View {
                     .lineLimit(4)
             }
 
-            if let tmdbId = result.tmdbId {
-                let type = result.mediaType == "series" ? "tv" : "movie"
-                Link(destination: URL(string: "https://www.themoviedb.org/\(type)/\(tmdbId)")!) {
+            if let tmdbId = result.tmdbId,
+               let tmdbURL = URL(string: "https://www.themoviedb.org/\(result.mediaType == "series" ? "tv" : "movie")/\(tmdbId)") {
+                Link(destination: tmdbURL) {
                     Label("Voir sur TMDB", systemImage: "arrow.up.right.square")
                         .font(.system(size: 13))
                         .foregroundColor(Theme.gold)
@@ -467,11 +469,19 @@ struct StatBox: View {
     var body: some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(.system(size: 22, weight: .bold))
-                .foregroundColor(Theme.gold)
+                .font(.custom("Georgia", size: 28))
+                .fontWeight(.bold)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color(hex: "#f0c870"), Color(hex: "#d4a64a")],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
             Text(label)
-                .font(.system(size: 11))
+                .font(.system(size: 10, weight: .medium))
                 .foregroundColor(Theme.textDim)
+                .textCase(.uppercase)
+                .tracking(0.5)
         }
         .frame(maxWidth: .infinity)
     }

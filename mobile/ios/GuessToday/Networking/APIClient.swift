@@ -267,6 +267,14 @@ extension APIClient {
         return r
     }
 
+    func oauthCallback(provider: String, providerId: String, email: String, displayName: String, avatarUrl: String?) async throws {
+        struct Body: Encodable { let provider: String; let providerId: String; let email: String; let displayName: String; let avatarUrl: String? }
+        let r: AuthResponse = try await request("/api/auth/oauth/callback", method: "POST", body: Body(provider: provider, providerId: providerId, email: email, displayName: displayName, avatarUrl: avatarUrl))
+        sessionToken = r.sessionToken
+        // Fetch current user after OAuth login
+        if let fetched = try? await me() { _ = fetched }
+    }
+
     func gameHistory(type: String) async throws -> [String: String] {
         struct Resp: Decodable { let history: [String: String] }
         let r: Resp = try await request("/api/auth/history?type=\(type)", requiresAuth: true)

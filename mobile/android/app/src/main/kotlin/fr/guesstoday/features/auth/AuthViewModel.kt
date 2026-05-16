@@ -2,6 +2,7 @@ package fr.guesstoday.features.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fr.guesstoday.data.api.*
 import fr.guesstoday.data.prefs.SessionManager
@@ -73,6 +74,29 @@ class AuthViewModel @Inject constructor(
             runCatching { api.logout() }
             sessionManager.clear()
             _uiState.update { it.copy(user = null) }
+        }
+    }
+
+    fun loginWithGoogle(account: GoogleSignInAccount, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            runCatching {
+                api.oauthCallback(
+                    OAuthCallbackBody(
+                        provider    = "google",
+                        providerId  = account.id ?: error("No Google ID"),
+                        email       = account.email ?: "",
+                        displayName = account.displayName ?: account.email?.substringBefore('@') ?: "User",
+                        avatarUrl   = account.photoUrl?.toString(),
+                    )
+                )
+            }.onSuccess { res ->
+                sessionManager.sessionToken = res.sessionToken
+                _uiState.update { it.copy(user = res.user, isLoading = false) }
+                onSuccess()
+            }.onFailure { e ->
+                _uiState.update { it.copy(isLoading = false, error = e.message) }
+            }
         }
     }
 

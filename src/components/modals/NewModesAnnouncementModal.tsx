@@ -79,10 +79,10 @@ export function NewModesAnnouncementModal({ isOpen, onClose, variant }: NewModes
             </li>
             <li className="flex gap-3 items-start">
               <span
-                className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center border border-[#a78bfa]/45"
-                style={{ background: 'rgba(139, 92, 246, 0.18)' }}
+                className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center border border-[#e85788]/45"
+                style={{ background: 'rgba(232, 87, 136, 0.18)' }}
               >
-                <Landmark size={18} className="text-[#c4b5fd]" aria-hidden />
+                <Landmark size={18} className="text-[#e85788]" aria-hidden />
               </span>
               <span className="text-film-text-dim leading-relaxed pt-1">
                 <span className="text-film-text font-medium">Personnalités</span> — devine la personnalité à partir de son

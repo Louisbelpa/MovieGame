@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.*
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.*
 import androidx.compose.ui.platform.*
 import androidx.compose.ui.text.font.*
@@ -77,22 +78,38 @@ fun ProfileScreen(
                     }
                 }
 
-                // Mode tabs
-                TabRow(
-                    selectedTabIndex = listOf(GameMode.FILM, GameMode.WIKI).indexOf(selectedMode),
-                    containerColor   = AppColors.surface,
-                    contentColor     = AppColors.gold,
-                    indicator        = { tabPositions ->
-                        val index = listOf(GameMode.FILM, GameMode.WIKI).indexOf(selectedMode)
-                        TabRowDefaults.SecondaryIndicator(Modifier.tabIndicatorOffset(tabPositions[index]), color = AppColors.gold)
-                    }
+                // Mode tabs — pill style
+                Surface(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    shape    = RoundedCornerShape(10.dp),
+                    color    = AppColors.surfaceAlt,
                 ) {
-                    listOf(GameMode.FILM to "Films", GameMode.WIKI to "Wiki").forEach { (mode, label) ->
-                        Tab(
-                            selected  = selectedMode == mode,
-                            onClick   = { selectedMode = mode },
-                            text      = { Text(label, color = if (selectedMode == mode) AppColors.gold else AppColors.textDim) }
-                        )
+                    Row(Modifier.padding(3.dp)) {
+                        listOf(GameMode.FILM to "Films", GameMode.WIKI to "Wiki").forEach { (mode, label) ->
+                            val isActive = selectedMode == mode
+                            val activeColor = modeColor(mode)
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isActive) activeColor.copy(alpha = 0.14f) else Color.Transparent)
+                                    .border(
+                                        width = if (isActive) 1.dp else 0.dp,
+                                        color = if (isActive) AppColors.border else Color.Transparent,
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable { selectedMode = mode }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    label,
+                                    color = if (isActive) activeColor else AppColors.textDim,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -112,6 +129,12 @@ fun ProfileScreen(
             }
         }
     }
+}
+
+private fun modeColor(mode: GameMode) = when (mode) {
+    GameMode.FILM -> AppColors.modeFilm
+    GameMode.WIKI -> AppColors.modeWiki
+    else          -> AppColors.gold
 }
 
 @Composable
@@ -173,10 +196,22 @@ private fun StatsPanel(mode: GameMode, modifier: Modifier = Modifier) {
             Row(Modifier.fillMaxWidth().padding(12.dp)) {
                 listOf("Joués" to "$played", "Victoires" to "$wins", "Série" to "$streak", "Max" to "$max").forEachIndexed { i, (label, value) ->
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(value, color = AppColors.gold, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Text(label, color = AppColors.textDim, fontSize = 11.sp)
+                        Text(
+                            value,
+                            color      = AppColors.gold,
+                            fontSize   = 28.sp,
+                            fontFamily = FontFamily.Serif,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            label,
+                            color    = AppColors.textDim,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = 0.5.sp,
+                        )
                     }
-                    if (i < 3) VerticalDivider(Modifier.height(36.dp), color = AppColors.border)
+                    if (i < 3) VerticalDivider(Modifier.height(44.dp), color = AppColors.border)
                 }
             }
         }

@@ -1,8 +1,7 @@
 import { useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Search, SkipForward } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { useWikiStore } from '@/store/wikiStore'
-import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
 interface WikiGuessInputProps {
@@ -32,6 +31,8 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && inputValue.trim()) {
       handleSubmit()
+    } else if (e.key === 'Escape') {
+      onSkip()
     }
   }
 
@@ -39,65 +40,72 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
     <div className="relative w-full">
       <motion.div
         key={shakeTrigger}
-        className={cn(
-          'flex items-center gap-1.5 sm:gap-2 p-1 pl-2 sm:pl-3 rounded-xl film-border transition-all min-h-[48px] sm:min-h-[52px]',
-          disabled && 'opacity-50'
-        )}
+        className={cn('rounded-xl transition-all', disabled && 'opacity-50')}
+        style={{
+          padding: '5px 5px 5px 14px',
+          border: '1px solid var(--mode-ring)',
+          background: 'var(--color-film-surface, #161b24)',
+          boxShadow: '0 0 0 3px var(--mode-soft)',
+        }}
         animate={shakeTrigger > 0 ? { x: [-8, 8, -5, 5, 0] } : {}}
         transition={{ duration: 0.35 }}
       >
-        <Search size={16} className="text-film-text-dim shrink-0" aria-hidden />
+        <div className="flex items-center gap-2">
+          <Search size={15} className="text-film-text-dim shrink-0" aria-hidden />
 
-        <input
-          ref={inputRef}
-          type="text"
-          aria-label="Votre réponse, nom de personnalité"
-          aria-invalid={hasError}
-          aria-describedby={hasError ? errorId : undefined}
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Personnalité…"
-          disabled={disabled}
-          autoComplete="off"
-          enterKeyHint="search"
-          spellCheck={false}
-          className={cn(
-            'flex-1 bg-transparent text-film-text placeholder:text-film-text-dim',
-            /* ≥16px sur mobile : évite le zoom automatique Safari iOS au focus */
-            'text-base sm:text-sm outline-none min-w-0 py-1.5 sm:py-2 rounded leading-snug',
-            'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold',
-          )}
-        />
+          <input
+            ref={inputRef}
+            type="text"
+            aria-label="Votre réponse, nom de personnalité"
+            aria-invalid={hasError}
+            aria-describedby={hasError ? errorId : undefined}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Personnalité…"
+            disabled={disabled}
+            autoComplete="off"
+            enterKeyHint="search"
+            spellCheck={false}
+            className={cn(
+              'flex-1 bg-transparent text-film-text placeholder:text-film-text-dim',
+              'text-base sm:text-sm outline-none min-w-0 py-2 rounded leading-snug',
+            )}
+          />
 
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onSkip}
-          disabled={disabled}
-          title="Passer cette tentative"
-          className="shrink-0 text-film-text-dim min-h-[44px] min-w-[44px] gap-1"
-        >
-          <SkipForward size={14} />
-          <span className="text-sm">Passer</span>
-        </Button>
+          <button
+            type="button"
+            onClick={onSkip}
+            disabled={disabled}
+            className="shrink-0 text-[12.5px] font-medium text-film-text-dim hover:text-film-text transition-colors px-2 py-1 rounded disabled:opacity-40 cursor-pointer"
+          >
+            Passer
+          </button>
 
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={handleSubmit}
-          disabled={disabled || !inputValue.trim()}
-          className="shrink-0 min-h-[44px] px-4"
-        >
-          Deviner
-        </Button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={disabled || !inputValue.trim()}
+            className="shrink-0 rounded-lg text-[12.5px] font-bold transition-opacity disabled:opacity-40 cursor-pointer"
+            style={{
+              background: 'linear-gradient(180deg, #e8c06a, #d4a64a, #a07030)',
+              color: '#1a0f00',
+              padding: '8px 14px',
+            }}
+          >
+            Deviner
+          </button>
+        </div>
       </motion.div>
 
       <p id={errorId} className="sr-only" role={hasError ? 'alert' : undefined}>
         {hasError ? 'Réponse invalide, veuillez réessayer.' : ''}
       </p>
 
-      <p className="mt-1.5 text-sm text-film-text-dim text-right">
+      <p className="mt-1.5 text-[10.5px] text-film-text-dim/60 hidden sm:block">
+        ↵ Deviner · Esc Passer
+      </p>
+      <p className="sr-only" aria-live="polite">
         {attemptsLeft} tentative{attemptsLeft > 1 ? 's' : ''} restante{attemptsLeft > 1 ? 's' : ''}
       </p>
     </div>

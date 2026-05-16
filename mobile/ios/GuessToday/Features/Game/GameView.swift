@@ -143,6 +143,7 @@ struct GameView: View {
                                 .font(.system(size: 16))
                                 .foregroundColor(Theme.textDim)
                         }
+                        .accessibilityLabel("Archive")
                     }
                     Button {
                         showRules = true
@@ -151,6 +152,7 @@ struct GameView: View {
                             .font(.system(size: 16))
                             .foregroundColor(Theme.textDim)
                     }
+                    .accessibilityLabel("Règles du jeu")
                 }
             }
         }
@@ -314,8 +316,13 @@ private struct GuessInputSection: View {
                     .cornerRadius(Theme.radiusM)
                     .overlay(
                         RoundedRectangle(cornerRadius: Theme.radiusM)
-                            .stroke(inputFocused.wrappedValue ? Theme.gold.opacity(0.6) : Theme.border, lineWidth: 1)
+                            .stroke(inputFocused.wrappedValue ? Theme.gold.opacity(0.55) : Theme.border, lineWidth: 1)
                     )
+                    .shadow(
+                        color: inputFocused.wrappedValue ? Theme.gold.opacity(0.18) : .clear,
+                        radius: 6, x: 0, y: 0
+                    )
+                    .animation(.easeInOut(duration: 0.18), value: inputFocused.wrappedValue)
                     .modifier(ShakeEffect(amount: vm.shakeAmount))
 
                     Button {
@@ -323,11 +330,21 @@ private struct GuessInputSection: View {
                         Task { await vm.submitGuess(vm.inputText) }
                     } label: {
                         Text("Deviner")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(canGuess ? Theme.background : Theme.muted)
-                            .padding(.horizontal, Theme.spacing16)
-                            .padding(.vertical, 13)
-                            .background(canGuess ? Theme.gold : Theme.surfaceAlt)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(canGuess ? Color(hex: "#1a0f00") : Theme.muted)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 11)
+                            .background(
+                                canGuess
+                                ? LinearGradient(
+                                    colors: [Color(hex: "#e8c06a"), Color(hex: "#d4a64a"), Color(hex: "#a07030")],
+                                    startPoint: .top, endPoint: .bottom
+                                  )
+                                : LinearGradient(
+                                    colors: [Theme.surfaceAlt, Theme.surfaceAlt],
+                                    startPoint: .top, endPoint: .bottom
+                                  )
+                            )
                             .cornerRadius(Theme.radiusM)
                     }
                     .disabled(!canGuess)
@@ -349,9 +366,9 @@ private struct GuessInputSection: View {
                 inputFocused.wrappedValue = false
                 Task { await vm.skipAttempt() }
             } label: {
-                Text("Passer (−1 essai)")
-                    .font(.system(size: 13))
-                    .foregroundColor(Theme.amber)
+                Text("Passer")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(Theme.textDim)
             }
         }
     }

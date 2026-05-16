@@ -13,6 +13,7 @@ import {
   authUpdateProfile,
   authImportStats,
   authAppleSignIn,
+  authOAuthCallback,
   authGetStats,
 } from '@/api/client'
 import type { ServerStatsData } from '@/api/client'
@@ -31,6 +32,7 @@ interface AuthStore {
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, displayName: string) => Promise<void>
   loginWithApple: (identityToken: string, displayName?: string) => Promise<void>
+  loginWithGoogle: (providerId: string, email: string, displayName: string, avatarUrl?: string) => Promise<void>
   logout: () => Promise<void>
   updateProfile: (data: { displayName?: string; avatarUrl?: string }) => Promise<void>
   setUser: (user: User) => void
@@ -120,6 +122,14 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
   loginWithApple: async (identityToken, displayName) => {
     const { user } = await authAppleSignIn(identityToken, displayName)
+    set({ user })
+    await importAllLocalStats()
+    clearLocalStats()
+    fetchAllServerStats().then((serverStats) => set({ serverStats })).catch(() => {})
+  },
+
+  loginWithGoogle: async (providerId, email, displayName, avatarUrl) => {
+    const { user } = await authOAuthCallback({ provider: 'google', providerId, email, displayName, avatarUrl })
     set({ user })
     await importAllLocalStats()
     clearLocalStats()

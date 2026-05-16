@@ -189,14 +189,15 @@ final class GameViewModel: ObservableObject {
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
 
+            isSearching = true
+            defer { isSearching = false }
             do {
-                isSearching = true
                 let results = mode == .wiki
                     ? try await APIClient.shared.searchWikiPersons(query: text)
                     : try await APIClient.shared.searchFilms(query: text, type: mode.apiType)
+                guard !Task.isCancelled else { return }
                 searchResults = results
             } catch {}
-            isSearching = false
         }
     }
 
@@ -326,11 +327,14 @@ final class GameViewModel: ObservableObject {
     private func triggerMilestoneHaptic(for streak: Int) {
         guard streak == 7 || streak == 30 || streak == 100 else { return }
         let gen = UINotificationFeedbackGenerator()
-        Task {
+        Task { [weak self] in
+            guard self != nil else { return }
             gen.notificationOccurred(.success)
             try? await Task.sleep(for: .milliseconds(180))
+            guard self != nil else { return }
             gen.notificationOccurred(.success)
             try? await Task.sleep(for: .milliseconds(180))
+            guard self != nil else { return }
             gen.notificationOccurred(.success)
         }
     }
@@ -352,9 +356,9 @@ final class GameViewModel: ObservableObject {
     private func triggerFlash(_ color: Color) {
         let opacity: Double = color == .green ? 0.35 : 0.28
         flashColor = color.opacity(opacity)
-        Task {
+        Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(500))
-            flashColor = nil
+            self?.flashColor = nil
         }
     }
 }

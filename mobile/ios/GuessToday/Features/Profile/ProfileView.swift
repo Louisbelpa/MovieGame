@@ -16,9 +16,9 @@ struct ProfileView: View {
 
                 if !auth.isLoggedIn {
                     GuestProfileView(showLogin: $showLogin)
-                } else {
+                } else if let currentUser = auth.user {
                     LoggedInProfileView(
-                        user: auth.user!,
+                        user: currentUser,
                         selectedMode: $selectedMode,
                         showChangePassword: $showChangePassword,
                         showEditName: $showEditName
@@ -38,6 +38,7 @@ struct ProfileView: View {
                             Image(systemName: "rectangle.portrait.and.arrow.right")
                                 .foregroundColor(Theme.textDim)
                         }
+                        .accessibilityLabel("Se déconnecter")
                     }
                 }
             }
@@ -46,10 +47,10 @@ struct ProfileView: View {
             LoginView().environment(auth)
         }
         .sheet(isPresented: $showChangePassword) {
-            ChangePasswordView()
+            ChangePasswordView().environment(auth)
         }
         .sheet(isPresented: $showEditName) {
-            EditNameView()
+            EditNameView().environment(auth)
         }
     }
 }
@@ -118,6 +119,7 @@ private struct LoggedInProfileView: View {
     @Environment(AuthViewModel.self) var auth
     @State private var avatarItem: PhotosPickerItem?
     @State private var avatarUploading = false
+    @State private var avatarError: String?
 
     var body: some View {
         ScrollView {
@@ -142,10 +144,17 @@ private struct LoggedInProfileView: View {
                     }
                     .onChange(of: avatarItem) { _, item in
                         guard let item else { return }
+                        avatarError = nil
                         Task { await uploadAvatar(item) }
                     }
 
                     VStack(spacing: 4) {
+                        if let avatarError {
+                            Text(avatarError)
+                                .font(.system(size: 11))
+                                .foregroundColor(Theme.red)
+                                .multilineTextAlignment(.center)
+                        }
                         HStack(spacing: 6) {
                             Text(user.displayName)
                                 .font(.custom("Georgia", size: 22))
@@ -171,25 +180,28 @@ private struct LoggedInProfileView: View {
                 }
                 .padding(.top, Theme.spacing16)
 
-                // Mode tabs
-                HStack(spacing: 0) {
+                // Mode tabs — pill style
+                HStack(spacing: 4) {
                     ForEach([GameMode.film, .series, .wiki], id: \.title) { mode in
-                        Button(mode.title) { selectedMode = mode }
-                            .font(.system(size: 13, weight: selectedMode == mode ? .semibold : .regular))
-                            .foregroundColor(selectedMode == mode ? Theme.gold : Theme.textDim)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(selectedMode == mode ? Theme.gold.opacity(0.1) : Color.clear)
-                            .overlay(alignment: .bottom) {
-                                if selectedMode == mode {
-                                    Rectangle()
-                                        .fill(Theme.gold)
-                                        .frame(height: 2)
-                                }
-                            }
+                        let isActive = selectedMode == mode
+                        let activeColor = modeColor(mode)
+                        Button(mode.title) {
+                            withAnimation(.easeInOut(duration: 0.18)) { selectedMode = mode }
+                        }
+                        .font(.system(size: 13, weight: isActive ? .semibold : .regular))
+                        .foregroundColor(isActive ? activeColor : Theme.textDim)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(isActive ? activeColor.opacity(0.14) : Color.clear)
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(isActive ? Theme.border : Color.clear, lineWidth: 1)
+                        )
                     }
                 }
-                .background(Theme.surface)
+                .padding(3)
+                .background(Theme.surfaceAlt)
                 .cornerRadius(Theme.radiusM)
                 .padding(.horizontal, Theme.spacing16)
 
@@ -225,6 +237,14 @@ private struct LoggedInProfileView: View {
         }
     }
 
+    private func modeColor(_ mode: GameMode) -> Color {
+        switch mode {
+        case .film:   return Theme.gold
+        case .series: return Color(hex: "#6b7cff")
+        case .wiki:   return Color(hex: "#e85788")
+        }
+    }
+
     private func uploadAvatar(_ item: PhotosPickerItem) async {
         avatarUploading = true
         defer { avatarUploading = false; avatarItem = nil }
@@ -240,7 +260,11 @@ private struct LoggedInProfileView: View {
         do {
             let updated = try await APIClient.shared.uploadAvatar(imageData: compressed)
             try await auth.updateProfile(avatarUrl: updated.avatarUrl)
-        } catch {}
+        } catch let e as APIError {
+            avatarError = e.localizedDescription
+        } catch {
+            avatarError = "Erreur lors de l'envoi de la photo."
+        }
     }
 }
 

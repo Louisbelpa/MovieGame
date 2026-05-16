@@ -24,7 +24,7 @@ import multer from 'multer';
 import appleSignin from 'apple-signin-auth';
 import db from '../db/database.js';
 import { userAuth, requireUser, USER_SESSION_COOKIE } from '../middleware/userAuth.js';
-import { AUTH } from '../middleware/rateLimiter.js';
+import { AUTH, apiLimiter } from '../middleware/rateLimiter.js';
 import { sendPasswordResetEmail, sendVerificationEmail } from '../lib/email.js';
 import { registerPushToken } from '../services/push-notification.service.js';
 import { getUploadsAbsDir } from '../config/uploads.js';
@@ -111,8 +111,8 @@ authRouter.post('/register', AUTH, async (req: Request, res: Response): Promise<
     res.status(400).json({ error: 'Password must be at least 8 characters' });
     return;
   }
-  if (typeof displayName !== 'string' || displayName.trim().length === 0) {
-    res.status(400).json({ error: 'Display name is required' });
+  if (typeof displayName !== 'string' || displayName.trim().length === 0 || displayName.trim().length > 50) {
+    res.status(400).json({ error: 'Display name must be between 1 and 50 characters' });
     return;
   }
 
@@ -215,11 +215,11 @@ authRouter.put('/profile', userAuth, requireUser, (req: Request, res: Response):
     avatarUrl?: unknown;
   };
 
-  if (displayName !== undefined && (typeof displayName !== 'string' || displayName.trim().length === 0)) {
-    res.status(400).json({ error: 'Display name cannot be empty' });
+  if (displayName !== undefined && (typeof displayName !== 'string' || displayName.trim().length === 0 || displayName.trim().length > 50)) {
+    res.status(400).json({ error: 'Display name must be between 1 and 50 characters' });
     return;
   }
-  if (avatarUrl !== undefined && avatarUrl !== null && typeof avatarUrl !== 'string') {
+  if (avatarUrl !== undefined && avatarUrl !== null && (typeof avatarUrl !== 'string' || avatarUrl.length > 500)) {
     res.status(400).json({ error: 'Invalid avatarUrl' });
     return;
   }
@@ -362,21 +362,21 @@ authRouter.post('/oauth/callback', AUTH, (req: Request, res: Response): void => 
         ? email.split('@')[0]
         : 'User';
 
-    const result = db
-      .prepare(
-        `INSERT INTO users (email, display_name, avatar_url) VALUES (?, ?, ?)`
-      )
-      .run(
-        typeof email === 'string' ? email.toLowerCase() : null,
-        name,
-        typeof avatarUrl === 'string' ? avatarUrl : null
-      );
+    const createOAuthUser = db.transaction(() => {
+      const r = db
+        .prepare(`INSERT INTO users (email, display_name, avatar_url) VALUES (?, ?, ?)`)
+        .run(
+          typeof email === 'string' ? email.toLowerCase() : null,
+          name,
+          typeof avatarUrl === 'string' ? avatarUrl : null
+        );
+      const newUserId = r.lastInsertRowid as number;
+      db.prepare(`INSERT INTO oauth_accounts (user_id, provider, provider_id) VALUES (?, ?, ?)`)
+        .run(newUserId, provider, providerId);
+      return newUserId;
+    });
 
-    userId = result.lastInsertRowid as number;
-
-    db.prepare(
-      `INSERT INTO oauth_accounts (user_id, provider, provider_id) VALUES (?, ?, ?)`
-    ).run(userId, provider, providerId);
+    userId = createOAuthUser();
   }
 
   const user = db
@@ -457,7 +457,7 @@ authRouter.post('/reset-password', AUTH, async (req: Request, res: Response): Pr
 });
 
 /** GET /api/auth/verify-email?token= */
-authRouter.get('/verify-email', (req: Request, res: Response): void => {
+authRouter.get('/verify-email', AUTH, (req: Request, res: Response): void => {
   const { token } = req.query as { token?: unknown };
 
   if (typeof token !== 'string' || token.trim().length === 0) {
@@ -484,7 +484,7 @@ authRouter.get('/verify-email', (req: Request, res: Response): void => {
 });
 
 /** POST /api/auth/verify-email/send — resend verification email */
-authRouter.post('/verify-email/send', userAuth, requireUser, (req: Request, res: Response): void => {
+authRouter.post('/verify-email/send', AUTH, userAuth, requireUser, (req: Request, res: Response): void => {
   const userId = req.user!.id;
   const user = db
     .prepare<number, UserRow>(`SELECT id, email, display_name, avatar_url, password_hash, is_banned, email_verified FROM users WHERE id = ?`)
@@ -509,7 +509,7 @@ authRouter.post('/verify-email/send', userAuth, requireUser, (req: Request, res:
 });
 
 /** POST /api/auth/challenge-result — record a completed challenge for the authenticated user */
-authRouter.post('/challenge-result', userAuth, requireUser, (req: Request, res: Response): void => {
+authRouter.post('/challenge-result', apiLimiter, userAuth, requireUser, (req: Request, res: Response): void => {
   const { challengeId, won, attemptsUsed } = req.body as {
     challengeId?: unknown;
     won?: unknown;
@@ -553,11 +553,46 @@ authRouter.post('/challenge-result', userAuth, requireUser, (req: Request, res: 
   res.json({ ok: true });
 });
 
-/** GET /api/auth/history?limit=&offset= */
-authRouter.get('/history', userAuth, requireUser, (req: Request, res: Response): void => {
-  const limit = Math.min(parseInt(String(req.query.limit ?? '20'), 10) || 20, 100);
-  const offset = parseInt(String(req.query.offset ?? '0'), 10) || 0;
+/**
+ * GET /api/auth/history
+ *
+ * With ?type=film|series|wiki — returns { history: { "YYYY-MM-DD": "won"|"lost" } }
+ * Without ?type             — paginated list with ?limit=&offset=
+ */
+authRouter.get('/history', apiLimiter, userAuth, requireUser, (req: Request, res: Response): void => {
   const userId = req.user!.id;
+  const type   = typeof req.query.type === 'string' ? req.query.type : '';
+  const validTypes = ['film', 'series', 'wiki'] as const;
+
+  if (type) {
+    // Type-filtered calendar view: { history: { "YYYY-MM-DD": "won"|"lost" } }
+    if (!validTypes.includes(type as never)) {
+      res.status(400).json({ error: 'type must be film, series or wiki' });
+      return;
+    }
+
+    interface Row { challenge_date: string; won: number }
+    const rows = db
+      .prepare<[number, string], Row>(`
+        SELECT dc.challenge_date, r.won
+        FROM user_challenge_results r
+        JOIN daily_challenges dc ON dc.id = r.challenge_id
+        WHERE r.user_id = ? AND r.media_type = ?
+        ORDER BY dc.challenge_date DESC
+      `)
+      .all(userId, type);
+
+    const history: Record<string, 'won' | 'lost'> = {};
+    for (const row of rows) {
+      history[row.challenge_date] = row.won === 1 ? 'won' : 'lost';
+    }
+    res.json({ history });
+    return;
+  }
+
+  // Paginated list view
+  const limit = Math.min(parseInt(String(req.query.limit ?? '20'), 10) || 20, 100);
+  const offset = Math.max(0, parseInt(String(req.query.offset ?? '0'), 10) || 0);
 
   interface HistoryRow {
     challenge_id: number;
@@ -596,34 +631,6 @@ authRouter.get('/history', userAuth, requireUser, (req: Request, res: Response):
     limit,
     offset,
   });
-});
-
-/** GET /api/auth/history?type=film|series|wiki — returns { history: { "YYYY-MM-DD": "won"|"lost" } } */
-authRouter.get('/history', userAuth, requireUser, (req: Request, res: Response): void => {
-  const userId = req.user!.id;
-  const type   = String(req.query.type ?? '');
-  const validTypes = ['film', 'series', 'wiki'] as const;
-  if (!validTypes.includes(type as never)) {
-    res.status(400).json({ error: 'type must be film, series or wiki' });
-    return;
-  }
-
-  interface Row { challenge_date: string; won: number }
-  const rows = db
-    .prepare<[number, string], Row>(`
-      SELECT dc.challenge_date, r.won
-      FROM user_challenge_results r
-      JOIN daily_challenges dc ON dc.id = r.challenge_id
-      WHERE r.user_id = ? AND r.media_type = ?
-      ORDER BY dc.challenge_date DESC
-    `)
-    .all(userId, type);
-
-  const history: Record<string, 'won' | 'lost'> = {}
-  for (const row of rows) {
-    history[row.challenge_date] = row.won === 1 ? 'won' : 'lost'
-  }
-  res.json({ history });
 });
 
 /** GET /api/auth/stats?type=film|series|wiki — compute stats from user_challenge_results */
@@ -894,17 +901,16 @@ authRouter.post('/apple', AUTH, async (req: Request, res: Response): Promise<voi
     }
   }
 
-  const result = db
-    .prepare(
-      `INSERT INTO users (email, display_name) VALUES (?, ?)`
-    )
-    .run(appleEmail ? appleEmail.toLowerCase() : null, name);
-
-  userId = result.lastInsertRowid as number;
-
-  db.prepare(
-    `INSERT INTO oauth_accounts (user_id, provider, provider_id) VALUES (?, ?, ?)`
-  ).run(userId, 'apple', sub);
+  const createAppleUser = db.transaction(() => {
+    const r = db
+      .prepare(`INSERT INTO users (email, display_name) VALUES (?, ?)`)
+      .run(appleEmail ? appleEmail.toLowerCase() : null, name);
+    const newUserId = r.lastInsertRowid as number;
+    db.prepare(`INSERT INTO oauth_accounts (user_id, provider, provider_id) VALUES (?, ?, ?)`)
+      .run(newUserId, 'apple', sub);
+    return newUserId;
+  });
+  userId = createAppleUser();
 
   const user = db
     .prepare<number, UserRow>(

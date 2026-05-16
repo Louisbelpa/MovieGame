@@ -1,4 +1,5 @@
 import Foundation
+import GoogleSignIn
 
 @Observable
 @MainActor
@@ -74,6 +75,33 @@ final class AuthViewModel {
         do {
             let r = try await APIClient.shared.appleSignIn(identityToken: identityToken, displayName: displayName)
             user = r.user
+            Task { await StatsManager.shared.importLocalToServer() }
+        } catch let e as APIError {
+            error = e.localizedDescription
+            throw e
+        }
+    }
+
+    func loginWithGoogle() async throws {
+        guard let rootVC = await UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .flatMap({ $0.windows })
+            .first(where: { $0.isKeyWindow })?.rootViewController else { return }
+
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+        do {
+            // TODO: Set your iOS Google Client ID via GIDSignIn.sharedInstance.configuration before calling signIn
+            // e.g. in App init: GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: "YOUR_IOS_CLIENT_ID")
+            let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootVC)
+            let gUser = result.user
+            guard let userId = gUser.userID,
+                  let email = gUser.profile?.email else { return }
+            let name = gUser.profile?.name ?? email.components(separatedBy: "@").first ?? "User"
+            let avatar = gUser.profile?.imageURL(withDimension: 200)?.absoluteString
+            try await APIClient.shared.oauthCallback(provider: "google", providerId: userId, email: email, displayName: name, avatarUrl: avatar)
+            user = try await APIClient.shared.me()
             Task { await StatsManager.shared.importLocalToServer() }
         } catch let e as APIError {
             error = e.localizedDescription

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Calendar, Share2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Calendar, Share2, HelpCircle } from 'lucide-react'
 import { GuessInput } from './GuessInput'
+import { GuessList } from './GuessList'
 import { HintPanel } from './HintPanel'
-import { AttemptTracker } from './AttemptTracker'
 import { ModeTabs } from './ModeTabs'
+import { AttemptTracker } from './AttemptTracker'
 import { MovieImage } from './MovieImage'
+import { FriendsLive } from './FriendsLive'
 import { WikiChallengeImage } from '@/components/wiki/WikiChallengeImage'
 import { WikiHintPanel } from '@/components/wiki/WikiHintPanel'
 import { WikiGuessInput } from '@/components/wiki/WikiGuessInput'
@@ -244,6 +246,44 @@ export function GamePage({ mode }: GamePageProps) {
     return () => { cancelled = true }
   }, [challenge?.challengeId, challenge?.id, isWiki, status])
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (window.innerWidth < 1024) return
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+
+      if (e.key === 'Enter' && !isGameOver) {
+        const val = isWiki ? wikiUi.inputValue : gameUi.inputValue
+        if (val.trim()) {
+          void submitGuess(val)
+        }
+        return
+      }
+      if (e.key === 'Escape' && !isGameOver) {
+        void skipAttempt()
+        return
+      }
+      const meta = e.metaKey || e.ctrlKey
+      if (meta && e.key === '1') {
+        e.preventDefault()
+        window.location.href = '/films'
+        return
+      }
+      if (meta && e.key === '2' && FEATURES.enableSeries) {
+        e.preventDefault()
+        window.location.href = '/series'
+        return
+      }
+      if (meta && e.key === '3' && FEATURES.enableWiki) {
+        e.preventDefault()
+        window.location.href = '/wiki'
+        return
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isGameOver, isWiki, gameUi.inputValue, wikiUi.inputValue, submitGuess, skipAttempt])
+
   if (isLoading || (status === 'idle' && !error)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4" role="status" aria-live="polite">
@@ -297,7 +337,6 @@ export function GamePage({ mode }: GamePageProps) {
               <span className="inline-flex min-h-[44px] min-w-[44px]" aria-hidden />
             )}
           </div>
-          <ModeTabs />
         </div>
 
         <div className="flex flex-col items-center justify-center min-h-[50vh] gap-2 text-center">
@@ -358,93 +397,134 @@ export function GamePage({ mode }: GamePageProps) {
         ? 'Résultat indisponible'
         : getChallengeName(challenge))
 
-  return (
-    <main className={`max-w-2xl mx-auto px-3 sm:px-4 py-3 sm:py-6 flex flex-col gap-3 sm:gap-5 game-page game-page--${mode}`}>
-      <div className="flex flex-col gap-0.5">
-        <div className="flex items-center justify-between gap-2 py-1.5 px-1">
-          {showPrevNav ? (
-            <button
-              type="button"
-              onClick={() => void navigateDate('prev')}
-              disabled={isLoading}
-              aria-label="Défi précédent"
-              title="Défi précédent"
-              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
-            >
-              <ChevronLeft size={20} aria-hidden />
-            </button>
+  // ── Shared sub-elements ──────────────────────────────────────────────────────
+
+  const dateNavBar = (
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center justify-between gap-2 py-1.5 px-1">
+        {showPrevNav ? (
+          <button
+            type="button"
+            onClick={() => void navigateDate('prev')}
+            disabled={isLoading}
+            aria-label="Défi précédent"
+            title="Défi précédent"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+          >
+            <ChevronLeft size={20} aria-hidden />
+          </button>
+        ) : (
+          <span className="inline-flex min-h-[44px] min-w-[44px]" aria-hidden />
+        )}
+
+        <div className="flex items-center gap-2 text-sm">
+          <Calendar size={13} className="text-film-text-dim" />
+          {isToday ? (
+            <span className="font-semibold text-film-gold">Aujourd'hui</span>
           ) : (
-            <span className="inline-flex min-h-[44px] min-w-[44px]" aria-hidden />
+            <button
+              onClick={() => void loadDate(todayParis)}
+              className="text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
+              title="Retour à aujourd'hui"
+            >
+              {formatDateFr(currentDate)}
+            </button>
           )}
-
-          <div className="flex items-center gap-2 text-sm">
-            <Calendar size={13} className="text-film-text-dim" />
-            {isToday ? (
-              <span className="font-semibold text-film-gold">Aujourd'hui</span>
-            ) : (
-              <button
-                onClick={() => void loadDate(todayParis)}
-                className="text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
-                title="Retour à aujourd'hui"
-              >
-                {formatDateFr(currentDate)}
-              </button>
-            )}
-            {viewingDate && (
-              <span className="text-xs bg-film-surface border border-film-border px-1.5 py-0.5 rounded text-film-text-dim">
-                Ancien défi
-              </span>
-            )}
-          </div>
-
-          {showNextNav ? (
-            <button
-              type="button"
-              onClick={() => void navigateDate('next')}
-              disabled={isLoading}
-              aria-label="Défi suivant"
-              title="Défi suivant"
-              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
-            >
-              <ChevronRight size={20} aria-hidden />
-            </button>
-          ) : (
-            <span className="inline-flex min-h-[44px] min-w-[44px]" aria-hidden />
+          {viewingDate && (
+            <span className="text-xs bg-film-surface border border-film-border px-1.5 py-0.5 rounded text-film-text-dim">
+              Ancien défi
+            </span>
           )}
         </div>
-        {isToday && hasPrev && (
-          <p className="text-center text-xs text-film-text-dim tracking-wide">
-            ← défis des jours précédents disponibles
-          </p>
+
+        {showNextNav ? (
+          <button
+            type="button"
+            onClick={() => void navigateDate('next')}
+            disabled={isLoading}
+            aria-label="Défi suivant"
+            title="Défi suivant"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+          >
+            <ChevronRight size={20} aria-hidden />
+          </button>
+        ) : (
+          <span className="inline-flex min-h-[44px] min-w-[44px]" aria-hidden />
         )}
-        <ModeTabs />
       </div>
-      {!isWiki && (
-        <MovieImage
-          imageUrl={challenge.photoUrl ?? null}
-          attempt={Math.min(guesses.length + 1, challenge.maxAttempts)}
-        />
+      {isToday && hasPrev && (
+        <p className="text-center text-xs text-film-text-dim tracking-wide">
+          ← défis des jours précédents disponibles
+        </p>
       )}
+    </div>
+  )
 
-      {isWiki && (
-        <WikiChallengeImage
-          imageUrl={challenge.photoUrl ?? null}
-          isRevealed={isGameOver}
-        />
+  const gameOverBanner = isGameOver ? (
+    <div
+      className={`flex flex-wrap items-center justify-between gap-2 py-2.5 px-4 rounded-lg text-sm font-semibold ${
+        status === 'won'
+          ? 'bg-film-green/10 border border-film-green/30 text-film-green'
+          : 'bg-film-red/10 border border-film-red/30 text-film-red'
+      }`}
+      role="status"
+      aria-live="polite"
+    >
+      <span>
+        {status === 'won'
+          ? `Bravo ! Trouvé en ${guesses.findIndex((g) => g.correct) + 1}/${challenge.maxAttempts}`
+          : 'Pas cette fois…'}
+      </span>
+      {resolvedAnswerName && (
+        <span className="text-xs font-medium text-film-text-dim truncate max-w-[45%] text-center min-w-0">
+          {resolvedAnswerName}
+          {!isWiki && resultDetails?.year != null ? ` (${resultDetails.year})` : ''}
+        </span>
       )}
-
-      {isWiki && (
-        <WikiHintPanel
-          profile={wikiProfile}
-          hints={[]}
-          hintsAvailable={hintsAvailable}
-          hintsRevealed={hintsRevealed}
-          showHints={false}
-          wikiPersonType={wikiPersonType}
-        />
+      {answerLabelPending && (
+        <span className="text-xs font-medium text-film-text-dim animate-pulse">Chargement…</span>
       )}
+      {resultLoadError && (
+        <span className="text-xs font-medium text-film-text-dim">Résultat indisponible</span>
+      )}
+      <button
+        type="button"
+        onClick={() => openModal(status === 'won' ? 'win' : 'lose')}
+        className="flex items-center gap-1.5 text-xs font-medium opacity-70 hover:opacity-100 transition-opacity cursor-pointer shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold rounded"
+        title="Voir les détails du défi"
+      >
+        <Share2 size={13} aria-hidden />
+        Voir le résultat
+      </button>
+    </div>
+  ) : null
 
-      <section className="flex flex-col gap-3">
+  return (
+    <main
+      className={`game-page game-page--${mode} atmosphere-${mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : 'film'} px-3 sm:px-4 lg:px-4 py-3 sm:py-5 lg:py-5`}
+      data-mode={mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : undefined}
+    >
+      {/* ── Mobile layout (stack) ── */}
+      <div className="lg:hidden max-w-2xl mx-auto flex flex-col gap-3 sm:gap-5">
+        <div className="flex justify-center pt-1">
+          <ModeTabs />
+        </div>
+        {dateNavBar}
+
+        {!isWiki && (
+          <MovieImage
+            imageUrl={challenge.photoUrl ?? null}
+            attempt={Math.min(guesses.length + 1, challenge.maxAttempts)}
+            maxAttempts={challenge.maxAttempts}
+          />
+        )}
+        {isWiki && (
+          <WikiChallengeImage
+            imageUrl={challenge.photoUrl ?? null}
+            isRevealed={isGameOver}
+          />
+        )}
+
         <div className="flex items-center justify-between">
           <AttemptTracker guesses={guessesForTracker} maxAttempts={challenge.maxAttempts} />
           <span className="text-sm text-film-text-dim font-mono">{guesses.length}/{challenge.maxAttempts}</span>
@@ -468,65 +548,185 @@ export function GamePage({ mode }: GamePageProps) {
           )
         )}
 
-        {isGameOver && (
-          <div
-            className={`flex flex-wrap items-center justify-between gap-2 py-2.5 px-4 rounded-lg text-sm font-semibold ${
-              status === 'won'
-                ? 'bg-film-green/10 border border-film-green/30 text-film-green'
-                : 'bg-film-red/10 border border-film-red/30 text-film-red'
-            }`}
-            role="status"
-            aria-live="polite"
-          >
-            <span>
-              {status === 'won'
-                ? `Bravo ! Trouvé en ${guesses.findIndex((g) => g.correct) + 1}/${challenge.maxAttempts}`
-                : 'Pas cette fois…'}
-            </span>
-            {resolvedAnswerName && (
-              <span className="text-xs font-medium text-film-text-dim truncate max-w-[45%] text-center min-w-0">
-                {resolvedAnswerName}
-                {!isWiki && resultDetails?.year != null ? ` (${resultDetails.year})` : ''}
-              </span>
-            )}
-            {answerLabelPending && (
-              <span className="text-xs font-medium text-film-text-dim animate-pulse">
-                Chargement…
-              </span>
-            )}
-            {resultLoadError && (
-              <span className="text-xs font-medium text-film-text-dim">
-                Résultat indisponible
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => openModal(status === 'won' ? 'win' : 'lose')}
-              className="flex items-center gap-1.5 text-xs font-medium opacity-70 hover:opacity-100 transition-opacity cursor-pointer shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold rounded"
-              title="Voir les détails du défi"
-            >
-              <Share2 size={13} aria-hidden />
-              Voir le résultat
-            </button>
-          </div>
-        )}
-      </section>
+        {gameOverBanner}
 
-      {isWiki ? (
-        <WikiHintPanel
-          profile={wikiProfile}
-          hints={challenge.hints as WikiHintPayload[]}
-          hintsAvailable={hintsAvailable}
-          hintsRevealed={hintsRevealed}
-          showProfile={false}
-        />
-      ) : (
-        <HintPanel
-          hints={challenge.hints as HintPayload[]}
-          hintsAvailable={hintsAvailable}
-          hintsRevealed={hintsRevealed}
-        />
-      )}
+        {isWiki && (
+          <WikiHintPanel
+            profile={wikiProfile}
+            hints={[]}
+            hintsAvailable={hintsAvailable}
+            hintsRevealed={hintsRevealed}
+            showHints={false}
+            wikiPersonType={wikiPersonType}
+          />
+        )}
+
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[10px] font-mono uppercase tracking-widest text-film-text-dim/50">Indices</span>
+          <button
+            type="button"
+            onClick={() => openModal('rules')}
+            className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-widest text-film-text-dim/50 hover:text-film-text-dim transition-colors cursor-pointer"
+          >
+            <HelpCircle size={11} aria-hidden />
+            Comment jouer
+          </button>
+        </div>
+
+        {isWiki ? (
+          <WikiHintPanel
+            profile={wikiProfile}
+            hints={challenge.hints as WikiHintPayload[]}
+            hintsAvailable={hintsAvailable}
+            hintsRevealed={hintsRevealed}
+            showProfile={false}
+          />
+        ) : (
+          <HintPanel
+            hints={challenge.hints as HintPayload[]}
+            hintsAvailable={hintsAvailable}
+            hintsRevealed={hintsRevealed}
+          />
+        )}
+
+        {guesses.length > 0 && (
+          <GuessList
+            guesses={guesses.map((g) => ({
+              value: g.guess,
+              status: g.correct ? 'correct' as const : 'wrong' as const,
+              timestamp: 0,
+            }))}
+            maxAttempts={challenge.maxAttempts}
+          />
+        )}
+      </div>
+
+      {/* ── Desktop 2-col layout ── */}
+      <div
+        className="hidden lg:grid items-start"
+        style={{ gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: '1.5rem' }}
+      >
+        {/* Left column: image 16/9 + attempt dots + hints */}
+        <div className="flex flex-col gap-3">
+          <div>
+            {!isWiki && (
+              <MovieImage
+                imageUrl={challenge.photoUrl ?? null}
+                attempt={Math.min(guesses.length + 1, challenge.maxAttempts)}
+                maxAttempts={challenge.maxAttempts}
+              />
+            )}
+            {isWiki && (
+              <WikiChallengeImage
+                imageUrl={challenge.photoUrl ?? null}
+                isRevealed={isGameOver}
+              />
+            )}
+          </div>
+
+          {/* AttemptTracker below image */}
+          <div className="flex items-center justify-center">
+            <AttemptTracker guesses={guessesForTracker} maxAttempts={challenge.maxAttempts} />
+          </div>
+
+          <div className="shrink-0 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-film-text-dim/50">Indices</span>
+              <button
+                type="button"
+                onClick={() => openModal('rules')}
+                className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-widest text-film-text-dim/50 hover:text-film-text-dim transition-colors cursor-pointer"
+              >
+                <HelpCircle size={11} aria-hidden />
+                Comment jouer
+              </button>
+            </div>
+            {isWiki ? (
+              <>
+                <WikiHintPanel
+                  profile={wikiProfile}
+                  hints={[]}
+                  hintsAvailable={hintsAvailable}
+                  hintsRevealed={hintsRevealed}
+                  showHints={false}
+                  wikiPersonType={wikiPersonType}
+                />
+                <WikiHintPanel
+                  profile={wikiProfile}
+                  hints={challenge.hints as WikiHintPayload[]}
+                  hintsAvailable={hintsAvailable}
+                  hintsRevealed={hintsRevealed}
+                  showProfile={false}
+                />
+              </>
+            ) : (
+              <HintPanel
+                hints={challenge.hints as HintPayload[]}
+                hintsAvailable={hintsAvailable}
+                hintsRevealed={hintsRevealed}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Right column: date nav + input + guesses + friends */}
+        <div className="flex flex-col gap-4">
+          {/* Date nav — desktop only */}
+          {dateNavBar}
+
+          {/* Guess input */}
+          <div>
+            {!isGameOver && (
+              isWiki ? (
+                <WikiGuessInput
+                  onSubmit={submitGuess}
+                  onSkip={skipAttempt}
+                  attemptsLeft={attemptsLeft}
+                  disabled={isSubmitting}
+                />
+              ) : (
+                <GuessInput
+                  onSubmit={submitGuess}
+                  onSkip={skipAttempt}
+                  attemptsLeft={attemptsLeft}
+                  disabled={isSubmitting}
+                />
+              )
+            )}
+            {gameOverBanner}
+          </div>
+
+          {/* Shortcuts + attempts counter */}
+          {!isGameOver && (
+            <div className="flex items-center justify-between text-[11px] font-mono text-film-text-dim/60 select-none">
+              <span>↵ Deviner · Esc Passer</span>
+              <span>{attemptsLeft} essai{attemptsLeft !== 1 ? 's' : ''} restant{attemptsLeft !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+
+          {/* Guess list */}
+          {guesses.length > 0 && (
+            <>
+              <div className="text-[10px] font-semibold tracking-widest text-film-text-dim uppercase">
+                Tes tentatives
+              </div>
+              <GuessList
+                guesses={guesses.map((g) => ({
+                  value: g.guess,
+                  status: g.correct ? 'correct' as const : 'wrong' as const,
+                  timestamp: 0,
+                }))}
+                maxAttempts={challenge.maxAttempts}
+              />
+            </>
+          )}
+
+          {/* Friends live — desktop only */}
+          <div className="mt-auto pt-2">
+            <FriendsLive mode={isWiki ? 'wiki' : mode as 'film' | 'series'} />
+          </div>
+        </div>
+      </div>
 
       {(() => {
         const today = getTodayParis()

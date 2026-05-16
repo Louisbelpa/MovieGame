@@ -61,5 +61,3 @@ class PushNotificationService : FirebaseMessagingService() {
         scope.cancel()
     }
 }
-
-data class PushTokenBody(val token: String, val platform: String)

@@ -26,6 +26,7 @@ interface UserCodeRow {
   id: number;
   friend_code: string | null;
   display_name: string;
+  avatar_url: string | null;
   stats_streak: number;
 }
 
@@ -54,7 +55,7 @@ friendsRouter.get('/code', apiLimiter, userAuth, requireUser, (req: Request, res
   const userId = req.user!.id;
 
   const row = db
-    .prepare<number, UserCodeRow>(`SELECT id, friend_code, display_name, stats_streak FROM users WHERE id = ?`)
+    .prepare<number, UserCodeRow>(`SELECT id, friend_code, display_name, avatar_url, stats_streak FROM users WHERE id = ?`)
     .get(userId)!;
 
   if (row.friend_code) {
@@ -198,14 +199,15 @@ friendsRouter.get('/leaderboard', apiLimiter, userAuth, requireUser, (req: Reque
     ...accepted.map((f) => ({ ...f, isMe: false })),
   ];
 
-  interface WinsRow { user_id: number; media_type: string; wins: number; played: number; }
+  interface WinsRow { user_id: number; media_type: string; wins: number; played: number; avg_attempts: number; }
 
   const userIds = allUsers.map((u) => u.id);
   const winsData = userIds.length > 0
     ? (db.prepare(
         `SELECT ucr.user_id, dc.media_type,
                 COUNT(*) as played,
-                SUM(CASE WHEN ucr.won = 1 THEN 1 ELSE 0 END) as wins
+                SUM(CASE WHEN ucr.won = 1 THEN 1 ELSE 0 END) as wins,
+                ROUND(AVG(ucr.attempts_used), 1) as avg_attempts
          FROM user_challenge_results ucr
          JOIN daily_challenges dc ON dc.id = ucr.challenge_id
          WHERE ucr.user_id IN (${userIds.map(() => '?').join(',')})
@@ -221,6 +223,7 @@ friendsRouter.get('/leaderboard', apiLimiter, userAuth, requireUser, (req: Reque
     const wikiWins   = rows.find((r) => r.media_type === 'wiki')?.wins ?? 0;
     const totalWins  = filmWins + seriesWins + wikiWins;
     const totalPlayed = rows.reduce((s, r) => s + r.played, 0);
+    const totalAttempts = rows.reduce((s, r) => s + r.avg_attempts * r.played, 0);
     return {
       id: u.id,
       displayName: u.display_name,
@@ -232,6 +235,7 @@ friendsRouter.get('/leaderboard', apiLimiter, userAuth, requireUser, (req: Reque
       filmWins,
       seriesWins,
       wikiWins,
+      avgAttempts: totalPlayed > 0 ? Math.round((totalAttempts / totalPlayed) * 10) / 10 : null,
       currentStreak: u.stats_streak ?? 0,
       maxStreak: u.stats_max_streak ?? 0,
     };
@@ -255,7 +259,7 @@ friendsRouter.get('/', apiLimiter, userAuth, requireUser, (req: Request, res: Re
   const queryDate = dateParam > today ? today : dateParam;
 
   let myRow = db
-    .prepare<number, UserCodeRow>(`SELECT id, friend_code, display_name, stats_streak FROM users WHERE id = ?`)
+    .prepare<number, UserCodeRow>(`SELECT id, friend_code, display_name, avatar_url, stats_streak FROM users WHERE id = ?`)
     .get(me)!;
 
   // Auto-generate friend code on first visit
@@ -281,6 +285,7 @@ friendsRouter.get('/', apiLimiter, userAuth, requireUser, (req: Request, res: Re
   interface FriendRow {
     id: number;
     display_name: string;
+    avatar_url: string | null;
     stats_streak: number;
     friendship_id: number;
     requester_id: number;
@@ -290,7 +295,7 @@ friendsRouter.get('/', apiLimiter, userAuth, requireUser, (req: Request, res: Re
 
   const allFriendships = db
     .prepare<[number, number, number], FriendRow>(
-      `SELECT u.id, u.display_name, u.stats_streak,
+      `SELECT u.id, u.display_name, u.avatar_url, u.stats_streak,
               f.id as friendship_id, f.requester_id, f.addressee_id, f.status
        FROM friendships f
        JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
@@ -345,6 +350,7 @@ friendsRouter.get('/', apiLimiter, userAuth, requireUser, (req: Request, res: Re
     {
       id: myRow.id,
       displayName: myRow.display_name,
+      avatarUrl: myRow.avatar_url ?? null,
       streak: myRow.stats_streak ?? 0,
       scores: buildScores(me),
       isMe: true,
@@ -352,6 +358,7 @@ friendsRouter.get('/', apiLimiter, userAuth, requireUser, (req: Request, res: Re
     ...accepted.map((f) => ({
       id: f.id,
       displayName: f.display_name,
+      avatarUrl: f.avatar_url ?? null,
       streak: f.stats_streak ?? 0,
       scores: buildScores(f.id),
       isMe: false,

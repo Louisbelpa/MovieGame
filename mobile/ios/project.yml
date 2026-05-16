@@ -1,4 +1,10 @@
 name: GuessToday
+
+packages:
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: "8.0.0"
+
 options:
   bundleIdPrefix: fr.guesstoday
   deploymentTarget:
@@ -15,6 +21,11 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: GuessToday
+    dependencies:
+      - package: GoogleSignIn
+        product: GoogleSignIn
+      - package: GoogleSignIn
+        product: GoogleSignInSwift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: fr.guesstoday.app
@@ -53,3 +64,9 @@ targets:
         UILaunchScreen:
           UIColorName: ""
           UIImageName: ""
+        # Google Sign-In URL scheme — set GOOGLE_REVERSED_CLIENT_ID in Build Settings
+        # e.g. com.googleusercontent.apps.YOUR_CLIENT_ID_REVERSED
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLSchemes:
+              - $(GOOGLE_REVERSED_CLIENT_ID)

@@ -2,12 +2,22 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { GoogleOAuthProvider } from '@react-oauth/google'
 import './index.css'
 import { BRAND_NAME, FEATURES } from './config/features'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
+// TODO: Replace with your Web Google Client ID in .env (VITE_GOOGLE_CLIENT_ID)
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
+
 function wrap(el: React.ReactNode) {
-  return <StrictMode><ErrorBoundary>{el}</ErrorBoundary></StrictMode>
+  return (
+    <StrictMode>
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        <ErrorBoundary>{el}</ErrorBoundary>
+      </GoogleOAuthProvider>
+    </StrictMode>
+  )
 }
 
 function setMeta(title: string, description: string) {

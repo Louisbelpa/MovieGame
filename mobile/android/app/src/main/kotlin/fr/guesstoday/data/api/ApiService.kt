@@ -1,5 +1,6 @@
 package fr.guesstoday.data.api
 
+import com.squareup.moshi.JsonClass
 import retrofit2.http.*
 
 interface ApiService {
@@ -73,6 +74,9 @@ interface ApiService {
     @POST("/api/auth/forgot-password")
     suspend fun forgotPassword(@Body body: EmailBody): OkResponse
 
+    @POST("/api/auth/oauth/callback")
+    suspend fun oauthCallback(@Body body: OAuthCallbackBody): AuthResponse
+
     @POST("/api/auth/push-token")
     suspend fun registerPushToken(@Body body: PushTokenBody): OkResponse
 
@@ -89,17 +93,48 @@ interface ApiService {
 
     @DELETE("/api/friends/{userId}")
     suspend fun removeFriend(@Path("userId") userId: Int): OkResponse
+
+    @GET("/api/friends/leaderboard")
+    suspend fun friendsLeaderboard(): LeaderboardPayload
 }
 
 // MARK: - Request bodies
 
+@JsonClass(generateAdapter = true)
 data class GuessBody(val challengeId: Int, val guess: String)
+
+@JsonClass(generateAdapter = true)
 data class LoginBody(val email: String, val password: String)
+
+@JsonClass(generateAdapter = true)
 data class RegisterBody(val email: String, val password: String, val displayName: String)
+
+@JsonClass(generateAdapter = true)
 data class UpdateProfileBody(val displayName: String? = null, val avatarUrl: String? = null)
+
+@JsonClass(generateAdapter = true)
 data class ChangePasswordBody(val currentPassword: String, val newPassword: String)
+
+@JsonClass(generateAdapter = true)
 data class EmailBody(val email: String)
+
+@JsonClass(generateAdapter = true)
 data class PushTokenBody(val token: String, val platform: String)
+
+@JsonClass(generateAdapter = true)
 data class FriendCodeBody(val code: String)
+
+@JsonClass(generateAdapter = true)
 data class FriendUserIdBody(val userId: Int)
+
+@JsonClass(generateAdapter = true)
 data class UserWrapper(val user: User)
+
+@JsonClass(generateAdapter = true)
+data class OAuthCallbackBody(
+    val provider: String,
+    val providerId: String,
+    val email: String,
+    val displayName: String,
+    val avatarUrl: String? = null,
+)

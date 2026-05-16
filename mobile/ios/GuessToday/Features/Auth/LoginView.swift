@@ -1,5 +1,7 @@
 import SwiftUI
 import AuthenticationServices
+import GoogleSignIn
+import GoogleSignInSwift
 
 struct LoginView: View {
     @Environment(AuthViewModel.self) var auth
@@ -68,6 +70,14 @@ struct LoginView: View {
                             .foregroundColor(Theme.textDim)
                         }
 
+                        // Google Sign In
+                        GoogleSignInButton(scheme: .dark, style: .wide, state: .normal) {
+                            Task { await loginWithGoogle() }
+                        }
+                        .frame(height: 50)
+                        .cornerRadius(Theme.radiusM)
+                        .padding(.horizontal, Theme.spacing16)
+
                         // Apple Sign In
                         SignInWithAppleButton(.signIn) { request in
                             request.requestedScopes = [.fullName, .email]
@@ -121,6 +131,20 @@ struct LoginView: View {
             .sheet(isPresented: $showForgotPassword) {
                 ForgotPasswordView()
             }
+        }
+    }
+
+    private func loginWithGoogle() async {
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+        do {
+            try await auth.loginWithGoogle()
+            dismiss()
+        } catch let e as APIError {
+            error = e.localizedDescription
+        } catch {
+            self.error = error.localizedDescription
         }
     }
 

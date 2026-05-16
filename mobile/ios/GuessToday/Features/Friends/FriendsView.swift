@@ -28,6 +28,7 @@ final class FriendsViewModel {
         guard !addCode.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         isAdding = true
         addError = nil
+        addSuccess = false
         do {
             try await APIClient.shared.addFriend(code: addCode.uppercased())
             addCode = ""
@@ -45,14 +46,22 @@ final class FriendsViewModel {
         do {
             try await APIClient.shared.acceptFriend(userId: userId)
             await load()
-        } catch {}
+        } catch let e as APIError {
+            addError = e.localizedDescription
+        } catch {
+            addError = error.localizedDescription
+        }
     }
 
     func removeFriend(userId: Int) async {
         do {
             try await APIClient.shared.removeFriend(userId: userId)
             await load()
-        } catch {}
+        } catch let e as APIError {
+            addError = e.localizedDescription
+        } catch {
+            addError = error.localizedDescription
+        }
     }
 }
 

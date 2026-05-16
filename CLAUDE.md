@@ -2,7 +2,7 @@
 
 ## Architecture
 
-Monorepo avec un **frontend** React/Vite à la racine et un **backend** Express/SQLite dans `backend/`.
+Monorepo : **frontend** React/Vite à la racine, **backend** Express/SQLite dans `backend/`, **apps mobiles** natives dans `mobile/`.
 
 ```
 /
@@ -17,31 +17,59 @@ Monorepo avec un **frontend** React/Vite à la racine et un **backend** Express/
 │   ├── types/index.ts            # Types partagés frontend
 │   ├── config/features.ts        # Feature flags (VITE_ENABLE_SERIES, VITE_ENABLE_WIKI)
 │   ├── components/
-│   │   ├── game/                 # GamePage, DateNavBar, HintPanel, GuessInput…
+│   │   ├── game/                 # GamePage, DateNavBar, HintPanel, GuessInput, ModeTabs…
 │   │   ├── wiki/                 # WikiGamePage, WikiHintPanel, WikiGuessInput, modals
 │   │   ├── modals/               # WinModal, LoseModal, StatsModal, RulesModal
 │   │   ├── layout/               # Header, Footer
 │   │   └── ui/                   # Button, Badge, Modal, Spinner
 │   ├── hooks/                    # useAutocomplete, useKeyboard
-│   ├── App.tsx                   # Entrée films/séries
+│   ├── App.tsx                   # Entrée films/séries (contient aussi <ModeTabs />)
 │   ├── WikiApp.tsx               # Entrée mode Wikipedia
 │   └── admin/                    # Back office (pages, components, api.ts)
 │
-└── backend/
-    ├── src/
-    │   ├── routes/               # challenge.ts, films.ts, stats.ts, admin.ts, wiki-challenge.ts
-    │   ├── services/             # challenge.service.ts, wiki-challenge.service.ts
-│   ├── lib/                  # wikipedia.ts (parser + fetch Wikidata)
-│   ├── config/               # uploads.ts (chemins disque upload admin)
-│   ├── middleware/           # session, rateLimiter, adminAuth, errorHandler
-│   └── db/                   # schema.sql, migrate.ts, database.ts
-    └── scripts/
-        ├── seed.ts
-        ├── reset.ts
-        ├── backup.ts               # Sauvegarde SQLite
-        ├── fetch-backdrops.ts      # Télécharge les images TMDB en local
-        ├── backfill-wiki-persons.ts # Enrichit les fiches wiki existantes
-        └── check-wiki-parser.ts    # Debug parsing Wikipedia d'une fiche
+├── backend/
+│   ├── src/
+│   │   ├── routes/               # challenge.ts, films.ts, stats.ts, admin.ts, wiki-challenge.ts, auth.ts, friends.ts
+│   │   ├── services/             # challenge.service.ts, wiki-challenge.service.ts, push-notification.service.ts
+│   │   ├── lib/                  # wikipedia.ts (parser + fetch Wikidata)
+│   │   ├── config/               # uploads.ts (chemins disque upload admin)
+│   │   ├── middleware/           # session, rateLimiter, adminAuth, errorHandler
+│   │   └── db/                   # schema.sql, migrate.ts, database.ts
+│   └── scripts/
+│       ├── seed.ts
+│       ├── reset.ts
+│       ├── backup.ts               # Sauvegarde SQLite
+│       ├── fetch-backdrops.ts      # Télécharge les images TMDB en local
+│       ├── backfill-wiki-persons.ts # Enrichit les fiches wiki existantes
+│       └── check-wiki-parser.ts    # Debug parsing Wikipedia d'une fiche
+│
+└── mobile/
+    ├── ios/                      # App SwiftUI (iOS 17+)
+    │   └── GuessToday/
+    │       ├── App/              # GuessTodayApp, RootView, NotificationManager, SoundManager
+    │       ├── Networking/       # APIClient.swift, Models.swift, StatsManager.swift
+    │       ├── Features/
+    │       │   ├── Game/         # GameView, GameViewModel, WinSheet, LoseSheet, RulesSheet
+    │       │   ├── Archive/      # ArchiveView
+    │       │   ├── Auth/         # AuthViewModel, LoginView
+    │       │   ├── Friends/      # FriendsView (+ GlobalLeaderboardView, LeaderboardPodium)
+    │       │   ├── Home/         # HomeView
+    │       │   └── Profile/      # ProfileView
+    │       └── UI/               # Theme.swift, BlurImageView, HintCard, GuessRow, SearchDropdown
+    └── android/                  # App Jetpack Compose (Android 8+, minSdk 26)
+        └── app/src/main/kotlin/fr/guesstoday/
+            ├── data/api/         # ApiService.kt, ApiModels.kt
+            ├── data/network/     # NetworkModule.kt (Hilt + OkHttp CookieJar)
+            ├── data/prefs/       # SessionManager.kt
+            ├── data/push/        # PushNotificationService.kt (FCM)
+            ├── features/
+            │   ├── game/         # GameScreen.kt, GameViewModel.kt, RulesSheet.kt
+            │   ├── archive/      # ArchiveScreen.kt
+            │   ├── auth/         # AuthViewModel.kt, LoginScreen.kt
+            │   ├── friends/      # FriendsScreen.kt (+ LeaderboardViewModel, GlobalLeaderboard)
+            │   └── profile/      # ProfileScreen.kt
+            ├── navigation/       # AppNavigation.kt
+            └── ui/theme/         # Color.kt, Theme.kt (AppColors, GoldGradient), Type.kt
 ```
 
 ## Commandes
@@ -67,6 +95,19 @@ npm run dev          # Express sur http://localhost:3001
 ```bash
 npm run test                    # Frontend (vitest, jsdom)
 cd backend && npm run test      # Backend (vitest)
+```
+
+### iOS
+```bash
+cd mobile/ios
+xcodegen generate               # Génère GuessToday.xcodeproj (nécessite XcodeGen)
+open GuessToday.xcodeproj       # Puis Run dans Xcode 16+
+```
+
+### Android
+```bash
+cd mobile/android
+./gradlew assembleDebug         # Ou ouvrir dans Android Studio Ladybug+
 ```
 
 ## Variables d'environnement clés
@@ -98,6 +139,12 @@ cd backend && npm run test      # Backend (vitest)
 | `WIKI_PREFETCH_MAX_FETCH_PER_RUN` | Fiches enrichies par passe (défaut 4, max 40) |
 | `WIKI_PREFETCH_SPARQL_LIMIT` | Limite Wikidata (`LIMIT` SPARQL prefetch ; si absent : `max(100, WIKI_PREFETCH_TARGET_READY)` cap 800 ; si défini : 50–800 ; corrige l’ancien plafond fixe à 100) |
 | `PREFETCH_WARM_TOKEN` | Secrète pour `POST /api/admin/prefetch/warm` (cron) |
+| `APPLE_WEB_CLIENT_ID` | Client ID web Apple OAuth (`fr.guesstoday.web` par défaut) |
+| `APNS_KEY_ID` | Key ID clé APNs (Apple Developer Portal) |
+| `APNS_TEAM_ID` | Team ID Apple (10 caractères) |
+| `APNS_KEY_P8` | Contenu de la clé `.p8` APNs en base64 |
+| `FCM_SERVICE_ACCOUNT` | JSON service account Firebase en base64 (push Android) |
+| `PUSH_BUNDLE_ID` | Bundle ID de l’app iOS (ex: `fr.guesstoday.app`) |
 
 ## Points techniques importants
 
@@ -158,6 +205,59 @@ Ordre d'affichage : année → réalisateur → acteur principal (1 seul, `cast.
 - Les guesses stockées dans `game_sessions.attempts` sont échappées via `escapeHtml()`.
 - Les endpoints de recherche échappent `%` et `_` en LIKE SQL.
 - Les autocomplétions excluent aussi le contenu planifié dans le futur (anti-leak planning).
+
+### Authentification utilisateur (joueurs)
+- Sessions par cookie httpOnly signé (`COOKIE_SECRET`) — partagé web + mobile (même domaine ou CORS configuré).
+- Middleware `userAuth` + `requireUser` dans `backend/src/middleware/session.ts`.
+- Tables : `users`, `oauth_accounts`, `user_sessions`.
+- Routes sous `backend/src/routes/auth.ts` :
+  - `POST /api/auth/register` / `login` / `logout` / `me`
+  - `PUT /api/auth/profile` — displayName / avatarUrl
+  - `POST /api/auth/avatar` — upload multer
+  - `POST /api/auth/change-password` / `forgot-password` / `reset-password`
+  - `GET /api/auth/verify-email` / `POST /api/auth/verify-email/send`
+  - `POST /api/auth/apple` — Sign in with Apple (valide `identityToken` via `apple-signin-auth`)
+  - `POST /api/auth/oauth/callback` — callback générique Google/Apple
+  - `POST /api/auth/push-token` — enregistre un token FCM/APNs `{ token, platform: 'ios'|'android' }`
+  - `GET /api/auth/stats` / `GET /api/auth/history` — stats et historique par `media_type`
+  - `POST /api/auth/import-stats` — migration stats localStorage → compte
+- Les stats serveur (`GET /api/auth/stats`) ont priorité sur SharedPreferences mobile si l'utilisateur est connecté.
+
+### Système Amis & Classement
+- Routes sous `backend/src/routes/friends.ts` (préfixe `/api/friends/`) :
+  - `GET /code` — récupère le code ami personnel
+  - `POST /add` — ajoute par code
+  - `POST /accept` — accepte une demande
+  - `DELETE /:userId` — retire un ami
+  - `GET /` — liste amis + résultats du jour
+  - `GET /leaderboard` — classement global (`totalWins`, `filmWins`, `seriesWins`, `wikiWins`, `currentStreak`)
+- Le classement est calculé côté serveur depuis `user_sessions` + `wiki_sessions`.
+
+### Design system web
+- **Palette CSS** : variables `--film-black`, `--film-gold`, `--film-gold-light`, `--film-gold-deep`, `--film-green`, `--film-red`, `--film-border`, `--film-text`, `--film-text-dim`.
+- **Couleurs de mode** : `--sg-films` (gold), `--sg-wiki` (rose `#e85788`), `--sg-series` (violet `#6b7cff`). Variables `--mode-color`, `--mode-ring`, `--mode-soft` injectées dynamiquement selon le mode actif.
+- **Gradient gold** : `linear-gradient(180deg, #e8c06a, #d4a64a, #a07030)` avec texte `#1a0f00`.
+- **ModeTabs** (`src/components/game/ModeTabs.tsx` + `.css`) : pill flottant `position: fixed; bottom: 20px` affiché uniquement sur mobile (`lg:hidden`). Monté dans `App.tsx` (GameLayout), pas dans `GamePage`.
+- **Grille d'indices** : 3 colonnes (`grid-cols-2 sm:grid-cols-3`) — slots verrouillés avec tiret et icône cadenas, pas de label.
+- **GuessInput / WikiGuessInput** : conteneur avec bordure `--mode-ring` + glow `--mode-soft` ; bouton Deviner gradient gold, bouton Passer ghost.
+
+### Design system iOS (SwiftUI)
+- **`Theme.swift`** : constantes centralisées (`Theme.background`, `.gold`, `.green`, `.red`, `.surface`, `.border`, `.muted`, `.textDim`, `.text`, `.amber`).
+- **Grille d'indices** (`HintCard.swift`) : `LazyVGrid` 3 colonnes ; slots verrouillés avec `RoundedRectangle` en tirets (`StrokeStyle(lineWidth:1, dash:[5,4])`).
+- **`BlurImageView.swift`** : badge "Scène" (`.ultraThinMaterial`) en overlay top-left pour les défis films/séries.
+- **`WinSheet`** : confetti Canvas physique (150 particules, burst + gravité + fade), header trophée animé bounce, stats row serif 28pt gradient gold, prompt notifications APNs au 1er gain.
+- **`RulesSheet`** : sheet animée par mode (icône + règles numérotées + légende indices), persistée dans `UserDefaults` clé `rules_seen_{statsKey}`.
+- **`FriendsView`** : tab switcher "Aujourd'hui" / "Classement" ; `GlobalLeaderboardView` avec podium 3 colonnes + table ranks.
+- **Tab bar** : native iOS (`TabView`) — ne pas remplacer par un composant custom.
+
+### Design system Android (Jetpack Compose)
+- **`AppColors`** (`Theme.kt`) : palette complète + `modeFilm`, `modeSeries`, `modeWiki`.
+- **`GoldGradient`** : `Brush.verticalGradient(FilmGoldLight → FilmGold → FilmGoldDeep)` — utilisé pour le bouton Deviner.
+- **Slots verrouillés** : `Modifier.drawBehind` avec `PathEffect.dashPathEffect` (Compose ne supporte pas les tirets via `BorderStroke`).
+- **`RulesSheet.kt`** : même logique que iOS — détecté via `rulesAlreadySeen(ctx, mode)` → `SharedPreferences("game_stats")` clé `rules_seen_{statsKey}`.
+- **`FriendsScreen.kt`** : `LeaderboardViewModel` dédié + `GlobalLeaderboardSection` avec podium (`LeaderboardPodium`) et table (`LeaderboardTable`). Endpoint `GET /api/friends/leaderboard`.
+- **`ResultBottomSheet`** : `ConfettiOverlay` (Canvas `withFrameNanos` loop), `WinHeader` / `LoseHeader` animés, stats row 28sp serif, prompt notification Android 13+ via `ActivityResultContracts.RequestPermission`.
+- **Bottom nav** : native Material3 — ne pas remplacer.
 
 ---
 
@@ -226,7 +326,7 @@ Préfixe `/api/wiki/` — définies dans `wiki-challenge.ts`, enregistrées dans
 
 ## Schéma base de données (SQLite)
 
-10 tables — toutes créées/mises à jour par `npm run db:migrate` (idempotent).
+13 tables — toutes créées/mises à jour par `npm run db:migrate` (idempotent).
 
 | Table | Rôle | Champs clés |
 |-------|------|-------------|
@@ -234,8 +334,11 @@ Préfixe `/api/wiki/` — définies dans `wiki-challenge.ts`, enregistrées dans
 | `series` | Catalogue séries | Idem + `creator`, `number_of_seasons`, `network`, `status`, `original_language` |
 | `wiki_persons` | Personnalités Wikipedia | `slug_fr`, `slug_en`, `name`, `person_type` (8 valeurs), `infobox_data` (JSON), `hint_schedule` (JSON sans préfixe), `photo_url` |
 | `daily_challenges` | Planning quotidien | `challenge_date` (YYYY-MM-DD), `media_type` (film/series/wiki), `film_id`/`series_id`/`wiki_person_id`, `is_active` (soft-delete), `challenge_number` |
-| `game_sessions` | Sessions jeu films/séries | `session_token`, `challenge_id`, `attempts` (JSON), `status`, `completed_at` |
+| `game_sessions` | Sessions jeu films/séries | `session_token`, `challenge_id`, `user_id` (nullable), `attempts` (JSON), `status`, `completed_at` |
 | `wiki_sessions` | Sessions jeu wiki | Même structure que `game_sessions` |
+| `users` | Comptes joueurs | `email`, `display_name`, `avatar_url`, `email_verified`, `password_hash`, `friend_code` |
+| `oauth_accounts` | Liens OAuth (Google/Apple) | `user_id`, `provider`, `provider_sub` |
+| `user_sessions` | Sessions auth joueurs | `user_id`, `session_token`, `expires_at` |
 | `active_admin_tokens` | Auth admin | `token_hash` (SHA-256), `expires_at`, `revoked_at` |
 | `global_stats` | Stats agrégées communauté | Compteurs wins/losses/attempts par challenge |
 | `audit_logs` | Traçabilité admin | `action`, `entity_type`, `entity_id`, `admin_user`, `details` (JSON) |
@@ -244,6 +347,8 @@ Préfixe `/api/wiki/` — définies dans `wiki-challenge.ts`, enregistrées dans
 **Colonnes JSON** — toujours lire/écrire comme strings JSON : `title_aliases`, `genres`, `cast_members`, `hint_schedule`, `infobox_data`, `attempts`.
 
 **`is_active = 0`** = soft-delete (jamais supprimé physiquement). Filtrer systématiquement dans les requêtes publiques.
+
+**`game_sessions.user_id` / `wiki_sessions.user_id`** — nullable ; rempli si l'utilisateur est connecté. Sert à réconcilier les sessions anonymes avec un compte lors de l'import stats.
 
 ---
 

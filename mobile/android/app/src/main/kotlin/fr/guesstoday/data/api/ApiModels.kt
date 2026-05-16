@@ -229,6 +229,30 @@ data class AdjacentDatePayload(
     @Json(name = "date") val date: String?,
 )
 
+// MARK: - Leaderboard
+
+@JsonClass(generateAdapter = true)
+data class LeaderboardEntry(
+    @Json(name = "id")            val id: Int,
+    @Json(name = "displayName")   val displayName: String,
+    @Json(name = "avatarUrl")     val avatarUrl: String?,
+    @Json(name = "isMe")          val isMe: Boolean,
+    @Json(name = "rank")          val rank: Int,
+    @Json(name = "totalWins")     val totalWins: Int,
+    @Json(name = "totalPlayed")   val totalPlayed: Int,
+    @Json(name = "winRate")       val winRate: Float,
+    @Json(name = "filmWins")      val filmWins: Int,
+    @Json(name = "seriesWins")    val seriesWins: Int,
+    @Json(name = "wikiWins")      val wikiWins: Int,
+    @Json(name = "currentStreak") val currentStreak: Int,
+    @Json(name = "maxStreak")     val maxStreak: Int,
+)
+
+@JsonClass(generateAdapter = true)
+data class LeaderboardPayload(
+    @Json(name = "leaderboard") val leaderboard: List<LeaderboardEntry>,
+)
+
 // MARK: - Misc
 
 @JsonClass(generateAdapter = true)

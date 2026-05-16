@@ -41,7 +41,17 @@ object AppColors {
     val textDim     = FilmTextDim
     val gold        = FilmGold
     val goldLight   = FilmGoldLight
+    val goldDeep    = FilmGoldDeep
     val green       = FilmGreen
     val red         = FilmRed
     val amber       = FilmAmber
+    // Mode accents
+    val modeFilm    = ModeFilm
+    val modeSeries  = ModeSeries
+    val modeWiki    = ModeWiki
 }
+
+// Gold gradient brush (top → bottom), reusable
+val GoldGradient = androidx.compose.ui.graphics.Brush.verticalGradient(
+    colors = listOf(FilmGoldLight, FilmGold, FilmGoldDeep)
+)

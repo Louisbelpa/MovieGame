@@ -74,6 +74,7 @@ struct RulesSheet: View {
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(Theme.gold)
                     }
+                    .accessibilityLabel("Fermer les règles et commencer")
                 }
             }
         }

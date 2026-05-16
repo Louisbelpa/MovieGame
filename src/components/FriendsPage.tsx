@@ -1,25 +1,17 @@
-/**
- * FriendsPage.tsx
- * Social leaderboard page — compare today's scores with friends.
- */
-
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users,
   Copy,
   Check,
   Flame,
   Plus,
-  Share2,
-  Trophy,
+  X,
   Film,
   Tv,
   Landmark,
-  ChevronLeft,
-  ChevronRight,
-  Calendar,
-  Medal,
-  Target,
+  ChevronDown,
+  UserPlus,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useAuthModal } from '@/components/modals/AuthModal'
@@ -37,202 +29,356 @@ import {
 } from '@/api/client'
 import { FEATURES } from '@/config/features'
 import { Footer } from '@/components/layout/Footer'
+import { TopNav } from '@/components/layout/TopNav'
+import { ApertureIcon } from '@/components/ui/ApertureIcon'
+import { loadStats } from '@/lib/storage'
 
-// ─── Score helpers ────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 
-function winsCount(entry: FriendEntry): number {
-  return [entry.scores.film, entry.scores.series, entry.scores.wiki]
-    .filter((s) => s?.won).length
+type ModeFilter = 'all' | 'film' | 'series' | 'wiki'
+type Period = 'today' | '7d' | '30d' | 'all'
+
+interface TableRow {
+  id: number
+  displayName: string
+  avatarUrl: string | null
+  isMe: boolean
+  wins: number
+  played: number
+  winPct: number
+  avgAttempts: number | null
+  streak: number
+  pending?: boolean
 }
 
-function totalAttempts(entry: FriendEntry): number {
-  return [entry.scores.film, entry.scores.series, entry.scores.wiki]
-    .reduce((sum, s) => sum + (s?.attemptsUsed ?? 99), 0)
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function getFilteredScores(
+  scores: FriendEntry['scores'],
+  mode: ModeFilter
+): (FriendScore | null)[] {
+  if (mode === 'film') return [scores.film]
+  if (mode === 'series') return [scores.series]
+  if (mode === 'wiki') return [scores.wiki]
+  return [
+    scores.film,
+    FEATURES.enableSeries ? scores.series : null,
+    FEATURES.enableWiki ? scores.wiki : null,
+  ]
 }
 
-function sortedFriends(friends: FriendEntry[]): FriendEntry[] {
-  return [...friends].sort((a, b) => {
-    const wa = winsCount(a), wb = winsCount(b)
-    if (wa !== wb) return wb - wa
-    const ta = totalAttempts(a), tb = totalAttempts(b)
-    if (ta !== tb) return ta - tb
-    return 0
+function friendToRow(entry: FriendEntry, mode: ModeFilter): TableRow {
+  const scores = getFilteredScores(entry.scores, mode).filter(Boolean) as FriendScore[]
+  const played = scores.length
+  const wins = scores.filter((s) => s.won).length
+  const totalAttempts = scores.reduce((sum, s) => sum + s.attemptsUsed, 0)
+  return {
+    id: entry.id,
+    displayName: entry.displayName,
+    avatarUrl: entry.avatarUrl,
+    isMe: entry.isMe,
+    wins,
+    played,
+    winPct: played > 0 ? Math.round((wins / played) * 100) : 0,
+    avgAttempts: played > 0 ? Math.round((totalAttempts / played) * 10) / 10 : null,
+    streak: entry.streak,
+  }
+}
+
+function leaderboardToRow(entry: LeaderboardEntry, mode: ModeFilter): TableRow {
+  let wins: number
+  if (mode === 'film') wins = entry.filmWins
+  else if (mode === 'series') wins = entry.seriesWins
+  else if (mode === 'wiki') wins = entry.wikiWins
+  else wins = entry.totalWins
+  return {
+    id: entry.id,
+    displayName: entry.displayName,
+    avatarUrl: entry.avatarUrl,
+    isMe: entry.isMe,
+    wins,
+    played: entry.totalPlayed,
+    winPct: Math.round(entry.winRate * 100),
+    avgAttempts: entry.avgAttempts ?? null,
+    streak: entry.currentStreak,
+  }
+}
+
+function sortRows(rows: TableRow[]): TableRow[] {
+  return [...rows].sort((a, b) => {
+    if (b.wins !== a.wins) return b.wins - a.wins
+    if (b.winPct !== a.winPct) return b.winPct - a.winPct
+    const aAvg = a.avgAttempts ?? 99
+    const bAvg = b.avgAttempts ?? 99
+    return aAvg - bAvg
   })
 }
 
-const MAX_ATTEMPTS = 5
-
-function AttemptDots({ attemptsUsed, won }: { attemptsUsed: number; won: boolean }) {
-  return (
-    <span className="flex items-center gap-0.5">
-      {Array.from({ length: MAX_ATTEMPTS }).map((_, i) => {
-        const filled = i < attemptsUsed
-        const isWinDot = won && i === attemptsUsed - 1
-        return (
-          <span
-            key={i}
-            className={`w-2 h-2 rounded-full ${
-              isWinDot
-                ? 'bg-film-green'
-                : filled
-                  ? 'bg-film-red/70'
-                  : 'bg-film-border'
-            }`}
-          />
-        )
-      })}
-    </span>
-  )
+const PERIOD_LABELS: Record<Period, string> = {
+  today: "Aujourd'hui",
+  '7d': '7 derniers jours',
+  '30d': '30 derniers jours',
+  all: 'Toujours',
 }
 
-function ScoreBadge({ score, icon: Icon }: { score: FriendScore | null; icon: React.ElementType }) {
-  if (!score) {
+const PERIOD_PODIUM: Record<Period, string> = {
+  today: "AUJOURD'HUI",
+  '7d': '7 JOURS',
+  '30d': '30 JOURS',
+  all: 'TOUJOURS',
+}
+
+// ─── Avatar ───────────────────────────────────────────────────────────────────
+
+function Avatar({
+  displayName,
+  avatarUrl,
+  size = 32,
+  isMe = false,
+}: {
+  displayName: string
+  avatarUrl: string | null
+  size?: number
+  isMe?: boolean
+}) {
+  const initial = displayName.charAt(0).toUpperCase()
+  const baseStyle = {
+    width: size,
+    height: size,
+    fontSize: size * 0.38,
+    flexShrink: 0,
+  }
+  if (avatarUrl) {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-film-text-dim/50">
-        <Icon size={10} className="opacity-40" />
-        <span>—</span>
-      </span>
+      <img
+        src={avatarUrl}
+        alt={displayName}
+        className="rounded-full object-cover border border-film-gold/30 shrink-0"
+        style={baseStyle}
+      />
     )
   }
   return (
     <span
-      className={`inline-flex items-center gap-1 text-xs font-semibold ${
-        score.won ? 'text-film-green' : 'text-film-red'
+      className={`rounded-full flex items-center justify-center font-bold shrink-0 ${
+        isMe
+          ? 'bg-film-gold/25 border border-film-gold/50 text-film-gold'
+          : 'bg-white/[0.08] border border-film-border/60 text-film-text-dim'
       }`}
+      style={baseStyle}
     >
-      <Icon size={10} />
-      {score.won ? String(score.attemptsUsed) : '✗'}
+      {initial}
     </span>
   )
 }
 
-function ScoreCard({
-  score,
-  label,
-  icon: Icon,
-  accent,
+// ─── Podium ───────────────────────────────────────────────────────────────────
+
+const PODIUM_ORDER = [1, 0, 2] // silver | gold | bronze (display order)
+const PODIUM_COLORS = [
+  { bar: 'bg-[#9aa3ad]/20 border-t border-x border-[#9aa3ad]/30', text: '#9aa3ad', h: 80 },
+  { bar: 'bg-film-gold/20 border-t border-x border-film-gold/30', text: '#d4a64a', h: 112 },
+  { bar: 'bg-[#c87533]/20 border-t border-x border-[#c87533]/30', text: '#c87533', h: 64 },
+]
+
+function PodiumChart({
+  rows,
+  period,
 }: {
-  score: FriendScore | null
-  label: string
-  icon: React.ElementType
-  accent: string
+  rows: TableRow[]
+  period: Period
 }) {
-  const notPlayed = !score
-  const won = score?.won ?? false
-  const statusColor = notPlayed ? undefined : won ? 'text-film-green' : 'text-film-red'
-  const bgColor = notPlayed
-    ? 'bg-white/[0.02]'
-    : won
-      ? 'bg-film-green/[0.06]'
-      : 'bg-film-red/[0.06]'
-  const borderColor = notPlayed
-    ? 'border-film-border/40'
-    : won
-      ? 'border-film-green/25'
-      : 'border-film-red/25'
+  const top3 = rows.slice(0, 3)
 
-  return (
-    <div className={`flex-1 flex flex-col items-center gap-2 rounded-xl border px-3 py-3 ${bgColor} ${borderColor}`}>
-      {/* Mode label */}
-      <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: accent }}>
-        <Icon size={10} />
-        {label}
-      </span>
-
-      {/* Main score */}
-      <span className={`text-2xl font-bold font-mono leading-none ${notPlayed ? 'text-film-text-dim/30' : statusColor}`}>
-        {notPlayed ? '—' : won ? String(score!.attemptsUsed) : '✗'}
-      </span>
-
-      {/* Attempt dots */}
-      {score ? (
-        <AttemptDots attemptsUsed={score.attemptsUsed} won={score.won} />
-      ) : (
-        <span className="flex gap-0.5">
-          {Array.from({ length: MAX_ATTEMPTS }).map((_, i) => (
-            <span key={i} className="w-2 h-2 rounded-full bg-film-border/30" />
-          ))}
-        </span>
-      )}
-
-      {/* Status text */}
-      <span className={`text-[10px] font-medium leading-tight text-center ${notPlayed ? 'text-film-text-dim/40 italic' : statusColor}`}>
-        {notPlayed
-          ? 'Pas joué'
-          : won
-            ? score!.attemptsUsed === 1 ? 'Du premier coup !' : `en ${score!.attemptsUsed} essais`
-            : `Perdu — ${score!.attemptsUsed}/${MAX_ATTEMPTS}`}
-      </span>
-    </div>
-  )
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function Spinner() {
-  return (
-    <div className="flex items-center justify-center py-12">
-      <div className="w-7 h-7 rounded-full border-2 border-film-gold/30 border-t-film-gold animate-spin" />
-    </div>
-  )
-}
-
-function CodeCard({
-  code,
-  onShare,
-}: {
-  code: string
-  onShare: () => void
-}) {
-  const [copied, setCopied] = useState(false)
-
-  const copy = () => {
-    void navigator.clipboard.writeText(code).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
+  if (top3.length < 2) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-10 text-center">
+        <Users size={32} className="text-film-text-dim/30" />
+        <p className="text-sm text-film-text-dim">Pas encore assez de joueurs.</p>
+      </div>
+    )
   }
 
   return (
-    <div className="rounded-xl border border-film-gold/40 bg-film-gold/8 p-4">
-      <p className="text-xs font-semibold uppercase tracking-wider text-film-gold mb-2">
-        Mon code ami
-      </p>
-      <div className="flex items-center gap-2">
-        <span className="flex-1 font-mono text-xl font-bold text-film-text tracking-widest">
-          {code}
+    <div className="flex flex-col gap-0">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-film-border/40">
+        <span className="text-[10px] font-mono font-bold tracking-widest text-film-text-dim/60 uppercase">
+          Podium · {PERIOD_PODIUM[period]}
         </span>
-        <button
-          type="button"
-          onClick={copy}
-          title="Copier le code"
-          className="flex items-center gap-1.5 rounded-lg border border-film-border px-3 py-1.5 text-sm text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors cursor-pointer"
-        >
-          {copied ? <Check size={14} className="text-film-green" /> : <Copy size={14} />}
-          {copied ? 'Copié !' : 'Copier'}
-        </button>
-        <button
-          type="button"
-          onClick={onShare}
-          title="Partager"
-          className="flex items-center gap-1.5 rounded-lg border border-film-border px-3 py-1.5 text-sm text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors cursor-pointer"
-        >
-          <Share2 size={14} />
-          Partager
-        </button>
+      </div>
+
+      {/* Podium bars */}
+      <div className="flex items-end justify-center gap-2 px-4 pt-8 pb-4">
+        {PODIUM_ORDER.map((rank) => {
+          const entry = top3[rank]
+          if (!entry) return <div key={rank} className="flex-1" />
+          const { bar, text, h } = PODIUM_COLORS[rank]
+          const isGold = rank === 0
+          return (
+            <div key={entry.id} className="flex-1 flex flex-col items-center gap-1.5">
+              {isGold && <span className="text-base mb-0.5">👑</span>}
+              <Avatar
+                displayName={entry.displayName}
+                avatarUrl={entry.avatarUrl}
+                size={isGold ? 44 : 36}
+                isMe={entry.isMe}
+              />
+              <span
+                className="text-xs font-semibold text-center leading-tight truncate w-full text-center"
+                style={{ color: entry.isMe ? '#d4a64a' : 'var(--color-film-text)' }}
+              >
+                {entry.isMe ? 'Toi' : entry.displayName}
+              </span>
+              <span className="text-[10px] font-semibold" style={{ color: text }}>
+                {entry.wins} ✓
+              </span>
+              <motion.div
+                className={`w-full rounded-t-lg flex items-end justify-center pb-2 ${bar}`}
+                style={{ height: h }}
+                initial={{ scaleY: 0 }}
+                animate={{ scaleY: 1 }}
+                transition={{ delay: 0.1 + rank * 0.08, duration: 0.45, ease: 'easeOut' }}
+                // transformOrigin applied via style for framer-motion
+              >
+                <span className="text-xs font-bold font-mono" style={{ color: text }}>
+                  {rank + 1}
+                </span>
+              </motion.div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
 }
 
-function AddFriendForm({
+// ─── Table ────────────────────────────────────────────────────────────────────
+
+function TableRows({
+  rows,
+  pending,
+  onRelancer,
+}: {
+  rows: TableRow[]
+  pending: PendingEntry[]
+  onRelancer: (id: number) => void
+}) {
+  const outgoing = pending.filter((p) => p.direction === 'outgoing')
+
+  return (
+    <div className="flex flex-col">
+      {/* Header */}
+      <div className="grid gap-x-2 px-4 py-2 border-b border-film-border/40"
+        style={{ gridTemplateColumns: '1.5rem 1fr 2.5rem 2.5rem 3rem 2.5rem' }}>
+        {(['#', 'JOUEUR', 'V', '%', 'MOY.', '🔥'] as const).map((col) => (
+          <span key={col} className={`text-[10px] font-mono font-bold tracking-widest text-film-text-dim/50 uppercase ${col === 'JOUEUR' ? '' : 'text-center'}`}>
+            {col}
+          </span>
+        ))}
+      </div>
+
+      {/* Data rows */}
+      {rows.map((row, idx) => (
+        <motion.div
+          key={row.id}
+          className={`grid gap-x-2 px-4 py-2.5 items-center border-b border-film-border/20 last:border-0 ${
+            row.isMe
+              ? 'bg-film-gold/[0.07]'
+              : 'hover:bg-white/[0.02]'
+          }`}
+          style={{ gridTemplateColumns: '1.5rem 1fr 2.5rem 2.5rem 3rem 2.5rem' }}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.04 * idx, duration: 0.25 }}
+        >
+          {/* Rank */}
+          <span className={`text-xs font-bold font-mono text-center ${
+            idx === 0 ? 'text-film-gold' : idx === 1 ? 'text-[#9aa3ad]' : idx === 2 ? 'text-[#c87533]' : 'text-film-text-dim/50'
+          }`}>
+            {idx + 1}
+          </span>
+
+          {/* Name */}
+          <div className="flex items-center gap-2 min-w-0">
+            <Avatar displayName={row.displayName} avatarUrl={row.avatarUrl} size={26} isMe={row.isMe} />
+            <span className={`text-sm font-medium truncate ${row.isMe ? 'text-film-gold' : 'text-film-text'}`}>
+              {row.isMe ? 'toi' : row.displayName}
+            </span>
+            {row.isMe && (
+              <span className="text-xs text-film-gold/60 shrink-0">· toi</span>
+            )}
+          </div>
+
+          {/* V — wins */}
+          <span className="text-sm font-bold text-film-text text-center">{row.wins}</span>
+
+          {/* % */}
+          <span className="text-xs text-film-text-dim text-center">
+            {row.played > 0 ? `${row.winPct}%` : '—'}
+          </span>
+
+          {/* Moy */}
+          <span className="text-xs text-film-text-dim text-center font-mono">
+            {row.avgAttempts != null ? row.avgAttempts : '—'}
+          </span>
+
+          {/* Streak */}
+          <span className={`text-xs font-bold text-center ${row.streak > 0 ? 'text-amber-400' : 'text-film-text-dim/30'}`}>
+            {row.streak > 0 ? row.streak : '—'}
+          </span>
+        </motion.div>
+      ))}
+
+      {/* Pending (outgoing) rows */}
+      {outgoing.map((p) => (
+        <div
+          key={`pending-${p.id}`}
+          className="grid gap-x-2 px-4 py-2.5 items-center border-b border-film-border/20 last:border-0 opacity-45"
+          style={{ gridTemplateColumns: '1.5rem 1fr auto' }}
+        >
+          <span className="text-xs font-mono text-film-text-dim/40 text-center">—</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-[26px] h-[26px] rounded-full bg-film-border/20 border border-film-border/30 flex items-center justify-center text-xs text-film-text-dim/40 font-bold shrink-0">
+              {p.displayName.charAt(0).toUpperCase()}
+            </span>
+            <span className="text-sm text-film-text-dim truncate">{p.displayName}</span>
+            <span className="text-[10px] font-mono font-semibold text-film-text-dim/60 uppercase tracking-wider shrink-0">
+              En attente
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => onRelancer(p.id)}
+            className="text-xs text-film-text-dim/60 border border-film-border/40 rounded-lg px-2.5 py-1 hover:text-film-text hover:border-film-border transition-colors cursor-pointer shrink-0"
+          >
+            Relancer
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Add Friend Modal ─────────────────────────────────────────────────────────
+
+function AddFriendModal({
+  myCode,
+  onClose,
   onAdded,
 }: {
+  myCode: string | null
+  onClose: () => void
   onAdded: () => void
 }) {
   const [code, setCode] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -244,8 +390,7 @@ function AddFriendForm({
       await friendsAdd(trimmed)
       setStatus('success')
       setCode('')
-      setTimeout(() => setStatus('idle'), 2500)
-      onAdded()
+      setTimeout(() => { onAdded(); onClose() }, 1200)
     } catch (err) {
       setStatus('error')
       setErrorMsg(err instanceof Error ? err.message : 'Erreur réseau')
@@ -253,474 +398,325 @@ function AddFriendForm({
   }
 
   return (
-    <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-2 mt-3">
-      <div className="flex gap-2">
-        <input
-          value={code}
-          onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 8))}
-          placeholder="Code ami (ex: AB12CD34)"
-          maxLength={8}
-          className="flex-1 rounded-lg border border-film-border bg-white/5 px-3 py-2 text-sm text-film-text placeholder-film-text-dim focus:outline-none focus:border-film-gold/60 font-mono tracking-wider"
-        />
-        <button
-          type="submit"
-          disabled={status === 'loading' || !code.trim()}
-          className="flex items-center gap-1.5 rounded-lg bg-film-gold px-4 py-2 text-sm font-semibold text-film-black hover:bg-film-gold/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-        >
-          <Plus size={14} />
-          Ajouter
-        </button>
-      </div>
-      {status === 'success' && (
-        <p className="text-xs text-film-green">Demande envoyée !</p>
-      )}
-      {status === 'error' && (
-        <p className="text-xs text-film-red">{errorMsg || 'Impossible d\'envoyer la demande.'}</p>
-      )}
-    </form>
-  )
-}
-
-function LeaderboardRow({
-  rank,
-  entry,
-  onRemove,
-}: {
-  rank: number
-  entry: FriendEntry
-  onRemove: (id: number) => void
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const isFirst = rank === 1
-
-  return (
     <div
-      className={`rounded-xl overflow-hidden transition-colors ${
-        entry.isMe
-          ? 'bg-film-gold/10 border border-film-gold/25'
-          : 'border border-transparent hover:border-film-border/50'
-      }`}
+      className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      {/* Main row */}
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="group w-full flex items-center gap-3 px-3 py-2.5 text-left cursor-pointer"
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        className="relative w-full max-w-md rounded-2xl border border-film-border bg-[#0e1219] p-6 flex flex-col gap-5 shadow-2xl"
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 24 }}
+        transition={{ duration: 0.2 }}
       >
-        {/* Rank */}
-        <span
-          className={`w-6 text-center text-sm font-bold shrink-0 ${
-            isFirst ? 'text-film-gold' : 'text-film-text-dim'
-          }`}
-        >
-          {isFirst ? <Trophy size={14} className="inline text-film-gold" /> : rank}
-        </span>
-
-        {/* Name + streak */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-medium text-film-text truncate">
-              {entry.displayName}
-            </span>
-            {entry.isMe && (
-              <span className="text-xs text-film-gold font-normal shrink-0">· toi</span>
-            )}
-            {entry.streak > 0 && (
-              <span className="flex items-center gap-0.5 text-xs text-orange-400 shrink-0">
-                <Flame size={10} />
-                {entry.streak}
-              </span>
-            )}
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="font-semibold text-film-text text-base">Ajouter un ami</h2>
+            <p className="text-sm text-film-text-dim mt-0.5">Entre le code ami de la personne à inviter.</p>
           </div>
+          <button type="button" onClick={onClose} className="text-film-text-dim hover:text-film-text transition-colors cursor-pointer mt-0.5">
+            <X size={18} />
+          </button>
         </div>
 
-        {/* Mode scores */}
-        <div className="flex items-center gap-3 shrink-0">
-          <ScoreBadge score={entry.scores.film} icon={Film} />
-          {FEATURES.enableSeries && <ScoreBadge score={entry.scores.series} icon={Tv} />}
-          {FEATURES.enableWiki && <ScoreBadge score={entry.scores.wiki} icon={Landmark} />}
-        </div>
-
-        {/* Chevron */}
-        <span
-          className={`shrink-0 text-film-text-dim/40 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
-      </button>
-
-      {/* Detail panel */}
-      {expanded && (
-        <div className="px-3 pb-3 pt-2 border-t border-film-border/30">
+        <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-3">
           <div className="flex gap-2">
-            <ScoreCard score={entry.scores.film} label="Films" icon={Film} accent="#4d8ee8" />
-            {FEATURES.enableSeries && (
-              <ScoreCard score={entry.scores.series} label="Séries" icon={Tv} accent="#1eb088" />
-            )}
-            {FEATURES.enableWiki && (
-              <ScoreCard score={entry.scores.wiki} label="Perso." icon={Landmark} accent="#9b7de8" />
-            )}
-          </div>
-          {!entry.isMe && (
+            <input
+              ref={inputRef}
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 8))}
+              placeholder="Ex: KSXF5P4Q"
+              maxLength={8}
+              className="flex-1 rounded-xl border border-film-border bg-white/[0.04] px-3.5 py-2.5 text-sm text-film-text placeholder-film-text-dim/40 focus:outline-none focus:border-film-gold/50 font-mono tracking-widest"
+            />
             <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onRemove(entry.id) }}
-              className="mt-2.5 text-xs text-film-text-dim/40 hover:text-film-red transition-colors cursor-pointer"
+              type="submit"
+              disabled={status === 'loading' || !code.trim()}
+              className="flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold text-film-black disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0"
+              style={{ background: 'var(--sg-films)' }}
             >
-              Retirer cet ami
+              <Plus size={14} />
+              Ajouter
             </button>
-          )}
-        </div>
-      )}
+          </div>
+          {status === 'success' && <p className="text-xs text-film-green">Demande envoyée !</p>}
+          {status === 'error' && <p className="text-xs text-film-red">{errorMsg || 'Impossible d\'envoyer la demande.'}</p>}
+        </form>
+
+        {myCode && (
+          <div className="pt-4 border-t border-film-border/40">
+            <p className="text-xs text-film-text-dim mb-2">Ton code à partager :</p>
+            <CodeChip code={myCode} />
+          </div>
+        )}
+      </motion.div>
     </div>
   )
 }
 
-function PendingSection({
-  pending,
-  onAccept,
-  onDecline,
-  onCancel,
-}: {
-  pending: PendingEntry[]
-  onAccept: (id: number) => void
-  onDecline: (id: number) => void
-  onCancel: (id: number) => void
-}) {
-  if (pending.length === 0) return null
+// ─── Code chip ────────────────────────────────────────────────────────────────
 
-  const incoming = pending.filter((p) => p.direction === 'incoming')
-  const outgoing = pending.filter((p) => p.direction === 'outgoing')
-
-  return (
-    <div className="mt-6">
-      <p className="text-xs font-semibold uppercase tracking-wider text-film-text-dim mb-3">
-        Invitations
-      </p>
-      <div className="flex flex-col gap-2">
-        {incoming.map((p) => (
-          <div
-            key={p.id}
-            className="flex items-center gap-3 rounded-xl border border-film-border px-3 py-2.5"
-          >
-            <span className="flex-1 text-sm text-film-text truncate">{p.displayName}</span>
-            <span className="text-xs text-film-text-dim mr-1">t'invite</span>
-            <button
-              type="button"
-              onClick={() => onAccept(p.id)}
-              className="rounded-lg bg-film-green/20 border border-film-green/30 px-3 py-1 text-xs font-semibold text-film-green hover:bg-film-green/30 transition-colors cursor-pointer"
-            >
-              Accepter
-            </button>
-            <button
-              type="button"
-              onClick={() => onDecline(p.id)}
-              className="rounded-lg border border-film-border px-3 py-1 text-xs text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors cursor-pointer"
-            >
-              Ignorer
-            </button>
-          </div>
-        ))}
-        {outgoing.map((p) => (
-          <div
-            key={p.id}
-            className="flex items-center gap-3 rounded-xl border border-film-border px-3 py-2.5"
-          >
-            <span className="flex-1 text-sm text-film-text truncate">{p.displayName}</span>
-            <span className="text-xs text-film-text-dim mr-1">en attente</span>
-            <button
-              type="button"
-              onClick={() => onCancel(p.id)}
-              className="rounded-lg border border-film-border px-3 py-1 text-xs text-film-text-dim hover:text-film-red hover:border-film-red/40 transition-colors cursor-pointer"
-            >
-              Annuler
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ─── Global leaderboard ───────────────────────────────────────────────────────
-
-function Avatar({ entry, size = 32 }: { entry: LeaderboardEntry; size?: number }) {
-  const style = { width: size, height: size }
-  if (entry.avatarUrl) {
-    return (
-      <img
-        src={entry.avatarUrl}
-        alt={entry.displayName}
-        className="rounded-full object-cover border border-film-gold/30 shrink-0"
-        style={style}
-      />
-    )
+function CodeChip({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    void navigator.clipboard.writeText(code).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
   }
   return (
-    <span
-      className="rounded-full bg-film-gold/20 border border-film-gold/30 flex items-center justify-center font-bold text-film-gold shrink-0"
-      style={{ ...style, fontSize: size * 0.38 }}
+    <button
+      type="button"
+      onClick={copy}
+      title="Copier le code"
+      className="flex items-center gap-2 rounded-xl border border-film-border bg-white/[0.03] hover:bg-white/[0.06] px-3 py-1.5 transition-colors cursor-pointer group"
     >
-      {entry.displayName.charAt(0).toUpperCase()}
-    </span>
+      <span className="text-[10px] font-mono font-bold tracking-widest text-film-text-dim/60 uppercase">Code</span>
+      <span className="font-mono text-sm font-bold text-film-gold tracking-widest">{code}</span>
+      {copied
+        ? <Check size={13} className="text-film-green shrink-0" />
+        : <Copy size={13} className="text-film-text-dim/40 group-hover:text-film-text-dim transition-colors shrink-0" />
+      }
+    </button>
   )
 }
 
-const MEDAL = ['🥇', '🥈', '🥉']
-const PODIUM_HEIGHT = ['h-24', 'h-16', 'h-12']
-const PODIUM_ORDER = [1, 0, 2] // silver left, gold center, bronze right
+// ─── Period Dropdown ──────────────────────────────────────────────────────────
 
-function Podium({ top3 }: { top3: LeaderboardEntry[] }) {
+function PeriodDropdown({ value, onChange }: { value: Period; onChange: (p: Period) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
   return (
-    <div className="flex items-end justify-center gap-2 pt-4 pb-2">
-      {PODIUM_ORDER.map((i) => {
-        const e = top3[i]
-        if (!e) return <div key={i} className="flex-1" />
-        const isGold = i === 0
-        return (
-          <div key={e.id} className="flex-1 flex flex-col items-center gap-1.5">
-            <span className="text-xl">{MEDAL[i]}</span>
-            <Avatar entry={e} size={isGold ? 48 : 40} />
-            <span className={`text-xs font-semibold text-center leading-tight truncate w-full text-center ${e.isMe ? 'text-film-gold' : 'text-film-text'}`}>
-              {e.isMe ? 'Toi' : e.displayName}
-            </span>
-            <span className="text-[10px] text-film-text-dim">{e.totalWins} victoire{e.totalWins !== 1 ? 's' : ''}</span>
-            <div className={`w-full rounded-t-lg ${isGold ? 'bg-film-gold/20 border-t border-x border-film-gold/30' : 'bg-white/[0.04] border-t border-x border-film-border/40'} ${PODIUM_HEIGHT[i]}`} />
-          </div>
-        )
-      })}
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 rounded-xl border border-film-border bg-white/[0.03] hover:bg-white/[0.05] px-3 py-1.5 text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer shrink-0"
+      >
+        <span className="text-xs text-film-text-dim/60 mr-0.5">Période :</span>
+        <span className="font-medium text-film-text">{PERIOD_LABELS[value]}</span>
+        <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-film-border bg-[#0e1219] shadow-xl z-20 overflow-hidden"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.15 }}
+          >
+            {(Object.entries(PERIOD_LABELS) as [Period, string][]).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => { onChange(k); setOpen(false) }}
+                className={`w-full text-left px-3.5 py-2 text-sm transition-colors cursor-pointer ${
+                  value === k ? 'text-film-gold bg-film-gold/10' : 'text-film-text-dim hover:text-film-text hover:bg-white/[0.04]'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
 
-function GlobalLeaderboardTable({ entries }: { entries: LeaderboardEntry[] }) {
-  const [sortKey, setSortKey] = useState<'totalWins' | 'winRate' | 'currentStreak'>('totalWins')
+// ─── Incoming pending banner ──────────────────────────────────────────────────
 
-  const sorted = [...entries].sort((a, b) => {
-    if (sortKey === 'winRate') return b.winRate - a.winRate || b.totalWins - a.totalWins
-    if (sortKey === 'currentStreak') return b.currentStreak - a.currentStreak || b.totalWins - a.totalWins
-    return b.totalWins - a.totalWins || b.winRate - a.winRate
-  })
-
-  const SortBtn = ({ k, label }: { k: typeof sortKey; label: string }) => (
-    <button
-      type="button"
-      onClick={() => setSortKey(k)}
-      className={`text-[10px] font-semibold px-2 py-0.5 rounded transition-colors cursor-pointer ${sortKey === k ? 'bg-film-gold/20 text-film-gold' : 'text-film-text-dim hover:text-film-text'}`}
-    >
-      {label}
-    </button>
-  )
-
+function IncomingBanner({
+  incoming,
+  onAccept,
+  onDecline,
+}: {
+  incoming: PendingEntry[]
+  onAccept: (id: number) => void
+  onDecline: (id: number) => void
+}) {
+  if (incoming.length === 0) return null
   return (
     <div className="flex flex-col gap-2">
-      {/* Sort controls */}
-      <div className="flex items-center gap-1 justify-end">
-        <span className="text-[10px] text-film-text-dim mr-1">Trier par</span>
-        <SortBtn k="totalWins" label="Victoires" />
-        <SortBtn k="winRate" label="% victoire" />
-        <SortBtn k="currentStreak" label="Série" />
-      </div>
-
-      {/* Header */}
-      <div className="grid grid-cols-[1.5rem_1fr_2rem_2rem_2rem_3rem_2rem] gap-x-2 px-3 text-[10px] text-film-text-dim/60 font-semibold uppercase tracking-wider">
-        <span>#</span>
-        <span>Joueur</span>
-        <span className="text-center"><Film size={9} className="inline" /></span>
-        {FEATURES.enableSeries && <span className="text-center"><Tv size={9} className="inline" /></span>}
-        {FEATURES.enableWiki && <span className="text-center"><Landmark size={9} className="inline" /></span>}
-        <span className="text-center"><Target size={9} className="inline" /></span>
-        <span className="text-center"><Flame size={9} className="inline" /></span>
-      </div>
-
-      {sorted.map((e, idx) => (
+      {incoming.map((p) => (
         <div
-          key={e.id}
-          className={`group grid grid-cols-[1.5rem_1fr_2rem_2rem_2rem_3rem_2rem] gap-x-2 items-center px-3 py-2.5 rounded-xl border transition-colors ${
-            e.isMe
-              ? 'bg-film-gold/8 border-film-gold/25'
-              : 'border-transparent hover:border-film-border/50 hover:bg-white/[0.02]'
-          }`}
+          key={p.id}
+          className="flex items-center gap-3 rounded-xl border border-film-border/60 bg-white/[0.02] px-3.5 py-2.5"
         >
-          <span className="text-xs font-bold text-film-text-dim text-center">
-            {idx < 3 ? MEDAL[idx] : idx + 1}
+          <span className="w-7 h-7 rounded-full bg-film-border/20 border border-film-border/30 flex items-center justify-center text-xs font-bold text-film-text-dim shrink-0">
+            {p.displayName.charAt(0).toUpperCase()}
           </span>
-          <div className="flex items-center gap-2 min-w-0">
-            <Avatar entry={e} size={24} />
-            <span className={`text-sm font-medium truncate ${e.isMe ? 'text-film-gold' : 'text-film-text'}`}>
-              {e.isMe ? 'Toi' : e.displayName}
-            </span>
-          </div>
-          <span className="text-xs font-semibold text-center text-film-gold">{e.filmWins}</span>
-          {FEATURES.enableSeries && <span className="text-xs font-semibold text-center text-purple-400">{e.seriesWins}</span>}
-          {FEATURES.enableWiki && <span className="text-xs font-semibold text-center text-film-green">{e.wikiWins}</span>}
-          <span className="text-xs font-semibold text-center text-film-text-dim">
-            {e.totalPlayed > 0 ? `${Math.round(e.winRate * 100)}%` : '—'}
+          <span className="flex-1 text-sm text-film-text truncate">
+            <strong>{p.displayName}</strong> t'invite
           </span>
-          <span className={`text-xs font-semibold text-center ${e.currentStreak > 0 ? 'text-orange-400' : 'text-film-text-dim/40'}`}>
-            {e.currentStreak > 0 ? `🔥${e.currentStreak}` : '—'}
-          </span>
+          <button
+            type="button"
+            onClick={() => onAccept(p.id)}
+            className="rounded-lg bg-film-green/20 border border-film-green/30 px-3 py-1 text-xs font-semibold text-film-green hover:bg-film-green/30 transition-colors cursor-pointer shrink-0"
+          >
+            Accepter
+          </button>
+          <button
+            type="button"
+            onClick={() => onDecline(p.id)}
+            className="text-xs text-film-text-dim/50 hover:text-film-text-dim transition-colors cursor-pointer shrink-0"
+          >
+            Ignorer
+          </button>
         </div>
       ))}
     </div>
   )
 }
 
-function GlobalLeaderboard() {
-  const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    friendsGetLeaderboard()
-      .then((r) => setEntries(r.leaderboard))
-      .catch(() => setEntries([]))
-      .finally(() => setLoading(false))
-  }, [])
-
-  if (loading) return <Spinner />
-
-  if (!entries || entries.length <= 1) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-10 text-center">
-        <Trophy size={32} className="text-film-text-dim" />
-        <p className="text-film-text-dim text-sm">Ajoutez des amis pour voir le classement global.</p>
-      </div>
-    )
-  }
-
-  const top3 = entries.slice(0, 3)
-
-  return (
-    <div className="flex flex-col gap-6">
-      <Podium top3={top3} />
-      <GlobalLeaderboardTable entries={entries} />
-    </div>
-  )
-}
-
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-function getTodayLocal(): string {
+function getTodayParis(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
-}
-
-function formatDateLabel(date: string, today: string): string {
-  if (date === today) return "Aujourd'hui"
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
-  const yStr = yesterday.toISOString().slice(0, 10)
-  if (date === yStr) return 'Hier'
-  return new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(
-    new Date(date + 'T12:00:00')
-  )
 }
 
 export function FriendsPage() {
   const user = useAuthStore((s) => s.user)
   const { open: openAuth } = useAuthModal()
 
-  const [tab, setTab] = useState<'today' | 'global'>('today')
-  const [data, setData] = useState<FriendsResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [selectedDate, setSelectedDate] = useState<string>(getTodayLocal)
+  const [modeFilter, setModeFilter] = useState<ModeFilter>('all')
+  const [period, setPeriod] = useState<Period>('7d')
+  const [showAddModal, setShowAddModal] = useState(false)
 
-  const load = useCallback((date: string) => {
-    setLoading(true)
-    const param = date === getTodayLocal() ? undefined : date
-    friendsGetAll(param)
-      .then((res) => { setData(res); setSelectedDate(res.date) })
-      .catch(() => setData(null))
-      .finally(() => setLoading(false))
+  const [friendsData, setFriendsData] = useState<FriendsResponse | null>(null)
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null)
+  const [loadingFriends, setLoadingFriends] = useState(true)
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(true)
+
+  const maxStreak = Math.max(
+    loadStats('film').currentStreak,
+    loadStats('wiki').currentStreak,
+    FEATURES.enableSeries ? loadStats('series').currentStreak : 0,
+  )
+
+  const loadFriends = useCallback(() => {
+    setLoadingFriends(true)
+    friendsGetAll()
+      .then(setFriendsData)
+      .catch(() => setFriendsData(null))
+      .finally(() => setLoadingFriends(false))
+  }, [])
+
+  const loadLeaderboard = useCallback(() => {
+    setLoadingLeaderboard(true)
+    friendsGetLeaderboard()
+      .then((r) => setLeaderboard(r.leaderboard))
+      .catch(() => setLeaderboard([]))
+      .finally(() => setLoadingLeaderboard(false))
   }, [])
 
   useEffect(() => {
-    if (!user) { setLoading(false); return }
-    load(selectedDate)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user])
-
-  const today = data?.today ?? getTodayLocal()
-  const isToday = selectedDate === today
-
-  const goDay = (delta: number) => {
-    const d = new Date(selectedDate + 'T12:00:00')
-    d.setDate(d.getDate() + delta)
-    const next = d.toISOString().slice(0, 10)
-    if (next > today) return
-    setSelectedDate(next)
-    load(next)
-  }
-
-  const handleShare = () => {
-    if (!data?.myCode) return
-    const text = `Rejoins-moi sur GuessToday ! Mon code : ${data.myCode}`
-    if (navigator.share) {
-      void navigator.share({ title: 'GuessToday — Amis', text })
-    } else {
-      void navigator.clipboard.writeText(text)
-    }
-  }
-
-  const reload = useCallback(() => load(selectedDate), [load, selectedDate])
+    if (!user) { setLoadingFriends(false); setLoadingLeaderboard(false); return }
+    loadFriends()
+    loadLeaderboard()
+  }, [user, loadFriends, loadLeaderboard])
 
   const handleAccept = async (userId: number) => {
     await friendsAccept(userId).catch(() => null)
-    reload()
+    loadFriends(); loadLeaderboard()
   }
-
   const handleDecline = async (userId: number) => {
     await friendsRemove(userId).catch(() => null)
-    reload()
+    loadFriends()
+  }
+  const handleRelancer = (userId: number) => {
+    // No backend endpoint yet — cancel and allow re-invite
+    void friendsRemove(userId).catch(() => null).then(() => loadFriends())
   }
 
-  const handleCancel = async (userId: number) => {
-    await friendsRemove(userId).catch(() => null)
-    reload()
-  }
+  // Build table rows based on period + mode
+  const tableRows: TableRow[] = (() => {
+    if (period === 'today') {
+      if (!friendsData) return []
+      return sortRows(friendsData.friends.map((f) => friendToRow(f, modeFilter)))
+    }
+    if (!leaderboard) return []
+    return sortRows(leaderboard.map((e) => leaderboardToRow(e, modeFilter)))
+  })()
 
-  const handleRemove = async (userId: number) => {
-    await friendsRemove(userId).catch(() => null)
-    reload()
-  }
+  const loading = period === 'today' ? loadingFriends : loadingLeaderboard
+  const pending = friendsData?.pending ?? []
+  const incoming = pending.filter((p) => p.direction === 'incoming')
+  const myCode = friendsData?.myCode ?? null
 
-  const ranked = data ? sortedFriends(data.friends) : []
+  // Mode tabs config
+  const modeTabs: { key: ModeFilter; label: string; icon: React.ElementType; color?: string }[] = [
+    { key: 'all', label: 'Tous les modes', icon: Users },
+    { key: 'film', label: 'Films', icon: Film, color: 'var(--sg-films)' },
+    ...(FEATURES.enableSeries ? [{ key: 'series' as ModeFilter, label: 'Séries', icon: Tv, color: 'var(--sg-series)' }] : []),
+    ...(FEATURES.enableWiki ? [{ key: 'wiki' as ModeFilter, label: 'Personnalités', icon: Landmark, color: 'var(--sg-wiki)' }] : []),
+  ]
 
   return (
     <div className="min-h-dvh flex flex-col bg-film-black text-film-text">
-      {/* Minimal header */}
-      <header className="border-b border-film-border bg-film-black/90 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-4 h-14 flex items-center gap-3">
-          <a
-            href="/films"
-            className="text-film-text-dim hover:text-film-text transition-colors text-sm"
-          >
-            ← Retour
+      {/* Desktop nav */}
+      <TopNav />
+
+      {/* Mobile header */}
+      <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-film-border bg-film-black sticky top-0 z-10">
+        <div className="flex items-center gap-2">
+          <a href="/" className="flex items-center gap-2">
+            <ApertureIcon size={20} />
           </a>
-          <div className="flex-1" />
-          <Users size={18} className="text-film-gold" />
-          <span className="font-semibold text-film-text">Amis</span>
+          <h1 className="font-semibold text-film-text text-base">Amis</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          {maxStreak > 0 && (
+            <span className="text-xs font-semibold text-amber-400">🔥 {maxStreak}</span>
+          )}
+          {user ? (
+            <a href="/profile" className="w-7 h-7 rounded-full bg-film-gold/20 border border-film-gold/40 flex items-center justify-center text-xs font-bold text-film-gold overflow-hidden">
+              {user.avatarUrl
+                ? <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />
+                : user.displayName.charAt(0).toUpperCase()
+              }
+            </a>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-1 rounded-full border border-film-gold/40 bg-film-gold/10 px-2.5 py-1 text-xs font-semibold text-film-gold cursor-pointer"
+          >
+            <UserPlus size={11} />
+            Inviter
+          </button>
         </div>
       </header>
 
-      <main className="flex-1 max-w-lg mx-auto w-full px-4 py-6">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6 lg:py-8">
         {/* Auth gate */}
-        {!user && !loading && (
+        {!user && !loadingFriends && (
           <div className="flex flex-col items-center gap-5 pt-16 text-center">
             <div className="w-16 h-16 rounded-2xl bg-film-gold/10 border border-film-gold/25 flex items-center justify-center">
               <Users size={28} className="text-film-gold" />
             </div>
             <div>
               <p className="font-semibold text-film-text text-lg">Défi entre amis</p>
-              <p className="text-film-text-dim text-sm mt-1">
+              <p className="text-film-text-dim text-sm mt-1 max-w-xs">
                 Crée un compte pour défier tes amis et comparer vos scores du jour.
               </p>
             </div>
             <button
               type="button"
               onClick={() => openAuth('register')}
-              className="rounded-lg bg-film-gold px-6 py-2.5 text-sm font-semibold text-film-black hover:bg-film-gold/90 transition-colors cursor-pointer"
+              className="rounded-xl px-6 py-2.5 text-sm font-semibold text-film-black transition-colors cursor-pointer"
+              style={{ background: 'var(--sg-films)' }}
             >
               Créer un compte
             </button>
@@ -734,122 +730,131 @@ export function FriendsPage() {
           </div>
         )}
 
-        {/* Loading */}
-        {user && loading && <Spinner />}
+        {user && (
+          <>
+            {/* Page header */}
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
+              <div>
+                <h1 className="hidden lg:block text-3xl font-bold text-film-text">Amis</h1>
+                <p className="hidden lg:block text-sm text-film-text-dim mt-1">Compare tes scores et défie tes proches.</p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {myCode && <CodeChip code={myCode} />}
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(true)}
+                  className="hidden lg:flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-film-black transition-colors cursor-pointer"
+                  style={{ background: 'var(--sg-films)' }}
+                >
+                  <Plus size={14} />
+                  Ajouter un ami
+                </button>
+              </div>
+            </div>
 
-        {/* Content */}
-        {user && !loading && data && (
-          <div className="flex flex-col gap-5">
-            {/* My code card */}
-            {data.myCode && (
-              <CodeCard code={data.myCode} onShare={handleShare} />
+            {/* Incoming pending */}
+            {incoming.length > 0 && (
+              <div className="mb-5">
+                <IncomingBanner
+                  incoming={incoming}
+                  onAccept={(id) => void handleAccept(id)}
+                  onDecline={(id) => void handleDecline(id)}
+                />
+              </div>
             )}
 
-            {/* Add friend */}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-film-text-dim mb-1">
-                Ajouter un ami
-              </p>
-              <AddFriendForm onAdded={reload} />
+            {/* Filter bar */}
+            <div className="flex items-center justify-between gap-3 mb-6">
+              <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
+                {modeTabs.map((tab) => {
+                  const Icon = tab.icon
+                  const active = modeFilter === tab.key
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => setModeFilter(tab.key)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-sm font-medium transition-colors cursor-pointer shrink-0 ${
+                        active
+                          ? 'bg-white/[0.07] border-film-border text-film-text'
+                          : 'border-transparent text-film-text-dim hover:text-film-text hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <Icon size={13} style={tab.color ? { color: tab.color } : undefined} />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                      <span className="sm:hidden">
+                        {tab.key === 'all' ? 'Tous' : tab.key === 'wiki' ? 'Pers.' : tab.label}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+              <PeriodDropdown value={period} onChange={setPeriod} />
             </div>
 
-            {/* Pending */}
-            <PendingSection
-              pending={data.pending}
-              onAccept={(id) => void handleAccept(id)}
-              onDecline={(id) => void handleDecline(id)}
-              onCancel={(id) => void handleCancel(id)}
-            />
+            {/* Loading skeleton */}
+            {loading && (
+              <div className="grid lg:grid-cols-[340px_1fr] gap-5">
+                <div className="rounded-2xl border border-film-border bg-[#0e1219] h-64 animate-pulse" />
+                <div className="rounded-2xl border border-film-border bg-[#0e1219] h-64 animate-pulse" />
+              </div>
+            )}
 
-            {/* Tab switcher */}
-            <div className="flex rounded-xl border border-film-border overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setTab('today')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${tab === 'today' ? 'bg-film-gold/15 text-film-gold' : 'text-film-text-dim hover:text-film-text hover:bg-white/5'}`}
-              >
-                <Calendar size={13} />
-                Aujourd'hui
-              </button>
-              <div className="w-px bg-film-border" />
-              <button
-                type="button"
-                onClick={() => setTab('global')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${tab === 'global' ? 'bg-film-gold/15 text-film-gold' : 'text-film-text-dim hover:text-film-text hover:bg-white/5'}`}
-              >
-                <Medal size={13} />
-                Classement
-              </button>
-            </div>
-
-            {/* Today tab */}
-            {tab === 'today' && (
-              <>
-                {/* Date navigator */}
-                <div className="flex items-center gap-2 rounded-xl border border-film-border bg-white/[0.02] px-3 py-2">
-                  <button type="button" onClick={() => goDay(-1)} className="flex items-center justify-center w-7 h-7 rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors cursor-pointer" aria-label="Jour précédent">
-                    <ChevronLeft size={16} />
-                  </button>
-                  <div className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium text-film-text">
-                    <Calendar size={13} className="text-film-text-dim" />
-                    <span className="capitalize">{formatDateLabel(selectedDate, today)}</span>
-                  </div>
-                  <button type="button" onClick={() => goDay(1)} disabled={isToday} className="flex items-center justify-center w-7 h-7 rounded-lg text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-25 disabled:cursor-default" aria-label="Jour suivant">
-                    <ChevronRight size={16} />
-                  </button>
+            {/* Content grid */}
+            {!loading && (
+              <div className="grid lg:grid-cols-[340px_1fr] gap-5 items-start">
+                {/* Podium card */}
+                <div className="rounded-2xl border border-film-border bg-[#0e1219] overflow-hidden">
+                  <PodiumChart rows={tableRows} period={period} />
                 </div>
 
-                {ranked.length === 0 ? (
-                  <div className="flex flex-col items-center gap-3 py-10 text-center">
-                    <Users size={32} className="text-film-text-dim" />
-                    <p className="text-film-text-dim text-sm">Aucun ami pour l'instant.</p>
-                    {data.myCode && (
-                      <p className="text-xs text-film-text-dim max-w-xs">
-                        Partage ton code <span className="font-mono font-semibold text-film-gold">{data.myCode}</span> pour inviter des amis.
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-film-text-dim">Classement du jour</p>
-                      <div className="flex items-center gap-3 text-[10px] text-film-text-dim/60">
-                        <span className="flex items-center gap-1"><Film size={9} /> Films</span>
-                        {FEATURES.enableSeries && <span className="flex items-center gap-1"><Tv size={9} /> Séries</span>}
-                        {FEATURES.enableWiki && <span className="flex items-center gap-1"><Landmark size={9} /> Wiki</span>}
-                      </div>
+                {/* Table card */}
+                <div className="rounded-2xl border border-film-border bg-[#0e1219] overflow-hidden">
+                  {tableRows.length === 0 ? (
+                    <div className="flex flex-col items-center gap-3 py-12 text-center px-6">
+                      <Users size={32} className="text-film-text-dim/30" />
+                      <p className="text-sm text-film-text-dim">Aucun ami pour l'instant.</p>
+                      {myCode && (
+                        <p className="text-xs text-film-text-dim max-w-xs">
+                          Partage ton code <span className="font-mono font-bold text-film-gold">{myCode}</span> pour inviter des amis.
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowAddModal(true)}
+                        className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-film-black mt-1 cursor-pointer"
+                        style={{ background: 'var(--sg-films)' }}
+                      >
+                        <UserPlus size={13} />
+                        Ajouter un ami
+                      </button>
                     </div>
-                    {ranked.map((entry, idx) => (
-                      <LeaderboardRow key={entry.id} rank={idx + 1} entry={entry} onRemove={(id) => void handleRemove(id)} />
-                    ))}
-                  </div>
-                )}
-              </>
+                  ) : (
+                    <TableRows
+                      rows={tableRows}
+                      pending={pending}
+                      onRelancer={handleRelancer}
+                    />
+                  )}
+                </div>
+              </div>
             )}
-
-            {/* Global tab */}
-            {tab === 'global' && (
-              <GlobalLeaderboard />
-            )}
-          </div>
-        )}
-
-        {/* Fetch failed */}
-        {user && !loading && !data && (
-          <div className="flex flex-col items-center gap-3 py-16 text-center">
-            <p className="text-film-text-dim text-sm">Impossible de charger les amis.</p>
-            <button
-              type="button"
-              onClick={() => void reload()}
-              className="text-sm text-film-gold hover:underline cursor-pointer"
-            >
-              Réessayer
-            </button>
-          </div>
+          </>
         )}
       </main>
 
       <Footer />
+
+      {/* Add friend modal */}
+      <AnimatePresence>
+        {showAddModal && (
+          <AddFriendModal
+            myCode={myCode}
+            onClose={() => setShowAddModal(false)}
+            onAdded={() => { loadFriends(); loadLeaderboard() }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

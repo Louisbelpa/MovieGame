@@ -310,6 +310,19 @@ export function authAppleSignIn(identityToken: string, displayName?: string): Pr
   })
 }
 
+export function authOAuthCallback(data: {
+  provider: string
+  providerId: string
+  email: string
+  displayName: string
+  avatarUrl?: string
+}): Promise<{ user: UserPayload }> {
+  return request<{ user: UserPayload }>('/api/auth/oauth/callback', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
 // ─── Friends ──────────────────────────────────────────────────────────────────
 
 export interface FriendScore {
@@ -321,6 +334,7 @@ export interface FriendScore {
 export interface FriendEntry {
   id: number
   displayName: string
+  avatarUrl: string | null
   streak: number
   isMe: boolean
   scores: {
@@ -373,6 +387,7 @@ export interface LeaderboardEntry {
   filmWins: number
   seriesWins: number
   wikiWins: number
+  avgAttempts: number | null
   currentStreak: number
   maxStreak: number
 }

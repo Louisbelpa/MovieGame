@@ -86,15 +86,27 @@ async function sendApns(deviceToken: string, title: string, body: string): Promi
 // ── FCM send ──────────────────────────────────────────────────────────────────
 
 let fcmAccessToken: { token: string; expiresAt: number } | null = null;
+let fcmServiceAccount: { client_email: string; private_key: string; project_id: string } | null = null;
 
-async function getFcmAccessToken(): Promise<string | null> {
+function getFcmServiceAccount(): { client_email: string; private_key: string; project_id: string } | null {
+  if (fcmServiceAccount) return fcmServiceAccount;
   const saB64 = process.env.FCM_SERVICE_ACCOUNT;
   if (!saB64) return null;
+  try {
+    fcmServiceAccount = JSON.parse(Buffer.from(saB64, 'base64').toString('utf8'));
+    return fcmServiceAccount;
+  } catch {
+    return null;
+  }
+}
+
+async function getFcmAccessToken(): Promise<string | null> {
+  const sa = getFcmServiceAccount();
+  if (!sa) return null;
 
   const now = Date.now();
   if (fcmAccessToken && fcmAccessToken.expiresAt > now + 60_000) return fcmAccessToken.token;
 
-  const sa = JSON.parse(Buffer.from(saB64, 'base64').toString('utf8'));
   const iat = Math.floor(now / 1000);
   const exp = iat + 3600;
   const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
@@ -129,11 +141,10 @@ async function getFcmAccessToken(): Promise<string | null> {
 }
 
 async function sendFcm(deviceToken: string, title: string, body: string): Promise<void> {
-  const saB64 = process.env.FCM_SERVICE_ACCOUNT;
-  if (!saB64) return;
+  const sa = getFcmServiceAccount();
+  if (!sa) return;
 
-  const sa = JSON.parse(Buffer.from(saB64, 'base64').toString('utf8'));
-  const projectId = sa.project_id as string;
+  const projectId = sa.project_id;
   const accessToken = await getFcmAccessToken();
   if (!accessToken) return;
 

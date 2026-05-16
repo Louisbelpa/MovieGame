@@ -374,6 +374,10 @@ const incremental: { name: string; sql: string }[] = [
     name: 'create_friendships_idx',
     sql: `CREATE INDEX IF NOT EXISTS idx_friendships_addressee ON friendships (addressee_id, status)`,
   },
+  {
+    name: 'create_users_idx_friend_code',
+    sql: `CREATE INDEX IF NOT EXISTS idx_users_friend_code ON users (friend_code)`,
+  },
 ]
 
 // Multi-statement migrations that need db.exec() rather than db.prepare().run()

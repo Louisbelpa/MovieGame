@@ -92,6 +92,10 @@ dependencies {
     // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging.ktx)
+
+    // Google Sign-In
+    // TODO: Make sure your Android google-services.json includes the OAuth client ID for this app
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
 }
 
 kapt { correctErrorTypes = true }

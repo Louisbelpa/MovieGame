@@ -1,10 +1,11 @@
 interface ApertureIconProps {
   size?: number
   className?: string
+  id?: string
 }
 
-export function ApertureIcon({ size = 20, className }: ApertureIconProps) {
-  const id = 'ap'
+export function ApertureIcon({ size = 20, className, id: idProp }: ApertureIconProps) {
+  const id = idProp ?? 'ap'
   return (
     <svg
       width={size}

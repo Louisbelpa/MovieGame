@@ -4,7 +4,7 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express'
-import { guessLimiter } from '../middleware/rateLimiter.js'
+import { guessLimiter, searchLimiter } from '../middleware/rateLimiter.js'
 import { userAuth } from '../middleware/userAuth.js'
 import db from '../db/database.js'
 import {
@@ -183,7 +183,7 @@ wikiChallengeRouter.get('/adjacent', (req: Request, res: Response, next: NextFun
 
 // ─── GET /api/wiki/search ─────────────────────────────────────────────────────
 
-wikiChallengeRouter.get('/search', (req: Request, res: Response, next: NextFunction) => {
+wikiChallengeRouter.get('/search', searchLimiter, (req: Request, res: Response, next: NextFunction) => {
   try {
     const q = (req.query.q as string) ?? ''
     const limit = Math.min(20, parseInt((req.query.limit as string) ?? '8', 10))

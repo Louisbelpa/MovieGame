@@ -50,22 +50,14 @@ struct LockedHintCard: View {
     let index: Int
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "lock.fill")
-                .font(.system(size: 12))
-                .foregroundColor(Theme.muted)
-            Text("Indice \(index + 1)")
-                .font(.system(size: 13))
-                .foregroundColor(Theme.muted)
-            Spacer()
-        }
-        .padding(Theme.spacing12)
-        .background(Theme.surfaceAlt.opacity(0.5))
-        .cornerRadius(Theme.radiusM)
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.radiusM)
-                .stroke(Theme.border.opacity(0.4), lineWidth: 1)
-        )
+        RoundedRectangle(cornerRadius: Theme.radiusM)
+            .stroke(Theme.border.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+            .frame(minHeight: 52)
+            .overlay(
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 11))
+                    .foregroundColor(Theme.muted.opacity(0.45))
+            )
     }
 }
 
@@ -86,7 +78,7 @@ struct HintsGrid: View {
         VStack(spacing: Theme.spacing8) {
             if !regularIndices.isEmpty || lockedCount > 0 {
                 LazyVGrid(
-                    columns: [GridItem(.flexible()), GridItem(.flexible())],
+                    columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
                     spacing: Theme.spacing8
                 ) {
                     ForEach(regularIndices, id: \.self) { i in

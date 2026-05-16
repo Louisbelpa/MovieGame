@@ -15,6 +15,9 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import fr.guesstoday.features.archive.ArchiveScreen
 import fr.guesstoday.features.auth.AuthViewModel
+import fr.guesstoday.features.auth.ForgotPasswordScreen
+import fr.guesstoday.features.auth.LoginScreen
+import fr.guesstoday.features.auth.RegisterScreen
 import fr.guesstoday.features.friends.FriendsScreen
 import fr.guesstoday.features.game.GameMode
 import fr.guesstoday.features.game.GameScreen
@@ -96,6 +99,15 @@ fun AppNavigation() {
             }
             composable(Screen.Friends.route) {
                 FriendsScreen(navController = navController)
+            }
+            composable("login") {
+                LoginScreen(navController = navController, authViewModel = authViewModel)
+            }
+            composable("register") {
+                RegisterScreen(navController = navController, authViewModel = authViewModel)
+            }
+            composable("forgotPassword") {
+                ForgotPasswordScreen(navController = navController)
             }
         }
     }
