@@ -4,7 +4,6 @@ import {
   Users,
   Copy,
   Check,
-  Flame,
   Plus,
   X,
   Film,
@@ -581,10 +580,6 @@ function IncomingBanner({
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
-
-function getTodayParis(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
-}
 
 export function FriendsPage() {
   const user = useAuthStore((s) => s.user)

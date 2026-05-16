@@ -225,7 +225,7 @@ function SettingsModal({ onClose, user, onSaveName, onChangePassword, onLogout }
   const [pwConfirm, setPwConfirm] = useState('')
   const [pwShowCurrent, setPwShowCurrent] = useState(false)
   const [pwShowNew, setPwShowNew] = useState(false)
-  const [pwLoading, setPwLoading] = useState(false)
+  const [pwLoading] = useState(false)
   const [pwError, setPwError] = useState<string | null>(null)
   const [pwSuccess, setPwSuccess] = useState(false)
 
