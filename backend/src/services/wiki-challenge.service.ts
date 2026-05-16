@@ -595,6 +595,7 @@ export function buildWikiAdminPreviewFromPerson(person: WikiPersonRow, wikiPerso
     id: 0,
     session_token: '',
     challenge_id: fakeChallenge.id,
+    user_id: null,
     attempts: '[]',
     hints_revealed: MAX_HINTS,
     outcome: null,
