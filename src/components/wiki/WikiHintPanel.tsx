@@ -4,7 +4,7 @@
  */
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { Briefcase, Building2, Calendar, Flag, Trophy, Lock, Lightbulb } from 'lucide-react'
+import { Briefcase, Building2, Calendar, Film, Flag, Trophy, Lock, Lightbulb } from 'lucide-react'
 import type { WikiChallengePayload, WikiHintPayload, WikiVisibleProfile } from '@/api/wikiClient'
 
 type WikiPersonUiType = WikiChallengePayload['personType']
@@ -189,6 +189,26 @@ function VisibleProfile({
     )
   }
 
+  if (profile.type === 'actor') {
+    const parts = profile.notableFilmsParts ?? (profile.notableFilms ? [profile.notableFilms] : [])
+    return (
+      <ProfileCard icon={Film} label="Filmographie notable">
+        {parts.length === 0 ? (
+          <p className="text-sm text-film-text-dim italic">Filmographie non renseignée.</p>
+        ) : parts.length === 1 ? (
+          <p className="text-sm text-film-text">{parts[0]}</p>
+        ) : (
+          <ul className="list-disc pl-4 space-y-0.5 text-sm text-film-text">
+            {parts.map((film, i) => <li key={i}>{film}</li>)}
+          </ul>
+        )}
+        {profile.occupation && (
+          <p className="mt-2 text-xs text-film-text-dim">{profile.occupation}</p>
+        )}
+      </ProfileCard>
+    )
+  }
+
   return (
     <ProfileCard icon={Trophy} label={`Carrière sportive${profile.sport ? ` · ${profile.sport}` : ''}`}>
       {(profile.clubs.length > 0 || profile.clubsYouth.length > 0) ? (
@@ -306,6 +326,8 @@ function resolveWikiHint(hint: WikiHintPayload): {
       return { icon: Lightbulb, label: 'Oeuvre notable', formatted: (hint.value as string | null) ?? 'Non renseigné' }
     case 'wiki_company':
       return { icon: Building2, label: 'Entreprise(s)', formatted: (hint.value as string | null) ?? 'Non renseigné' }
+    case 'wiki_notable_films':
+      return { icon: Film, label: 'Films notables', formatted: (hint.value as string | null) ?? 'Non renseigné' }
     case 'wiki_name_initials':
       return { icon: Lightbulb, label: 'Initiales', formatted: String(hint.value) }
     case 'wiki_name_length':

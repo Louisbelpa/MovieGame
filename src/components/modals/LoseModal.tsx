@@ -1,15 +1,17 @@
-import { useState, useEffect } from 'react'
-import { Share2, XCircle, BarChart2, ExternalLink, Film, Tv, Landmark } from 'lucide-react'
+import { Share2, XCircle, BarChart2, ExternalLink, Film, Tv, User, UserCircle, Users } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { useAuthStore } from '@/store/authStore'
+import { useAuthModal } from '@/components/modals/AuthModal'
+import { NextGameCountdown } from '@/components/modals/NextGameCountdown'
 
 type GameMode = 'film' | 'series' | 'wiki'
 
 const MODE_META: Record<GameMode, { label: string; icon: React.ElementType }> = {
   film: { label: 'Cinéma', icon: Film },
   series: { label: 'Séries', icon: Tv },
-  wiki: { label: 'Personnalités', icon: Landmark },
+  wiki: { label: 'Personnalités', icon: User },
 }
 
 interface LoseModalProps {
@@ -33,6 +35,7 @@ interface LoseModalProps {
     hintsRevealed: number
   }
   onShare: () => void
+  onShareAll?: () => void
   onOpenStats?: () => void
   unplayedModes?: Array<{ type: GameMode; path: string }>
 }
@@ -50,10 +53,12 @@ function getPersonTypeLabel(personType?: string): string {
   }
 }
 
-export function LoseModal({ isOpen, onClose, mode, result, stats, onShare, onOpenStats, unplayedModes }: LoseModalProps) {
+export function LoseModal({ isOpen, onClose, mode, result, stats, onShare, onShareAll, onOpenStats, unplayedModes }: LoseModalProps) {
   const isWiki = mode === 'wiki'
   const modalTitleId = 'modal-title'
   const modalDescId = 'modal-desc-lose'
+  const user = useAuthStore((s) => s.user)
+  const { open: openAuth } = useAuthModal()
   const tmdbUrl = !isWiki && result.tmdbId
     ? `https://www.themoviedb.org/${mode === 'series' ? 'tv' : 'movie'}/${result.tmdbId}`
     : null
@@ -132,6 +137,13 @@ export function LoseModal({ isOpen, onClose, mode, result, stats, onShare, onOpe
           </Button>
         </div>
 
+        {onShareAll && (
+          <Button variant="secondary" size="md" onClick={onShareAll} className="w-full">
+            <Share2 size={15} />
+            Partager les 3 jeux 🎬📺🏛️
+          </Button>
+        )}
+
         {unplayedModes && unplayedModes.length > 0 && (
           <div className="w-full">
             <div className="flex items-center gap-2 mb-2">
@@ -155,6 +167,34 @@ export function LoseModal({ isOpen, onClose, mode, result, stats, onShare, onOpe
           </div>
         )}
 
+        {user && (
+          <a href="/friends" className="w-full">
+            <Button variant="secondary" size="md" className="w-full">
+              <Users size={15} />
+              Voir les scores de mes amis
+            </Button>
+          </a>
+        )}
+
+        {!user && (
+          <div className="w-full rounded-xl border border-film-border bg-white/[0.03] p-3 flex items-center gap-3">
+            <div className="shrink-0 w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
+              <UserCircle size={15} className="text-film-text-dim" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-film-text">Protège ta progression</p>
+              <p className="text-xs text-film-text-dim">Un compte gratuit sauvegarde tes stats et ta série.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { onClose(); openAuth('register') }}
+              className="shrink-0 text-xs font-semibold text-film-gold hover:underline cursor-pointer whitespace-nowrap"
+            >
+              Créer un compte
+            </button>
+          </div>
+        )}
+
         <p className="text-xs text-film-text-dim">
           Prochain défi dans <NextGameCountdown />
         </p>
@@ -163,28 +203,3 @@ export function LoseModal({ isOpen, onClose, mode, result, stats, onShare, onOpe
   )
 }
 
-function getSecondsUntilMidnightParis(): number {
-  const formatter = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/Paris',
-    hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false,
-  })
-  const parts = formatter.formatToParts(new Date())
-  const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value ?? '0', 10)
-  return 24 * 3600 - (get('hour') * 3600 + get('minute') * 60 + get('second'))
-}
-
-function NextGameCountdown() {
-  const [secs, setSecs] = useState(getSecondsUntilMidnightParis)
-  useEffect(() => {
-    const id = setInterval(() => setSecs(getSecondsUntilMidnightParis()), 1000)
-    return () => clearInterval(id)
-  }, [])
-  const h = Math.floor(secs / 3600)
-  const m = Math.floor((secs % 3600) / 60)
-  const s = secs % 60
-  return (
-    <strong className="text-film-text tabular-nums">
-      {h}h{String(m).padStart(2, '0')}m{String(s).padStart(2, '0')}s
-    </strong>
-  )
-}

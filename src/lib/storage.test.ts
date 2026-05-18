@@ -173,4 +173,29 @@ describe('clearGameState', () => {
     expect(loadGameState('film')).toBeNull()
     expect(loadGameState('series')).toEqual(mockState)
   })
+
+  it('is idempotent — clearing non-existent state does not throw', () => {
+    expect(() => clearGameState('wiki')).not.toThrow()
+  })
+})
+
+// ─── Wiki game state scoping ──────────────────────────────────────────────────
+
+describe('wiki game state scoping', () => {
+  it('saveGameState / loadGameState scoped to wiki type', () => {
+    const wikiState: PersistedGameState = { ...mockState, challengeId: 'wiki-2026-05-08' }
+    saveGameState(wikiState, 'wiki')
+    expect(loadGameState('wiki')).toEqual(wikiState)
+    expect(loadGameState('film')).toBeNull()
+  })
+})
+
+// ─── History: wiki type ───────────────────────────────────────────────────────
+
+describe('addToHistory / loadHistory — wiki type', () => {
+  it('stores and retrieves wiki history separately', () => {
+    addToHistory('2026-05-08', 'won', 'wiki')
+    expect(loadHistory('wiki')['2026-05-08']).toBe('won')
+    expect(loadHistory('film')).toEqual({})
+  })
 })

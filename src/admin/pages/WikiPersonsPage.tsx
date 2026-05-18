@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
-import { Plus, Search, X, WandSparkles, ExternalLink, Trash2, Pencil, Shuffle, History, Loader2, Upload, Eye } from 'lucide-react'
+import { Plus, Search, WandSparkles, ExternalLink, Trash2, Pencil, Shuffle, History, Loader2, Upload, Eye } from 'lucide-react'
 import {
   getWikiPersons,
   createWikiPerson,
@@ -16,6 +16,8 @@ import {
 import { AdminLayout } from '../components/AdminLayout'
 import { AdminFormSection, AdminFormSubheading } from '../components/AdminFormSection'
 import { WikiGamePreviewModal, WikiGamePreviewOpenButton } from '../components/WikiGamePreviewModal'
+import { Modal, ConfirmDeleteModal } from '../components/Modal'
+import { useToast } from '../hooks/useToast'
 
 // Module-level pool — persists across modal open/close cycles
 const _wikiSlugPool: string[] = []
@@ -35,6 +37,7 @@ function personTypeLabel(personType: PersonType): string {
     case 'entrepreneur': return 'Entrepreneur'
     case 'writer': return 'Ecrivain'
     case 'historical_figure': return 'Historique'
+    case 'actor': return 'Acteur'
     case 'generic': return 'Générique'
     default: return 'Profil'
   }
@@ -46,7 +49,7 @@ type ModalState =
   | { type: 'delete'; person: AdminWikiPerson }
   | null
 
-type PersonType = 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic'
+type PersonType = 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic' | 'actor'
 
 interface WikiRoleFormRow {
   title: string
@@ -140,6 +143,8 @@ const HINT_KEY_LABELS: Record<string, string> = {
   position: 'Poste',
   domain: 'Domaine',
   notable_work: 'Œuvre notable',
+  notable_films: 'Films notables',
+  occupation: 'Métier',
   company: 'Entreprise(s)',
   name_initials: 'Initiales du nom',
   name_length: 'Longueur du nom',
@@ -160,6 +165,9 @@ function getWikiHintKeysSelectable(personType: PersonType): string[] {
   if (personType === 'entrepreneur') {
     return ['birth_year', 'nationality', 'domain', 'notable_work', 'company', 'name_initials', 'name_length']
   }
+  if (personType === 'actor') {
+    return ['birth_year', 'nationality', 'notable_films', 'occupation', 'name_initials', 'name_length']
+  }
   return ['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials', 'name_length']
 }
 
@@ -173,6 +181,9 @@ function getDefaultWikiHintSchedule(personType: PersonType): string[] {
   }
   if (personType === 'entrepreneur') {
     return ['birth_year', 'nationality', 'company', 'name_initials', 'name_length']
+  }
+  if (personType === 'actor') {
+    return ['birth_year', 'nationality', 'notable_films', 'name_initials', 'name_length']
   }
   return ['birth_year', 'nationality', 'name_initials', 'name_length']
 }
@@ -285,21 +296,6 @@ function parseSportInfobox(raw: Record<string, unknown>): SportInfoboxForm {
   }
 }
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl my-4 sm:my-8">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900 truncate pr-4">{title}</h2>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="px-4 sm:px-6 py-4 sm:py-5">{children}</div>
-      </div>
-    </div>
-  )
-}
 
 function WikiPersonForm({
   initial,
@@ -340,6 +336,8 @@ function WikiPersonForm({
   const [notableWork, setNotableWork] = useState('')
   const [company, setCompany] = useState('')
   const [era, setEra] = useState('')
+  const [notableFilms, setNotableFilms] = useState('')
+  const [actorOccupation, setActorOccupation] = useState('')
   const [wikiLang, setWikiLang] = useState<'fr' | 'en'>('fr')
   const [loadingWiki, setLoadingWiki] = useState(false)
   const [loadingRandomWiki, setLoadingRandomWiki] = useState(false)
@@ -402,6 +400,24 @@ function WikiPersonForm({
       setNotableWork('')
       setCompany('')
       setEra('')
+    } else if (currentType === 'actor') {
+      const a = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {}
+      setBirthYear(typeof a.birth_year === 'number' ? String(a.birth_year) : '')
+      setNationality(typeof a.nationality === 'string' ? a.nationality : '')
+      setNotableFilms(typeof a.notable_films === 'string' ? a.notable_films.replace(/ · /g, '\n') : '')
+      setActorOccupation(typeof a.occupation === 'string' ? a.occupation : '')
+      setDomain('')
+      setNotableWork('')
+      setCompany('')
+      setEra('')
+      setCareerHighlightsText('')
+      setClubsText('')
+      setClubsYouthText('')
+      setSport('')
+      setPosition('')
+      setNationalTeamName('')
+      setNationalTeamCaps('')
+      setNationalTeamGoals('')
     } else {
       const g = parseGenericInfobox(raw)
       setBirthYear(g.birth_year != null ? String(g.birth_year) : '')
@@ -418,6 +434,8 @@ function WikiPersonForm({
       setNationalTeamName('')
       setNationalTeamCaps('')
       setNationalTeamGoals('')
+      setNotableFilms('')
+      setActorOccupation('')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial?.id])
@@ -508,6 +526,29 @@ function WikiPersonForm({
       return
     }
 
+    if (data.person_type === 'actor') {
+      const a = data.infobox_data
+      setBirthYear(typeof a.birth_year === 'number' ? String(a.birth_year) : '')
+      setNationality(typeof a.nationality === 'string' ? a.nationality : '')
+      setNotableFilms(typeof a.notable_films === 'string' ? a.notable_films.replace(/ · /g, '\n') : '')
+      setActorOccupation(typeof a.occupation === 'string' ? a.occupation : '')
+      setDomain('')
+      setNotableWork('')
+      setCompany('')
+      setEra('')
+      setParty('')
+      setRolesText('')
+      setSport('')
+      setPosition('')
+      setClubsText('')
+      setClubsYouthText('')
+      setNationalTeamName('')
+      setNationalTeamCaps('')
+      setNationalTeamGoals('')
+      setCareerHighlightsText('')
+      return
+    }
+
     const g = parseGenericInfobox(data.infobox_data)
     setBirthYear(g.birth_year != null ? String(g.birth_year) : '')
     setNationality(g.nationality ?? '')
@@ -516,6 +557,8 @@ function WikiPersonForm({
     setCompany(g.company ?? '')
     setEra(g.era ?? '')
     setCareerHighlightsText(careerHighlightsToLines(g.highlights))
+    setNotableFilms('')
+    setActorOccupation('')
     setParty('')
     setRolesText('')
     setSport('')
@@ -658,6 +701,18 @@ function WikiPersonForm({
           : null,
         birth_year: toNullableNumber(birthYear),
         nationality: toNullableString(nationality),
+      }
+    } else if (personType === 'actor') {
+      // notable_films stored as "Film1 · Film2 · Film3" (lines → joined with ·)
+      const filmsList = notableFilms
+        .split('\n')
+        .map(s => s.trim())
+        .filter(Boolean)
+      data = {
+        birth_year: toNullableNumber(birthYear),
+        nationality: toNullableString(nationality),
+        notable_films: filmsList.length > 0 ? filmsList.join(' · ') : null,
+        occupation: toNullableString(actorOccupation),
       }
     } else {
       const hl = parseCareerHighlightsLines(careerHighlightsText)
@@ -841,10 +896,11 @@ function WikiPersonForm({
             <option value="politician">Politicien</option>
             <option value="sportsperson">Sportif</option>
             <option value="artist">Artiste</option>
+            <option value="actor">Acteur</option>
             <option value="scientist">Scientifique</option>
             <option value="entrepreneur">Entrepreneur</option>
             <option value="writer">Ecrivain</option>
-            <option value="historical_figure">Personnalite historique</option>
+            <option value="historical_figure">Personnalité historique</option>
             <option value="generic">Générique</option>
           </select>
           <p className="mt-1 text-xs text-gray-500">Pilote les clés d’indices disponibles et le rendu du profil sous la photo.</p>
@@ -940,6 +996,32 @@ function WikiPersonForm({
               <label className="block text-sm font-medium text-gray-700 mb-1">Buts</label>
               <input value={nationalTeamGoals} onChange={(e) => setNationalTeamGoals(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
             </div>
+          </div>
+        </div>
+      ) : personType === 'actor' ? (
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nationalité</label>
+            <input value={nationality} onChange={(e) => setNationality(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Année de naissance</label>
+            <input value={birthYear} onChange={(e) => setBirthYear(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Métier / rôle</label>
+            <input value={actorOccupation} onChange={(e) => setActorOccupation(e.target.value)} placeholder="ex. Actrice, Réalisatrice" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Films / séries notables</label>
+            <p className="text-xs text-gray-500 mb-1">Un film ou série par ligne — affiché en liste à puces en jeu.</p>
+            <textarea
+              rows={6}
+              value={notableFilms}
+              onChange={(e) => setNotableFilms(e.target.value)}
+              placeholder={"Sauve qui peut (la vie)\nLa Balance\nVénus Beauté (Institut)"}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
+            />
           </div>
         </div>
       ) : (
@@ -1176,16 +1258,17 @@ function WikiPersonListActions({
 }
 
 export function WikiPersonsPage() {
+  const toast = useToast()
   const [persons, setPersons] = useState<AdminWikiPerson[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [modal, setModal] = useState<ModalState>(null)
   const [deleting, setDeleting] = useState(false)
   const [randomLoading, setRandomLoading] = useState(false)
   const [uploadingWikiPhotoId, setUploadingWikiPhotoId] = useState<number | null>(null)
   const [listPreviewPersonId, setListPreviewPersonId] = useState<number | null>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
 
   async function handlePageRandom() {
     setRandomLoading(true)
@@ -1212,17 +1295,26 @@ export function WikiPersonsPage() {
     load()
   }, [load])
 
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal({ type: 'create' }) }
+      if (e.key === '/') { e.preventDefault(); searchRef.current?.focus() }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
+
   async function handleWikiPhotoUpload(person: AdminWikiPerson, file: File) {
     setUploadingWikiPhotoId(person.id)
-    setError(null)
     try {
       const url = await uploadImage(file)
       await updateWikiPerson(person.id, { photo_url: url })
-      setSuccess('Photo mise à jour.')
-      setTimeout(() => setSuccess(null), 3000)
+      toast.success('Photo mise à jour')
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur upload')
+      toast.error(err instanceof Error ? err.message : 'Erreur upload')
     } finally {
       setUploadingWikiPhotoId(null)
     }
@@ -1230,28 +1322,24 @@ export function WikiPersonsPage() {
 
   async function handleCreate(payload: WikiPersonPayload) {
     try {
-      setError(null)
-      setSuccess(null)
       await createWikiPerson(payload)
-      setSuccess('Fiche personnalité créée.')
+      toast.success('Fiche personnalité créée')
       setModal(null)
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur création')
+      throw err
     }
   }
 
   async function handleEdit(payload: WikiPersonPayload) {
     if (modal?.type !== 'edit') return
     try {
-      setError(null)
-      setSuccess(null)
       await updateWikiPerson(modal.person.id, payload)
-      setSuccess('Fiche personnalité mise à jour.')
+      toast.success('Fiche personnalité mise à jour')
       setModal(null)
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur mise à jour')
+      throw err
     }
   }
 
@@ -1259,14 +1347,12 @@ export function WikiPersonsPage() {
     if (modal?.type !== 'delete') return
     setDeleting(true)
     try {
-      setError(null)
-      setSuccess(null)
       await deleteWikiPerson(modal.person.id)
-      setSuccess('Fiche personnalité supprimée.')
+      toast.success('Fiche personnalité supprimée')
       setModal(null)
       load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur suppression')
+      toast.error(err instanceof Error ? err.message : 'Erreur suppression')
     } finally {
       setDeleting(false)
     }
@@ -1277,7 +1363,7 @@ export function WikiPersonsPage() {
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1 sm:max-w-sm">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher une personnalité..." className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg" />
+          <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher une personnalité… (/)" className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg" />
         </div>
         <div className="flex items-center gap-2 sm:ml-auto">
           <button
@@ -1291,14 +1377,13 @@ export function WikiPersonsPage() {
             }
             <span className="hidden sm:inline">Personnalité aléatoire</span>
           </button>
-          <button onClick={() => setModal({ type: 'create' })} className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+          <button onClick={() => setModal({ type: 'create' })} className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors" title="Nouvelle personnalité (N)">
             <Plus size={15} /> Ajouter
           </button>
         </div>
       </div>
 
       {error && <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">{error}</div>}
-      {success && <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-4 py-3 text-sm">{success}</div>}
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {loading ? (
@@ -1457,17 +1542,13 @@ export function WikiPersonsPage() {
         </Modal>
       )}
       {modal?.type === 'delete' && (
-        <Modal title="Supprimer la personnalité" onClose={() => setModal(null)}>
-          <p className="text-sm text-gray-600 mb-6">
-            Confirmer la suppression de <strong className="text-gray-900">« {modal.person.name} »</strong> ?
-          </p>
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setModal(null)} disabled={deleting} className="px-4 py-2 text-sm border rounded-lg disabled:opacity-50">Annuler</button>
-            <button onClick={handleDelete} disabled={deleting} className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50">
-              {deleting ? 'Suppression…' : 'Supprimer'}
-            </button>
-          </div>
-        </Modal>
+        <ConfirmDeleteModal
+          title="Supprimer la personnalité"
+          name={modal.person.name}
+          onConfirm={handleDelete}
+          onCancel={() => setModal(null)}
+          loading={deleting}
+        />
       )}
 
       <WikiGamePreviewModal

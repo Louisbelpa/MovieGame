@@ -20,6 +20,9 @@ import { seriesRouter } from './routes/series.js';
 import { statsRouter } from './routes/stats.js';
 import { adminRouter } from './routes/admin.js';
 import { sessionMiddleware } from './middleware/session.js';
+import { userAuth } from './middleware/userAuth.js';
+import { authRouter } from './routes/auth.js';
+import { friendsRouter } from './routes/friends.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { createRateLimiter } from './middleware/rateLimiter.js';
@@ -74,14 +77,23 @@ export function createApp(): express.Application {
       directives: {
         defaultSrc: ["'self'"],
         imgSrc: ["'self'", 'https://image.tmdb.org', 'https://upload.wikimedia.org', 'data:'],
-        scriptSrc: ["'self'"],
+        scriptSrc: ["'self'", 'https://appleid.cdn-apple.com'],
         styleSrc: ["'self'", "'unsafe-inline'"],
+        connectSrc: ["'self'", 'https://appleid.apple.com', 'https://idmsa.apple.com'],
+        frameSrc: ["'self'", 'https://appleid.apple.com'],
       },
     },
   }));
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ limit: '1mb', extended: true }));
-  app.use(cookieParser(process.env.COOKIE_SECRET ?? 'dev_secret'));
+  const cookieSecret = process.env.COOKIE_SECRET;
+  if (!cookieSecret && process.env.NODE_ENV === 'production') {
+    logger.error('COOKIE_SECRET is not set — using insecure fallback in production!');
+  }
+  if (!process.env.CORS_ORIGIN) {
+    logger.warn('CORS_ORIGIN is not set — all origins are allowed. Set this in production.');
+  }
+  app.use(cookieParser(cookieSecret ?? 'dev_secret'));
 
   // Static files before CORS — same-origin assets don't need CORS headers
   ensureUploadsDir();
@@ -113,6 +125,7 @@ export function createApp(): express.Application {
   }));
 
   app.use(sessionMiddleware);
+  app.use(userAuth);
   app.use('/api', createRateLimiter({
     max: parseInt(process.env.API_RATE_LIMIT_MAX ?? '600', 10),
     windowMs: parseInt(process.env.API_RATE_LIMIT_WINDOW_MS ?? '60000', 10),
@@ -124,6 +137,8 @@ export function createApp(): express.Application {
   app.use('/api/series', seriesRouter);
   app.use('/api/stats', statsRouter);
   app.use('/api/admin', adminRouter);
+  app.use('/api/auth', authRouter);
+  app.use('/api/friends', friendsRouter);
 
   app.get(
     '/health',
@@ -137,6 +152,9 @@ export function createApp(): express.Application {
       }
     }
   );
+
+  const privacyHtml = path.join(__dirname, '../public/privacy.html');
+  app.get('/privacy', (_req, res) => { res.sendFile(privacyHtml); });
 
   const spaIndex = path.join(__dirname, '../public/index.html');
   app.get('*', (req, res) => {

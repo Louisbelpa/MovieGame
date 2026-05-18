@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { ExternalLink, Film, Landmark } from 'lucide-react'
+import { ExternalLink, Film, User } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { BRAND_NAME, FEATURES } from '@/config/features'
 
@@ -246,7 +246,7 @@ export function Footer() {
           {/* Wikipédia / Wikidata attribution (mode Personnalités) */}
           {FEATURES.enableWiki && isWikiPage && (
             <div className="flex items-center justify-center gap-2 mb-3 text-xs text-film-text-dim">
-              <Landmark size={11} />
+              <User size={11} />
               <span>
                 Mode Personnalités — données issues de{' '}
                 <a href="https://fr.wikipedia.org" target="_blank" rel="noopener noreferrer" className="underline hover:text-film-text-dim transition-colors">Wikipédia</a>

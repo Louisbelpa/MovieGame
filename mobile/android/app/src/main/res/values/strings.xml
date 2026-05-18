@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GuessToday</string>
+    <string name="channel_daily_name">Défi quotidien</string>
+    <string name="channel_daily_description">Notifiez-moi quand le nouveau défi est disponible</string>
+</resources>

@@ -67,3 +67,15 @@ export const loginLimiter = createRateLimiter({
   max: envInt('LOGIN_RATE_LIMIT_MAX', 10),
   windowMs: envInt('LOGIN_RATE_LIMIT_WINDOW_MS', 60_000),
 });
+
+/** User auth endpoints: register / login / OAuth callback (10 req / 15 min per IP) */
+export const AUTH = createRateLimiter({
+  max: envInt('AUTH_RATE_LIMIT_MAX', 10),
+  windowMs: envInt('AUTH_RATE_LIMIT_WINDOW_MS', 15 * 60_000),
+});
+
+/** General API limiter for data-fetching routes (120 req / min per IP) */
+export const apiLimiter = createRateLimiter({
+  max: envInt('API_RATE_LIMIT_MAX', 120),
+  windowMs: envInt('API_RATE_LIMIT_WINDOW_MS', 60_000),
+});

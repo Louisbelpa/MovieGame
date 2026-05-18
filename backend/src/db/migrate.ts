@@ -226,6 +226,158 @@ const incremental: { name: string; sql: string }[] = [
     name: 'add_hint_schedule_to_series',
     sql: `ALTER TABLE series ADD COLUMN hint_schedule TEXT NOT NULL DEFAULT '["year","creator","cast"]'`,
   },
+  {
+    name: 'create_users',
+    sql: `CREATE TABLE IF NOT EXISTS users (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      email         TEXT UNIQUE,
+      password_hash TEXT,
+      display_name  TEXT NOT NULL,
+      avatar_url    TEXT,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      is_banned     INTEGER NOT NULL DEFAULT 0,
+      stats_games_played INTEGER DEFAULT 0,
+      stats_wins         INTEGER DEFAULT 0,
+      stats_streak       INTEGER DEFAULT 0,
+      stats_max_streak   INTEGER DEFAULT 0
+    )`,
+  },
+  {
+    name: 'create_oauth_accounts',
+    sql: `CREATE TABLE IF NOT EXISTS oauth_accounts (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      provider    TEXT NOT NULL,
+      provider_id TEXT NOT NULL,
+      UNIQUE(provider, provider_id)
+    )`,
+  },
+  {
+    name: 'create_user_sessions',
+    sql: `CREATE TABLE IF NOT EXISTS user_sessions (
+      id         TEXT PRIMARY KEY,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  },
+  {
+    name: 'create_user_sessions_idx_user_id',
+    sql: `CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions (user_id)`,
+  },
+  {
+    name: 'create_user_sessions_idx_expires_at',
+    sql: `CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions (expires_at)`,
+  },
+  {
+    name: 'add_user_id_to_game_sessions',
+    sql: `ALTER TABLE game_sessions ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL`,
+  },
+  {
+    name: 'create_wiki_sessions',
+    sql: `CREATE TABLE IF NOT EXISTS wiki_sessions (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_token   TEXT NOT NULL,
+      challenge_id    INTEGER NOT NULL REFERENCES daily_challenges (id) ON DELETE CASCADE,
+      attempts        TEXT NOT NULL DEFAULT '[]',
+      hints_revealed  INTEGER NOT NULL DEFAULT 0,
+      outcome         TEXT CHECK (outcome IN ('won', 'lost')),
+      started_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      finished_at     TEXT,
+      user_id         INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      UNIQUE (session_token, challenge_id)
+    )`,
+  },
+  {
+    name: 'create_wiki_sessions_idx_token',
+    sql: `CREATE INDEX IF NOT EXISTS idx_wiki_sessions_token ON wiki_sessions (session_token)`,
+  },
+  {
+    name: 'create_wiki_sessions_idx_challenge',
+    sql: `CREATE INDEX IF NOT EXISTS idx_wiki_sessions_challenge ON wiki_sessions (challenge_id)`,
+  },
+  {
+    name: 'create_wiki_sessions_idx_outcome',
+    sql: `CREATE INDEX IF NOT EXISTS idx_wiki_sessions_outcome ON wiki_sessions (outcome)`,
+  },
+  {
+    name: 'create_wiki_sessions_idx_user_id',
+    sql: `CREATE INDEX IF NOT EXISTS idx_wiki_sessions_user_id ON wiki_sessions (user_id)`,
+  },
+  {
+    name: 'add_email_verified_to_users',
+    sql: `ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0`,
+  },
+  {
+    name: 'create_password_reset_tokens',
+    sql: `CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      used_at    TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  },
+  {
+    name: 'create_password_reset_tokens_idx',
+    sql: `CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash ON password_reset_tokens (token_hash)`,
+  },
+  {
+    name: 'create_email_verification_tokens',
+    sql: `CREATE TABLE IF NOT EXISTS email_verification_tokens (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      used_at    TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  },
+  {
+    name: 'create_email_verification_tokens_idx',
+    sql: `CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_hash ON email_verification_tokens (token_hash)`,
+  },
+  {
+    name: 'create_user_challenge_results',
+    sql: `CREATE TABLE IF NOT EXISTS user_challenge_results (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      challenge_id INTEGER NOT NULL REFERENCES daily_challenges(id) ON DELETE CASCADE,
+      media_type   TEXT NOT NULL,
+      attempts_used INTEGER NOT NULL,
+      won          INTEGER NOT NULL DEFAULT 0,
+      completed_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(user_id, challenge_id)
+    )`,
+  },
+  {
+    name: 'create_user_challenge_results_idx_user_id',
+    sql: `CREATE INDEX IF NOT EXISTS idx_ucr_user_id ON user_challenge_results (user_id, completed_at DESC)`,
+  },
+  {
+    name: 'add_friend_code_to_users',
+    sql: `ALTER TABLE users ADD COLUMN friend_code TEXT`,
+  },
+  {
+    name: 'create_friendships',
+    sql: `CREATE TABLE IF NOT EXISTS friendships (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    requester_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    addressee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status       TEXT NOT NULL CHECK(status IN ('pending','accepted')) DEFAULT 'pending',
+    created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+    UNIQUE(requester_id, addressee_id)
+  )`,
+  },
+  {
+    name: 'create_friendships_idx',
+    sql: `CREATE INDEX IF NOT EXISTS idx_friendships_addressee ON friendships (addressee_id, status)`,
+  },
+  {
+    name: 'create_users_idx_friend_code',
+    sql: `CREATE INDEX IF NOT EXISTS idx_users_friend_code ON users (friend_code)`,
+  },
 ]
 
 // Multi-statement migrations that need db.exec() rather than db.prepare().run()
@@ -388,6 +540,40 @@ const multiStatement: { name: string; sql: string }[] = [
       PRAGMA foreign_keys = ON;
     `,
   },
+  {
+    name: 'add_actor_to_wiki_person_types',
+    sql: `
+      PRAGMA foreign_keys = OFF;
+      DROP TABLE IF EXISTS wiki_persons_v4;
+      CREATE TABLE wiki_persons_v4 (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        name            TEXT NOT NULL,
+        name_lower      TEXT NOT NULL GENERATED ALWAYS AS (lower(name)) STORED,
+        name_aliases    TEXT NOT NULL DEFAULT '[]',
+        person_type     TEXT NOT NULL DEFAULT 'generic' CHECK (person_type IN ('politician','sportsperson','artist','scientist','entrepreneur','writer','historical_figure','generic','actor')),
+        wikipedia_slug  TEXT NOT NULL UNIQUE,
+        infobox_data    TEXT NOT NULL DEFAULT '{}',
+        hint_schedule   TEXT NOT NULL DEFAULT '[]',
+        photo_url       TEXT,
+        extract         TEXT,
+        wikipedia_url   TEXT,
+        difficulty      INTEGER NOT NULL DEFAULT 3 CHECK (difficulty BETWEEN 1 AND 5),
+        is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+      INSERT OR IGNORE INTO wiki_persons_v4
+        (id, name, name_aliases, person_type, wikipedia_slug, infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty, is_active, created_at, updated_at)
+        SELECT id, name, name_aliases, person_type, wikipedia_slug, infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty, is_active, created_at, updated_at
+        FROM wiki_persons;
+      DROP TABLE wiki_persons;
+      ALTER TABLE wiki_persons_v4 RENAME TO wiki_persons;
+      CREATE INDEX IF NOT EXISTS idx_wiki_persons_name_lower ON wiki_persons (name_lower);
+      CREATE INDEX IF NOT EXISTS idx_wiki_persons_person_type ON wiki_persons (person_type);
+      CREATE INDEX IF NOT EXISTS idx_wiki_persons_is_active ON wiki_persons (is_active);
+      PRAGMA foreign_keys = ON;
+    `,
+  },
 ]
 
 // ─── Incremental migrations (single-statement, idempotent) ───────────────────
@@ -437,9 +623,30 @@ for (const { name, sql } of multiStatement) {
     const tableSql = row?.sql ?? ''
     if (tableSql.includes("'generic'")) { markApplied(name); continue }
   }
+  if (name === 'add_actor_to_wiki_person_types') {
+    const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='wiki_persons'`).get() as { sql?: string } | undefined
+    const tableSql = row?.sql ?? ''
+    if (tableSql.includes("'actor'")) { markApplied(name); continue }
+  }
 
   try {
-    db.transaction(() => { db.exec(sql) })()
+    // Migrations that use PRAGMA foreign_keys need it executed outside any transaction
+    // (SQLite forbids changing foreign_keys enforcement mid-transaction)
+    if (sql.includes('PRAGMA foreign_keys = OFF')) {
+      db.pragma('foreign_keys = OFF')
+      // Strip the PRAGMA lines and run the rest inside a transaction
+      const stripped = sql
+        .split('\n')
+        .filter((l) => !l.trim().startsWith('PRAGMA foreign_keys'))
+        .join('\n')
+      try {
+        db.transaction(() => { db.exec(stripped) })()
+      } finally {
+        db.pragma('foreign_keys = ON')
+      }
+    } else {
+      db.transaction(() => { db.exec(sql) })()
+    }
     markApplied(name)
     console.log(`  ✓ ${name}`)
   } catch (err) {
@@ -449,12 +656,64 @@ for (const { name, sql } of multiStatement) {
 
 const postMultiStatementIncremental: { name: string; sql: string }[] = [
   {
+    name: 'create_push_tokens',
+    sql: `CREATE TABLE IF NOT EXISTS push_tokens (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token      TEXT    NOT NULL,
+      platform   TEXT    NOT NULL CHECK (platform IN ('ios', 'android')),
+      created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(user_id, platform)
+    )`,
+  },
+  {
     name: 'repair_daily_challenges_is_active_after_table_recreate',
     sql: `ALTER TABLE daily_challenges ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))`,
   },
   {
     name: 'repair_daily_challenges_idx_is_active_after_recreate',
     sql: `CREATE INDEX IF NOT EXISTS idx_daily_challenges_is_active ON daily_challenges (is_active)`,
+  },
+  { name: 'add_import_film_played',      sql: `ALTER TABLE users ADD COLUMN import_film_played      INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_film_wins',        sql: `ALTER TABLE users ADD COLUMN import_film_wins        INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_film_streak',      sql: `ALTER TABLE users ADD COLUMN import_film_streak      INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_film_max_streak',  sql: `ALTER TABLE users ADD COLUMN import_film_max_streak  INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_series_played',    sql: `ALTER TABLE users ADD COLUMN import_series_played    INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_series_wins',      sql: `ALTER TABLE users ADD COLUMN import_series_wins      INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_series_streak',    sql: `ALTER TABLE users ADD COLUMN import_series_streak    INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_series_max_streak',sql: `ALTER TABLE users ADD COLUMN import_series_max_streak INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_wiki_played',      sql: `ALTER TABLE users ADD COLUMN import_wiki_played      INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_wiki_wins',        sql: `ALTER TABLE users ADD COLUMN import_wiki_wins        INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_wiki_streak',      sql: `ALTER TABLE users ADD COLUMN import_wiki_streak      INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_import_wiki_max_streak',  sql: `ALTER TABLE users ADD COLUMN import_wiki_max_streak  INTEGER NOT NULL DEFAULT 0` },
+  {
+    name: 'create_user_platforms',
+    sql: `CREATE TABLE IF NOT EXISTS user_platforms (
+      user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      platform     TEXT    NOT NULL CHECK (platform IN ('ios', 'android', 'web')),
+      last_seen_at TEXT    NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, platform)
+    )`,
+  },
+  {
+    name: 'create_idx_sessions_user_challenge',
+    sql: `CREATE INDEX IF NOT EXISTS idx_sessions_user_challenge ON game_sessions (user_id, challenge_id)`,
+  },
+  {
+    name: 'backfill_game_sessions_user_id_from_ucr',
+    sql: `UPDATE game_sessions
+      SET user_id = (
+        SELECT ucr.user_id FROM user_challenge_results ucr
+        WHERE ucr.challenge_id = game_sessions.challenge_id
+          AND ucr.won = CASE WHEN game_sessions.outcome = 'won' THEN 1 ELSE 0 END
+          AND ucr.attempts_used = json_array_length(game_sessions.attempts)
+        LIMIT 1
+      )
+      WHERE user_id IS NULL AND outcome IS NOT NULL`,
+  },
+  {
+    name: 'add_idx_dc_date_type_active',
+    sql: `CREATE INDEX IF NOT EXISTS idx_dc_date_type_active ON daily_challenges (challenge_date, media_type, is_active)`,
   },
 ]
 

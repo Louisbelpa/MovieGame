@@ -67,6 +67,12 @@ export type WikiVisibleProfile =
       nationalTeam: { name: string; caps: number | null; goals: number | null } | null
     }
   | {
+      type: 'actor'
+      notableFilms: string | null
+      notableFilmsParts: string[]
+      occupation: string | null
+    }
+  | {
       type: 'generic'
       domain: string | null
       notableWork: string | null
@@ -83,7 +89,7 @@ export interface WikiChallengePayload {
   date: string
   isPastChallenge: boolean
   mediaType: 'wiki'
-  personType: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure'
+  personType: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'actor'
   photoUrl: string | null
   profile: WikiVisibleProfile
   isGameOver: boolean
@@ -110,7 +116,7 @@ export interface WikiResultPayload {
   outcome: 'won' | 'lost'
   mediaType: 'wiki'
   name: string
-  personType: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure'
+  personType: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'actor'
   extract: string | null
   photoUrl: string | null
   wikipediaUrl: string | null

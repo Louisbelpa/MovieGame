@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { addToHistory, loadStats, saveStats } from '@/lib/storage'
 import { updateStats } from '@/lib/utils'
+import { authChallengeResult } from '@/api/client'
+import { useAuthStore } from '@/store/authStore'
 
 type BaseOutcome = 'won' | 'lost' | null
 
@@ -288,6 +290,14 @@ export function createBaseGameStore<
           }))
           const updated = updateStats(prev, { guesses: mappedGuesses, status: outcome }, challengeDate)
           saveStats(updated, type)
+          if (useAuthStore.getState().user) {
+            void authChallengeResult(
+              payload.challenge.challengeId,
+              outcome === 'won',
+              payload.challenge.attempts.length,
+            )
+            void useAuthStore.getState().refreshServerStats()
+          }
         }
       } catch (err) {
         set({

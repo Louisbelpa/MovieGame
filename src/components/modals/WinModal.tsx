@@ -1,16 +1,19 @@
-import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Share2, Trophy, BarChart2, ExternalLink, Film, Tv, Landmark } from 'lucide-react'
+import { Share2, Trophy, BarChart2, ExternalLink, Film, Tv, User, Flame, UserCircle, Users } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { useAuthStore } from '@/store/authStore'
+import { useAuthModal } from '@/components/modals/AuthModal'
+import { loadStats } from '@/lib/storage'
+import { NextGameCountdown } from '@/components/modals/NextGameCountdown'
 
 type GameMode = 'film' | 'series' | 'wiki'
 
 const MODE_META: Record<GameMode, { label: string; icon: React.ElementType }> = {
-  film: { label: 'Cinéma', icon: Film },
-  series: { label: 'Séries', icon: Tv },
-  wiki: { label: 'Personnalités', icon: Landmark },
+  film:   { label: 'Cinéma',         icon: Film },
+  series: { label: 'Séries',         icon: Tv   },
+  wiki:   { label: 'Personnalités',  icon: User },
 }
 
 interface WinModalProps {
@@ -36,14 +39,19 @@ interface WinModalProps {
     hintsRevealed: number
   }
   onShare: () => void
+  onShareAll?: () => void
   onOpenStats?: () => void
   unplayedModes?: Array<{ type: GameMode; path: string }>
 }
 
-export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onOpenStats, unplayedModes }: WinModalProps) {
+export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShareAll, onOpenStats, unplayedModes }: WinModalProps) {
   const isWiki = mode === 'wiki'
   const modalTitleId = 'modal-title-win'
   const modalDescId = 'modal-desc'
+  const user = useAuthStore((s) => s.user)
+  const { open: openAuth } = useAuthModal()
+  const statsType = mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : 'film'
+  const currentStreak = isOpen ? loadStats(statsType).currentStreak : 0
   const tmdbUrl = !isWiki && result.tmdbId
     ? `https://www.themoviedb.org/${mode === 'series' ? 'tv' : 'movie'}/${result.tmdbId}`
     : null
@@ -121,6 +129,13 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onOpen
           </Button>
         </div>
 
+        {onShareAll && (
+          <Button onClick={onShareAll} variant="secondary" size="md" className="w-full">
+            <Share2 size={15} />
+            Partager les 3 jeux 🎬📺🏛️
+          </Button>
+        )}
+
         {unplayedModes && unplayedModes.length > 0 && (
           <div className="w-full">
             <div className="flex items-center gap-2 mb-2">
@@ -144,6 +159,41 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onOpen
           </div>
         )}
 
+        {!user && (
+          <div className="w-full rounded-xl border border-film-gold/30 bg-film-gold/8 p-3 flex items-center gap-3">
+            <div className="shrink-0 w-8 h-8 rounded-full bg-film-gold/15 flex items-center justify-center">
+              <Flame size={15} className="text-film-gold" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-film-text">
+                {stats.attemptsUsed === 1
+                  ? 'Coup de maître ! Sauvegarde cette performance.'
+                  : currentStreak >= 3
+                    ? `Série de ${currentStreak} jours 🔥 — ne la perds pas.`
+                    : 'Sauvegarde tes stats sur un compte gratuit.'}
+              </p>
+              <p className="text-xs text-film-text-dim">Gratuit · synchronisé sur tous tes appareils.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { onClose(); openAuth('register') }}
+              className="shrink-0 text-xs font-semibold text-film-gold hover:underline cursor-pointer whitespace-nowrap flex items-center gap-1"
+            >
+              <UserCircle size={13} />
+              Créer un compte
+            </button>
+          </div>
+        )}
+
+        {user && (
+          <a href="/friends" className="w-full">
+            <Button variant="secondary" size="md" className="w-full">
+              <Users size={15} />
+              Voir les scores de mes amis
+            </Button>
+          </a>
+        )}
+
         <p className="text-xs text-film-text-dim">
           Prochain défi dans <NextGameCountdown />
         </p>
@@ -152,30 +202,3 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onOpen
   )
 }
 
-function getSecondsUntilMidnightParis(): number {
-  const formatter = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/Paris',
-    hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false,
-  })
-  const parts = formatter.formatToParts(new Date())
-  const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value ?? '0', 10)
-  return 24 * 3600 - (get('hour') * 3600 + get('minute') * 60 + get('second'))
-}
-
-function NextGameCountdown() {
-  const [secs, setSecs] = useState(getSecondsUntilMidnightParis)
-
-  useEffect(() => {
-    const id = setInterval(() => setSecs(getSecondsUntilMidnightParis()), 1000)
-    return () => clearInterval(id)
-  }, [])
-
-  const h = Math.floor(secs / 3600)
-  const m = Math.floor((secs % 3600) / 60)
-  const s = secs % 60
-  return (
-    <strong className="text-film-text tabular-nums">
-      {h}h{String(m).padStart(2, '0')}m{String(s).padStart(2, '0')}s
-    </strong>
-  )
-}

@@ -1,0 +1,679 @@
+openapi: 3.0.3
+info:
+  title: GuessToday Mobile API (partial)
+  description: >
+    Contrat aligné sur le backend Express et les clients TypeScript
+    `src/api/client.ts` et `src/api/wikiClient.ts`. Cookies `mg_session`
+    (session de partie) + optionnel `Authorization: Bearer <user_session>`.
+  version: 1.0.0
+servers:
+  - url: https://api.example.com
+    description: Remplacer par l’URL réelle (ex. prod GuessToday)
+
+tags:
+  - name: challenge
+  - name: wiki
+  - name: auth
+  - name: friends
+  - name: films
+  - name: series
+  - name: stats
+
+paths:
+  /api/challenge/today:
+    get:
+      tags: [challenge]
+      parameters:
+        - name: type
+          in: query
+          schema: { type: string, enum: [film, series], default: film }
+      responses:
+        '200':
+          description: Défi du jour + état session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChallengePayload' }
+
+  /api/challenge/date/{date}:
+    get:
+      tags: [challenge]
+      parameters:
+        - name: date
+          in: path
+          required: true
+          schema: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
+        - name: type
+          in: query
+          schema: { type: string, enum: [film, series], default: film }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChallengePayload' }
+
+  /api/challenge/guess:
+    post:
+      tags: [challenge]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [guess]
+              properties:
+                guess: { type: string }
+                challengeId: { type: integer }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GuessResultPayload' }
+
+  /api/challenge/result:
+    get:
+      tags: [challenge]
+      parameters:
+        - name: challengeId
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResultPayload' }
+
+  /api/challenge/dates:
+    get:
+      tags: [challenge]
+      parameters:
+        - name: days
+          in: query
+          schema: { type: integer, default: 365, maximum: 365 }
+        - name: type
+          in: query
+          schema: { type: string, enum: [film, series], default: film }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dates:
+                    type: array
+                    items: { type: string }
+
+  /api/challenge/adjacent:
+    get:
+      tags: [challenge]
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema: { type: string }
+        - name: direction
+          in: query
+          required: true
+          schema: { type: string, enum: [prev, next] }
+        - name: type
+          in: query
+          schema: { type: string, enum: [film, series], default: film }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date: { type: string }
+
+  /api/wiki/today:
+    get:
+      tags: [wiki]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WikiChallengePayload' }
+
+  /api/wiki/date/{date}:
+    get:
+      tags: [wiki]
+      parameters:
+        - name: date
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WikiChallengePayload' }
+
+  /api/wiki/guess:
+    post:
+      tags: [wiki]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [guess, challengeId]
+              properties:
+                guess: { type: string }
+                challengeId: { type: integer }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WikiGuessResultPayload' }
+
+  /api/wiki/result:
+    get:
+      tags: [wiki]
+      parameters:
+        - name: challengeId
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WikiResultPayload' }
+
+  /api/wiki/dates:
+    get:
+      tags: [wiki]
+      parameters:
+        - name: days
+          in: query
+          schema: { type: integer, default: 365 }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dates:
+                    type: array
+                    items: { type: string }
+
+  /api/wiki/adjacent:
+    get:
+      tags: [wiki]
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema: { type: string }
+        - name: direction
+          in: query
+          required: true
+          schema: { type: string, enum: [prev, next] }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date: { type: string }
+
+  /api/wiki/search:
+    get:
+      tags: [wiki]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 8 }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items: { $ref: '#/components/schemas/WikiPersonSuggestion' }
+
+  /api/films/search:
+    get:
+      tags: [films]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 8 }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items: { $ref: '#/components/schemas/SearchResult' }
+
+  /api/series/search:
+    get:
+      tags: [series]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 8 }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items: { $ref: '#/components/schemas/SearchResult' }
+
+  /api/auth/register:
+    post:
+      tags: [auth]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, displayName]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                displayName: { type: string }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+                  sessionToken: { type: string, description: Id session 64 hex pour Bearer }
+
+  /api/auth/login:
+    post:
+      tags: [auth]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+                  sessionToken: { type: string }
+
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+
+  /api/auth/me:
+    get:
+      tags: [auth]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+        '401':
+          description: Non authentifié
+
+  /api/auth/profile:
+    put:
+      tags: [auth]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName: { type: string }
+                avatarUrl: { type: string, nullable: true }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+
+  /api/friends:
+    get:
+      tags: [friends]
+      parameters:
+        - name: date
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FriendsResponse' }
+
+  /api/friends/code:
+    get:
+      tags: [friends]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+
+  /api/friends/add:
+    post:
+      tags: [friends]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  pending:
+                    type: object
+                    nullable: true
+                    properties:
+                      id: { type: integer }
+                      displayName: { type: string }
+
+  /api/friends/accept:
+    post:
+      tags: [friends]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: { type: integer }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+
+  /api/friends/{userId}:
+    delete:
+      tags: [friends]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+
+components:
+  schemas:
+    HintPayload:
+      type: object
+      properties:
+        type: { type: string }
+        value: {}
+
+    AttemptPayload:
+      type: object
+      properties:
+        guess: { type: string }
+        correct: { type: boolean }
+
+    ChallengePayload:
+      type: object
+      properties:
+        challengeId: { type: integer }
+        challengeNumber: { type: integer }
+        date: { type: string }
+        isPastChallenge: { type: boolean }
+        mediaType: { type: string, enum: [film, series] }
+        imageUrl: { type: string }
+        isGameOver: { type: boolean }
+        hintsAvailable: { type: integer }
+        hintsRevealed: { type: integer }
+        hints:
+          type: array
+          items: { $ref: '#/components/schemas/HintPayload' }
+        attemptsUsed: { type: integer }
+        maxAttempts: { type: integer }
+        attempts:
+          type: array
+          items: { $ref: '#/components/schemas/AttemptPayload' }
+        outcome:
+          type: string
+          nullable: true
+          enum: [won, lost]
+        hasPrevChallenge: { type: boolean }
+        hasNextChallenge: { type: boolean }
+        isPreview: { type: boolean }
+
+    GuessResultPayload:
+      type: object
+      properties:
+        correct: { type: boolean }
+        outcome: { type: string, nullable: true, enum: [won, lost] }
+        attemptsLeft: { type: integer }
+        nextHintUnlocked: { type: boolean }
+        challenge: { $ref: '#/components/schemas/ChallengePayload' }
+
+    ResultPayload:
+      type: object
+      properties:
+        outcome: { type: string, enum: [won, lost] }
+        title: { type: string }
+        year: { type: integer }
+        director: { type: string }
+        genres:
+          type: array
+          items: { type: string }
+        cast:
+          type: array
+          items: { type: string }
+        tagline: { type: string, nullable: true }
+        synopsis: { type: string, nullable: true }
+        imageUrl: { type: string }
+        tmdbId: { type: integer, nullable: true }
+        mediaType: { type: string, enum: [film, series] }
+        attemptsUsed: { type: integer }
+        maxAttempts: { type: integer }
+        attempts:
+          type: array
+          items: { $ref: '#/components/schemas/AttemptPayload' }
+        startedAt: { type: string }
+        finishedAt: { type: string }
+
+    SearchResult:
+      type: object
+      properties:
+        title: { type: string }
+        year: { type: integer }
+
+    WikiHintPayload:
+      type: object
+      properties:
+        type: { type: string }
+        value: {}
+
+    WikiAttemptPayload:
+      type: object
+      properties:
+        guess: { type: string }
+        correct: { type: boolean }
+
+    WikiVisibleProfile:
+      description: Union discriminée par `type` — schéma simplifié pour OpenAPI
+      type: object
+      properties:
+        type: { type: string }
+
+    WikiChallengePayload:
+      type: object
+      properties:
+        challengeId: { type: integer }
+        challengeNumber: { type: integer }
+        date: { type: string }
+        isPastChallenge: { type: boolean }
+        mediaType: { type: string, enum: [wiki] }
+        personType: { type: string }
+        photoUrl: { type: string, nullable: true }
+        profile: { $ref: '#/components/schemas/WikiVisibleProfile' }
+        isGameOver: { type: boolean }
+        hintsAvailable: { type: integer }
+        hintsRevealed: { type: integer }
+        hints:
+          type: array
+          items: { $ref: '#/components/schemas/WikiHintPayload' }
+        attemptsUsed: { type: integer }
+        maxAttempts: { type: integer }
+        attempts:
+          type: array
+          items: { $ref: '#/components/schemas/WikiAttemptPayload' }
+        outcome: { type: string, nullable: true, enum: [won, lost] }
+        isPreview: { type: boolean }
+
+    WikiGuessResultPayload:
+      type: object
+      properties:
+        correct: { type: boolean }
+        outcome: { type: string, nullable: true }
+        attemptsLeft: { type: integer }
+        nextHintUnlocked: { type: boolean }
+        challenge: { $ref: '#/components/schemas/WikiChallengePayload' }
+
+    WikiResultPayload:
+      type: object
+      properties:
+        outcome: { type: string, enum: [won, lost] }
+        mediaType: { type: string, enum: [wiki] }
+        name: { type: string }
+        personType: { type: string }
+        extract: { type: string, nullable: true }
+        photoUrl: { type: string, nullable: true }
+        wikipediaUrl: { type: string, nullable: true }
+        attemptsUsed: { type: integer }
+        maxAttempts: { type: integer }
+        attempts:
+          type: array
+          items: { $ref: '#/components/schemas/WikiAttemptPayload' }
+        startedAt: { type: string }
+        finishedAt: { type: string }
+
+    WikiPersonSuggestion:
+      type: object
+      properties:
+        title: { type: string }
+        year: { type: string }
+
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        email: { type: string, nullable: true }
+        displayName: { type: string }
+        avatarUrl: { type: string, nullable: true }
+        emailVerified: { type: boolean }
+
+    FriendScore:
+      type: object
+      nullable: true
+      properties:
+        attemptsUsed: { type: integer }
+        won: { type: boolean }
+        completedAt: { type: string }
+
+    FriendEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        displayName: { type: string }
+        streak: { type: integer }
+        isMe: { type: boolean }
+        scores:
+          type: object
+          properties:
+            film: { $ref: '#/components/schemas/FriendScore' }
+            series: { $ref: '#/components/schemas/FriendScore' }
+            wiki: { $ref: '#/components/schemas/FriendScore' }
+
+    PendingEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        displayName: { type: string }
+        direction: { type: string, enum: [incoming, outgoing] }
+
+    FriendsResponse:
+      type: object
+      properties:
+        date: { type: string }
+        today: { type: string }
+        myCode: { type: string, nullable: true }
+        friends:
+          type: array
+          items: { $ref: '#/components/schemas/FriendEntry' }
+        pending:
+          type: array
+          items: { $ref: '#/components/schemas/PendingEntry' }

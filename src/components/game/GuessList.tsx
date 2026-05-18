@@ -12,16 +12,17 @@ import type { GuessEntry } from '@/types'
 interface GuessListProps {
   guesses: GuessEntry[]
   maxAttempts: number
+  hints?: string[]
 }
 
-export function GuessList({ guesses, maxAttempts }: GuessListProps) {
+export function GuessList({ guesses, maxAttempts, hints }: GuessListProps) {
   const slots = Array.from({ length: maxAttempts }, (_, i) => guesses[i] ?? null)
 
   return (
     <ol className="flex flex-col gap-2 w-full" aria-label="Historique des tentatives">
       <AnimatePresence initial={false}>
         {slots.map((guess, i) => (
-          <GuessSlot key={i} index={i} guess={guess} />
+          <GuessSlot key={i} index={i} guess={guess} hint={hints?.[i]} />
         ))}
       </AnimatePresence>
     </ol>
@@ -31,9 +32,18 @@ export function GuessList({ guesses, maxAttempts }: GuessListProps) {
 interface GuessSlotProps {
   index: number
   guess: GuessEntry | null
+  hint?: string
 }
 
-function GuessSlot({ index, guess }: GuessSlotProps) {
+function hintBadgeClass(hint: string): string {
+  const h = hint.toLowerCase()
+  if (h.includes('récent')) return 'bg-film-red/20 text-film-red'
+  if (h.includes('ancien')) return 'bg-film-muted/40 text-film-text-dim'
+  if (h.includes('année') || h.includes('même')) return 'text-film-gold bg-film-gold/10'
+  return 'bg-film-border/30 text-film-text-dim'
+}
+
+function GuessSlot({ index, guess, hint }: GuessSlotProps) {
   const isEmpty = guess === null
 
   return (
@@ -85,6 +95,16 @@ function GuessSlot({ index, guess }: GuessSlotProps) {
       <span className={cn('flex-1 truncate', isEmpty && 'invisible')}>
         {isEmpty ? '—' : guess.value || 'Passé'}
       </span>
+
+      {/* Hint badge */}
+      {!isEmpty && hint && (
+        <span
+          className={cn('text-[10px] font-mono uppercase px-1.5 py-0.5 rounded shrink-0', hintBadgeClass(hint))}
+          aria-label={`Indice: ${hint}`}
+        >
+          {hint}
+        </span>
+      )}
 
       {/* Status icon */}
       {!isEmpty && (

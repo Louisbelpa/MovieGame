@@ -18,6 +18,9 @@ export const ADMIN_COOKIE = 'admin_token';
 
 /** Generate a new admin token and persist only its hash. */
 export function computeAdminToken(): string {
+  // Purge expired/revoked tokens to keep the table bounded.
+  db.prepare(`DELETE FROM active_admin_tokens WHERE expires_at < datetime('now') OR revoked_at IS NOT NULL`).run();
+
   const token = randomBytes(32).toString('hex');
   const hash = createHash('sha256').update(token).digest('hex');
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();

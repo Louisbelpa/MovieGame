@@ -30,6 +30,8 @@ describe('isCorrectGuess', () => {
   it('wrong answer → false', () => expect(isCorrectGuess('Avatar', 'Titanic')).toBe(false))
   it('empty guess → false', () => expect(isCorrectGuess('', 'Titanic')).toBe(false))
   it('normalises both sides', () => expect(isCorrectGuess('Été', 'Ete')).toBe(true))
+  it('trailing whitespace normalised', () => expect(isCorrectGuess('Titanic ', 'Titanic')).toBe(true))
+  it('does not match empty target', () => expect(isCorrectGuess('Titanic', '')).toBe(false))
 })
 
 // ─── buildShareGrid ───────────────────────────────────────────────────────────
@@ -259,5 +261,35 @@ describe('updateStats — accumulation', () => {
     expect(stats.maxStreak).toBe(1)
     expect(stats.gamesPlayed).toBe(3)
     expect(stats.gamesWon).toBe(2)
+  })
+
+  it('skipped guesses are not counted in attempt key', () => {
+    // 1 skip + 1 correct = attempt key 1 (skips excluded)
+    const prev = defaultStats()
+    const next = updateStats(prev, { status: 'won', guesses: makeGuesses(['skipped', 'correct']) }, '2026-05-08')
+    expect(next.guessDistribution[1]).toBe(1)
+    expect(next.guessDistribution[2]).toBe(0)
+  })
+})
+
+// ─── buildShareText edge cases ────────────────────────────────────────────────
+
+describe('buildShareText — edge cases', () => {
+  const allCorrect: GuessEntry[] = [{ value: 'Titanic', status: 'correct', timestamp: 0 }]
+
+  it('win on first attempt shows 1/max', () => {
+    const text = buildShareText('2026-05-08', allCorrect, true, 5)
+    expect(text).toContain('1/5')
+  })
+
+  it('does not include challenge number when not provided', () => {
+    const text = buildShareText('2026-05-08', allCorrect, true, 5)
+    expect(text).not.toContain('#')
+  })
+
+  it('wiki mode uses 🏛️ for correct', () => {
+    const text = buildShareText('2026-05-08', allCorrect, true, 5, 1, 'wiki')
+    expect(text).toContain('🏛️')
+    expect(text).toContain('Personnalités')
   })
 })
