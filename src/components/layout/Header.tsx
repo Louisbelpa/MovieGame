@@ -7,9 +7,7 @@
 
 import { useRef } from 'react'
 import { BarChart2, CalendarDays, LogIn, Flame, UserRound } from 'lucide-react'
-import { Film, Tv, User } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useLocation } from 'react-router-dom'
 import { useGameStore } from '@/store/gameStore'
 import { useWikiStore } from '@/store/wikiStore'
 import { useAuthStore } from '@/store/authStore'
@@ -22,16 +20,9 @@ interface HeaderProps {
   mode: 'film' | 'series' | 'wiki'
 }
 
-const MODE_TABS = [
-  { id: 'film',   label: 'Films',        to: '/films',  Icon: Film,     color: 'var(--sg-films)',  enabled: true },
-  { id: 'series', label: 'Séries',       to: '/series', Icon: Tv,       color: 'var(--sg-series)', enabled: FEATURES.enableSeries },
-  { id: 'wiki',   label: 'Personnalités', to: '/wiki',  Icon: User, color: 'var(--sg-wiki)',   enabled: FEATURES.enableWiki },
-].filter((t) => t.enabled)
 
 export function Header({ mode }: HeaderProps) {
   const isWiki = mode === 'wiki'
-  const { pathname } = useLocation()
-
   const user = useAuthStore((s) => s.user)
   const isLoading = useAuthStore((s) => s.isLoading)
   const { open: openAuthModal } = useAuthModal()
@@ -57,8 +48,6 @@ export function Header({ mode }: HeaderProps) {
   const wikiStreak = FEATURES.enableWiki ? loadStats('wiki').currentStreak : 0
   const seriesStreak = FEATURES.enableSeries ? loadStats('series').currentStreak : 0
   const maxStreak = Math.max(filmStreak, wikiStreak, seriesStreak)
-
-  const activeTabId = pathname.startsWith('/series') ? 'series' : pathname.startsWith('/wiki') ? 'wiki' : 'film'
 
   const iconBtn = 'inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold'
 

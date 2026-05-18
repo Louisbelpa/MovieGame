@@ -147,7 +147,7 @@ interface GameCardProps {
   todayStatus?: 'won' | 'lost' | null
 }
 
-function GameCard({ href, icon, modeLabel, description, accentColor, accentSoft, accentRing, disabled, badge, todayStatus }: GameCardProps) {
+function GameCard({ href, icon, modeLabel, description, accentColor, accentRing, disabled, badge, todayStatus }: GameCardProps) {
   const showPlayButton = !todayStatus && !disabled
   const Tag = disabled ? 'div' : 'a'
 
@@ -387,60 +387,7 @@ function MobileAuthNudge() {
   )
 }
 
-// ─── Friends mini bar (mobile) ────────────────────────────────────────────────
 
-function FriendsMiniBar({ friends }: { friends: FriendEntry[] }) {
-  const isLoading = useAuthStore((s) => s.isLoading)
-  const user = useAuthStore((s) => s.user)
-  if (isLoading || !user) return null
-
-  const others = friends.filter((e) => !e.isMe)
-
-  // No real friends — show add CTA
-  if (others.length === 0) {
-    return (
-      <a
-        href="/friends"
-        className="lg:hidden flex items-center gap-3 rounded-xl border border-film-border bg-film-surface hover:bg-film-dark px-4 py-3 transition-colors mt-3"
-      >
-        <div className="w-8 h-8 rounded-lg bg-film-gray flex items-center justify-center shrink-0">
-          <Users size={15} className="text-film-text-dim" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-film-text leading-tight">Ajouter des amis</p>
-          <p className="text-xs text-film-text-dim/60 mt-0.5">Compare tes scores chaque jour</p>
-        </div>
-        <ChevronRight size={14} className="text-film-text-dim/40 shrink-0" />
-      </a>
-    )
-  }
-
-  const played = others.filter((e) => e.scores.film || e.scores.series || e.scores.wiki)
-  if (played.length === 0) return null
-
-  return (
-    <a
-      href="/friends"
-      className="lg:hidden flex items-center gap-3 rounded-xl border border-film-border bg-film-surface hover:bg-film-dark px-4 py-3 transition-colors mt-3"
-    >
-      <div className="flex -space-x-1.5 shrink-0">
-        {played.slice(0, 3).map((f) => (
-          <div
-            key={f.id}
-            className="w-6 h-6 rounded-full border-2 border-film-surface bg-film-gold/20 flex items-center justify-center text-[9px] font-bold text-film-gold"
-          >
-            {f.displayName.charAt(0).toUpperCase()}
-          </div>
-        ))}
-      </div>
-      <span className="flex-1 text-sm text-film-text-dim">
-        <strong className="text-film-text">{played.length} ami{played.length > 1 ? 's' : ''}</strong>{' '}
-        {played.length > 1 ? 'ont' : 'a'} déjà joué
-      </span>
-      <ChevronRight size={14} className="text-film-text-dim/40 shrink-0" />
-    </a>
-  )
-}
 
 // ─── iOS app banner ───────────────────────────────────────────────────────────
 
@@ -607,8 +554,7 @@ export function HomePage() {
         <TopNav />
         <MobileHeader />
 
-        {/* 2-col layout */}
-        <div className="flex-1 max-w-6xl w-full mx-auto pb-6 px-4 lg:px-6 lg:grid lg:grid-cols-[1fr_280px] lg:gap-8 lg:items-start">
+        <div className="flex-1 max-w-3xl w-full mx-auto pb-6 px-4 lg:px-6">
 
           {/* ── Main column ── */}
           <div>
@@ -715,22 +661,19 @@ export function HomePage() {
             {/* Stats strip — desktop only */}
             <StatsStrip />
 
+            {/* Friends block */}
+            <div className="mt-5">
+              <FriendsSidebar friends={friends} loading={friendsLoading} />
+            </div>
+
             {/* Account nudge (streak save) */}
             <AccountNudge />
 
             {/* Auth nudge — mobile only, non-logged */}
             <MobileAuthNudge />
 
-            {/* Friends mini bar — mobile only */}
-            <FriendsMiniBar friends={friends} />
-
             {/* iOS app banner — bottom of column, after all game/social content */}
             <IosAppBanner />
-          </div>
-
-          {/* ── Right sidebar — desktop only ── */}
-          <div className="hidden lg:flex lg:flex-col lg:gap-4 lg:sticky lg:top-6">
-            <FriendsSidebar friends={friends} loading={friendsLoading} />
           </div>
         </div>
       </div>
