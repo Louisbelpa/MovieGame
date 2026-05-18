@@ -31,8 +31,8 @@ enum GameMode {
     var color: Color {
         switch self {
         case .film:   return Theme.gold
-        case .series: return Color(hex: "#6b7cff")
-        case .wiki:   return Color(hex: "#e85788")
+        case .series: return Theme.modeSeries
+        case .wiki:   return Theme.modeWiki
         }
     }
 

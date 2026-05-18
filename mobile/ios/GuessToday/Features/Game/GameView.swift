@@ -340,13 +340,13 @@ private struct GuessInputSection: View {
                 } label: {
                     Text("Deviner")
                         .font(Theme.inter(size: 13, weight: .bold))
-                        .foregroundColor(canGuess ? Color(hex: "#1a0f00") : Theme.muted)
+                        .foregroundColor(canGuess ? Theme.primaryButtonFg : Theme.muted)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 11)
                         .background(
                             canGuess
                             ? LinearGradient(
-                                colors: [Color(hex: "#e8c06a"), Color(hex: "#d4a64a"), Color(hex: "#a07030")],
+                                colors: [Color(hex: "#D4900F"), Color(hex: "#C07C0A"), Color(hex: "#8A5500")],
                                 startPoint: .top, endPoint: .bottom
                               )
                             : LinearGradient(

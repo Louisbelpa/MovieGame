@@ -175,7 +175,7 @@ private struct WelcomePage: View {
                     + Text("today")
                         .font(Theme.fraunces(size: 32, italic: true))
                         .foregroundStyle(LinearGradient(
-                            colors: [Color(hex: "#e8c06a"), Color(hex: "#a07030")],
+                            colors: [Color(hex: "#D4900F"), Color(hex: "#8A5500")],
                             startPoint: .top, endPoint: .bottom
                         ))
                 )

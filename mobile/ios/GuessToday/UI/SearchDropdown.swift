@@ -41,6 +41,6 @@ struct SearchDropdown: View {
             RoundedRectangle(cornerRadius: Theme.radiusM)
                 .stroke(Theme.border, lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
+        .shadow(color: Color.black.opacity(0.10), radius: 12, x: 0, y: 4)
     }
 }

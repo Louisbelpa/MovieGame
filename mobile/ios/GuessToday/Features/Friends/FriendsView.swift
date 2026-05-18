@@ -246,9 +246,9 @@ private struct GuestFriendsView: View {
 
 private struct GuestAvatarCluster: View {
     private let avatars: [(color: Color, initial: String)] = [
-        (Color(hex: "#6b7cff"), "L"),
-        (Color(hex: "#e85788"), "M"),
-        (Color(hex: "#4cb078"), "T"),
+        (Theme.modeSeries, "L"),
+        (Theme.modeWiki,   "M"),
+        (Theme.green,      "T"),
     ]
 
     var body: some View {

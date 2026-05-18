@@ -194,13 +194,13 @@ struct HomeView: View {
                 GeometryReader { geo in
                     ZStack {
                         RadialGradient(
-                            colors: [Color(hex: "#d4a64a").opacity(0.10), .clear],
+                            colors: [Theme.modeFilm.opacity(0.10), .clear],
                             center: UnitPoint(x: 0.1, y: 0.04),
                             startRadius: 0,
                             endRadius: geo.size.width * 0.7
                         )
                         RadialGradient(
-                            colors: [Color(hex: "#6b7cff").opacity(0.07), .clear],
+                            colors: [Theme.modeSeries.opacity(0.07), .clear],
                             center: UnitPoint(x: 0.92, y: 0.88),
                             startRadius: 0,
                             endRadius: geo.size.width * 0.65
@@ -382,7 +382,7 @@ private struct HeroSection: View {
                 }
                 .padding(.horizontal, 11)
                 .padding(.vertical, 6)
-                .background(Color(hex: "#1c1406"))
+                .background(Color(hex: "#FEF3E2"))
                 .cornerRadius(100)
                 .overlay(
                     Capsule().stroke(Color(hex: "#f59e0b").opacity(0.22), lineWidth: 1)
@@ -578,7 +578,7 @@ private struct DayChallengeCard: View {
                 Text("→")
                     .font(Theme.inter(size: 13, weight: .semibold))
             }
-            .foregroundColor(mode == .film ? Color(hex: "#1a0f00") : .white)
+            .foregroundColor(mode == .film ? Theme.primaryButtonFg : .white)
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
             .background(isNextToPlayBackground)
@@ -593,7 +593,7 @@ private struct DayChallengeCard: View {
     private var isNextToPlayBackground: some ShapeStyle {
         if mode == .film {
             return AnyShapeStyle(LinearGradient(
-                colors: [Color(hex: "#e8c06a"), Color(hex: "#d4a64a"), Color(hex: "#a07030")],
+                colors: [Color(hex: "#D4900F"), Color(hex: "#C07C0A"), Color(hex: "#8A5500")],
                 startPoint: .top, endPoint: .bottom
             ))
         }
@@ -632,8 +632,8 @@ private struct DayChallengeCard: View {
 
     private var cardBackground: Color {
         if let s = status {
-            if s.isWon  { return Color(hex: "#091a10") }
-            if s.isLost { return Color(hex: "#1a0d0d") }
+            if s.isWon  { return Theme.green.opacity(0.10) }
+            if s.isLost { return Theme.red.opacity(0.08) }
         }
         if isNextToPlay { return Theme.surface }
         return Theme.surface
@@ -726,7 +726,7 @@ private struct StatCell: View {
                     .font(Theme.fraunces(size: 22))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [Color(hex: "#e8c06a"), Color(hex: "#d4a64a")],
+                            colors: [Color(hex: "#D4900F"), Color(hex: "#C07C0A")],
                             startPoint: .top, endPoint: .bottom
                         )
                     )
@@ -781,10 +781,10 @@ private struct FriendsSnippet: View {
     let count: Int
 
     private let avatarColors: [Color] = [
-        Color(hex: "#7c6bff"),
-        Color(hex: "#4cb078"),
-        Color(hex: "#e85788"),
-        Color(hex: "#f59e0b"),
+        Theme.modeSeries,
+        Theme.green,
+        Theme.modeWiki,
+        Theme.amber,
         Color(hex: "#38bdf8"),
     ]
 

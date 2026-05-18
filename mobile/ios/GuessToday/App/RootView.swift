@@ -114,11 +114,11 @@ struct SplashView: View {
                     HStack(spacing: 0) {
                         Text("Guess")
                             .font(Theme.fraunces(size: 30))
-                            .foregroundColor(Color(hex: "#e8eaed"))
+                            .foregroundColor(Theme.text)
                         Text("today")
                             .font(Theme.fraunces(size: 30, italic: true))
                             .foregroundStyle(LinearGradient(
-                                colors: [Color(hex: "#f0c870"), Color(hex: "#a47225")],
+                                colors: [Color(hex: "#D4900F"), Color(hex: "#8A5500")],
                                 startPoint: .top, endPoint: .bottom))
                     }
                 }
@@ -136,11 +136,11 @@ struct SplashView: View {
                     HStack(spacing: 0) {
                         Text("Guess")
                             .font(Theme.fraunces(size: 34))
-                            .foregroundColor(Color(hex: "#e8eaed"))
+                            .foregroundColor(Theme.text)
                         Text("today")
                             .font(Theme.fraunces(size: 34, italic: true))
                             .foregroundStyle(LinearGradient(
-                                colors: [Color(hex: "#f0c870"), Color(hex: "#a47225")],
+                                colors: [Color(hex: "#D4900F"), Color(hex: "#8A5500")],
                                 startPoint: .top, endPoint: .bottom))
                     }
                     .opacity(wordmarkVisible ? 1 : 0)

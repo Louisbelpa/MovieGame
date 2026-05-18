@@ -576,7 +576,7 @@ struct NotificationPromoCard: View {
                             .padding(.vertical, 12)
                             .background(
                                 LinearGradient(
-                                    colors: [Color(hex: "#e8c06a"), Color(hex: "#d4a64a"), Color(hex: "#a07030")],
+                                    colors: [Color(hex: "#D4900F"), Color(hex: "#C07C0A"), Color(hex: "#8A5500")],
                                     startPoint: .top, endPoint: .bottom
                                 )
                             )
@@ -1027,7 +1027,7 @@ struct AboutView: View {
                             + Text("today")
                                 .font(Theme.fraunces(size: 28, italic: true))
                                 .foregroundStyle(LinearGradient(
-                                    colors: [Color(hex: "#e8c06a"), Color(hex: "#d4a64a"), Color(hex: "#a07030")],
+                                    colors: [Color(hex: "#D4900F"), Color(hex: "#C07C0A"), Color(hex: "#8A5500")],
                                     startPoint: .top, endPoint: .bottom
                                 ))
                         )

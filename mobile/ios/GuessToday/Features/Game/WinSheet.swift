@@ -198,7 +198,7 @@ private struct ConfettiOverlay: View {
             .onAppear {
                 let cx = geo.size.width / 2
                 let cy = geo.size.height * 0.38   // slightly above center
-                let colors: [Color] = [Theme.gold, Theme.green, Color(hex: "#8b6ff0"), Theme.amber, Color.pink, Color.cyan, .white, Theme.gold]
+                let colors: [Color] = [Theme.gold, Theme.green, Color(hex: "#8b6ff0"), Theme.amber, Color.pink, Color.cyan, Theme.muted, Theme.gold]
                 particles = (0..<150).map { i in
                     // Random angle in full circle, biased upward (more particles go up/sideways)
                     let angleBias = Double.random(in: -Double.pi...Double.pi)
@@ -481,7 +481,7 @@ struct StatBox: View {
                 .fontWeight(.bold)
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [Color(hex: "#f0c870"), Color(hex: "#d4a64a")],
+                        colors: [Color(hex: "#D4900F"), Color(hex: "#C07C0A")],
                         startPoint: .top, endPoint: .bottom
                     )
                 )
@@ -590,7 +590,7 @@ struct ShareResultCard: View {
                 (
                     Text("Guess").font(Theme.fraunces(size: 14)).foregroundColor(Theme.text)
                     + Text("today").font(Theme.fraunces(size: 14, italic: true))
-                        .foregroundStyle(LinearGradient(colors: [Color(hex: "#f0c870"), Color(hex: "#8a5e1f")], startPoint: .top, endPoint: .bottom))
+                        .foregroundStyle(LinearGradient(colors: [Color(hex: "#D4900F"), Color(hex: "#8A5500")], startPoint: .top, endPoint: .bottom))
                 )
                 Spacer()
                 Text(modeLabel)

@@ -1,28 +1,31 @@
 import SwiftUI
 
 enum Theme {
-    // MARK: - Base colours (mirrored from web CSS variables)
-    static let background   = Color(hex: "#0a0d12")  // --color-film-black
-    static let surface      = Color(hex: "#0e1219")  // --color-film-dark
-    static let surfaceAlt   = Color(hex: "#161c25")  // --color-film-gray
-    static let border       = Color(hex: "#1e2738")  // --color-film-border
-    static let muted        = Color(hex: "#5f6772")  // --color-film-muted
-    static let text         = Color(hex: "#e8eaed")  // --color-film-text
-    static let textDim      = Color(hex: "#9aa3ad")  // --color-film-text-dim
-    static let gold         = Color(hex: "#d4a64a")  // --color-film-gold
-    static let goldLight    = Color(hex: "#e8b95c")  // --color-film-gold-light
-    static let green        = Color(hex: "#4cb078")  // --color-film-green
-    static let red          = Color(hex: "#d4604a")  // --color-film-red
-    static let amber        = Color(hex: "#e09040")  // --color-film-amber
+    // MARK: - Base colours (Light Mode — mirrored from web CSS variables)
+    static let background   = Color(hex: "#F4F1EB")  // --color-film-black (crème chaud)
+    static let surface      = Color(hex: "#FFFFFF")  // --color-film-surface (cartes/modales)
+    static let surfaceAlt   = Color(hex: "#EDE9E1")  // --color-film-dark (surface secondaire)
+    static let border       = Color(hex: "#DDD8CE")  // --color-film-border
+    static let muted        = Color(hex: "#A89F96")  // --color-film-muted
+    static let text         = Color(hex: "#1C1816")  // --color-film-text
+    static let textDim      = Color(hex: "#6B625A")  // --color-film-text-dim
+    static let gold         = Color(hex: "#C07C0A")  // --color-film-gold (ambre profond)
+    static let goldLight    = Color(hex: "#D4900F")  // --color-film-gold-light
+    static let green        = Color(hex: "#1E8449")  // --color-film-green
+    static let red          = Color(hex: "#C0392B")  // --color-film-red
+    static let amber        = Color(hex: "#B7770D")  // --color-film-amber
 
     // MARK: - Mode colours
-    static let modeFilm     = Color(hex: "#d4a64a")  // --sg-films
-    static let modeSeries   = Color(hex: "#6b7cff")  // --sg-series
-    static let modeWiki     = Color(hex: "#e85788")  // --sg-wiki
+    static let modeFilm     = Color(hex: "#C07C0A")  // --sg-films (ambre profond)
+    static let modeSeries   = Color(hex: "#4A50E0")  // --sg-series (indigo dense)
+    static let modeWiki     = Color(hex: "#C91F5A")  // --sg-wiki (rose framboise)
 
-    // MARK: - Gold gradient (matches web linear-gradient(180deg, #e8c06a, #d4a64a, #a07030))
+    // MARK: - Dedicated text colour for primary (gold) buttons
+    static let primaryButtonFg = Color(hex: "#1A0F00")  // dark brown — lisible sur fond ambre
+
+    // MARK: - Gold gradient (ambre profond pour fond clair)
     static let goldGradient = LinearGradient(
-        colors: [Color(hex: "#e8c06a"), Color(hex: "#d4a64a"), Color(hex: "#a07030")],
+        colors: [Color(hex: "#D4900F"), Color(hex: "#C07C0A"), Color(hex: "#8A5500")],
         startPoint: .top,
         endPoint: .bottom
     )
@@ -95,7 +98,7 @@ struct PrimaryButtonStyle: ButtonStyle {
             configuration.label
         }
         .font(Theme.inter(size: 15, weight: .semibold))
-        .foregroundColor(Theme.background)
+        .foregroundColor(Theme.primaryButtonFg)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
         .background(
@@ -140,7 +143,7 @@ struct ShimmerModifier: ViewModifier {
                     LinearGradient(
                         stops: [
                             .init(color: .clear, location: phase - 0.3),
-                            .init(color: .white.opacity(0.08), location: phase),
+                            .init(color: .black.opacity(0.06), location: phase),
                             .init(color: .clear, location: phase + 0.3),
                         ],
                         startPoint: .leading,
@@ -189,7 +192,7 @@ struct ModeAtmosphere: View {
                             var path = Path()
                             path.move(to: CGPoint(x: 0, y: y + 2))
                             path.addLine(to: CGPoint(x: size.width, y: y + 2))
-                            ctx.stroke(path, with: .color(.black.opacity(0.22)), lineWidth: 1)
+                            ctx.stroke(path, with: .color(.black.opacity(0.025)), lineWidth: 1)
                             y += 3
                         }
                     case .series:
@@ -199,7 +202,7 @@ struct ModeAtmosphere: View {
                             var path = Path()
                             path.move(to: CGPoint(x: 0, y: y + 3))
                             path.addLine(to: CGPoint(x: size.width, y: y + 3))
-                            ctx.stroke(path, with: .color(.black.opacity(0.15)), lineWidth: 1)
+                            ctx.stroke(path, with: .color(.black.opacity(0.018)), lineWidth: 1)
                             y += 4
                         }
                     case .wiki:

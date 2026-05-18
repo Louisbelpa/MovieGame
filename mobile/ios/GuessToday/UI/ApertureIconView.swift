@@ -119,11 +119,11 @@ struct ApertureLockup: View {
         ApertureIconView(size: 120, showBackground: true)
     }
     .padding(32)
-    .background(Color(hex: "#0a0d12"))
+    .background(Theme.background)
 }
 
 #Preview("Lockup") {
     ApertureLockup()
         .padding(32)
-        .background(Color(hex: "#0a0d12"))
+        .background(Theme.background)
 }

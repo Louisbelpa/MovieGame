@@ -57,7 +57,7 @@ struct BlurImageView: View {
                 .foregroundColor(Theme.textDim)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
-                .background(Color(hex: "#0a0d12").opacity(0.7))
+                .background(Theme.surface.opacity(0.82))
                 .cornerRadius(6)
                 .padding(8)
             }
@@ -89,9 +89,9 @@ private struct ShimmerPlaceholder: View {
                 LinearGradient(
                     stops: [
                         .init(color: .clear, location: 0),
-                        .init(color: Color.white.opacity(0.07), location: 0.45),
-                        .init(color: Color.white.opacity(0.12), location: 0.5),
-                        .init(color: Color.white.opacity(0.07), location: 0.55),
+                        .init(color: Color.black.opacity(0.05), location: 0.45),
+                        .init(color: Color.black.opacity(0.08), location: 0.5),
+                        .init(color: Color.black.opacity(0.05), location: 0.55),
                         .init(color: .clear, location: 1),
                     ],
                     startPoint: .leading,

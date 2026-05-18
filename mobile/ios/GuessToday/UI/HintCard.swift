@@ -53,22 +53,22 @@ struct LockedHintCard: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Indice \(index)")
                 .font(Theme.inter(size: 10, weight: .semibold))
-                .foregroundColor(.white.opacity(0.25))
+                .foregroundColor(Theme.muted)
                 .textCase(.uppercase)
                 .tracking(0.8)
             Spacer(minLength: 4)
             Image(systemName: "lock.fill")
                 .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.30))
+                .foregroundColor(Theme.muted)
         }
         .padding(Theme.spacing12)
         .frame(maxWidth: .infinity, minHeight: 64, maxHeight: .infinity, alignment: .leading)
-        .background(Color.clear)
+        .background(Theme.surfaceAlt)
         .cornerRadius(Theme.radiusM)
         .overlay(
             RoundedRectangle(cornerRadius: Theme.radiusM)
                 .stroke(
-                    Color.white.opacity(0.18),
+                    Theme.border,
                     style: StrokeStyle(lineWidth: 1, dash: [5, 4])
                 )
         )
