@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { CheckCircle2, XCircle, Film, Tv, User, LogIn, Flame, Smartphone } from 'lucide-react'
+import { CheckCircle2, XCircle, Film, Tv, User, LogIn, Smartphone } from 'lucide-react'
 import { ApertureIcon } from '@/components/ui/ApertureIcon'
 import { Footer } from '@/components/layout/Footer'
 import { AuthModal, useAuthModal } from '@/components/modals/AuthModal'
@@ -405,7 +405,7 @@ function BelowFoldUser({ friends, friendsLoading }: { friends: FriendEntry[]; fr
       {total > 0 && (
         <div className="px-4 lg:px-8 py-6" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
           <div className="max-w-3xl mx-auto">
-            <div className="grid grid-cols-3 divide-x rounded-2xl overflow-hidden" style={{ background: 'var(--color-film-surface)', border: '1px solid rgba(255,255,255,0.07)', divideColor: 'rgba(255,255,255,0.07)' }}>
+            <div className="grid grid-cols-3 divide-x divide-[rgba(255,255,255,0.07)] rounded-2xl overflow-hidden" style={{ background: 'var(--color-film-surface)', border: '1px solid rgba(255,255,255,0.07)' }}>
               {[
                 { value: String(total), label: 'Joués' },
                 { value: `${pct}%`, label: 'Victoires' },
