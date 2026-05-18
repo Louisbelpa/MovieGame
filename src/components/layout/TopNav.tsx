@@ -41,7 +41,7 @@ export function TopNav() {
         {FEATURES.enableSeries ? (
           <a
             href="/series"
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium text-film-text-dim hover:text-film-text hover:bg-white/[0.05] transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium text-film-text-dim hover:text-film-text hover:bg-film-dark transition-colors"
             style={{ color: 'var(--sg-series)' }}
           >
             <Tv size={14} />
@@ -73,7 +73,7 @@ export function TopNav() {
         )}
 
         {isLoading ? (
-          <div className="w-8 h-8 rounded-full bg-white/[0.06] animate-pulse" />
+          <div className="w-8 h-8 rounded-full bg-film-gray animate-pulse" />
         ) : user ? (
           <a
             href="/profile"
@@ -89,7 +89,7 @@ export function TopNav() {
           <button
             type="button"
             onClick={() => openAuth('login')}
-            className="flex items-center gap-1.5 rounded-full border border-film-border bg-white/[0.03] hover:bg-white/[0.06] px-3 py-1.5 text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 rounded-full border border-film-border bg-film-dark hover:bg-film-gray px-3 py-1.5 text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
           >
             <LogIn size={14} />
             Se connecter

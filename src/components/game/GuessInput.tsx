@@ -45,7 +45,7 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
         style={{
           padding: '5px 5px 5px 14px',
           border: '1px solid var(--mode-ring)',
-          background: 'var(--color-film-surface, #161b24)',
+          background: 'var(--color-film-surface)',
           boxShadow: '0 0 0 3px var(--mode-soft)',
         }}
         animate={shakeTrigger > 0 ? { x: [-8, 8, -5, 5, 0] } : {}}

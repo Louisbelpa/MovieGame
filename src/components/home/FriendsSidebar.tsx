@@ -54,11 +54,11 @@ export function FriendsSidebar({ friends: friendsProp, loading: loadingProp }: F
 
   if (isLoading) {
     return (
-      <aside className="rounded-2xl border border-film-border bg-[#0e1219] p-5">
-        <div className="h-4 w-16 rounded bg-white/[0.06] animate-pulse mb-4" />
+      <aside className="rounded-2xl border border-film-border bg-film-surface p-5">
+        <div className="h-4 w-16 rounded bg-film-gray animate-pulse mb-4" />
         <div className="flex flex-col gap-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-10 rounded-lg bg-white/[0.03] animate-pulse" />
+            <div key={i} className="h-10 rounded-lg bg-film-dark animate-pulse" />
           ))}
         </div>
       </aside>
@@ -67,9 +67,9 @@ export function FriendsSidebar({ friends: friendsProp, loading: loadingProp }: F
 
   if (!user) {
     return (
-      <aside className="rounded-2xl border border-film-border bg-[#0e1219] p-5 flex flex-col gap-4">
+      <aside className="rounded-2xl border border-film-border bg-film-surface p-5 flex flex-col gap-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-film-dark flex items-center justify-center">
             <Users size={15} className="text-film-text-dim" />
           </div>
           <p className="font-semibold text-film-text text-sm">Amis</p>
@@ -104,7 +104,7 @@ export function FriendsSidebar({ friends: friendsProp, loading: loadingProp }: F
   const winsToGold = topWins - userWins
 
   return (
-    <aside className="rounded-2xl border border-film-border bg-[#0e1219] overflow-hidden flex flex-col">
+    <aside className="rounded-2xl border border-film-border bg-film-surface overflow-hidden flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-film-border">
         <div className="flex items-center gap-2">
@@ -130,7 +130,7 @@ export function FriendsSidebar({ friends: friendsProp, loading: loadingProp }: F
       {loading ? (
         <div className="flex flex-col gap-2 p-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-10 rounded-lg bg-white/[0.03] animate-pulse" />
+            <div key={i} className="h-10 rounded-lg bg-film-dark animate-pulse" />
           ))}
         </div>
       ) : sorted.length === 0 ? (
@@ -139,7 +139,7 @@ export function FriendsSidebar({ friends: friendsProp, loading: loadingProp }: F
           <p className="text-sm text-film-text-dim">Pas encore d'amis.<br />Invite quelqu'un !</p>
           <a
             href="/friends"
-            className="flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-2 border border-film-border hover:bg-white/[0.04] text-film-text-dim hover:text-film-text transition-colors"
+            className="flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-2 border border-film-border hover:bg-film-dark text-film-text-dim hover:text-film-text transition-colors"
           >
             <UserPlus size={13} />
             Ajouter un ami

@@ -80,10 +80,10 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShar
       <div className="flex flex-col items-center gap-4 text-center">
         <p id={modalDescId} className="sr-only">Résumé de victoire et actions de partage.</p>
 
-        <div className="w-full film-border rounded-xl overflow-hidden bg-film-black/40">
+        <div className="w-full film-border rounded-xl overflow-hidden">
           {result.photoUrl && (
             isWiki ? (
-              <div className="flex h-48 w-full items-center justify-center bg-film-black/70">
+              <div className="flex h-48 w-full items-center justify-center bg-film-gray">
                 <img src={result.photoUrl} alt={result.name} className="max-h-full max-w-full object-contain" referrerPolicy="no-referrer" />
               </div>
             ) : (

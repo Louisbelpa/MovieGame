@@ -1,28 +1,28 @@
 @import "tailwindcss";
 
 :root {
-  /* Mode films — or (aligné sur la charte dorée globale) */
-  --sg-films:       #d4a64a;
-  --sg-films-hover: #e8b95c;
-  --sg-films-soft:  rgba(212, 166, 74, 0.16);
-  --sg-films-ring:  rgba(212, 166, 74, 0.32);
+  /* Mode films — ambre profond (lisible sur fond clair) */
+  --sg-films:       #C07C0A;
+  --sg-films-hover: #D4900F;
+  --sg-films-soft:  rgba(192, 124, 10, 0.12);
+  --sg-films-ring:  rgba(192, 124, 10, 0.28);
 
-  /* Mode séries — indigo */
-  --sg-series:       #6b7cff;
-  --sg-series-hover: #8a98ff;
-  --sg-series-soft:  rgba(107, 124, 255, 0.18);
-  --sg-series-ring:  rgba(107, 124, 255, 0.34);
+  /* Mode séries — indigo dense */
+  --sg-series:       #4A50E0;
+  --sg-series-hover: #5A60EC;
+  --sg-series-soft:  rgba(74, 80, 224, 0.12);
+  --sg-series-ring:  rgba(74, 80, 224, 0.28);
 
-  /* Mode wiki / personnalités — rose */
-  --sg-wiki:       #e85788;
-  --sg-wiki-hover: #f06a9a;
-  --sg-wiki-soft:  rgba(232, 87, 136, 0.18);
-  --sg-wiki-ring:  rgba(232, 87, 136, 0.34);
+  /* Mode wiki / personnalités — rose framboise */
+  --sg-wiki:       #C91F5A;
+  --sg-wiki-hover: #E0256A;
+  --sg-wiki-soft:  rgba(201, 31, 90, 0.12);
+  --sg-wiki-ring:  rgba(201, 31, 90, 0.28);
 
   /* Couleur "à jouer" dans le calendrier — doré, indépendant du mode */
-  --sg-todo:      #d4a64a;
-  --sg-todo-soft: rgba(212, 166, 74, 0.18);
-  --sg-todo-ring: rgba(212, 166, 74, 0.40);
+  --sg-todo:      #C07C0A;
+  --sg-todo-soft: rgba(192, 124, 10, 0.14);
+  --sg-todo-ring: rgba(192, 124, 10, 0.35);
 
   /* Token de mode — résolu par data-mode sur l'ancêtre */
   --mode-color: var(--sg-films);
@@ -43,25 +43,27 @@
 }
 
 @theme {
-  --color-film-black: #0a0d12;
-  --color-film-dark:  #0e1219;
-  --color-film-gray:  #161c25;
-  --color-film-border: #1e2738;
-  --color-film-muted: #5f6772;
-  --color-film-text: #e8eaed;
-  --color-film-text-dim: #9aa3ad;
-  --color-film-gold: #d4a64a;
-  --color-film-gold-light: #e8b95c;
-  --color-film-green: #4cb078;
-  --color-film-red: #d4604a;
-  --color-film-amber: #e09040;
+  /* Light mode palette */
+  --color-film-black:    #F4F1EB;  /* App background — blanc cassé chaud */
+  --color-film-dark:     #EDE9E1;  /* Surface secondaire */
+  --color-film-gray:     #E5E1D8;  /* Surface tertiaire */
+  --color-film-surface:  #FFFFFF;  /* Cartes, inputs, modales */
+  --color-film-border:   #DDD8CE;  /* Contours */
+  --color-film-muted:    #A89F96;  /* Éléments désactivés */
+  --color-film-text:     #1C1816;  /* Texte principal */
+  --color-film-text-dim: #6B625A;  /* Texte secondaire */
+  --color-film-gold:     #C07C0A;  /* Films — ambre profond */
+  --color-film-gold-light: #D4900F;
+  --color-film-green:    #1E8449;  /* Correct */
+  --color-film-red:      #C0392B;  /* Erreur */
+  --color-film-amber:    #B7770D;
 
   --font-title: "Fraunces", "Playfair Display", Georgia, serif;
   --font-body: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 
   --radius-game: 0.75rem;
-  --shadow-glow: 0 0 20px rgba(212, 168, 66, 0.25);
+  --shadow-glow: 0 0 20px rgba(192, 124, 10, 0.18);
 }
 
 @layer base {
@@ -85,7 +87,7 @@
 
   ::selection {
     background-color: var(--color-film-gold);
-    color: var(--color-film-black);
+    color: #FFFFFF;
   }
 
   ::-webkit-scrollbar {
@@ -95,7 +97,7 @@
     background: var(--color-film-dark);
   }
   ::-webkit-scrollbar-thumb {
-    background: var(--color-film-muted);
+    background: var(--color-film-border);
     border-radius: 3px;
   }
 
@@ -152,7 +154,7 @@
 
 .film-border {
   border: 1px solid var(--color-film-border);
-  background: linear-gradient(135deg, var(--color-film-dark) 0%, #1c1c28 100%);
+  background: var(--color-film-surface);
 }
 
 .glow-gold {
@@ -218,7 +220,7 @@
 .skeleton-line {
   height: 0.75rem;
   border-radius: 0.375rem;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(28, 24, 22, 0.08);
 }
 .skeleton-line + .skeleton-line {
   margin-top: 0.5rem;
@@ -289,47 +291,47 @@
 
 /* ── Mode atmospheres ──────────────────────────────────────────────────────── */
 
-/* Films — grain argentique : lignes horizontales fines + halo doré */
+/* Films — grain argentique léger + halo ambre */
 .atmosphere-film {
   background-image:
     repeating-linear-gradient(
       0deg,
       transparent 0px 2px,
-      rgba(0, 0, 0, 0.28) 2px 3px
+      rgba(0, 0, 0, 0.025) 2px 3px
     ),
     radial-gradient(
       ellipse 80% 50% at 50% 20%,
-      rgba(212, 166, 74, 0.07),
+      rgba(192, 124, 10, 0.07),
       transparent 65%
     );
 }
 
-/* Séries — scanlines CRT : lignes plus espacées + halo violet-bleu */
+/* Séries — scanlines discrètes + halo indigo */
 .atmosphere-series {
   background-image:
     repeating-linear-gradient(
       0deg,
       transparent 0px 3px,
-      rgba(0, 0, 0, 0.18) 3px 4px
+      rgba(0, 0, 0, 0.015) 3px 4px
     ),
     radial-gradient(
       ellipse 80% 50% at 50% 20%,
-      rgba(107, 124, 255, 0.07),
+      rgba(74, 80, 224, 0.07),
       transparent 65%
     );
 }
 
-/* Personnalités — trame halftone façon presse + halo rose */
+/* Personnalités — trame halftone douce + halo rose framboise */
 .atmosphere-wiki {
   background-image:
     radial-gradient(
       circle,
-      rgba(232, 87, 136, 0.055) 1px,
+      rgba(201, 31, 90, 0.04) 1px,
       transparent 1.5px
     ),
     radial-gradient(
       ellipse 80% 50% at 50% 20%,
-      rgba(232, 87, 136, 0.07),
+      rgba(201, 31, 90, 0.07),
       transparent 65%
     );
   background-size: 6px 6px, 100% 100%;

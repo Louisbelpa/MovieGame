@@ -164,7 +164,7 @@ function Avatar({
       className={`rounded-full flex items-center justify-center font-bold shrink-0 ${
         isMe
           ? 'bg-film-gold/25 border border-film-gold/50 text-film-gold'
-          : 'bg-white/[0.08] border border-film-border/60 text-film-text-dim'
+          : 'bg-film-gray/60 border border-film-border/60 text-film-text-dim'
       }`}
       style={baseStyle}
     >
@@ -286,7 +286,7 @@ function TableRows({
           className={`grid gap-x-2 px-4 py-2.5 items-center border-b border-film-border/20 last:border-0 ${
             row.isMe
               ? 'bg-film-gold/[0.07]'
-              : 'hover:bg-white/[0.02]'
+              : 'hover:bg-film-surface'
           }`}
           style={{ gridTemplateColumns: '1.5rem 1fr 2.5rem 2.5rem 3rem 2.5rem' }}
           initial={{ opacity: 0, y: 8 }}
@@ -405,7 +405,7 @@ function AddFriendModal({
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <motion.div
-        className="relative w-full max-w-md rounded-2xl border border-film-border bg-[#0e1219] p-6 flex flex-col gap-5 shadow-2xl"
+        className="relative w-full max-w-md rounded-2xl border border-film-border bg-film-surface p-6 flex flex-col gap-5 shadow-2xl"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 24 }}
@@ -429,7 +429,7 @@ function AddFriendModal({
               onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 8))}
               placeholder="Ex: KSXF5P4Q"
               maxLength={8}
-              className="flex-1 rounded-xl border border-film-border bg-white/[0.04] px-3.5 py-2.5 text-sm text-film-text placeholder-film-text-dim/40 focus:outline-none focus:border-film-gold/50 font-mono tracking-widest"
+              className="flex-1 rounded-xl border border-film-border bg-film-dark/70 px-3.5 py-2.5 text-sm text-film-text placeholder-film-text-dim/40 focus:outline-none focus:border-film-gold/50 font-mono tracking-widest"
             />
             <button
               type="submit"
@@ -471,7 +471,7 @@ function CodeChip({ code }: { code: string }) {
       type="button"
       onClick={copy}
       title="Copier le code"
-      className="flex items-center gap-2 rounded-xl border border-film-border bg-white/[0.03] hover:bg-white/[0.06] px-3 py-1.5 transition-colors cursor-pointer group"
+      className="flex items-center gap-2 rounded-xl border border-film-border bg-film-dark hover:bg-film-gray px-3 py-1.5 transition-colors cursor-pointer group"
     >
       <span className="text-[10px] font-mono font-bold tracking-widest text-film-text-dim/60 uppercase">Code</span>
       <span className="font-mono text-sm font-bold text-film-gold tracking-widest">{code}</span>
@@ -502,7 +502,7 @@ function PeriodDropdown({ value, onChange }: { value: Period; onChange: (p: Peri
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 rounded-xl border border-film-border bg-white/[0.03] hover:bg-white/[0.05] px-3 py-1.5 text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer shrink-0"
+        className="flex items-center gap-1.5 rounded-xl border border-film-border bg-film-dark hover:bg-film-dark px-3 py-1.5 text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer shrink-0"
       >
         <span className="text-xs text-film-text-dim/60 mr-0.5">Période :</span>
         <span className="font-medium text-film-text">{PERIOD_LABELS[value]}</span>
@@ -511,7 +511,7 @@ function PeriodDropdown({ value, onChange }: { value: Period; onChange: (p: Peri
       <AnimatePresence>
         {open && (
           <motion.div
-            className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-film-border bg-[#0e1219] shadow-xl z-20 overflow-hidden"
+            className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-film-border bg-film-surface shadow-xl z-20 overflow-hidden"
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
@@ -523,7 +523,7 @@ function PeriodDropdown({ value, onChange }: { value: Period; onChange: (p: Peri
                 type="button"
                 onClick={() => { onChange(k); setOpen(false) }}
                 className={`w-full text-left px-3.5 py-2 text-sm transition-colors cursor-pointer ${
-                  value === k ? 'text-film-gold bg-film-gold/10' : 'text-film-text-dim hover:text-film-text hover:bg-white/[0.04]'
+                  value === k ? 'text-film-gold bg-film-gold/10' : 'text-film-text-dim hover:text-film-text hover:bg-film-dark/70'
                 }`}
               >
                 {label}
@@ -553,7 +553,7 @@ function IncomingBanner({
       {incoming.map((p) => (
         <div
           key={p.id}
-          className="flex items-center gap-3 rounded-xl border border-film-border/60 bg-white/[0.02] px-3.5 py-2.5"
+          className="flex items-center gap-3 rounded-xl border border-film-border/60 bg-film-surface px-3.5 py-2.5"
         >
           <span className="w-7 h-7 rounded-full bg-film-border/20 border border-film-border/30 flex items-center justify-center text-xs font-bold text-film-text-dim shrink-0">
             {p.displayName.charAt(0).toUpperCase()}
@@ -691,7 +691,7 @@ export function FriendsPage() {
               type="button"
               onClick={() => setShowAddModal(true)}
               aria-label="Ajouter un ami"
-              className="w-7 h-7 rounded-full border border-film-border/60 bg-white/[0.04] flex items-center justify-center text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
+              className="w-7 h-7 rounded-full border border-film-border/60 bg-film-dark/70 flex items-center justify-center text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
             >
               <UserPlus size={14} />
             </button>
@@ -784,8 +784,8 @@ export function FriendsPage() {
                       onClick={() => setModeFilter(tab.key)}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-sm font-medium transition-colors cursor-pointer shrink-0 ${
                         active
-                          ? 'bg-white/[0.07] border-film-border text-film-text'
-                          : 'border-transparent text-film-text-dim hover:text-film-text hover:bg-white/[0.04]'
+                          ? 'bg-film-gray border-film-border text-film-text'
+                          : 'border-transparent text-film-text-dim hover:text-film-text hover:bg-film-dark/70'
                       }`}
                     >
                       <Icon size={13} style={tab.color ? { color: tab.color } : undefined} />
@@ -803,8 +803,8 @@ export function FriendsPage() {
             {/* Loading skeleton */}
             {loading && (
               <div className="grid lg:grid-cols-[340px_1fr] gap-5">
-                <div className="rounded-2xl border border-film-border bg-[#0e1219] h-64 animate-pulse" />
-                <div className="rounded-2xl border border-film-border bg-[#0e1219] h-64 animate-pulse" />
+                <div className="rounded-2xl border border-film-border bg-film-surface h-64 animate-pulse" />
+                <div className="rounded-2xl border border-film-border bg-film-surface h-64 animate-pulse" />
               </div>
             )}
 
@@ -813,13 +813,13 @@ export function FriendsPage() {
               <div className="grid lg:grid-cols-[340px_1fr] gap-5 items-start">
                 {/* Podium card — only shown when there are players */}
                 {tableRows.length > 0 && (
-                  <div className="rounded-2xl border border-film-border bg-[#0e1219] overflow-hidden">
+                  <div className="rounded-2xl border border-film-border bg-film-surface overflow-hidden">
                     <PodiumChart rows={tableRows} period={period} />
                   </div>
                 )}
 
                 {/* Table card */}
-                <div className={`rounded-2xl border border-film-border bg-[#0e1219] overflow-hidden ${tableRows.length === 0 ? 'lg:col-span-2' : ''}`}>
+                <div className={`rounded-2xl border border-film-border bg-film-surface overflow-hidden ${tableRows.length === 0 ? 'lg:col-span-2' : ''}`}>
                   {tableRows.length === 0 ? (
                     <div className="flex flex-col items-center gap-3 py-12 text-center px-6">
                       <Users size={32} className="text-film-text-dim/30" />

@@ -94,19 +94,19 @@ export function StatsModal(props: StatsModalProps) {
             {/* Panel */}
             <motion.aside
               key="stats-panel"
-              className="fixed top-0 right-0 bottom-0 z-50 w-[380px] bg-[#0e1219] border-l border-film-border shadow-2xl overflow-y-auto hidden lg:flex flex-col"
+              className="fixed top-0 right-0 bottom-0 z-50 w-[380px] bg-film-dark border-l border-film-border shadow-2xl overflow-y-auto hidden lg:flex flex-col"
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'tween', duration: 0.28, ease: [0.32, 0, 0.67, 0] }}
             >
-              <div className="flex items-center justify-between px-6 py-5 border-b border-film-border sticky top-0 bg-[#0e1219] z-10">
+              <div className="flex items-center justify-between px-6 py-5 border-b border-film-border sticky top-0 bg-film-dark z-10">
                 <h2 className="font-title font-semibold text-lg text-film-text">{getModalTitle(mode)}</h2>
                 <button
                   type="button"
                   onClick={onClose}
                   aria-label="Fermer"
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-film-text-dim hover:text-film-text hover:bg-white/5 transition-colors cursor-pointer"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer"
                 >
                   <X size={18} />
                 </button>

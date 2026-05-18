@@ -167,7 +167,7 @@ export function Header({ mode }: HeaderProps) {
               <button
                 type="button"
                 onClick={() => openAuthModal()}
-                className="hidden lg:flex items-center gap-1.5 rounded-full border border-film-border bg-white/[0.03] hover:bg-white/[0.06] px-3 py-1.5 text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
+                className="hidden lg:flex items-center gap-1.5 rounded-full border border-film-border bg-film-dark hover:bg-film-gray px-3 py-1.5 text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
               >
                 <LogIn size={14} aria-hidden />
                 Se connecter

@@ -86,15 +86,15 @@ function AchievementCard({ a, hinted, onToggleHint }: {
       type="button"
       onClick={() => onToggleHint(a.id)}
       className="flex-shrink-0 w-[100px] h-[100px] lg:w-auto lg:h-auto lg:aspect-square
-        bg-white/[0.02] border border-film-border/30 rounded-xl p-3
-        flex flex-col items-start justify-between cursor-pointer hover:bg-white/[0.04] transition-colors text-left"
+        bg-film-surface border border-film-border/30 rounded-xl p-3
+        flex flex-col items-start justify-between cursor-pointer hover:bg-film-dark/70 transition-colors text-left"
     >
       <Lock size={14} className="text-film-text-dim/20" />
       <div className="w-full">
         <p className="text-[11px] text-film-text-dim/40 leading-tight">{a.title}</p>
         {a.progress && a.progress.current > 0 && (
           <div className="mt-1 w-full">
-            <div className="h-0.5 rounded-full bg-white/[0.06] overflow-hidden">
+            <div className="h-0.5 rounded-full bg-film-gray overflow-hidden">
               <div
                 className="h-full rounded-full bg-film-text-dim/25 transition-all"
                 style={{ width: `${Math.min(100, (a.progress.current / a.progress.target) * 100)}%` }}
@@ -123,7 +123,7 @@ function AchievementsSection({ serverStats }: { serverStats: ServerStatsMap }) {
   }
 
   return (
-    <div className="rounded-2xl border border-film-border bg-white/[0.03] p-5 flex flex-col gap-4">
+    <div className="rounded-2xl border border-film-border bg-film-dark p-5 flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <p className="text-[11px] font-mono uppercase tracking-widest text-film-text-dim">SUCCÈS</p>
         <span className="text-xs text-film-text-dim">{earned.length}/{achievements.length}</span>
@@ -689,7 +689,7 @@ export function ProfilePage() {
 
         {/* ── Identity hero — order 1 mobile, col 1 row 1 desktop ── */}
         <div className="order-1 lg:col-start-1 lg:row-start-1
-          rounded-2xl border border-film-border bg-white/[0.03] p-6 flex flex-col gap-4">
+          rounded-2xl border border-film-border bg-film-dark p-6 flex flex-col gap-4">
           <div className="flex items-center gap-4">
             <div className="flex flex-col items-center gap-1 flex-shrink-0">
               <label className="relative group cursor-pointer" title="Changer la photo de profil">
@@ -820,9 +820,9 @@ export function ProfilePage() {
         <a
           href="/friends"
           className="order-5 lg:col-start-1 lg:row-start-4
-            group rounded-2xl border border-film-border bg-white/[0.03] hover:bg-white/[0.05] p-5 flex items-center gap-4 transition-colors"
+            group rounded-2xl border border-film-border bg-film-dark hover:bg-film-dark p-5 flex items-center gap-4 transition-colors"
         >
-          <div className="w-10 h-10 rounded-lg bg-white/[0.05] flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-lg bg-film-dark flex items-center justify-center shrink-0">
             <Users size={18} className="text-film-text-dim group-hover:text-film-text transition-colors" />
           </div>
           <div className="flex-1 min-w-0">

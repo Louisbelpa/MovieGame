@@ -83,10 +83,10 @@ export function LoseModal({ isOpen, onClose, mode, result, stats, onShare, onSha
       <div className="flex flex-col items-center gap-4 text-center">
         <p id={modalDescId} className="sr-only">Résumé de défaite et actions de partage.</p>
 
-        <div className="w-full film-border rounded-xl overflow-hidden bg-film-black/40">
+        <div className="w-full film-border rounded-xl overflow-hidden">
           {result.photoUrl && (
             isWiki ? (
-              <div className="flex h-48 w-full items-center justify-center bg-film-black/70">
+              <div className="flex h-48 w-full items-center justify-center bg-film-gray">
                 <img src={result.photoUrl} alt={result.name} className="max-h-full max-w-full object-contain" referrerPolicy="no-referrer" />
               </div>
             ) : (
@@ -177,8 +177,8 @@ export function LoseModal({ isOpen, onClose, mode, result, stats, onShare, onSha
         )}
 
         {!user && (
-          <div className="w-full rounded-xl border border-film-border bg-white/[0.03] p-3 flex items-center gap-3">
-            <div className="shrink-0 w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
+          <div className="w-full rounded-xl border border-film-border bg-film-dark p-3 flex items-center gap-3">
+            <div className="shrink-0 w-8 h-8 rounded-full bg-film-gray flex items-center justify-center">
               <UserCircle size={15} className="text-film-text-dim" />
             </div>
             <div className="flex-1 min-w-0">

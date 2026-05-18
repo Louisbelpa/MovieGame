@@ -4,10 +4,11 @@
   gap: 4px;
   padding: 5px;
   border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(14, 18, 28, 0.88);
+  border: 1px solid rgba(28, 24, 22, 0.10);
+  background: rgba(255, 255, 255, 0.90);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: 0 2px 12px rgba(28, 24, 22, 0.08);
 }
 
 .mode-tab {
@@ -19,14 +20,14 @@
   border-radius: 22px;
   font-size: 13px;
   font-weight: 500;
-  color: rgba(140, 140, 160, 0.8);
+  color: var(--color-film-text-dim);
   text-decoration: none;
   transition: color 150ms ease, background 150ms ease;
   white-space: nowrap;
 }
 
 .mode-tab:hover {
-  color: rgba(200, 200, 220, 0.9);
+  color: var(--color-film-text);
 }
 
 .mode-tab.is-active {

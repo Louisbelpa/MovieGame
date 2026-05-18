@@ -48,7 +48,7 @@ function HintCard({ hint, index }: { hint: HintPayload; index: number }) {
       className="flex flex-col gap-1 rounded-[10px] min-w-0"
       style={{
         padding: '10px 12px',
-        background: 'var(--color-film-gray, #1a1f2e)',
+        background: 'var(--color-film-gray)',
         border: '1px solid var(--color-film-border)',
       }}
     >
@@ -72,17 +72,18 @@ function LockedSlot({ index }: { index: number }) {
       style={{
         padding: '10px 12px',
         minHeight: '56px',
-        border: '1px dashed rgba(255,255,255,0.18)',
+        background: 'var(--color-film-dark)',
+        border: '1px dashed var(--color-film-border)',
       }}
     >
       <p
         className="font-mono uppercase tracking-wider leading-none shrink-0"
-        style={{ fontSize: '9px', fontWeight: 600, color: 'rgba(255,255,255,0.25)' }}
+        style={{ fontSize: '9px', fontWeight: 600, color: 'var(--color-film-muted)' }}
       >
         Indice {index}
       </p>
       <div className="flex-1 flex items-center">
-        <Lock size={13} style={{ color: 'rgba(255,255,255,0.30)' }} aria-hidden />
+        <Lock size={13} style={{ color: 'var(--color-film-muted)' }} aria-hidden />
       </div>
     </div>
   )

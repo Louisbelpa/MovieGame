@@ -64,7 +64,6 @@ targets:
         aps-environment: production
         com.apple.developer.associated-domains:
           - applinks:guesstoday.fr
-        com.apple.developer.sign-in-with-apple: default
     info:
       path: GuessToday/App/Info.plist
       properties:
@@ -74,6 +73,11 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         UIStatusBarStyle: UIStatusBarStyleLightContent
         UIUserInterfaceStyle: Dark
         NSAppTransportSecurity:

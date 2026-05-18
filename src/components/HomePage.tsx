@@ -106,7 +106,7 @@ function MobileHeader() {
           </a>
         )}
         {isLoading ? (
-          <div className="w-7 h-7 rounded-full bg-white/[0.06] animate-pulse" />
+          <div className="w-7 h-7 rounded-full bg-film-gray animate-pulse" />
         ) : user ? (
           <a
             href="/profile"
@@ -121,7 +121,7 @@ function MobileHeader() {
           <button
             type="button"
             onClick={() => openAuth('login')}
-            className="flex items-center gap-1 text-xs text-film-text-dim border border-film-border rounded-full px-2.5 py-1 bg-white/[0.03]"
+            className="flex items-center gap-1 text-xs text-film-text-dim border border-film-border rounded-full px-2.5 py-1 bg-film-dark"
           >
             <LogIn size={12} />
             Connexion
@@ -172,7 +172,7 @@ function GameCard({ href, icon, modeLabel, description, accentColor, accentSoft,
           className="relative flex items-center justify-center"
           style={{
             aspectRatio: '4 / 3',
-            background: `linear-gradient(155deg, ${accentSoft} 0%, rgba(10,13,18,0.7) 100%)`,
+            background: `linear-gradient(155deg, ${accentSoft} 0%, var(--color-film-gray) 100%)`,
           }}
         >
           {todayStatus === 'won' && (
@@ -214,7 +214,7 @@ function GameCard({ href, icon, modeLabel, description, accentColor, accentSoft,
         </div>
 
         {/* Info bar */}
-        <div className="px-4 py-3.5" style={{ background: '#0e1219' }}>
+        <div className="px-4 py-3.5" style={{ background: 'var(--color-film-dark)' }}>
           <span className="text-[10px] font-mono uppercase tracking-widest text-film-text-dim/50">
             {modeLabel}
           </span>
@@ -231,7 +231,7 @@ function GameCard({ href, icon, modeLabel, description, accentColor, accentSoft,
           disabled ? 'opacity-50 cursor-default' : 'cursor-pointer'
         }`}
         style={{
-          background: '#0e1219',
+          background: 'var(--color-film-dark)',
           border: `1px solid ${
             todayStatus === 'won' ? 'rgba(76,176,120,0.3)'
             : todayStatus === 'lost' ? 'rgba(212,96,74,0.25)'
@@ -307,7 +307,7 @@ function StatsStrip() {
         <div
           key={label}
           className="flex flex-col items-center rounded-xl py-4 gap-0.5"
-          style={{ background: '#0e1219', border: '1px solid #1e2738' }}
+          style={{ background: 'var(--color-film-dark)', border: '1px solid var(--color-film-border)' }}
         >
           <span className="font-title text-[22px] font-bold text-film-gold leading-none">{value}</span>
           <span className="text-[10.5px] text-film-text-dim uppercase tracking-widest font-mono mt-1">{label}</span>
@@ -338,7 +338,7 @@ function AccountNudge() {
         type="button"
         onClick={() => openAuth('register')}
         className="shrink-0 text-xs font-semibold rounded-lg px-3 py-1.5 transition-colors"
-        style={{ background: 'rgba(212,166,74,0.12)', color: '#d4a64a', border: '1px solid rgba(212,166,74,0.25)' }}
+        style={{ background: 'var(--sg-films-soft)', color: 'var(--sg-films)', border: '1px solid var(--sg-films-ring)' }}
       >
         Créer un compte
       </button>
@@ -355,8 +355,8 @@ function MobileAuthNudge() {
   if (isLoading || user) return null
 
   return (
-    <div className="lg:hidden mt-4 rounded-xl border border-film-border bg-[#0e1219] p-4 flex items-center gap-3">
-      <div className="w-9 h-9 rounded-lg bg-white/[0.05] flex items-center justify-center shrink-0">
+    <div className="lg:hidden mt-4 rounded-xl border border-film-border bg-film-dark p-4 flex items-center gap-3">
+      <div className="w-9 h-9 rounded-lg bg-film-gray flex items-center justify-center shrink-0">
         <Users size={16} className="text-film-text-dim" />
       </div>
       <div className="flex-1 min-w-0">
@@ -367,7 +367,7 @@ function MobileAuthNudge() {
         type="button"
         onClick={() => openAuth('register')}
         className="shrink-0 text-xs font-semibold rounded-lg px-3 py-2 text-film-black"
-        style={{ background: '#d4a64a' }}
+        style={{ background: 'var(--color-film-gold)' }}
       >
         S'inscrire
       </button>
@@ -389,9 +389,9 @@ function FriendsMiniBar({ friends }: { friends: FriendEntry[] }) {
     return (
       <a
         href="/friends"
-        className="lg:hidden flex items-center gap-3 rounded-xl border border-film-border bg-white/[0.02] hover:bg-white/[0.04] px-4 py-3 transition-colors mt-3"
+        className="lg:hidden flex items-center gap-3 rounded-xl border border-film-border bg-film-surface hover:bg-film-dark px-4 py-3 transition-colors mt-3"
       >
-        <div className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center shrink-0">
+        <div className="w-8 h-8 rounded-lg bg-film-gray flex items-center justify-center shrink-0">
           <Users size={15} className="text-film-text-dim" />
         </div>
         <div className="flex-1 min-w-0">
@@ -409,13 +409,13 @@ function FriendsMiniBar({ friends }: { friends: FriendEntry[] }) {
   return (
     <a
       href="/friends"
-      className="lg:hidden flex items-center gap-3 rounded-xl border border-film-border bg-white/[0.02] hover:bg-white/[0.04] px-4 py-3 transition-colors mt-3"
+      className="lg:hidden flex items-center gap-3 rounded-xl border border-film-border bg-film-surface hover:bg-film-dark px-4 py-3 transition-colors mt-3"
     >
       <div className="flex -space-x-1.5 shrink-0">
         {played.slice(0, 3).map((f) => (
           <div
             key={f.id}
-            className="w-6 h-6 rounded-full border-2 border-[#0a0d12] bg-film-gold/20 flex items-center justify-center text-[9px] font-bold text-film-gold"
+            className="w-6 h-6 rounded-full border-2 border-film-surface bg-film-gold/20 flex items-center justify-center text-[9px] font-bold text-film-gold"
           >
             {f.displayName.charAt(0).toUpperCase()}
           </div>
@@ -643,9 +643,9 @@ export function HomePage() {
                 icon={<Film />}
                 modeLabel="Films"
                 description="Identifie le film du jour à partir d'une scène et d'indices"
-                accentColor="#d4a64a"
-                accentSoft="rgba(212,166,74,0.18)"
-                accentRing="rgba(212,166,74,0.32)"
+                accentColor="var(--sg-films)"
+                accentSoft="var(--sg-films-soft)"
+                accentRing="var(--sg-films-ring)"
                 todayStatus={filmStatus}
               />
 
@@ -655,9 +655,9 @@ export function HomePage() {
                   icon={<Tv />}
                   modeLabel="Séries"
                   description="Identifie la série du jour à partir d'une scène et d'indices"
-                  accentColor="#6b7cff"
-                  accentSoft="rgba(107,124,255,0.20)"
-                  accentRing="rgba(107,124,255,0.34)"
+                  accentColor="var(--sg-series)"
+                  accentSoft="var(--sg-series-soft)"
+                  accentRing="var(--sg-series-ring)"
                   badge={showNewBadge ? 'Nouveau' : undefined}
                   todayStatus={seriesStatus}
                 />
@@ -667,9 +667,9 @@ export function HomePage() {
                   icon={<Tv />}
                   modeLabel="Séries"
                   description="Identifie la série du jour à partir d'une scène et d'indices"
-                  accentColor="#6b7cff"
-                  accentSoft="rgba(107,124,255,0.10)"
-                  accentRing="rgba(107,124,255,0.18)"
+                  accentColor="var(--sg-series)"
+                  accentSoft="var(--sg-series-soft)"
+                  accentRing="var(--sg-series-ring)"
                   disabled
                 />
               )}
@@ -680,9 +680,9 @@ export function HomePage() {
                   icon={<User />}
                   modeLabel="Personnalités"
                   description="Devine une personnalité célèbre à partir d'indices sur sa carrière"
-                  accentColor="#e85788"
-                  accentSoft="rgba(232,87,136,0.20)"
-                  accentRing="rgba(232,87,136,0.34)"
+                  accentColor="var(--sg-wiki)"
+                  accentSoft="var(--sg-wiki-soft)"
+                  accentRing="var(--sg-wiki-ring)"
                   badge={showNewBadge ? 'Nouveau' : undefined}
                   todayStatus={wikiStatus}
                 />
@@ -692,9 +692,9 @@ export function HomePage() {
                   icon={<User />}
                   modeLabel="Personnalités"
                   description="Devine une personnalité célèbre à partir d'indices sur sa carrière"
-                  accentColor="#e85788"
-                  accentSoft="rgba(232,87,136,0.10)"
-                  accentRing="rgba(232,87,136,0.18)"
+                  accentColor="var(--sg-wiki)"
+                  accentSoft="var(--sg-wiki-soft)"
+                  accentRing="var(--sg-wiki-ring)"
                   disabled
                 />
               )}
