@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { ExternalLink, Film, User } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { BRAND_NAME, FEATURES } from '@/config/features'
 
@@ -203,74 +203,70 @@ type ModalType = 'faq' | 'privacy' | 'changelog' | null
 export function Footer() {
   const [modal, setModal] = useState<ModalType>(null)
   const location = useLocation()
-  const isWikiPage = location.pathname.startsWith('/wiki')
-  const isHomePage = location.pathname === '/' || location.pathname === ''
+  const isGamePage = location.pathname !== '/'
 
   return (
-    <>
-      <footer className="mt-auto border-t border-film-border/50 bg-film-black">
-        <div className="max-w-2xl mx-auto px-4 py-5">
-          {/* Links row */}
-          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-film-text-dim mb-4">
-            <button
-              onClick={() => setModal('faq')}
-              className="hover:text-film-text transition-colors cursor-pointer"
-            >
-              FAQ
-            </button>
-            <button
-              onClick={() => setModal('privacy')}
-              className="hover:text-film-text transition-colors cursor-pointer"
-            >
-              Politique de confidentialité
-            </button>
+    <footer
+      className="w-full py-4 px-4"
+      style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
+    >
+      <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-[11px] text-film-text-dim">
+        {/* Left: brand + copyright */}
+        <span style={{ color: 'rgba(236,233,226,0.35)' }}>
+          © {new Date().getFullYear()} {BRAND_NAME}
+        </span>
+
+        {/* Center/Right: links */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setModal('faq')}
+            className="hover:text-film-text transition-colors cursor-pointer"
+          >
+            FAQ
+          </button>
+          <button
+            type="button"
+            onClick={() => setModal('privacy')}
+            className="hover:text-film-text transition-colors cursor-pointer"
+          >
+            Confidentialité
+          </button>
+          <button
+            type="button"
+            onClick={() => setModal('changelog')}
+            className="hover:text-film-text transition-colors cursor-pointer"
+          >
+            Notes de version
+          </button>
+          {isGamePage && (
             <a
-              href="mailto:contact@guesstoday.fr"
-              className="flex items-center gap-1.5 hover:text-film-text transition-colors"
+              href="https://www.themoviedb.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 hover:text-film-text transition-colors"
             >
-              <ExternalLink size={12} />
-              Contact
+              <ExternalLink size={10} aria-hidden />
+              TMDB
             </a>
-          </div>
-
-          {/* TMDB attribution (pas sur l’accueil — pas de contenu TMDB affiché) */}
-          {!isWikiPage && !isHomePage && (
-            <div className="flex items-center justify-center gap-2 mb-2 text-xs text-film-text-dim">
-              <Film size={11} />
-              <span>
-                Ce produit utilise l'API TMDB mais n'est pas approuvé ou certifié par{' '}
-                <a href="https://www.themoviedb.org" target="_blank" rel="noopener noreferrer" className="underline hover:text-film-text-dim transition-colors">TMDB</a>.
-              </span>
-            </div>
           )}
-          {/* Wikipédia / Wikidata attribution (mode Personnalités) */}
-          {FEATURES.enableWiki && isWikiPage && (
-            <div className="flex items-center justify-center gap-2 mb-3 text-xs text-film-text-dim">
-              <User size={11} />
-              <span>
-                Mode Personnalités — données issues de{' '}
-                <a href="https://fr.wikipedia.org" target="_blank" rel="noopener noreferrer" className="underline hover:text-film-text-dim transition-colors">Wikipédia</a>
-                {' '}(CC BY-SA 4.0).
-              </span>
-            </div>
-          )}
-
-          {/* Copyright + version */}
-          <div className="flex items-center justify-center gap-3 text-xs text-film-text-dim">
-            <p>© {new Date().getFullYear()} {BRAND_NAME}. Tous droits réservés.</p>
-            <button
-              onClick={() => setModal('changelog')}
-              className="hover:text-film-text-dim transition-colors cursor-pointer"
+          {FEATURES.enableWiki && isGamePage && (
+            <a
+              href="https://www.wikipedia.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 hover:text-film-text transition-colors"
             >
-              v{__APP_VERSION__}
-            </button>
-          </div>
+              <ExternalLink size={10} aria-hidden />
+              Wikipedia
+            </a>
+          )}
         </div>
-      </footer>
+      </div>
 
       {modal === 'faq' && <FaqModal onClose={() => setModal(null)} />}
       {modal === 'privacy' && <PrivacyModal onClose={() => setModal(null)} />}
       {modal === 'changelog' && <ChangelogModal onClose={() => setModal(null)} />}
-    </>
+    </footer>
   )
 }

@@ -103,12 +103,7 @@ struct RulesSheet: View {
                         .foregroundColor(Theme.primaryButtonFg)
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
-                        .background(
-                            LinearGradient(
-                                colors: [Color(hex: "#D4900F"), Color(hex: "#C07C0A"), Color(hex: "#8A5500")],
-                                startPoint: .top, endPoint: .bottom
-                            )
-                        )
+                        .background(Theme.goldGradient)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.radiusM))
                 }
                 .padding(.horizontal, Theme.spacing16)

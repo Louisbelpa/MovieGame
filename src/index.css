@@ -1,28 +1,28 @@
 @import "tailwindcss";
 
 :root {
-  /* Mode films — Mandarin Sorbet */
-  --sg-films:       #ffb142;
-  --sg-films-hover: #f5a030;
-  --sg-films-soft:  rgba(255, 177, 66, 0.14);
-  --sg-films-ring:  rgba(255, 177, 66, 0.38);
+  /* Mode films — Gold chaud */
+  --sg-films:       #f5c842;
+  --sg-films-hover: #ffe07a;
+  --sg-films-soft:  rgba(245, 200, 66, 0.13);
+  --sg-films-ring:  rgba(245, 200, 66, 0.35);
 
-  /* Mode séries — C64 Purple */
-  --sg-series:       #706fd3;
-  --sg-series-hover: #8584e0;
-  --sg-series-soft:  rgba(112, 111, 211, 0.13);
-  --sg-series-ring:  rgba(112, 111, 211, 0.34);
+  /* Mode séries — Teal menthe */
+  --sg-series:       #4ecdc4;
+  --sg-series-hover: #6ee0d8;
+  --sg-series-soft:  rgba(78, 205, 196, 0.13);
+  --sg-series-ring:  rgba(78, 205, 196, 0.34);
 
-  /* Mode wiki / personnalités — Fluorescent Red */
-  --sg-wiki:       #ff5252;
-  --sg-wiki-hover: #ff6b6b;
-  --sg-wiki-soft:  rgba(255, 82, 82, 0.12);
-  --sg-wiki-ring:  rgba(255, 82, 82, 0.32);
+  /* Mode wiki / personnalités — Rose */
+  --sg-wiki:       #ff6b9d;
+  --sg-wiki-hover: #ff8db5;
+  --sg-wiki-soft:  rgba(255, 107, 157, 0.13);
+  --sg-wiki-ring:  rgba(255, 107, 157, 0.34);
 
   /* Couleur "à jouer" dans le calendrier */
-  --sg-todo:      #ffb142;
-  --sg-todo-soft: rgba(255, 177, 66, 0.14);
-  --sg-todo-ring: rgba(255, 177, 66, 0.38);
+  --sg-todo:      #f5c842;
+  --sg-todo-soft: rgba(245, 200, 66, 0.14);
+  --sg-todo-ring: rgba(245, 200, 66, 0.35);
 
   /* Token de mode — résolu par data-mode sur l'ancêtre */
   --mode-color: var(--sg-films);
@@ -43,27 +43,28 @@
 }
 
 @theme {
-  /* Flat UI Spanish palette */
-  --color-film-black:    #f7f1e3;  /* Swan White — fond app */
-  --color-film-dark:     #ede8db;  /* Surface secondaire */
-  --color-film-gray:     #d1ccc0;  /* Crocodile Tooth — surface tertiaire */
-  --color-film-surface:  #FFFFFF;  /* Cartes, inputs, modales */
-  --color-film-border:   #c4bfb3;  /* Contours */
-  --color-film-muted:    #aaa69d;  /* Hot Stone — éléments désactivés */
-  --color-film-text:     #2c2c54;  /* Lucky Point — texte principal */
-  --color-film-text-dim: #474787;  /* Liberty — texte secondaire */
-  --color-film-gold:     #ffb142;  /* Mandarin Sorbet */
-  --color-film-gold-light: #f5a030;
-  --color-film-green:    #218c74;  /* Palm Springs Splash */
-  --color-film-red:      #b33939;  /* Eye of Newt */
-  --color-film-amber:    #cc8e35;  /* Alameda Ochre */
+  /* Minuit Studio */
+  --color-film-black:    #0b0b1a;   /* fond global */
+  --color-film-dark:     #0f0f22;   /* surface secondaire légère */
+  --color-film-gray:     #1a1a38;   /* surface tertiaire */
+  --color-film-surface:  #13132b;   /* cartes, inputs, modales */
+  --color-film-border:   rgba(255, 255, 255, 0.09);
+  --color-film-muted:    rgba(255, 255, 255, 0.18);
+  --color-film-text:     #ece9e2;   /* blanc chaud */
+  --color-film-text-dim: rgba(236, 233, 226, 0.48);
+  --color-film-gold:     #f5c842;
+  --color-film-gold-light: #ffe07a;
+  --color-film-gold-deep:  #c49820;
+  --color-film-green:    #2fc87a;
+  --color-film-red:      #ff5252;
+  --color-film-amber:    #f0a820;
 
   --font-title: "Fraunces", "Playfair Display", Georgia, serif;
-  --font-body: "Inter", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --font-body:  "Inter", system-ui, sans-serif;
+  --font-mono:  "JetBrains Mono", monospace;
 
   --radius-game: 0.75rem;
-  --shadow-glow: 0 0 20px rgba(255, 177, 66, 0.22);
+  --shadow-glow: 0 0 24px rgba(245, 200, 66, 0.20);
 }
 
 @layer base {
@@ -162,7 +163,7 @@
 }
 
 .text-gradient-gold {
-  background: linear-gradient(135deg, var(--color-film-gold), var(--color-film-gold-light));
+  background: linear-gradient(135deg, #f5c842, #ffe07a);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -220,7 +221,7 @@
 .skeleton-line {
   height: 0.75rem;
   border-radius: 0.375rem;
-  background: rgba(28, 24, 22, 0.08);
+  background: rgba(255, 255, 255, 0.06);
 }
 .skeleton-line + .skeleton-line {
   margin-top: 0.5rem;
@@ -291,50 +292,23 @@
 
 /* ── Mode atmospheres ──────────────────────────────────────────────────────── */
 
-/* Films — halo Mandarin Sorbet */
+/* Films — halo Gold chaud */
 .atmosphere-film {
   background-image:
-    repeating-linear-gradient(
-      0deg,
-      transparent 0px 2px,
-      rgba(0, 0, 0, 0.018) 2px 3px
-    ),
-    radial-gradient(
-      ellipse 80% 50% at 50% 20%,
-      rgba(255, 177, 66, 0.09),
-      transparent 65%
-    );
+    radial-gradient(ellipse 90% 55% at 50% -5%, rgba(245, 200, 66, 0.13), transparent 65%);
 }
 
-/* Séries — halo C64 Purple */
+/* Séries — halo Teal menthe */
 .atmosphere-series {
   background-image:
-    repeating-linear-gradient(
-      0deg,
-      transparent 0px 3px,
-      rgba(0, 0, 0, 0.012) 3px 4px
-    ),
-    radial-gradient(
-      ellipse 80% 50% at 50% 20%,
-      rgba(112, 111, 211, 0.08),
-      transparent 65%
-    );
+    radial-gradient(ellipse 90% 55% at 50% -5%, rgba(78, 205, 196, 0.11), transparent 65%);
 }
 
-/* Personnalités — halo Fluorescent Red */
+/* Personnalités — halo Rose */
 .atmosphere-wiki {
   background-image:
-    radial-gradient(
-      circle,
-      rgba(255, 82, 82, 0.035) 1px,
-      transparent 1.5px
-    ),
-    radial-gradient(
-      ellipse 80% 50% at 50% 20%,
-      rgba(255, 82, 82, 0.08),
-      transparent 65%
-    );
-  background-size: 6px 6px, 100% 100%;
+    radial-gradient(ellipse 90% 55% at 50% -5%, rgba(255, 107, 157, 0.11), transparent 65%);
+  background-size: 100% 100%;
 }
 
 @media (prefers-reduced-motion: reduce) {

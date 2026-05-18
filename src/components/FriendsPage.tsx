@@ -670,7 +670,10 @@ export function FriendsPage() {
       <TopNav />
 
       {/* Mobile header */}
-      <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-film-border bg-film-black sticky top-0 z-10">
+      <header
+        className="lg:hidden flex items-center justify-between px-4 py-3 sticky top-0 z-10"
+        style={{ background: 'rgba(11,11,26,0.92)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+      >
         <div className="flex items-center gap-2">
           <button
             type="button"

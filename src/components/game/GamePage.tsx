@@ -533,37 +533,62 @@ export function GamePage({ mode }: GamePageProps) {
 
   return (
     <main
-      className={`game-page game-page--${mode} atmosphere-${mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : 'film'} px-3 sm:px-4 lg:px-4 py-3 sm:py-5 lg:py-5`}
+      className={`game-page game-page--${mode} atmosphere-${mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : 'film'} min-h-screen px-3 sm:px-4 lg:px-8 py-3 sm:py-5 lg:py-6`}
       data-mode={mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : undefined}
     >
       {/* ── Mobile layout (stack) ── */}
-      <div className="lg:hidden max-w-2xl mx-auto flex flex-col gap-3 sm:gap-4 pb-24">
+      <div className="lg:hidden max-w-2xl mx-auto flex flex-col gap-3 sm:gap-4 pb-28">
         {dateNavBar}
 
         {/* Image full-bleed */}
         {!isWiki && (
           <div className="-mx-3 sm:-mx-4">
-            <MovieImage
-              imageUrl={challenge.photoUrl ?? null}
-              attempt={Math.min(guesses.length + 1, challenge.maxAttempts)}
-              maxAttempts={challenge.maxAttempts}
-              fullBleed
-            />
+            <div className="relative">
+              <MovieImage
+                imageUrl={challenge.photoUrl ?? null}
+                attempt={Math.min(guesses.length + 1, challenge.maxAttempts)}
+                maxAttempts={challenge.maxAttempts}
+                fullBleed
+              />
+              {/* Gradient overlay bottom */}
+              <div
+                className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none"
+                style={{ background: 'linear-gradient(to top, var(--color-film-black) 0%, transparent 100%)' }}
+              />
+              {/* AttemptTracker overlaid bottom-left */}
+              <div className="absolute bottom-3 left-3 z-10">
+                <AttemptTracker guesses={guessesForTracker} maxAttempts={challenge.maxAttempts} />
+              </div>
+              {/* Counter bottom-right */}
+              <div className="absolute bottom-3 right-3 z-10">
+                <span className="text-xs font-mono text-film-text-dim/80 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded">{guesses.length}/{challenge.maxAttempts}</span>
+              </div>
+            </div>
           </div>
         )}
         {isWiki && (
           <div className="-mx-3 sm:-mx-4">
-            <WikiChallengeImage
-              imageUrl={challenge.photoUrl ?? null}
-              isRevealed={isGameOver}
-            />
+            <div className="relative">
+              <WikiChallengeImage
+                imageUrl={challenge.photoUrl ?? null}
+                isRevealed={isGameOver}
+              />
+              {/* Gradient overlay bottom */}
+              <div
+                className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none"
+                style={{ background: 'linear-gradient(to top, var(--color-film-black) 0%, transparent 100%)' }}
+              />
+              {/* AttemptTracker overlaid bottom-left */}
+              <div className="absolute bottom-3 left-3 z-10">
+                <AttemptTracker guesses={guessesForTracker} maxAttempts={challenge.maxAttempts} />
+              </div>
+              {/* Counter bottom-right */}
+              <div className="absolute bottom-3 right-3 z-10">
+                <span className="text-xs font-mono text-film-text-dim/80 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded">{guesses.length}/{challenge.maxAttempts}</span>
+              </div>
+            </div>
           </div>
         )}
-
-        <div className="flex items-center justify-between px-1">
-          <AttemptTracker guesses={guessesForTracker} maxAttempts={challenge.maxAttempts} />
-          <span className="text-sm text-film-text-dim font-mono">{guesses.length}/{challenge.maxAttempts}</span>
-        </div>
 
         {gameOverBanner}
 
@@ -578,15 +603,16 @@ export function GamePage({ mode }: GamePageProps) {
           />
         )}
 
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] font-mono uppercase tracking-widest text-film-text-dim/50">Indices</span>
+        <div className="flex items-center justify-between mb-2 px-0.5">
+          <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: 'rgba(236,233,226,0.35)' }}>Indices</span>
           <button
             type="button"
             onClick={() => openModal('rules')}
-            className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-widest text-film-text-dim/50 hover:text-film-text-dim transition-colors cursor-pointer"
+            className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-widest transition-colors cursor-pointer"
+            style={{ color: 'rgba(236,233,226,0.35)' }}
           >
             <HelpCircle size={11} aria-hidden />
-            Comment jouer
+            Règles
           </button>
         </div>
 
@@ -623,9 +649,10 @@ export function GamePage({ mode }: GamePageProps) {
         <div
           className="lg:hidden fixed bottom-0 left-0 right-0 z-30 px-3 pt-3 pb-4"
           style={{
-            background: 'var(--color-film-black)',
-            borderTop: '1px solid var(--color-film-border)',
-            boxShadow: '0 -4px 20px rgba(44,44,84,0.08)',
+            background: 'rgba(11,11,26,0.95)',
+            backdropFilter: 'blur(16px)',
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 -4px 32px rgba(0,0,0,0.4)',
           }}
         >
           {isWiki ? (
@@ -648,12 +675,12 @@ export function GamePage({ mode }: GamePageProps) {
 
       {/* ── Desktop 2-col layout ── */}
       <div
-        className="hidden lg:grid items-start"
+        className="hidden lg:grid max-w-5xl mx-auto items-start"
         style={{ gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: '1.5rem' }}
       >
         {/* Left column: image 16/9 + attempt dots + hints */}
         <div className="flex flex-col gap-3">
-          <div>
+          <div className="relative">
             {!isWiki && (
               <MovieImage
                 imageUrl={challenge.photoUrl ?? null}
@@ -667,23 +694,32 @@ export function GamePage({ mode }: GamePageProps) {
                 isRevealed={isGameOver}
               />
             )}
-          </div>
-
-          {/* AttemptTracker below image */}
-          <div className="flex items-center justify-center">
-            <AttemptTracker guesses={guessesForTracker} maxAttempts={challenge.maxAttempts} />
+            {/* Gradient overlay bottom */}
+            <div
+              className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none"
+              style={{ background: 'linear-gradient(to top, var(--color-film-black) 0%, transparent 100%)' }}
+            />
+            {/* AttemptTracker overlaid bottom-left */}
+            <div className="absolute bottom-3 left-3 z-10">
+              <AttemptTracker guesses={guessesForTracker} maxAttempts={challenge.maxAttempts} />
+            </div>
+            {/* Counter bottom-right */}
+            <div className="absolute bottom-3 right-3 z-10">
+              <span className="text-xs font-mono text-film-text-dim/80 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded">{guesses.length}/{challenge.maxAttempts}</span>
+            </div>
           </div>
 
           <div className="shrink-0 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono uppercase tracking-widest text-film-text-dim/50">Indices</span>
+            <div className="flex items-center justify-between mb-2 px-0.5">
+              <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: 'rgba(236,233,226,0.35)' }}>Indices</span>
               <button
                 type="button"
                 onClick={() => openModal('rules')}
-                className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-widest text-film-text-dim/50 hover:text-film-text-dim transition-colors cursor-pointer"
+                className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-widest transition-colors cursor-pointer"
+                style={{ color: 'rgba(236,233,226,0.35)' }}
               >
                 <HelpCircle size={11} aria-hidden />
-                Comment jouer
+                Règles
               </button>
             </div>
             {isWiki ? (
@@ -715,7 +751,10 @@ export function GamePage({ mode }: GamePageProps) {
         </div>
 
         {/* Right column: date nav + input + guesses + friends */}
-        <div className="flex flex-col gap-4">
+        <div
+          className="flex flex-col gap-4 rounded-2xl p-4"
+          style={{ background: 'var(--color-film-surface)', border: '1px solid rgba(255,255,255,0.07)' }}
+        >
           {/* Date nav — desktop only */}
           {dateNavBar}
 

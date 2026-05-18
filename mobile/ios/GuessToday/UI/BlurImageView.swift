@@ -36,16 +36,30 @@ struct BlurImageView: View {
         .frame(height: isWiki ? 280 : 240)
         .clipped()
         .cornerRadius(Theme.radiusL)
+        // Bottom gradient overlay — mirrors web GamePage image gradient
+        .overlay(alignment: .bottom) {
+            LinearGradient(
+                colors: [.clear, Theme.background.opacity(0.80)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 80)
+            .cornerRadius(Theme.radiusL)
+            .allowsHitTesting(false)
+        }
+        // Flash feedback
         .overlay(
             RoundedRectangle(cornerRadius: Theme.radiusL)
                 .fill(flashColor ?? .clear)
                 .allowsHitTesting(false)
                 .animation(.easeOut(duration: 0.4), value: flashColor != nil)
         )
+        // Subtle border
         .overlay(
             RoundedRectangle(cornerRadius: Theme.radiusL)
                 .stroke(Theme.border, lineWidth: 1)
         )
+        // "Scène" badge top-left
         .overlay(alignment: .topLeading) {
             if !isWiki {
                 HStack(spacing: 4) {
@@ -57,7 +71,7 @@ struct BlurImageView: View {
                 .foregroundColor(Theme.textDim)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
-                .background(Theme.surface.opacity(0.82))
+                .background(.ultraThinMaterial)
                 .cornerRadius(6)
                 .padding(8)
             }
@@ -89,9 +103,9 @@ private struct ShimmerPlaceholder: View {
                 LinearGradient(
                     stops: [
                         .init(color: .clear, location: 0),
-                        .init(color: Color.black.opacity(0.05), location: 0.45),
-                        .init(color: Color.black.opacity(0.08), location: 0.5),
-                        .init(color: Color.black.opacity(0.05), location: 0.55),
+                        .init(color: Color.white.opacity(0.06), location: 0.45),
+                        .init(color: Color.white.opacity(0.09), location: 0.5),
+                        .init(color: Color.white.opacity(0.06), location: 0.55),
                         .init(color: .clear, location: 1),
                     ],
                     startPoint: .leading,

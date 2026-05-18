@@ -4,37 +4,49 @@ struct HintCard: View {
     let hint: HintItem
     let isNew: Bool
     var staggerDelay: Double = 0
+    var accentColor: Color = Theme.gold
 
     @State private var appeared = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(hint.displayLabel)
-                .font(Theme.inter(size: 10, weight: .semibold))
-                .foregroundColor(Theme.gold)
-                .textCase(.uppercase)
-                .tracking(0.8)
+        HStack(spacing: 0) {
+            // Left accent bar — mirrors web `borderLeft: 3px solid var(--mode-color)`
+            RoundedRectangle(cornerRadius: 2)
+                .fill(accentColor)
+                .frame(width: 3)
+                .padding(.vertical, 10)
 
-            if hint.isSynopsis {
-                Text(hint.value.displayText)
-                    .font(Theme.inter(size: 13))
-                    .foregroundColor(Theme.text)
-                    .lineLimit(4)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                Text(hint.value.displayText)
-                    .font(Theme.inter(size: 14, weight: .medium))
-                    .foregroundColor(Theme.text)
-                    .lineLimit(2)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(hint.displayLabel)
+                    .font(Theme.inter(size: 10, weight: .semibold))
+                    .foregroundColor(accentColor.opacity(0.85))
+                    .textCase(.uppercase)
+                    .tracking(0.8)
+
+                if hint.isSynopsis {
+                    Text(hint.value.displayText)
+                        .font(Theme.inter(size: 13))
+                        .foregroundColor(Theme.text)
+                        .lineLimit(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text(hint.value.displayText)
+                        .font(Theme.inter(size: 14, weight: .medium))
+                        .foregroundColor(Theme.text)
+                        .lineLimit(2)
+                }
             }
+            .padding(.leading, 10)
+            .padding(.trailing, Theme.spacing12)
+            .padding(.vertical, Theme.spacing12)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(Theme.spacing12)
         .frame(maxWidth: .infinity, minHeight: 64, maxHeight: .infinity, alignment: .leading)
         .background(Theme.surface)
         .cornerRadius(Theme.radiusM)
         .overlay(
             RoundedRectangle(cornerRadius: Theme.radiusM)
-                .stroke(isNew ? Theme.gold.opacity(0.6) : Theme.border, lineWidth: 1)
+                .stroke(isNew ? accentColor.opacity(0.5) : Theme.border, lineWidth: 1)
         )
         .scaleEffect(appeared ? 1 : 0.92)
         .opacity(appeared ? 1 : 0)
@@ -80,6 +92,7 @@ struct HintsGrid: View {
     let hintsAvailable: Int
     let hintsRevealed: Int
     let previousRevealCount: Int
+    var accentColor: Color = Theme.gold
 
     private var lockedCount: Int { max(0, hintsAvailable - hintsRevealed) }
 
@@ -117,7 +130,8 @@ struct HintsGrid: View {
                             HintCard(
                                 hint: regularHints[i],
                                 isNew: isNew,
-                                staggerDelay: isNew ? Double(i - previousRevealCount) * 0.09 : 0
+                                staggerDelay: isNew ? Double(i - previousRevealCount) * 0.09 : 0,
+                                accentColor: accentColor
                             )
                         case .locked(let slot):
                             LockedHintCard(index: hintsRevealed + slot + 1)
@@ -131,7 +145,8 @@ struct HintsGrid: View {
                 HintCard(
                     hint: hint,
                     isNew: isNew,
-                    staggerDelay: isNew ? Double((regularHints.count + i) - previousRevealCount) * 0.09 : 0
+                    staggerDelay: isNew ? Double((regularHints.count + i) - previousRevealCount) * 0.09 : 0,
+                    accentColor: accentColor
                 )
             }
         }

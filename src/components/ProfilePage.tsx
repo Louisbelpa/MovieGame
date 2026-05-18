@@ -123,7 +123,10 @@ function AchievementsSection({ serverStats }: { serverStats: ServerStatsMap }) {
   }
 
   return (
-    <div className="rounded-2xl border border-film-border bg-film-dark p-5 flex flex-col gap-4">
+    <div
+      className="rounded-2xl p-5 flex flex-col gap-4"
+      style={{ background: 'var(--color-film-surface)', border: '1px solid rgba(255,255,255,0.07)' }}
+    >
       <div className="flex items-center justify-between">
         <p className="text-[11px] font-mono uppercase tracking-widest text-film-text-dim">SUCCÈS</p>
         <span className="text-xs text-film-text-dim">{earned.length}/{achievements.length}</span>
@@ -179,8 +182,8 @@ function DistributionChart({
               <motion.div
                 className="h-full rounded"
                 style={isMax
-                  ? { background: 'linear-gradient(180deg, #e8c06a, #d4a64a, #a07030)' }
-                  : { background: 'rgba(212,166,74,0.45)' }
+                  ? { background: 'var(--mode-color, linear-gradient(180deg, #e8c06a, #d4a64a, #a07030))' }
+                  : { background: 'color-mix(in srgb, var(--mode-color, #d4a64a) 45%, transparent)' }
                 }
                 initial={{ width: 0 }}
                 animate={{ width: `${Math.max(pct, count > 0 ? 4 : 0)}%` }}
@@ -627,7 +630,10 @@ export function ProfilePage() {
   return (
     <div className="min-h-screen bg-film-black text-film-text">
       {/* Header */}
-      <header className="sticky top-0 z-30 w-full h-14 border-b border-film-border bg-film-black/90 backdrop-blur">
+      <header
+        className="sticky top-0 z-30 w-full h-14"
+        style={{ background: 'rgba(11,11,26,0.92)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+      >
         {/* Desktop */}
         <div className="hidden lg:flex items-center justify-between h-full px-6 max-w-5xl mx-auto">
           <a href="/" className="flex items-center gap-2">
@@ -688,8 +694,10 @@ export function ProfilePage() {
         lg:grid lg:grid-cols-[1fr_1.2fr] lg:grid-rows-[auto_auto_auto_auto] lg:gap-x-9 lg:gap-y-6">
 
         {/* ── Identity hero — order 1 mobile, col 1 row 1 desktop ── */}
-        <div className="order-1 lg:col-start-1 lg:row-start-1
-          rounded-2xl border border-film-border bg-film-dark p-6 flex flex-col gap-4">
+        <div
+          className="order-1 lg:col-start-1 lg:row-start-1 rounded-2xl p-6 flex flex-col gap-4"
+          style={{ background: 'var(--color-film-surface)', border: '1px solid rgba(255,255,255,0.07)' }}
+        >
           <div className="flex items-center gap-4">
             <div className="flex flex-col items-center gap-1 flex-shrink-0">
               <label className="relative group cursor-pointer" title="Changer la photo de profil">
@@ -819,10 +827,10 @@ export function ProfilePage() {
         {/* ── Friends link — order 5 mobile, col 1 row 4 desktop ── */}
         <a
           href="/friends"
-          className="order-5 lg:col-start-1 lg:row-start-4
-            group rounded-2xl border border-film-border bg-film-dark hover:bg-film-dark p-5 flex items-center gap-4 transition-colors"
+          className="order-5 lg:col-start-1 lg:row-start-4 group rounded-2xl p-5 flex items-center gap-4 transition-colors"
+          style={{ background: 'var(--color-film-surface)', border: '1px solid rgba(255,255,255,0.07)' }}
         >
-          <div className="w-10 h-10 rounded-lg bg-film-dark flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--color-film-dark)' }}>
             <Users size={18} className="text-film-text-dim group-hover:text-film-text transition-colors" />
           </div>
           <div className="flex-1 min-w-0">

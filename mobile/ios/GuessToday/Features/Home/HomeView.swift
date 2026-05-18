@@ -213,10 +213,10 @@ struct HomeView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         // ── Header ──────────────────────────────
-                        HomeHeaderBar()
+                        HomeHeaderBar(vm: vm)
                             .padding(.horizontal, Theme.spacing16)
                             .padding(.top, Theme.spacing8)
-                            .padding(.bottom, Theme.spacing20)
+                            .padding(.bottom, Theme.spacing16)
 
                         // ── Hero ────────────────────────────────
                         HeroSection(vm: vm)
@@ -307,14 +307,32 @@ struct HomeView: View {
 
 private struct HomeHeaderBar: View {
     @Environment(AuthViewModel.self) var auth
+    let vm: HomeViewModel
 
     var body: some View {
-        HStack(alignment: .center) {
+        HStack(spacing: Theme.spacing8) {
+            // Logo lockup — mirrors web Header
             ApertureLockup(iconSize: 22, fontSize: 22)
 
             Spacer()
 
-            // Avatar / profile
+            // Streak pill — mirrors web Header desktop pill
+            if !vm.isLoading && vm.currentStreak > 0 {
+                HStack(spacing: 4) {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 10))
+                    Text("\(vm.currentStreak)j")
+                        .font(Theme.inter(size: 11, weight: .semibold))
+                }
+                .foregroundColor(Theme.amber)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(Theme.amber.opacity(0.12))
+                .cornerRadius(20)
+                .overlay(Capsule().stroke(Theme.amber.opacity(0.25), lineWidth: 1))
+            }
+
+            // Avatar or login icon
             if auth.isLoggedIn, let user = auth.user {
                 NavigationLink(destination: ProfileView()) {
                     Group {
@@ -335,7 +353,15 @@ private struct HomeHeaderBar: View {
                     .frame(width: 32, height: 32)
                     .background(Theme.gold.opacity(0.18))
                     .clipShape(Circle())
-                    .overlay(Circle().stroke(Theme.gold.opacity(0.35), lineWidth: 1))
+                    .overlay(Circle().stroke(Theme.gold.opacity(0.38), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            } else {
+                NavigationLink(destination: ProfileView()) {
+                    Image(systemName: "person.circle")
+                        .font(.system(size: 22))
+                        .foregroundColor(Theme.textDim)
+                        .frame(width: 36, height: 36)
                 }
                 .buttonStyle(.plain)
             }
@@ -359,35 +385,15 @@ private struct HeroSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.spacing12) {
-            // Date
+        VStack(alignment: .leading, spacing: 6) {
             Text(todayLabel.uppercased())
                 .font(Theme.inter(size: 10, weight: .semibold))
                 .tracking(1.4)
                 .foregroundColor(Theme.muted)
 
-            // Hero headline
             Text("À toi de trouver.")
-                .font(Theme.fraunces(size: 28))
+                .font(Theme.fraunces(size: 26))
                 .foregroundColor(Theme.text)
-
-            // Streak pill — only shown once streak data confirms a non-zero value
-            if !vm.isLoading && vm.currentStreak > 0 {
-                HStack(spacing: 5) {
-                    Text("🔥")
-                        .font(.system(size: 13))
-                    Text("\(vm.currentStreak) jour\(vm.currentStreak > 1 ? "s" : "") de série")
-                        .font(Theme.inter(size: 12, weight: .semibold))
-                        .foregroundColor(Color(hex: "#f59e0b"))
-                }
-                .padding(.horizontal, 11)
-                .padding(.vertical, 6)
-                .background(Color(hex: "#FEF3E2"))
-                .cornerRadius(100)
-                .overlay(
-                    Capsule().stroke(Color(hex: "#f59e0b").opacity(0.22), lineWidth: 1)
-                )
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -428,7 +434,7 @@ private struct ChallengesSectionHeader: View {
     }
 }
 
-// MARK: - Challenge card
+// MARK: - Challenge card (immersive, aligned with web homepage cards)
 
 private struct DayChallengeCard: View {
     let mode: GameMode
@@ -440,79 +446,73 @@ private struct DayChallengeCard: View {
     let onRetry: () -> Void
     let onTap: () -> Void
 
+    private var modeColor: Color { mode.color }
+
     var body: some View {
         Button(action: {
             if noChallenge { return }
             if loadFailed { onRetry() } else { onTap() }
         }) {
-            HStack(spacing: 14) {
-                // Icon square with gradient background
-                ZStack {
-                    RoundedRectangle(cornerRadius: 11)
-                        .fill(iconBackground)
-                    Image(systemName: modeIcon)
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundColor(modeColor)
+            ZStack(alignment: .topLeading) {
+                // Atmospheric background — radial glow at top like web `atmosphere-film`
+                GeometryReader { geo in
+                    ZStack {
+                        Theme.surface
+                        RadialGradient(
+                            colors: [modeColor.opacity(0.13), .clear],
+                            center: UnitPoint(x: 0.5, y: -0.1),
+                            startRadius: 0,
+                            endRadius: geo.size.width * 0.85
+                        )
+                    }
                 }
-                .frame(width: 44, height: 44)
 
-                // Labels
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 5) {
-                        Text(modeLabel.uppercased())
-                            .font(Theme.inter(size: 10, weight: .semibold))
-                            .tracking(0.8)
-                            .foregroundColor(modeColor)
+                VStack(alignment: .leading, spacing: 0) {
+                    // Top row: icon + challenge number
+                    HStack(alignment: .top) {
+                        ZStack {
+                            Circle()
+                                .fill(modeColor.opacity(0.15))
+                                .frame(width: 48, height: 48)
+                            Circle()
+                                .stroke(modeColor.opacity(0.22), lineWidth: 1)
+                                .frame(width: 48, height: 48)
+                            Image(systemName: modeIcon)
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundColor(modeColor)
+                        }
+
+                        Spacer()
+
                         if let n = status?.challengeNumber {
                             Text("#\(n)")
-                                .font(Theme.inter(size: 10))
-                                .foregroundColor(Theme.muted)
+                                .font(Theme.inter(size: 11, weight: .medium))
+                                .foregroundColor(Theme.textDim)
+                                .padding(.top, 4)
                         }
                     }
+                    .padding(.bottom, Theme.spacing12)
 
-                    if isLoading && status == nil && !loadFailed && !noChallenge {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(Theme.surfaceAlt)
-                            .frame(width: 110, height: 14)
-                            .shimmer()
-                    } else if noChallenge {
-                        Text("Pas de défi aujourd'hui")
-                            .font(Theme.inter(size: 14, weight: .semibold))
-                            .foregroundColor(Theme.muted)
-                    } else if loadFailed {
-                        Text("Impossible de charger")
-                            .font(Theme.inter(size: 14, weight: .semibold))
-                            .foregroundColor(Theme.red)
-                    } else if let s = status {
-                        Text(mainLabel(s))
-                            .font(Theme.inter(size: 15, weight: .semibold))
-                            .foregroundColor(mainLabelColor(s))
-                        if s.isWon || s.isLost {
-                            Text(subLabel(s))
-                                .font(Theme.inter(size: 11))
-                                .foregroundColor(Theme.muted)
-                        }
-                    } else {
-                        Text(isNextToPlay ? "À jouer maintenant" : "À jouer")
-                            .font(Theme.inter(size: 15, weight: .semibold))
-                            .foregroundColor(isNextToPlay ? Theme.text : Theme.textDim)
-                        Text(modeDescription)
-                            .font(Theme.inter(size: 11))
-                            .foregroundColor(Theme.muted)
-                            .lineLimit(1)
-                    }
+                    // Mode name
+                    Text(modeLabel)
+                        .font(Theme.fraunces(size: 22))
+                        .foregroundColor(Theme.text)
+                        .padding(.bottom, 4)
+
+                    // Status / description line
+                    statusLine
+                        .padding(.bottom, Theme.spacing16)
+
+                    // CTA
+                    ctaRow
                 }
-
-                Spacer()
-
-                rightAction
+                .padding(Theme.spacing16)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 13)
-            .background(cardBackground)
-            .cornerRadius(16)
+            .frame(maxWidth: .infinity)
+            .frame(height: 168)
+            .cornerRadius(18)
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 18)
                     .stroke(borderColor, lineWidth: isNextToPlay ? 1.5 : 1)
             )
         }
@@ -520,137 +520,156 @@ private struct DayChallengeCard: View {
         .disabled(noChallenge)
     }
 
-    // MARK: - Right action
+    // MARK: - Status line
 
     @ViewBuilder
-    private var rightAction: some View {
-        if noChallenge {
-            Image(systemName: "moon.zzz")
-                .font(.system(size: 14))
-                .foregroundColor(Theme.muted.opacity(0.5))
-        } else if loadFailed {
-            Image(systemName: "arrow.clockwise")
-                .font(.system(size: 14, weight: .semibold))
+    private var statusLine: some View {
+        if isLoading && status == nil && !loadFailed && !noChallenge {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Theme.surfaceAlt)
+                .frame(width: 120, height: 12)
+                .shimmer()
+        } else if noChallenge {
+            Text("Pas de défi aujourd'hui")
+                .font(Theme.inter(size: 13))
                 .foregroundColor(Theme.muted)
+        } else if loadFailed {
+            Text("Impossible de charger — Réessayer")
+                .font(Theme.inter(size: 13))
+                .foregroundColor(Theme.red)
+        } else if let s = status, s.isWon {
+            HStack(spacing: 5) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 13))
+                    .foregroundColor(Theme.green)
+                Text("Gagné en \(s.attemptsUsed)/\(s.maxAttempts)")
+                    .font(Theme.inter(size: 13))
+                    .foregroundColor(Theme.green)
+            }
+        } else if let s = status, s.isLost {
+            HStack(spacing: 5) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 13))
+                    .foregroundColor(Theme.red.opacity(0.8))
+                Text("Non trouvé")
+                    .font(Theme.inter(size: 13))
+                    .foregroundColor(Theme.red.opacity(0.8))
+            }
+        } else if let s = status, s.isInProgress {
+            Text("En cours — \(s.maxAttempts - s.attemptsUsed) essai\(s.maxAttempts - s.attemptsUsed > 1 ? "s" : "") restant\(s.maxAttempts - s.attemptsUsed > 1 ? "s" : "")")
+                .font(Theme.inter(size: 13))
+                .foregroundColor(modeColor)
+        } else {
+            Text(modeDescription)
+                .font(Theme.inter(size: 13))
+                .foregroundColor(Theme.textDim)
+        }
+    }
+
+    // MARK: - CTA row
+
+    @ViewBuilder
+    private var ctaRow: some View {
+        HStack {
+            if !noChallenge {
+                ctaButton
+            }
+            Spacer()
+            // Streak pill if exists
+            if let s = status, s.streak > 1 {
+                HStack(spacing: 3) {
+                    Text("🔥")
+                        .font(.system(size: 11))
+                    Text("\(s.streak)")
+                        .font(Theme.inter(size: 11, weight: .semibold))
+                        .foregroundColor(Theme.amber)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Theme.amber.opacity(0.10))
+                .cornerRadius(20)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var ctaButton: some View {
+        if isLoading && status == nil {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Theme.surfaceAlt)
+                .frame(width: 80, height: 30)
+                .shimmer()
+        } else if loadFailed {
+            EmptyView()
         } else if let s = status {
-            if s.isWon {
-                ZStack {
-                    Circle()
-                        .fill(Theme.green.opacity(0.15))
-                        .frame(width: 32, height: 32)
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(Theme.green)
+            if s.isWon || s.isLost {
+                // Replay / see result
+                HStack(spacing: 4) {
+                    Text("Voir")
+                        .font(Theme.inter(size: 12, weight: .semibold))
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 11, weight: .semibold))
                 }
-            } else if s.isLost {
-                ZStack {
-                    Circle()
-                        .fill(Theme.red.opacity(0.12))
-                        .frame(width: 32, height: 32)
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(Theme.red.opacity(0.7))
-                }
+                .foregroundColor(Theme.textDim)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(Theme.surfaceAlt)
+                .cornerRadius(8)
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border, lineWidth: 1))
             } else {
                 // In progress
                 HStack(spacing: 4) {
                     Text("Continuer")
                         .font(Theme.inter(size: 12, weight: .semibold))
-                    Text("→")
-                        .font(Theme.inter(size: 12, weight: .semibold))
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 11, weight: .semibold))
                 }
-                .foregroundColor(modeColor)
-                .padding(.horizontal, 11)
+                .foregroundColor(Theme.primaryButtonFg)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 7)
-                .background(modeColor.opacity(0.12))
+                .background(modeColor)
                 .cornerRadius(8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(modeColor.opacity(0.22), lineWidth: 1))
             }
-        } else if isLoading {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Theme.surfaceAlt)
-                .frame(width: 68, height: 30)
-                .shimmer()
         } else if isNextToPlay {
             HStack(spacing: 4) {
                 Text("Jouer")
-                    .font(Theme.inter(size: 13, weight: .semibold))
-                Text("→")
-                    .font(Theme.inter(size: 13, weight: .semibold))
+                    .font(Theme.inter(size: 13, weight: .bold))
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 12, weight: .bold))
             }
-            .foregroundColor(mode == .film ? Theme.primaryButtonFg : .white)
-            .padding(.horizontal, 14)
+            .foregroundColor(Theme.primaryButtonFg)
+            .padding(.horizontal, 16)
             .padding(.vertical, 9)
-            .background(isNextToPlayBackground)
+            .background(modeColor)
             .cornerRadius(10)
         } else {
-            Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(Theme.muted.opacity(0.6))
+            HStack(spacing: 4) {
+                Text("Jouer")
+                    .font(Theme.inter(size: 12, weight: .semibold))
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .foregroundColor(modeColor)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(modeColor.opacity(0.10))
+            .cornerRadius(8)
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(modeColor.opacity(0.25), lineWidth: 1))
         }
     }
 
-    private var isNextToPlayBackground: some ShapeStyle {
-        if mode == .film {
-            return AnyShapeStyle(LinearGradient(
-                colors: [Color(hex: "#D4900F"), Color(hex: "#C07C0A"), Color(hex: "#8A5500")],
-                startPoint: .top, endPoint: .bottom
-            ))
-        }
-        return AnyShapeStyle(modeColor)
-    }
-
-    // MARK: - Labels & colors
-
-    private func mainLabel(_ s: DailyChallengeStatus) -> String {
-        if s.isWon  { return "Gagné !" }
-        if s.isLost { return "Pas trouvé" }
-        if s.isInProgress { return "En cours…" }
-        return "À jouer"
-    }
-
-    private func subLabel(_ s: DailyChallengeStatus) -> String {
-        if s.isWon  { return "En \(s.attemptsUsed)/\(s.maxAttempts) tentative\(s.attemptsUsed > 1 ? "s" : "")" }
-        if s.isLost { return "Toutes les tentatives épuisées" }
-        return ""
-    }
-
-    private func mainLabelColor(_ s: DailyChallengeStatus) -> Color {
-        if s.isWon  { return Theme.green }
-        if s.isLost { return Theme.red }
-        if s.isInProgress { return modeColor }
-        return Theme.textDim
-    }
-
-    private var iconBackground: LinearGradient {
-        LinearGradient(
-            colors: [modeColor.opacity(0.22), modeColor.opacity(0.10)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    private var cardBackground: Color {
-        if let s = status {
-            if s.isWon  { return Theme.green.opacity(0.10) }
-            if s.isLost { return Theme.red.opacity(0.08) }
-        }
-        if isNextToPlay { return Theme.surface }
-        return Theme.surface
-    }
+    // MARK: - Colors & labels
 
     private var borderColor: Color {
         if noChallenge { return Theme.border }
-        if loadFailed  { return Theme.red.opacity(0.25) }
+        if loadFailed  { return Theme.red.opacity(0.30) }
         if let s = status {
             if s.isWon  { return Theme.green.opacity(0.30) }
             if s.isLost { return Theme.red.opacity(0.22) }
         }
-        if isNextToPlay { return modeColor.opacity(0.55) }
-        return modeColor.opacity(0.22)
+        if isNextToPlay { return modeColor.opacity(0.60) }
+        return modeColor.opacity(0.18)
     }
-
-    private var modeColor: Color { mode.color }
 
     private var modeIcon: String { mode.icon }
 
@@ -726,7 +745,7 @@ private struct StatCell: View {
                     .font(Theme.fraunces(size: 22))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [Color(hex: "#D4900F"), Color(hex: "#C07C0A")],
+                            colors: [Theme.goldLight, Theme.gold],
                             startPoint: .top, endPoint: .bottom
                         )
                     )

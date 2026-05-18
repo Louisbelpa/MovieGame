@@ -80,7 +80,8 @@ struct GameView: View {
                                         hints: challenge.hints,
                                         hintsAvailable: challenge.hintsAvailable,
                                         hintsRevealed: challenge.hintsRevealed,
-                                        previousRevealCount: vm.previousHintsRevealed
+                                        previousRevealCount: vm.previousHintsRevealed,
+                                        accentColor: mode.color
                                     )
                                     .id("\(challenge.challengeId)-\(challenge.hintsRevealed)")
                                 }
@@ -106,7 +107,7 @@ struct GameView: View {
                             }
 
                             // Input area
-                            GuessInputSection(vm: vm, inputFocused: $inputFocused)
+                            GuessInputSection(vm: vm, inputFocused: $inputFocused, accentColor: mode.color)
                                 .id("guessInput")
                                 .padding(.top, Theme.spacing16)
 
@@ -259,6 +260,7 @@ private struct DateNavBar: View {
 private struct GuessInputSection: View {
     var vm: GameViewModel
     var inputFocused: FocusState<Bool>.Binding
+    var accentColor: Color = Theme.gold
 
     private var canGuess: Bool { !vm.inputText.trimmingCharacters(in: .whitespaces).isEmpty }
 
@@ -294,7 +296,7 @@ private struct GuessInputSection: View {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 14))
-                        .foregroundColor(inputFocused.wrappedValue ? Theme.gold : Theme.muted)
+                        .foregroundColor(inputFocused.wrappedValue ? accentColor : Theme.muted)
 
                     TextField("Votre réponse…", text: Binding(
                         get: { vm.inputText },
@@ -303,7 +305,7 @@ private struct GuessInputSection: View {
                     .textFieldStyle(.plain)
                     .font(Theme.inter(size: 15))
                     .foregroundColor(Theme.text)
-                    .tint(Theme.gold)
+                    .tint(accentColor)
                     .autocorrectionDisabled()
                     .focused(inputFocused)
                     .onSubmit {
@@ -325,10 +327,10 @@ private struct GuessInputSection: View {
                 .cornerRadius(Theme.radiusM)
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.radiusM)
-                        .stroke(inputFocused.wrappedValue ? Theme.gold.opacity(0.55) : Theme.border, lineWidth: 1)
+                        .stroke(inputFocused.wrappedValue ? accentColor.opacity(0.55) : Theme.border, lineWidth: 1)
                 )
                 .shadow(
-                    color: inputFocused.wrappedValue ? Theme.gold.opacity(0.18) : .clear,
+                    color: inputFocused.wrappedValue ? accentColor.opacity(0.18) : .clear,
                     radius: 6, x: 0, y: 0
                 )
                 .animation(.easeInOut(duration: 0.18), value: inputFocused.wrappedValue)
@@ -345,14 +347,8 @@ private struct GuessInputSection: View {
                         .padding(.vertical, 11)
                         .background(
                             canGuess
-                            ? LinearGradient(
-                                colors: [Color(hex: "#D4900F"), Color(hex: "#C07C0A"), Color(hex: "#8A5500")],
-                                startPoint: .top, endPoint: .bottom
-                              )
-                            : LinearGradient(
-                                colors: [Theme.surfaceAlt, Theme.surfaceAlt],
-                                startPoint: .top, endPoint: .bottom
-                              )
+                            ? AnyShapeStyle(Theme.goldGradient)
+                            : AnyShapeStyle(Theme.surfaceAlt)
                         )
                         .cornerRadius(Theme.radiusM)
                 }
@@ -577,9 +573,9 @@ private struct ClubsTable: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Theme.background.opacity(0.3))
+        .background(Theme.background.opacity(0.5))
         .cornerRadius(8)
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border.opacity(0.4), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border, lineWidth: 1))
     }
 }
 

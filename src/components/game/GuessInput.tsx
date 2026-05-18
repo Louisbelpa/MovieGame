@@ -88,7 +88,7 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
             disabled={disabled || !inputValue.trim()}
             className="shrink-0 rounded-lg text-[12.5px] font-bold transition-all disabled:opacity-35 cursor-pointer"
             style={{
-              background: '#2c2c54',
+              background: 'var(--color-film-surface)',
               color: 'var(--mode-color)',
               border: '1.5px solid var(--mode-color)',
               padding: '8px 14px',

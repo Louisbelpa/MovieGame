@@ -44,7 +44,7 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
         style={{
           padding: '5px 5px 5px 14px',
           border: '1px solid var(--mode-ring)',
-          background: 'var(--color-film-surface, #161b24)',
+          background: 'var(--color-film-surface)',
           boxShadow: '0 0 0 3px var(--mode-soft)',
         }}
         animate={shakeTrigger > 0 ? { x: [-8, 8, -5, 5, 0] } : {}}
@@ -88,7 +88,7 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
             disabled={disabled || !inputValue.trim()}
             className="shrink-0 rounded-lg text-[12.5px] font-bold transition-opacity disabled:opacity-40 cursor-pointer"
             style={{
-              background: '#2c2c54',
+              background: 'var(--color-film-surface)',
               color: 'var(--mode-color)',
               border: '1.5px solid var(--mode-color)',
               padding: '8px 14px',

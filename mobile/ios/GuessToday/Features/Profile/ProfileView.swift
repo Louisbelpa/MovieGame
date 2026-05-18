@@ -575,10 +575,7 @@ struct NotificationPromoCard: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
                             .background(
-                                LinearGradient(
-                                    colors: [Color(hex: "#D4900F"), Color(hex: "#C07C0A"), Color(hex: "#8A5500")],
-                                    startPoint: .top, endPoint: .bottom
-                                )
+                                Theme.goldGradient
                             )
                         }
                         .disabled(isRequesting)
@@ -1026,10 +1023,7 @@ struct AboutView: View {
                                 .font(Theme.fraunces(size: 28)).foregroundColor(Theme.text)
                             + Text("today")
                                 .font(Theme.fraunces(size: 28, italic: true))
-                                .foregroundStyle(LinearGradient(
-                                    colors: [Color(hex: "#D4900F"), Color(hex: "#C07C0A"), Color(hex: "#8A5500")],
-                                    startPoint: .top, endPoint: .bottom
-                                ))
+                                .foregroundStyle(Theme.goldGradient)
                         )
                         Text("Version \(appVersion) (\(buildNumber))")
                             .font(.system(size: 12))

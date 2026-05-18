@@ -94,13 +94,14 @@ export function StatsModal(props: StatsModalProps) {
             {/* Panel */}
             <motion.aside
               key="stats-panel"
-              className="fixed top-0 right-0 bottom-0 z-50 w-[380px] bg-film-dark border-l border-film-border shadow-2xl overflow-y-auto hidden lg:flex flex-col"
+              className="fixed top-0 right-0 bottom-0 z-50 w-[380px] border-l shadow-2xl overflow-y-auto hidden lg:flex flex-col"
+              style={{ background: 'var(--color-film-surface)', borderColor: 'rgba(255,255,255,0.09)' }}
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'tween', duration: 0.28, ease: [0.32, 0, 0.67, 0] }}
             >
-              <div className="flex items-center justify-between px-6 py-5 border-b border-film-border sticky top-0 bg-film-dark z-10">
+              <div className="flex items-center justify-between px-6 py-5 sticky top-0 z-10" style={{ borderBottom: '1px solid rgba(255,255,255,0.09)', background: 'var(--color-film-surface)' }}>
                 <h2 className="font-title font-semibold text-lg text-film-text">{getModalTitle(mode)}</h2>
                 <button
                   type="button"
@@ -168,7 +169,8 @@ function DistributionChart({ distribution }: { distribution: Record<string, numb
             <span className="w-3 text-film-text-dim text-sm font-mono">{attemptKey}</span>
             <div className="flex-1 h-5 bg-film-gray rounded overflow-hidden">
               <motion.div
-                className="h-full bg-film-gold rounded"
+                className="h-full rounded"
+                style={{ background: 'var(--mode-color, var(--color-film-gold))' }}
                 initial={{ width: 0 }}
                 animate={{ width: `${Math.max(pct, count > 0 ? 4 : 0)}%` }}
                 transition={{ duration: 0.5, delay: (idx + 1) * 0.06, ease: 'easeOut' }}

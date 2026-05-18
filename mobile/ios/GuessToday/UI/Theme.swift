@@ -1,33 +1,33 @@
 import SwiftUI
 
 enum Theme {
-    // MARK: - Base colours (Light Mode — mirrored from web CSS variables)
-    static let background   = Color(hex: "#F4F1EB")  // --color-film-black (crème chaud)
-    static let surface      = Color(hex: "#FFFFFF")  // --color-film-surface (cartes/modales)
-    static let surfaceAlt   = Color(hex: "#EDE9E1")  // --color-film-dark (surface secondaire)
-    static let border       = Color(hex: "#DDD8CE")  // --color-film-border
-    static let muted        = Color(hex: "#A89F96")  // --color-film-muted
-    static let text         = Color(hex: "#1C1816")  // --color-film-text
-    static let textDim      = Color(hex: "#6B625A")  // --color-film-text-dim
-    static let gold         = Color(hex: "#C07C0A")  // --color-film-gold (ambre profond)
-    static let goldLight    = Color(hex: "#D4900F")  // --color-film-gold-light
-    static let green        = Color(hex: "#1E8449")  // --color-film-green
-    static let red          = Color(hex: "#C0392B")  // --color-film-red
-    static let amber        = Color(hex: "#B7770D")  // --color-film-amber
+    // MARK: - Base colours (Minuit Studio — dark cinema theme)
+    static let background   = Color(hex: "#0b0b1a")  // --color-film-black (fond global)
+    static let surface      = Color(hex: "#13132b")  // --color-film-surface (cartes, inputs, modales)
+    static let surfaceAlt   = Color(hex: "#1a1a38")  // --color-film-gray (surface tertiaire)
+    static let border       = Color(red: 1, green: 1, blue: 1, opacity: 0.09)   // rgba(255,255,255,0.09)
+    static let muted        = Color(red: 1, green: 1, blue: 1, opacity: 0.18)   // rgba(255,255,255,0.18)
+    static let text         = Color(hex: "#ece9e2")  // --color-film-text (blanc chaud)
+    static let textDim      = Color(red: 236/255, green: 233/255, blue: 226/255, opacity: 0.48)
+    static let gold         = Color(hex: "#f5c842")  // --color-film-gold
+    static let goldLight    = Color(hex: "#ffe07a")  // --color-film-gold-light
+    static let green        = Color(hex: "#2fc87a")  // --color-film-green
+    static let red          = Color(hex: "#ff5252")  // --color-film-red
+    static let amber        = Color(hex: "#f0a820")  // --color-film-amber
 
     // MARK: - Mode colours
-    static let modeFilm     = Color(hex: "#C07C0A")  // --sg-films (ambre profond)
-    static let modeSeries   = Color(hex: "#4A50E0")  // --sg-series (indigo dense)
-    static let modeWiki     = Color(hex: "#C91F5A")  // --sg-wiki (rose framboise)
+    static let modeFilm     = Color(hex: "#f5c842")  // --sg-films (gold chaud)
+    static let modeSeries   = Color(hex: "#4ecdc4")  // --sg-series (teal menthe)
+    static let modeWiki     = Color(hex: "#ff6b9d")  // --sg-wiki (rose)
 
     // MARK: - Dedicated text colour for primary (gold) buttons
-    static let primaryButtonFg = Color(hex: "#1A0F00")  // dark brown — lisible sur fond ambre
+    static let primaryButtonFg = Color(hex: "#0b0b1a")  // dark bg — lisible sur fond gold vif
 
-    // MARK: - Gold gradient (ambre profond pour fond clair)
+    // MARK: - Gold gradient (gold vif pour fond sombre)
     static let goldGradient = LinearGradient(
-        colors: [Color(hex: "#D4900F"), Color(hex: "#C07C0A"), Color(hex: "#8A5500")],
-        startPoint: .top,
-        endPoint: .bottom
+        colors: [Color(hex: "#f5c842"), Color(hex: "#d4a030")],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
     )
 
     // MARK: - Typography (Fraunces = display/serif titles, Inter = body/UI)
@@ -143,7 +143,7 @@ struct ShimmerModifier: ViewModifier {
                     LinearGradient(
                         stops: [
                             .init(color: .clear, location: phase - 0.3),
-                            .init(color: .black.opacity(0.06), location: phase),
+                            .init(color: .white.opacity(0.07), location: phase),
                             .init(color: .clear, location: phase + 0.3),
                         ],
                         startPoint: .leading,
@@ -176,7 +176,7 @@ struct ModeAtmosphere: View {
             ZStack {
                 // Top radial halo (mode-coloured glow at 20% from top)
                 RadialGradient(
-                    gradient: Gradient(colors: [haloColor.opacity(0.07), .clear]),
+                    gradient: Gradient(colors: [haloColor.opacity(0.13), .clear]),
                     center: UnitPoint(x: 0.5, y: 0.2),
                     startRadius: 0,
                     endRadius: geo.size.width * 0.65

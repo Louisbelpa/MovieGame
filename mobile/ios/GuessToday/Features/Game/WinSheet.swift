@@ -481,7 +481,7 @@ struct StatBox: View {
                 .fontWeight(.bold)
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [Color(hex: "#D4900F"), Color(hex: "#C07C0A")],
+                        colors: [Theme.goldLight, Theme.gold],
                         startPoint: .top, endPoint: .bottom
                     )
                 )
@@ -590,7 +590,7 @@ struct ShareResultCard: View {
                 (
                     Text("Guess").font(Theme.fraunces(size: 14)).foregroundColor(Theme.text)
                     + Text("today").font(Theme.fraunces(size: 14, italic: true))
-                        .foregroundStyle(LinearGradient(colors: [Color(hex: "#D4900F"), Color(hex: "#8A5500")], startPoint: .top, endPoint: .bottom))
+                        .foregroundStyle(LinearGradient(colors: [Theme.goldLight, Theme.gold], startPoint: .top, endPoint: .bottom))
                 )
                 Spacer()
                 Text(modeLabel)

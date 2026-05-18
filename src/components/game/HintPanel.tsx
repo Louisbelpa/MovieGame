@@ -47,14 +47,15 @@ function HintCard({ hint, index }: { hint: HintPayload; index: number }) {
       transition={{ duration: 0.3, delay: index * 0.05 }}
       className="flex flex-col gap-1 rounded-[10px] min-w-0"
       style={{
-        padding: '10px 12px',
+        padding: '10px 12px 10px 14px',
         background: 'var(--color-film-gray)',
-        border: '1px solid var(--color-film-border)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        borderLeft: '3px solid var(--mode-color)',
       }}
     >
       <p
-        className="font-mono uppercase tracking-wider leading-none shrink-0 text-film-gold"
-        style={{ fontSize: '9px', fontWeight: 600 }}
+        className="font-mono uppercase tracking-wider leading-none shrink-0"
+        style={{ fontSize: '9px', fontWeight: 600, color: 'var(--mode-color)', opacity: 0.85 }}
       >
         {label}
       </p>
@@ -68,23 +69,21 @@ function HintCard({ hint, index }: { hint: HintPayload; index: number }) {
 function LockedSlot({ index }: { index: number }) {
   return (
     <div
-      className="flex flex-col gap-1 rounded-[10px]"
+      className="flex flex-col items-center justify-center gap-1.5 rounded-[10px]"
       style={{
-        padding: '10px 12px',
-        minHeight: '56px',
-        background: 'var(--color-film-dark)',
-        border: '1px dashed var(--color-film-border)',
+        padding: '14px 12px',
+        minHeight: '64px',
+        background: 'rgba(255,255,255,0.02)',
+        border: '1px dashed rgba(255,255,255,0.10)',
       }}
     >
+      <Lock size={13} style={{ color: 'rgba(255,255,255,0.18)' }} aria-hidden />
       <p
-        className="font-mono uppercase tracking-wider leading-none shrink-0"
-        style={{ fontSize: '9px', fontWeight: 600, color: 'var(--color-film-muted)' }}
+        className="font-mono uppercase tracking-wider leading-none text-center"
+        style={{ fontSize: '9px', fontWeight: 600, color: 'rgba(255,255,255,0.18)' }}
       >
         Indice {index}
       </p>
-      <div className="flex-1 flex items-center">
-        <Lock size={13} style={{ color: 'var(--color-film-muted)' }} aria-hidden />
-      </div>
     </div>
   )
 }
