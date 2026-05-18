@@ -1,28 +1,28 @@
 @import "tailwindcss";
 
 :root {
-  /* Mode films — ambre profond (lisible sur fond clair) */
-  --sg-films:       #C07C0A;
-  --sg-films-hover: #D4900F;
-  --sg-films-soft:  rgba(192, 124, 10, 0.12);
-  --sg-films-ring:  rgba(192, 124, 10, 0.28);
+  /* Mode films — orange-ambre vif */
+  --sg-films:       #D97706;
+  --sg-films-hover: #EA8A0A;
+  --sg-films-soft:  rgba(217, 119, 6, 0.13);
+  --sg-films-ring:  rgba(217, 119, 6, 0.32);
 
-  /* Mode séries — indigo dense */
-  --sg-series:       #4A50E0;
-  --sg-series-hover: #5A60EC;
-  --sg-series-soft:  rgba(74, 80, 224, 0.12);
-  --sg-series-ring:  rgba(74, 80, 224, 0.28);
+  /* Mode séries — indigo-violet éclatant */
+  --sg-series:       #4F46E5;
+  --sg-series-hover: #6058EF;
+  --sg-series-soft:  rgba(79, 70, 229, 0.13);
+  --sg-series-ring:  rgba(79, 70, 229, 0.32);
 
-  /* Mode wiki / personnalités — rose framboise */
-  --sg-wiki:       #C91F5A;
-  --sg-wiki-hover: #E0256A;
-  --sg-wiki-soft:  rgba(201, 31, 90, 0.12);
-  --sg-wiki-ring:  rgba(201, 31, 90, 0.28);
+  /* Mode wiki / personnalités — rose-magenta vif */
+  --sg-wiki:       #E11D48;
+  --sg-wiki-hover: #F02456;
+  --sg-wiki-soft:  rgba(225, 29, 72, 0.12);
+  --sg-wiki-ring:  rgba(225, 29, 72, 0.30);
 
-  /* Couleur "à jouer" dans le calendrier — doré, indépendant du mode */
-  --sg-todo:      #C07C0A;
-  --sg-todo-soft: rgba(192, 124, 10, 0.14);
-  --sg-todo-ring: rgba(192, 124, 10, 0.35);
+  /* Couleur "à jouer" dans le calendrier */
+  --sg-todo:      #D97706;
+  --sg-todo-soft: rgba(217, 119, 6, 0.14);
+  --sg-todo-ring: rgba(217, 119, 6, 0.36);
 
   /* Token de mode — résolu par data-mode sur l'ancêtre */
   --mode-color: var(--sg-films);
@@ -52,8 +52,8 @@
   --color-film-muted:    #A89F96;  /* Éléments désactivés */
   --color-film-text:     #1C1816;  /* Texte principal */
   --color-film-text-dim: #6B625A;  /* Texte secondaire */
-  --color-film-gold:     #C07C0A;  /* Films — ambre profond */
-  --color-film-gold-light: #D4900F;
+  --color-film-gold:     #D97706;  /* Films — orange-ambre vif */
+  --color-film-gold-light: #EA8A0A;
   --color-film-green:    #1E8449;  /* Correct */
   --color-film-red:      #C0392B;  /* Erreur */
   --color-film-amber:    #B7770D;
@@ -63,7 +63,7 @@
   --font-mono: "JetBrains Mono", monospace;
 
   --radius-game: 0.75rem;
-  --shadow-glow: 0 0 20px rgba(192, 124, 10, 0.18);
+  --shadow-glow: 0 0 20px rgba(217, 119, 6, 0.22);
 }
 
 @layer base {
