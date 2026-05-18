@@ -40,7 +40,15 @@ enum GameMode {
         switch self {
         case .film:   return "film"
         case .series: return "tv"
-        case .wiki:   return "person.text.rectangle"
+        case .wiki:   return "person.bust"
+        }
+    }
+
+    var iconFilled: String {
+        switch self {
+        case .film:   return "film.fill"
+        case .series: return "tv.fill"
+        case .wiki:   return "person.bust.fill"
         }
     }
 }

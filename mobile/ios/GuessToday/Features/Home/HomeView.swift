@@ -652,13 +652,7 @@ private struct DayChallengeCard: View {
 
     private var modeColor: Color { mode.color }
 
-    private var modeIcon: String {
-        switch mode {
-        case .film:   return "film"
-        case .series: return "tv"
-        case .wiki:   return "person.bust"
-        }
-    }
+    private var modeIcon: String { mode.icon }
 
     private var modeLabel: String {
         switch mode {
