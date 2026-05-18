@@ -540,6 +540,40 @@ const multiStatement: { name: string; sql: string }[] = [
       PRAGMA foreign_keys = ON;
     `,
   },
+  {
+    name: 'add_actor_to_wiki_person_types',
+    sql: `
+      PRAGMA foreign_keys = OFF;
+      DROP TABLE IF EXISTS wiki_persons_v4;
+      CREATE TABLE wiki_persons_v4 (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        name            TEXT NOT NULL,
+        name_lower      TEXT NOT NULL GENERATED ALWAYS AS (lower(name)) STORED,
+        name_aliases    TEXT NOT NULL DEFAULT '[]',
+        person_type     TEXT NOT NULL DEFAULT 'generic' CHECK (person_type IN ('politician','sportsperson','artist','scientist','entrepreneur','writer','historical_figure','generic','actor')),
+        wikipedia_slug  TEXT NOT NULL UNIQUE,
+        infobox_data    TEXT NOT NULL DEFAULT '{}',
+        hint_schedule   TEXT NOT NULL DEFAULT '[]',
+        photo_url       TEXT,
+        extract         TEXT,
+        wikipedia_url   TEXT,
+        difficulty      INTEGER NOT NULL DEFAULT 3 CHECK (difficulty BETWEEN 1 AND 5),
+        is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+      INSERT OR IGNORE INTO wiki_persons_v4
+        (id, name, name_aliases, person_type, wikipedia_slug, infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty, is_active, created_at, updated_at)
+        SELECT id, name, name_aliases, person_type, wikipedia_slug, infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty, is_active, created_at, updated_at
+        FROM wiki_persons;
+      DROP TABLE wiki_persons;
+      ALTER TABLE wiki_persons_v4 RENAME TO wiki_persons;
+      CREATE INDEX IF NOT EXISTS idx_wiki_persons_name_lower ON wiki_persons (name_lower);
+      CREATE INDEX IF NOT EXISTS idx_wiki_persons_person_type ON wiki_persons (person_type);
+      CREATE INDEX IF NOT EXISTS idx_wiki_persons_is_active ON wiki_persons (is_active);
+      PRAGMA foreign_keys = ON;
+    `,
+  },
 ]
 
 // ─── Incremental migrations (single-statement, idempotent) ───────────────────
@@ -589,9 +623,30 @@ for (const { name, sql } of multiStatement) {
     const tableSql = row?.sql ?? ''
     if (tableSql.includes("'generic'")) { markApplied(name); continue }
   }
+  if (name === 'add_actor_to_wiki_person_types') {
+    const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='wiki_persons'`).get() as { sql?: string } | undefined
+    const tableSql = row?.sql ?? ''
+    if (tableSql.includes("'actor'")) { markApplied(name); continue }
+  }
 
   try {
-    db.transaction(() => { db.exec(sql) })()
+    // Migrations that use PRAGMA foreign_keys need it executed outside any transaction
+    // (SQLite forbids changing foreign_keys enforcement mid-transaction)
+    if (sql.includes('PRAGMA foreign_keys = OFF')) {
+      db.pragma('foreign_keys = OFF')
+      // Strip the PRAGMA lines and run the rest inside a transaction
+      const stripped = sql
+        .split('\n')
+        .filter((l) => !l.trim().startsWith('PRAGMA foreign_keys'))
+        .join('\n')
+      try {
+        db.transaction(() => { db.exec(stripped) })()
+      } finally {
+        db.pragma('foreign_keys = ON')
+      }
+    } else {
+      db.transaction(() => { db.exec(sql) })()
+    }
     markApplied(name)
     console.log(`  ✓ ${name}`)
   } catch (err) {
@@ -655,6 +710,10 @@ const postMultiStatementIncremental: { name: string; sql: string }[] = [
         LIMIT 1
       )
       WHERE user_id IS NULL AND outcome IS NOT NULL`,
+  },
+  {
+    name: 'add_idx_dc_date_type_active',
+    sql: `CREATE INDEX IF NOT EXISTS idx_dc_date_type_active ON daily_challenges (challenge_date, media_type, is_active)`,
   },
 ]
 

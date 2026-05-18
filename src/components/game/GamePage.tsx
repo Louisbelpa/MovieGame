@@ -88,6 +88,85 @@ async function shareResult(
   await navigator.clipboard.writeText(text)
 }
 
+interface DateNavBarProps {
+  showPrev: boolean
+  showNext: boolean
+  isLoading: boolean
+  isToday: boolean
+  hasPrev: boolean
+  currentDate: string
+  viewingDate: string | null
+  onPrev: () => void
+  onNext: () => void
+  onBackToday: () => void
+}
+
+function DateNavBar({
+  showPrev, showNext, isLoading, isToday, hasPrev,
+  currentDate, viewingDate, onPrev, onNext, onBackToday,
+}: DateNavBarProps) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center justify-between gap-2 py-1.5 px-1">
+        {showPrev ? (
+          <button
+            type="button"
+            onClick={onPrev}
+            disabled={isLoading}
+            aria-label="Défi précédent"
+            title="Défi précédent"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+          >
+            <ChevronLeft size={20} aria-hidden />
+          </button>
+        ) : (
+          <span className="inline-flex min-h-[44px] min-w-[44px]" aria-hidden />
+        )}
+
+        <div className="flex items-center gap-2 text-sm">
+          <Calendar size={13} className="text-film-text-dim" />
+          {isToday ? (
+            <span className="font-semibold text-film-gold">Aujourd'hui</span>
+          ) : (
+            <button
+              onClick={onBackToday}
+              className="text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
+              title="Retour à aujourd'hui"
+            >
+              {formatDateFr(currentDate)}
+            </button>
+          )}
+          {viewingDate && (
+            <span className="text-xs bg-film-surface border border-film-border px-1.5 py-0.5 rounded text-film-text-dim">
+              Ancien défi
+            </span>
+          )}
+        </div>
+
+        {showNext ? (
+          <button
+            type="button"
+            onClick={onNext}
+            disabled={isLoading}
+            aria-label="Défi suivant"
+            title="Défi suivant"
+            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+          >
+            <ChevronRight size={20} aria-hidden />
+          </button>
+        ) : (
+          <span className="inline-flex min-h-[44px] min-w-[44px]" aria-hidden />
+        )}
+      </div>
+      {isToday && hasPrev && (
+        <p className="text-center text-xs text-film-text-dim tracking-wide">
+          ← défis des jours précédents disponibles
+        </p>
+      )}
+    </div>
+  )
+}
+
 export function GamePage({ mode }: GamePageProps) {
   const isWiki = mode === 'wiki'
   const gameInit = useGameStore((s) => s.initGame)
@@ -400,64 +479,18 @@ export function GamePage({ mode }: GamePageProps) {
   // ── Shared sub-elements ──────────────────────────────────────────────────────
 
   const dateNavBar = (
-    <div className="flex flex-col gap-0.5">
-      <div className="flex items-center justify-between gap-2 py-1.5 px-1">
-        {showPrevNav ? (
-          <button
-            type="button"
-            onClick={() => void navigateDate('prev')}
-            disabled={isLoading}
-            aria-label="Défi précédent"
-            title="Défi précédent"
-            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
-          >
-            <ChevronLeft size={20} aria-hidden />
-          </button>
-        ) : (
-          <span className="inline-flex min-h-[44px] min-w-[44px]" aria-hidden />
-        )}
-
-        <div className="flex items-center gap-2 text-sm">
-          <Calendar size={13} className="text-film-text-dim" />
-          {isToday ? (
-            <span className="font-semibold text-film-gold">Aujourd'hui</span>
-          ) : (
-            <button
-              onClick={() => void loadDate(todayParis)}
-              className="text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
-              title="Retour à aujourd'hui"
-            >
-              {formatDateFr(currentDate)}
-            </button>
-          )}
-          {viewingDate && (
-            <span className="text-xs bg-film-surface border border-film-border px-1.5 py-0.5 rounded text-film-text-dim">
-              Ancien défi
-            </span>
-          )}
-        </div>
-
-        {showNextNav ? (
-          <button
-            type="button"
-            onClick={() => void navigateDate('next')}
-            disabled={isLoading}
-            aria-label="Défi suivant"
-            title="Défi suivant"
-            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
-          >
-            <ChevronRight size={20} aria-hidden />
-          </button>
-        ) : (
-          <span className="inline-flex min-h-[44px] min-w-[44px]" aria-hidden />
-        )}
-      </div>
-      {isToday && hasPrev && (
-        <p className="text-center text-xs text-film-text-dim tracking-wide">
-          ← défis des jours précédents disponibles
-        </p>
-      )}
-    </div>
+    <DateNavBar
+      showPrev={showPrevNav}
+      showNext={showNextNav}
+      isLoading={isLoading}
+      isToday={isToday}
+      hasPrev={hasPrev}
+      currentDate={currentDate}
+      onPrev={() => void navigateDate('prev')}
+      onNext={() => void navigateDate('next')}
+      onBackToday={() => void loadDate(todayParis)}
+      viewingDate={viewingDate}
+    />
   )
 
   const gameOverBanner = isGameOver ? (
@@ -696,10 +729,9 @@ export function GamePage({ mode }: GamePageProps) {
             {gameOverBanner}
           </div>
 
-          {/* Shortcuts + attempts counter */}
+          {/* Attempts counter */}
           {!isGameOver && (
-            <div className="flex items-center justify-between text-[11px] font-mono text-film-text-dim/60 select-none">
-              <span>↵ Deviner · Esc Passer</span>
+            <div className="flex items-center justify-end text-[11px] font-mono text-film-text-dim/60 select-none">
               <span>{attemptsLeft} essai{attemptsLeft !== 1 ? 's' : ''} restant{attemptsLeft !== 1 ? 's' : ''}</span>
             </div>
           )}

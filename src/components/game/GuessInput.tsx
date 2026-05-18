@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useId, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Search } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
@@ -12,7 +12,7 @@ interface GuessInputProps {
 }
 
 export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessInputProps) {
-  const errorId = `guess-error-${Math.random().toString(36).slice(2)}`
+  const errorId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
 
   const inputValue = useGameStore((s) => s.ui.inputValue)
@@ -100,10 +100,6 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
 
       <p id={errorId} className="sr-only" role={hasError ? 'alert' : undefined}>
         {hasError ? 'Réponse invalide, veuillez réessayer.' : ''}
-      </p>
-
-      <p className="mt-1.5 text-[10.5px] text-film-text-dim/60 hidden sm:block">
-        ↵ Deviner · Esc Passer
       </p>
       <p className="sr-only" aria-live="polite">
         {attemptsLeft} tentative{attemptsLeft > 1 ? 's' : ''} restante{attemptsLeft > 1 ? 's' : ''}

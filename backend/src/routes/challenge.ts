@@ -18,6 +18,7 @@ import {
   getResult,
 } from '../services/challenge.service.js';
 import { attachUserToGameSession } from '../services/game-session.service.js';
+import { getTodayParis } from '../lib/dates.js';
 
 export const challengeRouter = Router();
 
@@ -54,7 +55,7 @@ challengeRouter.get(
         return;
       }
 
-      const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+      const todayParis = getTodayParis();
       if (date > todayParis) {
         res.status(400).json({ error: 'Cannot access future challenges.' });
         return;
@@ -177,7 +178,7 @@ challengeRouter.get(
     try {
       const days = Math.min(Math.max(1, parseInt((req.query.days as string) ?? '90', 10)), 365)
       const type = (req.query.type === 'series' ? 'series' : 'film') as 'film' | 'series'
-      const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
+      const todayParis = getTodayParis()
       const from = new Date(todayParis + 'T12:00:00Z')
       from.setUTCDate(from.getUTCDate() - days)
       const fromStr = from.toISOString().slice(0, 10)
@@ -222,7 +223,7 @@ challengeRouter.get(
         return;
       }
 
-      const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+      const todayParis = getTodayParis();
 
       const type = (req.query.type === 'series' ? 'series' : 'film') as 'film' | 'series';
 

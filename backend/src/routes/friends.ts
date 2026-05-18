@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import db from '../db/database.js';
 import { userAuth, requireUser } from '../middleware/userAuth.js';
 import { AUTH, apiLimiter } from '../middleware/rateLimiter.js';
+import { getTodayParis } from '../lib/dates.js';
 
 export const friendsRouter = Router();
 
@@ -18,9 +19,6 @@ function generateFriendCode(): string {
   return code;
 }
 
-function getTodayParis(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
-}
 
 interface UserCodeRow {
   id: number;
@@ -179,11 +177,11 @@ friendsRouter.delete('/:userId', AUTH, userAuth, requireUser, (req: Request, res
 friendsRouter.get('/leaderboard', apiLimiter, userAuth, requireUser, (req: Request, res: Response): void => {
   const me = req.user!.id;
 
-  interface FriendRow { id: number; display_name: string; avatar_url: string | null; stats_streak: number; stats_max_streak: number; }
+  interface FriendRow { id: number; display_name: string; avatar_url: string | null; stats_max_streak: number; }
 
   const accepted = db
     .prepare<[number, number, number], FriendRow>(
-      `SELECT u.id, u.display_name, u.avatar_url, u.stats_streak, u.stats_max_streak
+      `SELECT u.id, u.display_name, u.avatar_url, u.stats_max_streak
        FROM friendships f
        JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
        WHERE (f.requester_id = ? OR f.addressee_id = ?) AND f.status = 'accepted'`
@@ -191,7 +189,7 @@ friendsRouter.get('/leaderboard', apiLimiter, userAuth, requireUser, (req: Reque
     .all(me, me, me);
 
   const meRow = db
-    .prepare<number, FriendRow>(`SELECT id, display_name, avatar_url, stats_streak, stats_max_streak FROM users WHERE id = ?`)
+    .prepare<number, FriendRow>(`SELECT id, display_name, avatar_url, stats_max_streak FROM users WHERE id = ?`)
     .get(me)!;
 
   const allUsers: (FriendRow & { isMe: boolean })[] = [
@@ -200,6 +198,7 @@ friendsRouter.get('/leaderboard', apiLimiter, userAuth, requireUser, (req: Reque
   ];
 
   interface WinsRow { user_id: number; media_type: string; wins: number; played: number; avg_attempts: number; }
+  interface WonDateRow { user_id: number; challenge_date: string; }
 
   const userIds = allUsers.map((u) => u.id);
   const winsData = userIds.length > 0
@@ -216,11 +215,41 @@ friendsRouter.get('/leaderboard', apiLimiter, userAuth, requireUser, (req: Reque
       ).all(...userIds) as WinsRow[])
     : [];
 
+  // Compute current streak dynamically from user_challenge_results
+  const todayParis = getTodayParis();
+  const yd = new Date(); yd.setDate(yd.getDate() - 1);
+  const yesterdayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(yd);
+
+  const wonDatesData = userIds.length > 0
+    ? (db.prepare(
+        `SELECT ucr.user_id, dc.challenge_date
+         FROM user_challenge_results ucr
+         JOIN daily_challenges dc ON dc.id = ucr.challenge_id
+         WHERE ucr.user_id IN (${userIds.map(() => '?').join(',')})
+           AND ucr.won = 1 AND dc.is_active = 1
+         ORDER BY ucr.user_id, dc.challenge_date DESC`
+      ).all(...userIds) as WonDateRow[])
+    : [];
+
+  function computeCurrentStreak(userId: number): number {
+    const dates = [...new Set(wonDatesData.filter((r) => r.user_id === userId).map((r) => r.challenge_date))].sort().reverse();
+    if (dates.length === 0 || (dates[0] !== todayParis && dates[0] !== yesterdayParis)) return 0;
+    let streak = 1;
+    for (let i = 1; i < dates.length; i++) {
+      const diff = Math.round((new Date(dates[i - 1]).getTime() - new Date(dates[i]).getTime()) / 86400000);
+      if (diff === 1) { streak++; } else { break; }
+    }
+    return streak;
+  }
+
   const entries = allUsers.map((u) => {
     const rows = winsData.filter((r) => r.user_id === u.id);
     const filmWins   = rows.find((r) => r.media_type === 'film')?.wins ?? 0;
     const seriesWins = rows.find((r) => r.media_type === 'series')?.wins ?? 0;
     const wikiWins   = rows.find((r) => r.media_type === 'wiki')?.wins ?? 0;
+    const filmPlayed   = rows.find((r) => r.media_type === 'film')?.played ?? 0;
+    const seriesPlayed = rows.find((r) => r.media_type === 'series')?.played ?? 0;
+    const wikiPlayed   = rows.find((r) => r.media_type === 'wiki')?.played ?? 0;
     const totalWins  = filmWins + seriesWins + wikiWins;
     const totalPlayed = rows.reduce((s, r) => s + r.played, 0);
     const totalAttempts = rows.reduce((s, r) => s + r.avg_attempts * r.played, 0);
@@ -235,8 +264,11 @@ friendsRouter.get('/leaderboard', apiLimiter, userAuth, requireUser, (req: Reque
       filmWins,
       seriesWins,
       wikiWins,
+      filmPlayed,
+      seriesPlayed,
+      wikiPlayed,
       avgAttempts: totalPlayed > 0 ? Math.round((totalAttempts / totalPlayed) * 10) / 10 : null,
-      currentStreak: u.stats_streak ?? 0,
+      currentStreak: computeCurrentStreak(u.id),
       maxStreak: u.stats_max_streak ?? 0,
     };
   });

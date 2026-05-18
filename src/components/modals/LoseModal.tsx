@@ -1,17 +1,17 @@
-import { useState, useEffect } from 'react'
-import { Share2, XCircle, BarChart2, ExternalLink, Film, Tv, Landmark, UserCircle, Users } from 'lucide-react'
+import { Share2, XCircle, BarChart2, ExternalLink, Film, Tv, User, UserCircle, Users } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { useAuthStore } from '@/store/authStore'
 import { useAuthModal } from '@/components/modals/AuthModal'
+import { NextGameCountdown } from '@/components/modals/NextGameCountdown'
 
 type GameMode = 'film' | 'series' | 'wiki'
 
 const MODE_META: Record<GameMode, { label: string; icon: React.ElementType }> = {
   film: { label: 'Cinéma', icon: Film },
   series: { label: 'Séries', icon: Tv },
-  wiki: { label: 'Personnalités', icon: Landmark },
+  wiki: { label: 'Personnalités', icon: User },
 }
 
 interface LoseModalProps {
@@ -203,28 +203,3 @@ export function LoseModal({ isOpen, onClose, mode, result, stats, onShare, onSha
   )
 }
 
-function getSecondsUntilMidnightParis(): number {
-  const formatter = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/Paris',
-    hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false,
-  })
-  const parts = formatter.formatToParts(new Date())
-  const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value ?? '0', 10)
-  return 24 * 3600 - (get('hour') * 3600 + get('minute') * 60 + get('second'))
-}
-
-function NextGameCountdown() {
-  const [secs, setSecs] = useState(getSecondsUntilMidnightParis)
-  useEffect(() => {
-    const id = setInterval(() => setSecs(getSecondsUntilMidnightParis()), 1000)
-    return () => clearInterval(id)
-  }, [])
-  const h = Math.floor(secs / 3600)
-  const m = Math.floor((secs % 3600) / 60)
-  const s = secs % 60
-  return (
-    <strong className="text-film-text tabular-nums">
-      {h}h{String(m).padStart(2, '0')}m{String(s).padStart(2, '0')}s
-    </strong>
-  )
-}

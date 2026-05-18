@@ -5,9 +5,13 @@ final class NotificationManager {
     static let shared = NotificationManager()
     private init() {}
 
-    private let enabledKey = "notif_daily_enabled"
-    private let hourKey    = "notif_daily_hour"
-    private let notifID    = "guesstoday_daily_reminder"
+    private let enabledKey  = "notif_daily_enabled"
+    private let hourKey     = "notif_daily_hour"
+    private let hourSetKey  = "notif_daily_hour_set"
+    private let notifID     = "guesstoday_daily_reminder"
+
+    /// Selectable reminder hours: 0h to 23h.
+    static let availableHours: [Int] = Array(0...23)
 
     var isEnabled: Bool {
         get { UserDefaults.standard.bool(forKey: enabledKey) }
@@ -19,11 +23,12 @@ final class NotificationManager {
 
     var reminderHour: Int {
         get {
-            let stored = UserDefaults.standard.integer(forKey: hourKey)
-            return stored == 0 ? 8 : stored
+            guard UserDefaults.standard.bool(forKey: hourSetKey) else { return 8 }
+            return UserDefaults.standard.integer(forKey: hourKey)
         }
         set {
             UserDefaults.standard.set(newValue, forKey: hourKey)
+            UserDefaults.standard.set(true, forKey: hourSetKey)
             if isEnabled { scheduleDaily() }
         }
     }

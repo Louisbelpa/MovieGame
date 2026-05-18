@@ -90,6 +90,9 @@ export function createApp(): express.Application {
   if (!cookieSecret && process.env.NODE_ENV === 'production') {
     logger.error('COOKIE_SECRET is not set — using insecure fallback in production!');
   }
+  if (!process.env.CORS_ORIGIN) {
+    logger.warn('CORS_ORIGIN is not set — all origins are allowed. Set this in production.');
+  }
   app.use(cookieParser(cookieSecret ?? 'dev_secret'));
 
   // Static files before CORS — same-origin assets don't need CORS headers
@@ -149,6 +152,9 @@ export function createApp(): express.Application {
       }
     }
   );
+
+  const privacyHtml = path.join(__dirname, '../public/privacy.html');
+  app.get('/privacy', (_req, res) => { res.sendFile(privacyHtml); });
 
   const spaIndex = path.join(__dirname, '../public/index.html');
   app.get('*', (req, res) => {

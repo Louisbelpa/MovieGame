@@ -3,7 +3,7 @@ import SwiftUI
 struct GameView: View {
     let mode: GameMode
     let initialDate: String?
-    @StateObject private var vm: GameViewModel
+    @State private var vm: GameViewModel
     @State private var showRules = false
     @State private var showArchive = false
     @FocusState private var inputFocused: Bool
@@ -15,7 +15,7 @@ struct GameView: View {
     init(mode: GameMode, initialDate: String? = nil) {
         self.mode = mode
         self.initialDate = initialDate
-        _vm = StateObject(wrappedValue: GameViewModel(mode: mode))
+        _vm = State(wrappedValue: GameViewModel(mode: mode))
     }
 
     var body: some View {
@@ -41,8 +41,8 @@ struct GameView: View {
             } else if let challenge = vm.challenge {
                 ScrollViewReader { proxy in
                     ScrollView {
-                        VStack(spacing: Theme.spacing16) {
-                            // Date navigation bar (always visible)
+                        VStack(spacing: 0) {
+                            // Date navigation bar
                             DateNavBar(
                                 challenge: challenge,
                                 viewingDate: vm.viewingDate,
@@ -50,27 +50,29 @@ struct GameView: View {
                                 onNext: { Task { await vm.navigateNext() } },
                                 onReturnToday: { Task { await vm.returnToToday() } }
                             )
+                            .padding(.top, Theme.spacing8)
+                            .padding(.bottom, Theme.spacing16)
 
-                            // Challenge image
+                            // Challenge image — full-bleed (counter the outer VStack padding)
                             BlurImageView(
                                 url: challenge.displayImageUrl,
                                 blurRadius: challenge.blurRadius,
                                 isWiki: challenge.isWiki,
                                 flashColor: vm.flashColor
                             )
-                            .padding(.horizontal, Theme.spacing16)
+                            .padding(.horizontal, -Theme.spacing16)
 
                             // Wiki profile (if wiki mode)
                             if let profile = challenge.profile {
                                 WikiProfileView(profile: profile)
-                                    .padding(.horizontal, Theme.spacing16)
+                                    .padding(.top, Theme.spacing16)
                             }
 
                             // Hints grid
                             if challenge.hintsAvailable > 0 {
                                 VStack(alignment: .leading, spacing: Theme.spacing8) {
                                     Text("INDICES")
-                                        .font(.system(size: 10, weight: .semibold))
+                                        .font(Theme.inter(size: 10, weight: .semibold))
                                         .foregroundColor(Theme.textDim)
                                         .tracking(1.2)
 
@@ -82,8 +84,8 @@ struct GameView: View {
                                     )
                                     .id("\(challenge.challengeId)-\(challenge.hintsRevealed)")
                                 }
-                                .padding(.horizontal, Theme.spacing16)
                                 .id("hintsSection")
+                                .padding(.top, Theme.spacing16)
                             }
 
                             // Attempt dots
@@ -91,7 +93,7 @@ struct GameView: View {
                                 attempts: challenge.attempts,
                                 maxAttempts: challenge.maxAttempts
                             )
-                            .padding(.horizontal, Theme.spacing16)
+                            .padding(.top, Theme.spacing16)
 
                             // Game result banner (shown after game over)
                             if challenge.isGameOver {
@@ -100,17 +102,24 @@ struct GameView: View {
                                     filmResult: vm.filmResult,
                                     wikiResult: vm.wikiResult
                                 )
-                                .padding(.horizontal, Theme.spacing16)
+                                .padding(.top, Theme.spacing8)
                             }
 
-                            // Input area (only for active game, today's challenge)
+                            // Input area
                             GuessInputSection(vm: vm, inputFocused: $inputFocused)
-                                .padding(.horizontal, Theme.spacing16)
                                 .id("guessInput")
+                                .padding(.top, Theme.spacing16)
 
                             Spacer(minLength: Theme.spacing24)
                         }
-                        .padding(.top, Theme.spacing8)
+                        .padding(.horizontal, Theme.spacing16)
+                    }
+                    .refreshable {
+                        if let date = vm.viewingDate {
+                            await vm.loadDate(date, isRefresh: true)
+                        } else {
+                            await vm.loadToday(isRefresh: true)
+                        }
                     }
                     .scrollDismissesKeyboard(.interactively)
                     .onChange(of: inputFocused) { _, focused in
@@ -134,26 +143,15 @@ struct GameView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 14) {
-                    // Only show archive button for today's challenge (not when already browsing past)
-                    if initialDate == nil {
-                        Button {
-                            showArchive = true
-                        } label: {
-                            Image(systemName: "calendar")
-                                .font(.system(size: 16))
-                                .foregroundColor(Theme.textDim)
-                        }
-                        .accessibilityLabel("Archive")
-                    }
-                    Button {
-                        showRules = true
-                    } label: {
-                        Image(systemName: "questionmark.circle")
-                            .font(.system(size: 16))
-                            .foregroundColor(Theme.textDim)
-                    }
-                    .accessibilityLabel("Règles du jeu")
+                Button { showArchive = true } label: {
+                    Image(systemName: "calendar")
+                        .foregroundColor(Theme.textDim)
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showRules = true } label: {
+                    Image(systemName: "info.circle")
+                        .foregroundColor(Theme.textDim)
                 }
             }
         }
@@ -194,43 +192,56 @@ private struct DateNavBar: View {
     let onNext: () -> Void
     let onReturnToday: () -> Void
 
+    private var showNext: Bool { challenge.hasNextChallenge && challenge.isPastChallenge }
+
     var body: some View {
         HStack {
-            Button(action: onPrev) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(challenge.hasPrevChallenge ? Theme.text : Theme.muted)
+            if challenge.hasPrevChallenge {
+                Button(action: onPrev) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Theme.text)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+            } else {
+                Color.clear.frame(width: 44, height: 44)
             }
-            .disabled(!challenge.hasPrevChallenge)
 
             Spacer()
 
             VStack(spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(formattedDate(challenge.date))
-                        .font(.system(size: 14, weight: .medium))
+                    Text(viewingDate == nil ? "Aujourd'hui" : formattedDate(challenge.date))
+                        .font(Theme.inter(size: 14, weight: .medium))
                         .foregroundColor(Theme.text)
                     Text("#\(challenge.challengeNumber)")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(Theme.inter(size: 12, weight: .medium))
                         .foregroundColor(Theme.textDim)
                 }
                 if viewingDate != nil {
                     Button("Retour à aujourd'hui", action: onReturnToday)
-                        .font(.system(size: 11))
+                        .font(Theme.inter(size: 11))
                         .foregroundColor(Theme.gold)
                 }
             }
 
             Spacer()
 
-            Button(action: onNext) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor((challenge.hasNextChallenge && challenge.isPastChallenge) ? Theme.text : Theme.muted)
+            if showNext {
+                Button(action: onNext) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Theme.text)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+            } else {
+                Color.clear.frame(width: 44, height: 44)
             }
-            .disabled(!challenge.hasNextChallenge || !challenge.isPastChallenge)
         }
-        .padding(.horizontal, Theme.spacing16)
         .padding(.vertical, Theme.spacing8)
     }
 
@@ -246,7 +257,7 @@ private struct DateNavBar: View {
 }
 
 private struct GuessInputSection: View {
-    @ObservedObject var vm: GameViewModel
+    var vm: GameViewModel
     var inputFocused: FocusState<Bool>.Binding
 
     private var canGuess: Bool { !vm.inputText.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -274,7 +285,7 @@ private struct GuessInputSection: View {
                 }
                 Spacer()
                 Text("\(attemptsLeft) essai\(attemptsLeft > 1 ? "s" : "") restant\(attemptsLeft > 1 ? "s" : "")")
-                    .font(.system(size: 12))
+                    .font(Theme.inter(size: 12))
                     .foregroundColor(Theme.textDim)
             }
 
@@ -291,7 +302,7 @@ private struct GuessInputSection: View {
                             set: { vm.onInputChange($0) }
                         ))
                         .textFieldStyle(.plain)
-                        .font(.system(size: 15))
+                        .font(Theme.inter(size: 15))
                         .foregroundColor(Theme.text)
                         .tint(Theme.gold)
                         .autocorrectionDisabled()
@@ -331,7 +342,7 @@ private struct GuessInputSection: View {
                         Task { await vm.submitGuess(vm.inputText) }
                     } label: {
                         Text("Deviner")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(Theme.inter(size: 13, weight: .bold))
                             .foregroundColor(canGuess ? Color(hex: "#1a0f00") : Theme.muted)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 11)
@@ -362,14 +373,19 @@ private struct GuessInputSection: View {
                 }
             }
 
-            // Skip link
+            // Skip button
             Button {
                 inputFocused.wrappedValue = false
                 Task { await vm.skipAttempt() }
             } label: {
                 Text("Passer")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(Theme.inter(size: 13, weight: .medium))
                     .foregroundColor(Theme.textDim)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .background(Theme.surface)
+                    .cornerRadius(Theme.radiusM)
+                    .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(Theme.border, lineWidth: 1))
             }
         }
     }
@@ -385,6 +401,8 @@ private struct WikiProfileView: View {
                 PoliticianProfileView(profile: profile)
             case "sportsperson":
                 SportspersonProfileView(profile: profile)
+            case "actor":
+                ActorProfileView(profile: profile)
             default:
                 GenericProfileView(profile: profile)
             }
@@ -398,7 +416,7 @@ private struct ProfileSectionHeader: View {
     let label: String
     var body: some View {
         Text(label.uppercased())
-            .font(.system(size: 10, weight: .semibold))
+            .font(Theme.inter(size: 10, weight: .semibold))
             .foregroundColor(Theme.textDim)
             .tracking(1.2)
     }
@@ -409,12 +427,12 @@ private struct PoliticianProfileView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.spacing8) {
             Label("Fonctions politiques", systemImage: "building.columns")
-                .font(.system(size: 12, weight: .semibold))
+                .font(Theme.inter(size: 12, weight: .semibold))
                 .foregroundColor(Theme.gold)
             let roles = profile.roles ?? []
             if roles.isEmpty {
                 Text("Fonctions non renseignées.")
-                    .font(.system(size: 13))
+                    .font(Theme.inter(size: 13))
                     .foregroundColor(Theme.textDim)
                     .italic()
             } else {
@@ -422,21 +440,62 @@ private struct PoliticianProfileView: View {
                     let role = roles[i]
                     VStack(alignment: .leading, spacing: 2) {
                         Text(role.title)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(Theme.inter(size: 13, weight: .medium))
                             .foregroundColor(Theme.text)
                         let meta = [role.years, role.country].compactMap { $0 }.joined(separator: " · ")
                         if !meta.isEmpty {
-                            Text(meta).font(.system(size: 11)).foregroundColor(Theme.textDim)
+                            Text(meta).font(Theme.inter(size: 11)).foregroundColor(Theme.textDim)
                         }
                         let transit = [
                             role.predecessor.map { "← \($0)" },
                             role.successor.map   { "\($0) →" }
                         ].compactMap { $0 }.joined(separator: " · ")
                         if !transit.isEmpty {
-                            Text(transit).font(.system(size: 11)).foregroundColor(Theme.textDim)
+                            Text(transit).font(Theme.inter(size: 11)).foregroundColor(Theme.textDim)
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+private struct ActorProfileView: View {
+    let profile: WikiProfile
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.spacing8) {
+            Label("Filmographie notable", systemImage: "film")
+                .font(Theme.inter(size: 12, weight: .semibold))
+                .foregroundColor(Theme.gold)
+            let parts = profile.notableFilmsParts ?? (profile.notableFilms.map { [$0] } ?? [])
+            if parts.isEmpty {
+                Text("Filmographie non renseignée.")
+                    .font(Theme.inter(size: 13))
+                    .foregroundColor(Theme.textDim)
+                    .italic()
+            } else if parts.count == 1 {
+                Text(parts[0])
+                    .font(Theme.inter(size: 13))
+                    .foregroundColor(Theme.text)
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(parts.indices, id: \.self) { i in
+                        HStack(alignment: .top, spacing: 6) {
+                            Text("•")
+                                .font(Theme.inter(size: 13))
+                                .foregroundColor(Theme.gold)
+                            Text(parts[i])
+                                .font(Theme.inter(size: 13))
+                                .foregroundColor(Theme.text)
+                        }
+                    }
+                }
+            }
+            if let occ = profile.occupation, !occ.trimmingCharacters(in: .whitespaces).isEmpty {
+                Text(occ)
+                    .font(Theme.inter(size: 11))
+                    .foregroundColor(Theme.textDim)
+                    .padding(.top, 2)
             }
         }
     }
@@ -448,7 +507,7 @@ private struct SportspersonProfileView: View {
         VStack(alignment: .leading, spacing: Theme.spacing12) {
             let sportLabel = profile.sport.map { "Carrière sportive · \($0)" } ?? "Carrière sportive"
             Label(sportLabel, systemImage: "trophy")
-                .font(.system(size: 12, weight: .semibold))
+                .font(Theme.inter(size: 12, weight: .semibold))
                 .foregroundColor(Theme.gold)
 
             let youth  = profile.clubsYouth ?? []
@@ -457,7 +516,7 @@ private struct SportspersonProfileView: View {
 
             if youth.isEmpty && senior.isEmpty && highlights.isEmpty {
                 Text("Carrière en cours de consolidation.")
-                    .font(.system(size: 13))
+                    .font(Theme.inter(size: 13))
                     .foregroundColor(Theme.textDim)
                     .italic()
             } else {
@@ -473,10 +532,10 @@ private struct SportspersonProfileView: View {
                     ForEach(highlights.indices, id: \.self) { i in
                         HStack(alignment: .top, spacing: 8) {
                             Text(highlights[i].label)
-                                .font(.system(size: 11)).foregroundColor(Theme.textDim)
+                                .font(Theme.inter(size: 11)).foregroundColor(Theme.textDim)
                                 .frame(minWidth: 70, alignment: .leading)
                             Text(highlights[i].value)
-                                .font(.system(size: 12)).foregroundColor(Theme.text)
+                                .font(Theme.inter(size: 12)).foregroundColor(Theme.text)
                         }
                     }
                 }
@@ -487,7 +546,7 @@ private struct SportspersonProfileView: View {
                         nt.goals.map { "\($0) b." }
                     ].compactMap { $0 }.joined(separator: " · ")
                     Text(ntInfo.isEmpty ? nt.name : "\(nt.name) · \(ntInfo)")
-                        .font(.system(size: 12))
+                        .font(Theme.inter(size: 12))
                         .foregroundColor(Theme.textDim)
                 }
             }
@@ -504,11 +563,11 @@ private struct ClubsTable: View {
                 let club = clubs[i]
                 HStack(spacing: 6) {
                     Text(club.years ?? "—")
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(Theme.inter(size: 11))
                         .foregroundColor(Theme.text)
                         .frame(width: 72, alignment: .leading)
                     Text(club.name)
-                        .font(.system(size: 12))
+                        .font(Theme.inter(size: 12))
                         .foregroundColor(Theme.text)
                     Spacer()
                     if showStats {
@@ -518,7 +577,7 @@ private struct ClubsTable: View {
                             return "—"
                         }()
                         Text(stat)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(Theme.inter(size: 11))
                             .foregroundColor(Theme.textDim)
                     }
                 }
@@ -541,7 +600,7 @@ private struct GenericProfileView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.spacing8) {
             Label("Biographie", systemImage: "person.text.rectangle")
-                .font(.system(size: 12, weight: .semibold))
+                .font(Theme.inter(size: 12, weight: .semibold))
                 .foregroundColor(Theme.gold)
 
             let highlights = profile.highlights ?? []
@@ -552,48 +611,48 @@ private struct GenericProfileView: View {
                 ForEach(highlights.indices, id: \.self) { i in
                     HStack(alignment: .top, spacing: 8) {
                         Text(highlights[i].label)
-                            .font(.system(size: 11)).foregroundColor(Theme.textDim)
+                            .font(Theme.inter(size: 11)).foregroundColor(Theme.textDim)
                             .frame(minWidth: 70, alignment: .leading)
                         Text(highlights[i].value)
-                            .font(.system(size: 12)).foregroundColor(Theme.text)
+                            .font(Theme.inter(size: 12)).foregroundColor(Theme.text)
                     }
                 }
             }
             if let company = profile.company, !company.trimmingCharacters(in: .whitespaces).isEmpty {
                 HStack(spacing: 4) {
-                    Text("Entreprise(s) ·").font(.system(size: 12)).foregroundColor(Theme.textDim)
-                    Text(company).font(.system(size: 12)).foregroundColor(Theme.text)
+                    Text("Entreprise(s) ·").font(Theme.inter(size: 12)).foregroundColor(Theme.textDim)
+                    Text(company).font(Theme.inter(size: 12)).foregroundColor(Theme.text)
                 }
             }
             if let domain = profile.domain, !domain.trimmingCharacters(in: .whitespaces).isEmpty {
                 HStack(spacing: 4) {
-                    Text("Domaine ·").font(.system(size: 12)).foregroundColor(Theme.textDim)
-                    Text(domain).font(.system(size: 12)).foregroundColor(Theme.text)
+                    Text("Domaine ·").font(Theme.inter(size: 12)).foregroundColor(Theme.textDim)
+                    Text(domain).font(Theme.inter(size: 12)).foregroundColor(Theme.text)
                 }
             }
             if parts.count > 1 {
                 ProfileSectionHeader(label: "Œuvres & faits")
                 ForEach(parts.indices, id: \.self) { i in
                     HStack(alignment: .top, spacing: 6) {
-                        Text("•").font(.system(size: 11)).foregroundColor(Theme.textDim)
-                        Text(parts[i]).font(.system(size: 12)).foregroundColor(Theme.text)
+                        Text("•").font(Theme.inter(size: 11)).foregroundColor(Theme.textDim)
+                        Text(parts[i]).font(Theme.inter(size: 12)).foregroundColor(Theme.text)
                     }
                 }
             } else if parts.count == 1 {
                 HStack(spacing: 4) {
-                    Text("Œuvre notable ·").font(.system(size: 12)).foregroundColor(Theme.textDim)
-                    Text(parts[0]).font(.system(size: 12)).foregroundColor(Theme.text)
+                    Text("Œuvre notable ·").font(Theme.inter(size: 12)).foregroundColor(Theme.textDim)
+                    Text(parts[0]).font(Theme.inter(size: 12)).foregroundColor(Theme.text)
                 }
             }
             if let era = profile.era, !era.trimmingCharacters(in: .whitespaces).isEmpty {
                 HStack(spacing: 4) {
-                    Text("Période ·").font(.system(size: 12)).foregroundColor(Theme.textDim)
-                    Text(era).font(.system(size: 12)).foregroundColor(Theme.text)
+                    Text("Période ·").font(Theme.inter(size: 12)).foregroundColor(Theme.textDim)
+                    Text(era).font(Theme.inter(size: 12)).foregroundColor(Theme.text)
                 }
             }
             if highlights.isEmpty && parts.isEmpty && profile.company == nil && profile.domain == nil && profile.era == nil {
                 Text("Informations non renseignées.")
-                    .font(.system(size: 13)).foregroundColor(Theme.textDim).italic()
+                    .font(Theme.inter(size: 13)).foregroundColor(Theme.textDim).italic()
             }
         }
     }
@@ -609,78 +668,76 @@ private struct NotFoundView: View {
     let onReturnToday: () -> Void
 
     private var isToday: Bool { viewingDate == nil }
+    @State private var appeared = false
 
-    private var modeLabel: String {
+    private var modeColor: Color { mode.color }
+
+    private var modeIcon: String {
         switch mode {
-        case .film:   return "Films"
-        case .series: return "Séries"
-        case .wiki:   return "Personnalités"
+        case .film:   return "film.fill"
+        case .series: return "tv.fill"
+        case .wiki:   return "person.fill"
         }
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Nav bar (same layout as DateNavBar)
+            // Date nav bar
             HStack {
                 Button(action: onPrev) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(Theme.text)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.borderless)
 
                 Spacer()
 
                 VStack(spacing: 2) {
-                    Text(isToday ? "Aujourd'hui" : formattedDate(viewingDate!))
-                        .font(.system(size: 14, weight: .medium))
+                    Text(isToday ? "Aujourd'hui" : formattedDate(viewingDate ?? ""))
+                        .font(Theme.inter(size: 14, weight: .medium))
                         .foregroundColor(Theme.text)
                     if !isToday {
                         Button("Retour à aujourd'hui", action: onReturnToday)
-                            .font(.system(size: 11))
+                            .font(Theme.inter(size: 11))
                             .foregroundColor(Theme.gold)
                     }
                 }
 
                 Spacer()
 
-                Button(action: onNext) {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(isToday ? Theme.muted : Theme.text)
+                if isToday {
+                    Color.clear.frame(width: 44, height: 44)
+                } else {
+                    Button(action: onNext) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(Theme.text)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.borderless)
                 }
-                .disabled(isToday)
             }
             .padding(.horizontal, Theme.spacing16)
             .padding(.vertical, Theme.spacing8)
 
             Spacer()
 
-            VStack(spacing: Theme.spacing12) {
-                ZStack {
-                    Circle()
-                        .fill(Theme.surfaceAlt)
-                        .frame(width: 72, height: 72)
-                    Image(systemName: "calendar.badge.exclamationmark")
-                        .font(.system(size: 30))
-                        .foregroundColor(Theme.textDim)
-                }
-
-                VStack(spacing: 6) {
-                    Text("Aucun défi \(modeLabel) planifié")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Theme.text)
-                        .multilineTextAlignment(.center)
-
-                    Text("Utilise les flèches pour naviguer\nvers une date avec un défi.")
-                        .font(.system(size: 14))
-                        .foregroundColor(Theme.textDim)
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(3)
-                }
+            if isToday {
+                TodayComingSoonView(modeIcon: modeIcon, modeColor: modeColor, appeared: appeared)
+            } else {
+                NoChallengeDateView(modeIcon: modeIcon, modeColor: modeColor, appeared: appeared,
+                                    date: formattedDate(viewingDate ?? ""),
+                                    onPrev: onPrev, onNext: onNext)
             }
-            .padding(Theme.spacing24)
 
             Spacer()
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.75).delay(0.1)) { appeared = true }
         }
     }
 
@@ -689,9 +746,141 @@ private struct NotFoundView: View {
         formatter.dateFormat = "yyyy-MM-dd"
         formatter.locale = Locale(identifier: "fr_FR")
         guard let d = formatter.date(from: date) else { return date }
-        formatter.dateStyle = .medium
+        formatter.dateStyle = .long
         formatter.timeStyle = .none
         return formatter.string(from: d)
+    }
+}
+
+// No game yet today
+private struct TodayComingSoonView: View {
+    let modeIcon: String
+    let modeColor: Color
+    let appeared: Bool
+
+    var body: some View {
+        VStack(spacing: Theme.spacing24) {
+            // Animated icon
+            ZStack {
+                Circle()
+                    .fill(modeColor.opacity(0.10))
+                    .frame(width: 96, height: 96)
+                Circle()
+                    .stroke(modeColor.opacity(0.20), lineWidth: 1.5)
+                    .frame(width: 96, height: 96)
+                Image(systemName: "moon.stars.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(modeColor.opacity(0.7))
+            }
+            .scaleEffect(appeared ? 1 : 0.6)
+            .opacity(appeared ? 1 : 0)
+
+            VStack(spacing: Theme.spacing12) {
+                Text("À demain !")
+                    .font(Theme.fraunces(size: 26))
+                    .foregroundColor(Theme.text)
+
+                Text("Le défi du jour n'est pas encore configuré.\nReviens demain à minuit (heure de Paris) pour\ndécouvrir la nouvelle énigme.")
+                    .font(Theme.inter(size: 14))
+                    .foregroundColor(Theme.textDim)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+            }
+            .opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 12)
+
+            // Hint card
+            HStack(spacing: 10) {
+                Image(systemName: modeIcon)
+                    .font(.system(size: 14))
+                    .foregroundColor(modeColor)
+                Text("En attendant, explore les défis passés →")
+                    .font(Theme.inter(size: 13))
+                    .foregroundColor(Theme.textDim)
+            }
+            .padding(.horizontal, Theme.spacing16)
+            .padding(.vertical, 10)
+            .background(modeColor.opacity(0.07))
+            .cornerRadius(Theme.radiusM)
+            .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(modeColor.opacity(0.18), lineWidth: 1))
+            .opacity(appeared ? 1 : 0)
+            .animation(.easeOut.delay(0.25), value: appeared)
+        }
+        .padding(.horizontal, Theme.spacing24)
+    }
+}
+
+// No game on a past/future date
+private struct NoChallengeDateView: View {
+    let modeIcon: String
+    let modeColor: Color
+    let appeared: Bool
+    let date: String
+    let onPrev: () -> Void
+    let onNext: () -> Void
+
+    var body: some View {
+        VStack(spacing: Theme.spacing24) {
+            ZStack {
+                Circle()
+                    .fill(Theme.surfaceAlt)
+                    .frame(width: 88, height: 88)
+                Image(systemName: "calendar.badge.minus")
+                    .font(.system(size: 36))
+                    .foregroundColor(Theme.muted)
+            }
+            .scaleEffect(appeared ? 1 : 0.6)
+            .opacity(appeared ? 1 : 0)
+
+            VStack(spacing: Theme.spacing8) {
+                Text("Rien ce jour-là")
+                    .font(Theme.fraunces(size: 24))
+                    .foregroundColor(Theme.text)
+                Text("Aucun défi n'était planifié\nle \(date).")
+                    .font(Theme.inter(size: 14))
+                    .foregroundColor(Theme.textDim)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+            }
+            .opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 10)
+
+            // Navigation shortcuts
+            HStack(spacing: Theme.spacing12) {
+                Button(action: onPrev) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text("Jour précédent")
+                            .font(Theme.inter(size: 14, weight: .medium))
+                    }
+                    .foregroundColor(Theme.text)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Theme.surface)
+                    .cornerRadius(Theme.radiusM)
+                    .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(Theme.border, lineWidth: 1))
+                }
+
+                Button(action: onNext) {
+                    HStack(spacing: 6) {
+                        Text("Jour suivant")
+                            .font(Theme.inter(size: 14, weight: .medium))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundColor(Theme.text)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Theme.surface)
+                    .cornerRadius(Theme.radiusM)
+                    .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(Theme.border, lineWidth: 1))
+                }
+            }
+            .opacity(appeared ? 1 : 0)
+            .animation(.easeOut.delay(0.2), value: appeared)
+        }
+        .padding(.horizontal, Theme.spacing24)
     }
 }
 
@@ -705,7 +894,7 @@ private struct ErrorView: View {
                 .font(.system(size: 40))
                 .foregroundColor(Theme.amber)
             Text(message)
-                .font(.system(size: 14))
+                .font(Theme.inter(size: 14))
                 .foregroundColor(Theme.textDim)
                 .multilineTextAlignment(.center)
             Button("Réessayer", action: retry)
@@ -780,7 +969,7 @@ private struct GameResultBanner: View {
                     .font(.system(size: 18))
                     .foregroundColor(challenge.won ? Theme.green : Theme.red)
                 Text(challenge.won ? "Bravo !" : "La réponse était…")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Theme.inter(size: 14, weight: .semibold))
                     .foregroundColor(challenge.won ? Theme.green : Theme.text)
                 Spacer()
             }
@@ -794,7 +983,7 @@ private struct GameResultBanner: View {
 
             if let synopsis {
                 Text(synopsis)
-                    .font(.system(size: 13))
+                    .font(Theme.inter(size: 13))
                     .foregroundColor(Theme.textDim)
                     .lineSpacing(3)
                     .lineLimit(5)

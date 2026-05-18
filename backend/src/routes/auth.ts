@@ -25,10 +25,11 @@ import appleSignin from 'apple-signin-auth';
 import db from '../db/database.js';
 import { userAuth, requireUser, USER_SESSION_COOKIE } from '../middleware/userAuth.js';
 import { AUTH, apiLimiter } from '../middleware/rateLimiter.js';
-import { sendPasswordResetEmail, sendVerificationEmail } from '../lib/email.js';
+import { sendPasswordResetEmail } from '../lib/email.js';
 import { registerPushToken } from '../services/push-notification.service.js';
 import { getUploadsAbsDir } from '../config/uploads.js';
 import { linkAnonymousGameSessionsToUser } from '../services/game-session.service.js';
+import { getTodayParis } from '../lib/dates.js';
 
 export const authRouter = Router();
 
@@ -38,7 +39,6 @@ const BCRYPT_ROUNDS = 12;
 const SESSION_TTL_DAYS = 30;
 const COOKIE_MAX_AGE_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;         // 1 hour
-const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;   // 24 hours
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -147,14 +147,6 @@ authRouter.post('/register', AUTH, async (req: Request, res: Response): Promise<
   const user = db
     .prepare<number, UserRow>(`SELECT id, email, display_name, avatar_url, password_hash, is_banned, email_verified FROM users WHERE id = ?`)
     .get(userId)!;
-
-  // Fire-and-forget verification email
-  const vToken = generateToken();
-  const vExpires = new Date(Date.now() + VERIFY_TOKEN_TTL_MS).toISOString();
-  db.prepare(
-    `INSERT INTO email_verification_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)`
-  ).run(userId, vToken.hash, vExpires);
-  void sendVerificationEmail(email.toLowerCase(), vToken.raw, displayName.trim());
 
   res.status(201).json({ user: formatUser(user), sessionToken: sessionId });
 });
@@ -465,55 +457,17 @@ authRouter.post('/reset-password', AUTH, async (req: Request, res: Response): Pr
   res.json({ ok: true });
 });
 
-/** GET /api/auth/verify-email?token= */
-authRouter.get('/verify-email', AUTH, (req: Request, res: Response): void => {
-  const { token } = req.query as { token?: unknown };
-
-  if (typeof token !== 'string' || token.trim().length === 0) {
-    res.status(400).json({ error: 'Token manquant.' });
-    return;
-  }
-
-  interface VerifyRow { id: number; user_id: number; expires_at: string; used_at: string | null }
-  const record = db
-    .prepare<string, VerifyRow>(
-      `SELECT id, user_id, expires_at, used_at FROM email_verification_tokens WHERE token_hash = ?`
-    )
-    .get(hashToken(token));
-
-  if (!record || record.used_at || new Date(record.expires_at) < new Date()) {
-    res.status(400).json({ error: 'Ce lien est invalide ou a expiré.' });
-    return;
-  }
-
-  db.prepare(`UPDATE users SET email_verified = 1 WHERE id = ?`).run(record.user_id);
-  db.prepare(`UPDATE email_verification_tokens SET used_at = datetime('now') WHERE id = ?`).run(record.id);
-
-  res.json({ ok: true });
-});
-
-/** POST /api/auth/verify-email/send — resend verification email */
-authRouter.post('/verify-email/send', AUTH, userAuth, requireUser, (req: Request, res: Response): void => {
-  const userId = req.user!.id;
-  const user = db
-    .prepare<number, UserRow>(`SELECT id, email, display_name, avatar_url, password_hash, is_banned, email_verified FROM users WHERE id = ?`)
-    .get(userId)!;
-
-  if (user.email_verified) {
-    res.json({ ok: true, alreadyVerified: true });
-    return;
-  }
-
-  // Invalidate previous tokens
-  db.prepare(`DELETE FROM email_verification_tokens WHERE user_id = ?`).run(userId);
-
-  const { raw, hash } = generateToken();
-  const expiresAt = new Date(Date.now() + VERIFY_TOKEN_TTL_MS).toISOString();
-  db.prepare(
-    `INSERT INTO email_verification_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)`
-  ).run(userId, hash, expiresAt);
-
-  void sendVerificationEmail(user.email!, raw, user.display_name);
+/** DELETE /api/auth/account */
+authRouter.delete('/account', AUTH, userAuth, requireUser, (req: Request, res: Response): void => {
+  const userId = (req as Request & { user: { id: number } }).user.id;
+  db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+  res.clearCookie(USER_SESSION_COOKIE, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    signed: true,
+    path: '/',
+  });
   res.json({ ok: true });
 });
 
@@ -648,7 +602,7 @@ authRouter.get('/stats', userAuth, requireUser, (req: Request, res: Response): v
   const type   = String(req.query.type ?? '');
   const validTypes = ['film', 'series', 'wiki'] as const;
 
-  const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+  const todayParis = getTodayParis();
   const yd = new Date(); yd.setDate(yd.getDate() - 1);
   const yesterdayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(yd);
 
@@ -820,6 +774,56 @@ authRouter.post('/import-stats', userAuth, requireUser, (req: Request, res: Resp
 
     res.json({ ok: true });
   }
+});
+
+/** POST /api/auth/import-history
+ *
+ * Back-fills user_challenge_results from a client-side { date → "won"|"lost" } map.
+ * Inserted rows use attempts_used = 0 (unknown); ON CONFLICT DO NOTHING preserves
+ * real rows that were written during a live authenticated session.
+ */
+authRouter.post('/import-history', apiLimiter, userAuth, requireUser, (req: Request, res: Response): void => {
+  const { type, history } = req.body as { type?: unknown; history?: unknown };
+
+  const validTypes = ['film', 'series', 'wiki'] as const;
+  if (!validTypes.includes(type as never)) {
+    res.status(400).json({ error: 'type must be film, series or wiki' });
+    return;
+  }
+  if (!history || typeof history !== 'object' || Array.isArray(history)) {
+    res.status(400).json({ error: 'history must be an object' });
+    return;
+  }
+
+  const mediaType = type as 'film' | 'series' | 'wiki';
+  const userId = req.user!.id;
+  const entries = Object.entries(history as Record<string, unknown>)
+    .filter(([date, outcome]) =>
+      /^\d{4}-\d{2}-\d{2}$/.test(date) && (outcome === 'won' || outcome === 'lost')
+    )
+    .slice(0, 500);
+
+  interface ChallengeRow { id: number; media_type: string }
+  const findChallenge = db.prepare<[string, string], ChallengeRow>(
+    `SELECT id, media_type FROM daily_challenges WHERE challenge_date = ? AND media_type = ? AND is_active = 1 LIMIT 1`
+  );
+  const insertResult = db.prepare(
+    `INSERT OR IGNORE INTO user_challenge_results (user_id, challenge_id, media_type, attempts_used, won, completed_at)
+     VALUES (?, ?, ?, 0, ?, datetime(? || 'T12:00:00'))`
+  );
+
+  let imported = 0;
+  const importBatch = db.transaction(() => {
+    for (const [date, outcome] of entries) {
+      const row = findChallenge.get(date, mediaType);
+      if (!row) continue;
+      const changes = insertResult.run(userId, row.id, mediaType, outcome === 'won' ? 1 : 0, date);
+      imported += changes.changes;
+    }
+  });
+  importBatch();
+
+  res.json({ imported });
 });
 
 /** POST /api/auth/apple */

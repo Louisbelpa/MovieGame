@@ -4,6 +4,9 @@ packages:
   GoogleSignIn:
     url: https://github.com/google/GoogleSignIn-iOS
     from: "8.0.0"
+  Lottie:
+    url: https://github.com/airbnb/lottie-ios
+    from: "4.0.0"
 
 options:
   bundleIdPrefix: fr.guesstoday
@@ -26,18 +29,22 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: GuessToday
+      - path: GuessToday/Resources/PrivacyInfo.xcprivacy
     dependencies:
       - package: GoogleSignIn
         product: GoogleSignIn
       - package: GoogleSignIn
         product: GoogleSignInSwift
+      - package: Lottie
+        product: Lottie
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: fr.guesstoday.app
-        DEVELOPMENT_TEAM: "YOUR_TEAM_ID"
+        DEVELOPMENT_TEAM: "Z5JH565RAL"
         SWIFT_VERSION: "5.10"
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
+        GOOGLE_REVERSED_CLIENT_ID: "$(GOOGLE_REVERSED_CLIENT_ID)"
         IPHONEOS_DEPLOYMENT_TARGET: "17.0"
         CODE_SIGN_STYLE: Automatic
         ENABLE_HARDENED_RUNTIME: YES
@@ -54,9 +61,10 @@ targets:
     entitlements:
       path: GuessToday/App/GuessToday.entitlements
       properties:
-        aps-environment: development
+        aps-environment: production
         com.apple.developer.associated-domains:
-          - applinks:moviegame-staging.up.railway.app
+          - applinks:guesstoday.fr
+        com.apple.developer.sign-in-with-apple: default
     info:
       path: GuessToday/App/Info.plist
       properties:
@@ -74,8 +82,7 @@ targets:
               NSExceptionAllowsInsecureHTTPLoads: true
               NSIncludesSubdomains: true
         UILaunchScreen:
-          UIColorName: ""
-          UIImageName: ""
+          UIColorName: LaunchBackground
         UIAppFonts:
           - Fraunces-Medium.ttf
           - Fraunces-MediumItalic.ttf
@@ -90,7 +97,11 @@ targets:
             CFBundleURLSchemes:
               - $(GOOGLE_REVERSED_CLIENT_ID)
           - CFBundleTypeRole: Editor
-            CFBundleURLName: fr.guesstoday.app
+            CFBundleURLName: fr.guesstoday.app.auth
+            CFBundleURLSchemes:
+              - guesstoday
+          - CFBundleTypeRole: Editor
+            CFBundleURLName: fr.guesstoday.app.nrt
             CFBundleURLSchemes:
               - NRT
 

@@ -17,11 +17,12 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import type { ServerStatsMap } from '@/store/authStore'
-import { authSendVerificationEmail, authChangePassword, authUploadAvatar } from '@/api/client'
+import { authDeleteAccount, authChangePassword, authUploadAvatar } from '@/api/client'
 import { loadStats } from '@/lib/storage'
 import { FEATURES } from '@/config/features'
 import type { GameStats } from '@/types'
 import { ApertureIcon } from '@/components/ui/ApertureIcon'
+import { Modal } from '@/components/ui/Modal'
 
 // ─── Achievements ─────────────────────────────────────────────────────────────
 
@@ -59,11 +60,67 @@ function buildAchievements(serverStats: ServerStatsMap): Achievement[] {
   ]
 }
 
+function AchievementCard({ a, hinted, onToggleHint }: {
+  a: Achievement
+  hinted: string | null
+  onToggleHint: (id: string) => void
+}) {
+  if (a.earned) {
+    return (
+      <div
+        title={`${a.title} — ${a.description}`}
+        className="flex flex-col items-start justify-between p-3 rounded-xl border transition-colors flex-shrink-0
+          w-[100px] h-[100px] lg:w-auto lg:h-auto lg:aspect-square"
+        style={{ borderColor: `${a.color}30`, background: `${a.color}14` }}
+      >
+        <span className="text-2xl leading-none">{a.icon}</span>
+        <div>
+          <p className="text-[11px] font-semibold text-film-text leading-tight">{a.title}</p>
+          <p className="text-[9px] text-film-text-dim leading-tight">{a.description}</p>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => onToggleHint(a.id)}
+      className="flex-shrink-0 w-[100px] h-[100px] lg:w-auto lg:h-auto lg:aspect-square
+        bg-white/[0.02] border border-film-border/30 rounded-xl p-3
+        flex flex-col items-start justify-between cursor-pointer hover:bg-white/[0.04] transition-colors text-left"
+    >
+      <Lock size={14} className="text-film-text-dim/20" />
+      <div className="w-full">
+        <p className="text-[11px] text-film-text-dim/40 leading-tight">{a.title}</p>
+        {a.progress && a.progress.current > 0 && (
+          <div className="mt-1 w-full">
+            <div className="h-0.5 rounded-full bg-white/[0.06] overflow-hidden">
+              <div
+                className="h-full rounded-full bg-film-text-dim/25 transition-all"
+                style={{ width: `${Math.min(100, (a.progress.current / a.progress.target) * 100)}%` }}
+              />
+            </div>
+            <span className="text-[9px] text-film-text-dim/40 mt-0.5 block tabular-nums">
+              {a.progress.current}/{a.progress.target}
+            </span>
+          </div>
+        )}
+        {hinted === a.id && (
+          <span className="text-[10px] text-film-text-dim leading-tight mt-0.5 block">{a.hint}</span>
+        )}
+      </div>
+    </button>
+  )
+}
+
 function AchievementsSection({ serverStats }: { serverStats: ServerStatsMap }) {
   const achievements = useMemo(() => buildAchievements(serverStats), [serverStats])
   const earned = achievements.filter((a) => a.earned)
-  const locked = achievements.filter((a) => !a.earned)
   const [hinted, setHinted] = useState<string | null>(null)
+
+  function toggleHint(id: string) {
+    setHinted((prev) => (prev === id ? null : id))
+  }
 
   return (
     <div className="rounded-2xl border border-film-border bg-white/[0.03] p-5 flex flex-col gap-4">
@@ -72,49 +129,17 @@ function AchievementsSection({ serverStats }: { serverStats: ServerStatsMap }) {
         <span className="text-xs text-film-text-dim">{earned.length}/{achievements.length}</span>
       </div>
 
-      <div className="grid grid-cols-3 gap-2.5">
-        {earned.map((a) => (
-          <div
-            key={a.id}
-            title={`${a.title} — ${a.description}`}
-            className="aspect-square flex flex-col items-start justify-between p-3 rounded-xl border transition-colors"
-            style={{ borderColor: `${a.color}30`, background: `${a.color}14` }}
-          >
-            <span className="text-2xl leading-none">{a.icon}</span>
-            <div>
-              <p className="text-[11px] font-semibold text-film-text leading-tight">{a.title}</p>
-              <p className="text-[9px] text-film-text-dim leading-tight">{a.description}</p>
-            </div>
-          </div>
-        ))}
-        {locked.map((a) => (
-          <button
-            key={a.id}
-            type="button"
-            onClick={() => setHinted(hinted === a.id ? null : a.id)}
-            className="aspect-square bg-white/[0.02] border border-film-border/30 rounded-xl p-3 flex flex-col items-start justify-between cursor-pointer hover:bg-white/[0.04] transition-colors w-full text-left"
-          >
-            <Lock size={14} className="text-film-text-dim/20" />
-            <div className="w-full">
-              <p className="text-[11px] text-film-text-dim/40 leading-tight">{a.title}</p>
-              {a.progress && a.progress.current > 0 && (
-                <div className="mt-1 w-full">
-                  <div className="h-0.5 rounded-full bg-white/[0.06] overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-film-text-dim/25 transition-all"
-                      style={{ width: `${Math.min(100, (a.progress.current / a.progress.target) * 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-[9px] text-film-text-dim/40 mt-0.5 block tabular-nums">
-                    {a.progress.current}/{a.progress.target}
-                  </span>
-                </div>
-              )}
-              {hinted === a.id && (
-                <span className="text-[10px] text-film-text-dim leading-tight mt-0.5 block">{a.hint}</span>
-              )}
-            </div>
-          </button>
+      {/* Mobile: horizontal slider / Desktop: 3-col grid */}
+      <div className="lg:hidden -mx-5 px-5">
+        <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
+          {achievements.map((a) => (
+            <AchievementCard key={a.id} a={a} hinted={hinted} onToggleHint={toggleHint} />
+          ))}
+        </div>
+      </div>
+      <div className="hidden lg:grid grid-cols-3 gap-2.5">
+        {achievements.map((a) => (
+          <AchievementCard key={a.id} a={a} hinted={hinted} onToggleHint={toggleHint} />
         ))}
       </div>
     </div>
@@ -210,9 +235,10 @@ interface SettingsModalProps {
   onSaveName: (name: string) => Promise<void>
   onChangePassword: (current: string, next: string, confirm: string) => Promise<string | null>
   onLogout: () => Promise<void>
+  onDeleteAccount: () => Promise<void>
 }
 
-function SettingsModal({ onClose, user, onSaveName, onChangePassword, onLogout }: SettingsModalProps) {
+function SettingsModal({ onClose, user, onSaveName, onChangePassword, onLogout, onDeleteAccount }: SettingsModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null)
 
   const [nameInput, setNameInput] = useState(user.displayName)
@@ -225,7 +251,7 @@ function SettingsModal({ onClose, user, onSaveName, onChangePassword, onLogout }
   const [pwConfirm, setPwConfirm] = useState('')
   const [pwShowCurrent, setPwShowCurrent] = useState(false)
   const [pwShowNew, setPwShowNew] = useState(false)
-  const [pwLoading] = useState(false)
+  const [pwLoading, setPwLoading] = useState(false)
   const [pwError, setPwError] = useState<string | null>(null)
   const [pwSuccess, setPwSuccess] = useState(false)
 
@@ -244,7 +270,9 @@ function SettingsModal({ onClose, user, onSaveName, onChangePassword, onLogout }
 
   async function handleChangePw() {
     setPwError(null)
+    setPwLoading(true)
     const err = await onChangePassword(pwCurrent, pwNew, pwConfirm)
+    setPwLoading(false)
     if (err) { setPwError(err); return }
     setPwSuccess(true)
     setPwCurrent(''); setPwNew(''); setPwConfirm('')
@@ -405,6 +433,14 @@ function SettingsModal({ onClose, user, onSaveName, onChangePassword, onLogout }
 
         <button
           type="button"
+          onClick={() => void onDeleteAccount()}
+          className="flex items-center gap-2 text-sm text-film-text-dim/50 hover:text-film-red transition-colors cursor-pointer text-left"
+        >
+          Supprimer mon compte
+        </button>
+
+        <button
+          type="button"
           onClick={onClose}
           className="text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer border border-film-border rounded-lg py-2.5"
         >
@@ -430,10 +466,12 @@ export function ProfilePage() {
     if (!isLoading && user === null) navigate('/', { replace: true })
   }, [user, isLoading, navigate])
 
-  const [verifySent, setVerifySent] = useState(false)
-  const [verifyCooldown, setVerifyCooldown] = useState(0)
   const [avatarLoading, setAvatarLoading] = useState(false)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   const enabledModes: Array<'film' | 'series' | 'wiki'> = [
     'film',
@@ -523,11 +561,12 @@ export function ProfilePage() {
     const file = e.target.files?.[0]
     if (!file) return
     setAvatarLoading(true)
+    setAvatarError(null)
     try {
       const { user: updated } = await authUploadAvatar(file)
       setUser(updated)
-    } catch {
-      // ignore upload errors silently
+    } catch (err: unknown) {
+      setAvatarError((err as { message?: string })?.message ?? 'Échec de l\'upload de la photo.')
     } finally {
       setAvatarLoading(false)
       e.target.value = ''
@@ -554,19 +593,20 @@ export function ProfilePage() {
     navigate('/')
   }
 
-  async function handleSendVerification() {
+  async function handleDeleteAccount() {
+    setShowDeleteConfirm(true)
+  }
+
+  async function confirmDeleteAccount() {
+    setDeleteLoading(true)
+    setDeleteError(null)
     try {
-      await authSendVerificationEmail()
-      setVerifySent(true)
-      setVerifyCooldown(60)
-      const iv = setInterval(() => {
-        setVerifyCooldown((prev) => {
-          if (prev <= 1) { clearInterval(iv); return 0 }
-          return prev - 1
-        })
-      }, 1000)
-    } catch {
-      // ignore
+      await authDeleteAccount()
+      await logout()
+      navigate('/')
+    } catch (err: unknown) {
+      setDeleteError((err as { message?: string })?.message ?? 'Une erreur est survenue. Veuillez réessayer.')
+      setDeleteLoading(false)
     }
   }
 
@@ -577,18 +617,11 @@ export function ProfilePage() {
     total: 'Total',
   }
 
-  const tabTextColor: Record<TabMode, string> = {
-    film: 'text-film-gold',
-    series: 'text-[#6b7cff]',
-    wiki: 'text-[#e85788]',
-    total: 'text-film-text',
-  }
-
-  const tabBorderColor: Record<TabMode, string> = {
-    film: 'border-film-gold',
-    series: 'border-[#6b7cff]',
-    wiki: 'border-[#e85788]',
-    total: 'border-film-text',
+  const tabActiveColor: Record<TabMode, string> = {
+    film:   'var(--sg-films)',
+    series: 'var(--sg-series)',
+    wiki:   'var(--sg-wiki)',
+    total:  'var(--color-film-text)',
   }
 
   return (
@@ -646,15 +679,20 @@ export function ProfilePage() {
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto py-8 px-4 lg:grid lg:grid-cols-[1fr_1.2fr] lg:gap-9 lg:px-10 flex flex-col gap-6">
+      {/*
+        Mobile order  : identity(1) → streak(2) → stats(3) → achievements(4) → friends(5)
+        Desktop layout: col-1 = identity+streak+achievements+friends  |  col-2 = stats (spans all rows)
+      */}
+      <div className="max-w-5xl mx-auto py-8 px-4 lg:px-10
+        flex flex-col gap-6
+        lg:grid lg:grid-cols-[1fr_1.2fr] lg:grid-rows-[auto_auto_auto_auto] lg:gap-x-9 lg:gap-y-6">
 
-        {/* ── Left column ── */}
-        <div className="flex flex-col gap-6">
-
-          {/* Identity hero */}
-          <div className="rounded-2xl border border-film-border bg-white/[0.03] p-6 flex flex-col gap-4">
-            <div className="flex items-center gap-4">
-              <label className="relative group cursor-pointer flex-shrink-0" title="Changer la photo de profil">
+        {/* ── Identity hero — order 1 mobile, col 1 row 1 desktop ── */}
+        <div className="order-1 lg:col-start-1 lg:row-start-1
+          rounded-2xl border border-film-border bg-white/[0.03] p-6 flex flex-col gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col items-center gap-1 flex-shrink-0">
+              <label className="relative group cursor-pointer" title="Changer la photo de profil">
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
@@ -681,92 +719,58 @@ export function ProfilePage() {
                   )}
                 </div>
               </label>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-film-text truncate">{user.displayName}</span>
-                  <button
-                    type="button"
-                    onClick={() => setSettingsOpen(true)}
-                    aria-label="Modifier le pseudo"
-                    className="text-film-text-dim hover:text-film-text cursor-pointer flex-shrink-0"
-                  >
-                    <Pencil size={14} />
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span className="text-sm text-film-text-dim truncate">{user.email ?? '—'}</span>
-                  {user.email && user.emailVerified === false && (
-                    <span className="inline-flex items-center gap-1 text-xs bg-amber-900/40 border border-amber-700/40 text-amber-400 rounded-full px-2 py-0.5">
-                      Email non vérifié
-                    </span>
-                  )}
-                </div>
-                {user.email && user.emailVerified === false && (
-                  <button
-                    type="button"
-                    onClick={() => void handleSendVerification()}
-                    disabled={verifyCooldown > 0}
-                    className="mt-1.5 text-xs text-film-gold hover:underline disabled:opacity-50 cursor-pointer disabled:cursor-default"
-                  >
-                    {verifySent
-                      ? verifyCooldown > 0
-                        ? `Email envoyé ! Renvoyer dans ${verifyCooldown}s`
-                        : 'Email envoyé !'
-                      : "Renvoyer l'email de vérification"}
-                  </button>
-                )}
-              </div>
+              {avatarError && (
+                <p className="text-[10px] text-film-red text-center max-w-[80px] leading-tight">{avatarError}</p>
+              )}
             </div>
-          </div>
 
-          {/* Streak banner */}
-          <div
-            className="rounded-2xl border border-amber-400/20 p-5"
-            style={{ background: 'linear-gradient(135deg, rgba(212,120,30,0.15) 0%, rgba(212,166,74,0.10) 100%)' }}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-mono uppercase text-amber-400/70 mb-1">Série en cours</p>
-                <div className="flex items-end gap-2">
-                  <span className="text-2xl">🔥</span>
-                  <span className="font-title font-bold text-gradient-gold" style={{ fontSize: '36px', lineHeight: 1 }}>
-                    {globalCurrentStreak}
-                  </span>
-                  <span className="text-sm text-film-text-dim mb-1">jours</span>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] font-mono uppercase text-film-text-dim/50 mb-1">RECORD</p>
-                <div className="flex items-end gap-1 justify-end">
-                  <span className="text-xl font-bold text-film-gold">{globalMaxStreak}</span>
-                  <span className="text-sm text-film-text-dim mb-0.5">j</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Achievements */}
-          <AchievementsSection serverStats={serverStats} />
-
-          {/* Friends link */}
-          <a
-            href="/friends"
-            className="group rounded-2xl border border-film-border bg-white/[0.03] hover:bg-white/[0.05] p-5 flex items-center gap-4 transition-colors"
-          >
-            <div className="w-10 h-10 rounded-lg bg-white/[0.05] flex items-center justify-center shrink-0">
-              <Users size={18} className="text-film-text-dim group-hover:text-film-text transition-colors" />
-            </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-film-text">Scores de mes amis</p>
-              <p className="text-sm text-film-text-dim mt-0.5">Compare tes résultats avec tes amis</p>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-film-text truncate">{user.displayName}</span>
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(true)}
+                  aria-label="Modifier le pseudo"
+                  className="text-film-text-dim hover:text-film-text cursor-pointer flex-shrink-0"
+                >
+                  <Pencil size={14} />
+                </button>
+              </div>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <span className="text-sm text-film-text-dim truncate">{user.email ?? '—'}</span>
+              </div>
             </div>
-            <ChevronRight size={16} className="text-film-text-dim/40 group-hover:text-film-text-dim transition-colors shrink-0" />
-          </a>
+          </div>
         </div>
 
-        {/* ── Right column ── */}
-        <div className="flex flex-col gap-5">
+        {/* ── Streak banner — order 2 mobile, col 1 row 2 desktop ── */}
+        <div
+          className="order-2 lg:col-start-1 lg:row-start-2 rounded-2xl border border-amber-400/20 p-5"
+          style={{ background: 'linear-gradient(135deg, rgba(212,120,30,0.15) 0%, rgba(212,166,74,0.10) 100%)' }}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-mono uppercase text-amber-400/70 mb-1">Série en cours</p>
+              <div className="flex items-end gap-2">
+                <span className="text-2xl">🔥</span>
+                <span className="font-title font-bold text-gradient-gold" style={{ fontSize: '36px', lineHeight: 1 }}>
+                  {globalCurrentStreak}
+                </span>
+                <span className="text-sm text-film-text-dim mb-1">jours</span>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-mono uppercase text-film-text-dim/50 mb-1">RECORD</p>
+              <div className="flex items-end gap-1 justify-end">
+                <span className="text-xl font-bold text-film-gold">{globalMaxStreak}</span>
+                <span className="text-sm text-film-text-dim mb-0.5">j</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Stats column — order 3 mobile, col 2 rows 1-4 desktop ── */}
+        <div className="order-3 lg:col-start-2 lg:row-start-1 lg:row-end-5 flex flex-col gap-5">
 
           {/* Mode tabs */}
           <div className="flex gap-4 border-b border-film-border/30 mb-5">
@@ -779,9 +783,10 @@ export function ProfilePage() {
                   onClick={() => setActiveTab(t)}
                   className={`pb-2.5 text-sm font-medium transition-colors cursor-pointer border-b-2 -mb-px ${
                     isActive
-                      ? `${tabTextColor[t]} ${tabBorderColor[t]}`
+                      ? ''
                       : 'text-film-text-dim border-transparent hover:text-film-text'
                   }`}
+                  style={isActive ? { color: tabActiveColor[t], borderColor: tabActiveColor[t] } : undefined}
                 >
                   {tabLabel[t]}
                 </button>
@@ -800,11 +805,33 @@ export function ProfilePage() {
           {/* Distribution */}
           <div>
             <p className="text-[11px] font-mono uppercase tracking-widest text-film-text-dim/60 mb-3">
-              DISTRIBUTION DES VICTOIRES
+              TENTATIVES
             </p>
             <DistributionChart distribution={stats.guessDistributionStr} losses={losses > 0 ? losses : undefined} />
           </div>
         </div>
+
+        {/* ── Achievements — order 4 mobile, col 1 row 3 desktop ── */}
+        <div className="order-4 lg:col-start-1 lg:row-start-3">
+          <AchievementsSection serverStats={serverStats} />
+        </div>
+
+        {/* ── Friends link — order 5 mobile, col 1 row 4 desktop ── */}
+        <a
+          href="/friends"
+          className="order-5 lg:col-start-1 lg:row-start-4
+            group rounded-2xl border border-film-border bg-white/[0.03] hover:bg-white/[0.05] p-5 flex items-center gap-4 transition-colors"
+        >
+          <div className="w-10 h-10 rounded-lg bg-white/[0.05] flex items-center justify-center shrink-0">
+            <Users size={18} className="text-film-text-dim group-hover:text-film-text transition-colors" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-film-text">Scores de mes amis</p>
+            <p className="text-sm text-film-text-dim mt-0.5">Compare tes résultats avec tes amis</p>
+          </div>
+          <ChevronRight size={16} className="text-film-text-dim/40 group-hover:text-film-text-dim transition-colors shrink-0" />
+        </a>
+
       </div>
 
       {settingsOpen && (
@@ -814,8 +841,41 @@ export function ProfilePage() {
           onSaveName={handleSaveName}
           onChangePassword={handleChangePassword}
           onLogout={handleLogout}
+          onDeleteAccount={handleDeleteAccount}
         />
       )}
+
+      <Modal
+        isOpen={showDeleteConfirm}
+        onClose={() => { if (!deleteLoading) { setShowDeleteConfirm(false); setDeleteError(null) } }}
+        title="Supprimer mon compte"
+        persistent={deleteLoading}
+      >
+        <p className="text-sm text-film-text-dim mb-6">
+          Cette action est irréversible. Toutes vos données de jeu, statistiques et connexions seront définitivement supprimées.
+        </p>
+        {deleteError && (
+          <p className="text-sm text-film-red mb-4">{deleteError}</p>
+        )}
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => void confirmDeleteAccount()}
+            disabled={deleteLoading}
+            className="w-full rounded-lg bg-film-red text-white font-semibold text-sm py-2.5 hover:opacity-90 disabled:opacity-50 transition-opacity cursor-pointer disabled:cursor-default"
+          >
+            {deleteLoading ? 'Suppression…' : 'Supprimer définitivement'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowDeleteConfirm(false); setDeleteError(null) }}
+            disabled={deleteLoading}
+            className="w-full rounded-lg border border-film-border text-sm text-film-text-dim hover:text-film-text transition-colors py-2.5 cursor-pointer disabled:opacity-50"
+          >
+            Annuler
+          </button>
+        </div>
+      </Modal>
     </div>
   )
 }

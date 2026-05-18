@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import GoogleSignIn
 
 @Observable
@@ -26,6 +27,23 @@ final class AuthViewModel {
         isCheckingSession = false
     }
 
+    /// Session created on the website after `?platform=ios` register/login — open via `guesstoday://auth?token=…`.
+    func completeWebHandoff(sessionToken: String) async {
+        APIClient.shared.sessionToken = sessionToken
+        isCheckingSession = true
+        defer { isCheckingSession = false }
+        do {
+            user = try await APIClient.shared.me()
+            if user != nil {
+                await StatsManager.shared.importLocalToServer()
+                await StatsManager.shared.refreshFromServer()
+            }
+        } catch {
+            APIClient.shared.sessionToken = nil
+            user = nil
+        }
+    }
+
     func login(email: String, password: String) async throws {
         isLoading = true
         error = nil
@@ -33,9 +51,11 @@ final class AuthViewModel {
         do {
             let r = try await APIClient.shared.login(email: email, password: password)
             user = r.user
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             Task { await StatsManager.shared.importLocalToServer() }
         } catch let e as APIError {
             error = e.localizedDescription
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
             throw e
         }
     }
@@ -57,6 +77,7 @@ final class AuthViewModel {
     func logout() async {
         do { try await APIClient.shared.logout() } catch {}
         user = nil
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
     func updateProfile(displayName: String? = nil, avatarUrl: String? = nil) async throws {
@@ -66,6 +87,12 @@ final class AuthViewModel {
 
     func changePassword(current: String, new: String) async throws {
         try await APIClient.shared.changePassword(current: current, new: new)
+    }
+
+    func deleteAccount() async throws {
+        try await APIClient.shared.deleteAccount()
+        user = nil
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
 
     func loginWithApple(identityToken: String, displayName: String?) async throws {

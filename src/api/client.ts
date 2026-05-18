@@ -196,15 +196,20 @@ export interface UserPayload {
   emailVerified: boolean
 }
 
-export function authRegister(email: string, password: string, displayName: string): Promise<{ user: UserPayload }> {
-  return request<{ user: UserPayload }>('/api/auth/register', {
+export interface AuthSessionPayload {
+  user: UserPayload
+  sessionToken: string
+}
+
+export function authRegister(email: string, password: string, displayName: string): Promise<AuthSessionPayload> {
+  return request<AuthSessionPayload>('/api/auth/register', {
     method: 'POST',
     body: JSON.stringify({ email, password, displayName }),
   })
 }
 
-export function authLogin(email: string, password: string): Promise<{ user: UserPayload }> {
-  return request<{ user: UserPayload }>('/api/auth/login', {
+export function authLogin(email: string, password: string): Promise<AuthSessionPayload> {
+  return request<AuthSessionPayload>('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   })
@@ -260,6 +265,17 @@ export function authGetStats(type: 'film' | 'series' | 'wiki'): Promise<ServerSt
   return request<ServerStatsData>(`/api/auth/stats?type=${type}`)
 }
 
+export function authGetHistory(type: 'film' | 'series' | 'wiki'): Promise<{ history: Record<string, 'won' | 'lost'> }> {
+  return request<{ history: Record<string, 'won' | 'lost'> }>(`/api/auth/history?type=${type}`)
+}
+
+export function authImportHistory(type: 'film' | 'series' | 'wiki', history: Record<string, 'won' | 'lost'>): Promise<{ imported: number }> {
+  return request<{ imported: number }>('/api/auth/import-history', {
+    method: 'POST',
+    body: JSON.stringify({ type, history }),
+  })
+}
+
 export function authImportStats(type: 'film' | 'series' | 'wiki', stats: ImportStatsData): Promise<void> {
   return request<void>('/api/auth/import-stats', {
     method: 'POST',
@@ -288,12 +304,8 @@ export function authResetPassword(token: string, password: string): Promise<void
   })
 }
 
-export function authVerifyEmail(token: string): Promise<void> {
-  return request<void>(`/api/auth/verify-email?token=${encodeURIComponent(token)}`)
-}
-
-export function authSendVerificationEmail(): Promise<void> {
-  return request<void>('/api/auth/verify-email/send', { method: 'POST' })
+export function authDeleteAccount(): Promise<void> {
+  return request<void>('/api/auth/account', { method: 'DELETE' })
 }
 
 export function authChangePassword(currentPassword: string, newPassword: string): Promise<void> {
@@ -303,8 +315,8 @@ export function authChangePassword(currentPassword: string, newPassword: string)
   })
 }
 
-export function authAppleSignIn(identityToken: string, displayName?: string): Promise<{ user: UserPayload }> {
-  return request<{ user: UserPayload }>('/api/auth/apple', {
+export function authAppleSignIn(identityToken: string, displayName?: string): Promise<AuthSessionPayload> {
+  return request<AuthSessionPayload>('/api/auth/apple', {
     method: 'POST',
     body: JSON.stringify({ identityToken, displayName }),
   })
@@ -316,8 +328,8 @@ export function authOAuthCallback(data: {
   email: string
   displayName: string
   avatarUrl?: string
-}): Promise<{ user: UserPayload }> {
-  return request<{ user: UserPayload }>('/api/auth/oauth/callback', {
+}): Promise<AuthSessionPayload> {
+  return request<AuthSessionPayload>('/api/auth/oauth/callback', {
     method: 'POST',
     body: JSON.stringify(data),
   })
@@ -387,6 +399,9 @@ export interface LeaderboardEntry {
   filmWins: number
   seriesWins: number
   wikiWins: number
+  filmPlayed: number
+  seriesPlayed: number
+  wikiPlayed: number
   avgAttempts: number | null
   currentStreak: number
   maxStreak: number

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @Observable
 @MainActor
@@ -10,6 +11,10 @@ final class FriendsViewModel {
     var isAdding = false
     var addError: String?
     var addSuccess = false
+
+    private let successHaptic = UINotificationFeedbackGenerator()
+    private let errorHaptic = UINotificationFeedbackGenerator()
+    private let lightImpact = UIImpactFeedbackGenerator(style: .light)
 
     func load() async {
         isLoading = true
@@ -33,11 +38,14 @@ final class FriendsViewModel {
             try await APIClient.shared.addFriend(code: addCode.uppercased())
             addCode = ""
             addSuccess = true
+            successHaptic.notificationOccurred(.success)
             await load()
         } catch let e as APIError {
             addError = e.localizedDescription
+            errorHaptic.notificationOccurred(.error)
         } catch {
             addError = error.localizedDescription
+            errorHaptic.notificationOccurred(.error)
         }
         isAdding = false
     }
@@ -45,11 +53,14 @@ final class FriendsViewModel {
     func acceptFriend(userId: Int) async {
         do {
             try await APIClient.shared.acceptFriend(userId: userId)
+            successHaptic.notificationOccurred(.success)
             await load()
         } catch let e as APIError {
             addError = e.localizedDescription
+            errorHaptic.notificationOccurred(.error)
         } catch {
             addError = error.localizedDescription
+            errorHaptic.notificationOccurred(.error)
         }
     }
 
@@ -80,6 +91,7 @@ struct FriendsView: View {
             } else if vm.isLoading && vm.payload == nil {
                 ProgressView().tint(Theme.gold)
             } else if let payload = vm.payload {
+                let hasFriends = payload.friends.filter { !$0.isMe }.count > 0 || !payload.pending.isEmpty
                 ScrollView {
                     VStack(spacing: Theme.spacing20) {
                         if let code = payload.myCode {
@@ -95,25 +107,27 @@ struct FriendsView: View {
                                 .padding(.horizontal, Theme.spacing16)
                         }
 
-                        // Tab switcher
-                        Picker("", selection: $selectedTab) {
-                            Text("Aujourd'hui").tag(0)
-                            Text("Classement").tag(1)
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.horizontal, Theme.spacing16)
+                        if hasFriends {
+                            // Tab switcher only when there are friends
+                            Picker("", selection: $selectedTab) {
+                                Text("Aujourd'hui").tag(0)
+                                Text("Classement").tag(1)
+                            }
+                            .pickerStyle(.segmented)
+                            .padding(.horizontal, Theme.spacing16)
 
-                        if selectedTab == 0 {
-                            let friends = payload.friends.filter { !$0.isMe }
-                            if !friends.isEmpty {
-                                LeaderboardSection(friends: friends, vm: vm)
+                            if selectedTab == 0 {
+                                let friends = payload.friends.filter { !$0.isMe }
+                                if !friends.isEmpty {
+                                    LeaderboardSection(friends: friends, vm: vm)
+                                        .padding(.horizontal, Theme.spacing16)
+                                }
+                            } else {
+                                GlobalLeaderboardView()
                                     .padding(.horizontal, Theme.spacing16)
-                            } else if payload.pending.isEmpty {
-                                EmptyFriendsView()
                             }
                         } else {
-                            GlobalLeaderboardView()
-                                .padding(.horizontal, Theme.spacing16)
+                            EmptyFriendsView()
                         }
 
                         Spacer(minLength: Theme.spacing24)
@@ -156,71 +170,157 @@ private struct GuestFriendsView: View {
     @Binding var showLogin: Bool
 
     var body: some View {
-        VStack(spacing: Theme.spacing24) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 0) {
+                // Hero section with contained glow
+                VStack(spacing: Theme.spacing20) {
+                    GuestAvatarCluster()
+                        .padding(.top, Theme.spacing28)
 
-            ZStack {
-                Circle()
-                    .fill(Theme.gold.opacity(0.1))
-                    .frame(width: 100, height: 100)
-                Image(systemName: "person.2.fill")
-                    .font(.system(size: 40))
-                    .foregroundColor(Theme.gold)
-            }
+                    VStack(spacing: Theme.spacing8) {
+                        Text("Joue avec tes amis")
+                            .font(Theme.fraunces(size: 26))
+                            .foregroundColor(Theme.text)
+                            .multilineTextAlignment(.center)
 
-            VStack(spacing: Theme.spacing12) {
-                Text("Défiez vos amis")
-                    .font(Theme.fraunces(size: 24))
-                    .fontWeight(.bold)
-                    .foregroundColor(Theme.text)
-
-                Text("Créez un compte pour obtenir un code ami, voir les résultats de vos proches et comparer vos scores chaque jour.")
-                    .font(.system(size: 15))
-                    .foregroundColor(Theme.textDim)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(3)
-                    .padding(.horizontal, Theme.spacing24)
-            }
-
-            VStack(spacing: Theme.spacing8) {
-                HStack(spacing: Theme.spacing16) {
-                    FeaturePill(icon: "trophy.fill", label: "Classement", color: Theme.gold)
-                    FeaturePill(icon: "flame.fill", label: "Streaks", color: Theme.amber)
-                    FeaturePill(icon: "bell.fill", label: "Défis", color: Theme.green)
+                        Text("Compare vos scores, suivez vos streaks\net voyez qui devine le plus vite.")
+                            .font(Theme.inter(size: 14))
+                            .foregroundColor(Theme.textDim)
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(4)
+                    }
+                    .padding(.bottom, Theme.spacing8)
                 }
+                .frame(maxWidth: .infinity)
+                .background(
+                    RadialGradient(
+                        gradient: Gradient(colors: [Theme.gold.opacity(0.09), .clear]),
+                        center: .init(x: 0.5, y: 0.1),
+                        startRadius: 0,
+                        endRadius: 220
+                    )
+                )
 
-                Button("Se connecter / Créer un compte") {
-                    showLogin = true
+                // Feature rows
+                VStack(spacing: 0) {
+                    GuestFeatureRow(
+                        icon: "number.square.fill",
+                        color: Theme.gold,
+                        title: "Code ami unique",
+                        subtitle: "Partage ton code pour inviter tes proches en un instant."
+                    )
+                    Divider().background(Theme.border).padding(.leading, 52)
+                    GuestFeatureRow(
+                        icon: "chart.bar.fill",
+                        color: Theme.modeSeries,
+                        title: "Scores du jour",
+                        subtitle: "Vois en temps réel si tes amis ont trouvé le film ou la personnalité."
+                    )
+                    Divider().background(Theme.border).padding(.leading, 52)
+                    GuestFeatureRow(
+                        icon: "flame.fill",
+                        color: Theme.amber,
+                        title: "Classement global",
+                        subtitle: "Victoires, streaks, taux de réussite — tout est là."
+                    )
                 }
-                .buttonStyle(PrimaryButtonStyle())
-                .padding(.horizontal, Theme.spacing24)
-                .padding(.top, Theme.spacing8)
-            }
+                .padding(.horizontal, Theme.spacing16)
+                .padding(.top, Theme.spacing24)
 
-            Spacer()
+                // CTAs
+                VStack(spacing: Theme.spacing12) {
+                    Button("Créer un compte") { showLogin = true }
+                        .buttonStyle(PrimaryButtonStyle())
+
+                    Button("J'ai déjà un compte") { showLogin = true }
+                        .font(Theme.inter(size: 14))
+                        .foregroundColor(Theme.textDim)
+                }
+                .padding(.horizontal, Theme.spacing16)
+                .padding(.top, Theme.spacing28)
+                .padding(.bottom, Theme.spacing24)
+            }
         }
     }
 }
 
-private struct FeaturePill: View {
-    let icon: String
-    let label: String
-    let color: Color
+private struct GuestAvatarCluster: View {
+    private let avatars: [(color: Color, initial: String)] = [
+        (Color(hex: "#6b7cff"), "L"),
+        (Color(hex: "#e85788"), "M"),
+        (Color(hex: "#4cb078"), "T"),
+    ]
 
     var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundColor(color)
-            Text(label)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(Theme.textDim)
+        ZStack {
+            // Subtle background disc
+            Circle()
+                .fill(Theme.surface)
+                .frame(width: 100, height: 100)
+                .overlay(Circle().stroke(Theme.border, lineWidth: 1))
+
+            // Avatar at left
+            avatarCircle(avatars[0], size: 46)
+                .offset(x: -30, y: 0)
+                .zIndex(1)
+
+            // Avatar at right
+            avatarCircle(avatars[2], size: 46)
+                .offset(x: 30, y: 0)
+                .zIndex(1)
+
+            // Avatar on top-center (slightly larger, in front)
+            avatarCircle(avatars[1], size: 50)
+                .offset(x: 0, y: -4)
+                .zIndex(2)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Theme.spacing12)
-        .background(Theme.surface)
-        .cornerRadius(Theme.radiusM)
-        .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(Theme.border, lineWidth: 1))
+        .frame(width: 120, height: 90)
+    }
+
+    @ViewBuilder
+    private func avatarCircle(_ avatar: (color: Color, initial: String), size: CGFloat) -> some View {
+        Circle()
+            .fill(avatar.color.opacity(0.16))
+            .frame(width: size, height: size)
+            .overlay(
+                Text(avatar.initial)
+                    .font(Theme.inter(size: size * 0.36, weight: .bold))
+                    .foregroundColor(avatar.color)
+            )
+            .overlay(Circle().stroke(avatar.color.opacity(0.40), lineWidth: 1.5))
+            .overlay(Circle().stroke(Theme.background, lineWidth: 2))
+    }
+}
+
+private struct GuestFeatureRow: View {
+    let icon: String
+    let color: Color
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Theme.spacing16) {
+            ZStack {
+                RoundedRectangle(cornerRadius: Theme.radiusS)
+                    .fill(color.opacity(0.12))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.system(size: 15))
+                    .foregroundColor(color)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(Theme.inter(size: 14, weight: .semibold))
+                    .foregroundColor(Theme.text)
+                Text(subtitle)
+                    .font(Theme.inter(size: 13))
+                    .foregroundColor(Theme.textDim)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+        }
+        .padding(.vertical, Theme.spacing14)
     }
 }
 
@@ -250,6 +350,7 @@ private struct YourCodeCard: View {
             HStack(spacing: Theme.spacing12) {
                 Button {
                     UIPasteboard.general.string = code
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
                     withAnimation { copied = true }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         withAnimation { copied = false }

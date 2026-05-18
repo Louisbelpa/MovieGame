@@ -9,6 +9,8 @@ import { activeChallengeOrdinalByDate } from '../lib/dailyChallengeOrdinal.js'
 import { normalizeCommonsPhotoUrl } from '../lib/commonsThumb.js'
 import { normalise, isGuessCorrect, expandWikiPersonAcceptedForms } from '../lib/matching.js'
 import { escapeHtml } from '../lib/utils.js'
+import { getTodayParis } from '../lib/dates.js'
+import { parseAttempts } from '../lib/session.js'
 import {
   dedupeYouthAgainstSeniorMergeEnds,
   inferClubStintEndYears,
@@ -22,16 +24,6 @@ import {
   type GameSessionRow,
 } from './game-session.service.js'
 
-function parseAttempts(raw: string): AttemptEntry[] {
-  try {
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) throw new Error('not an array')
-    return parsed as AttemptEntry[]
-  } catch {
-    throw Object.assign(new Error('Corrupted session data'), { status: 500 })
-  }
-}
-
 const MAX_ATTEMPTS = parseInt(process.env.WIKI_MAX_ATTEMPTS ?? '5', 10)
 const MAX_HINTS = 3
 
@@ -41,7 +33,7 @@ interface WikiPersonRow {
   id: number
   name: string
   name_aliases: string
-  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic'
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic' | 'actor'
   infobox_data: string
   hint_schedule: string
   photo_url: string | null
@@ -138,9 +130,6 @@ interface SportClubView {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getTodayParis(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
-}
 
 function hasAdjacentWikiChallenge(date: string, direction: 'prev' | 'next'): boolean {
   const todayParis = getTodayParis()
@@ -237,6 +226,9 @@ function getWikiHintKeysAllowed(personType: WikiPersonRow['person_type']): strin
   if (personType === 'entrepreneur') {
     return ['birth_year', 'nationality', 'domain', 'notable_work', 'company', 'name_initials', 'name_length']
   }
+  if (personType === 'actor') {
+    return ['birth_year', 'nationality', 'notable_films', 'occupation', 'name_initials', 'name_length']
+  }
   return ['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials', 'name_length']
 }
 
@@ -250,6 +242,9 @@ function getSupplementalHintKeys(personType: WikiPersonRow['person_type']): stri
   }
   if (personType === 'entrepreneur') {
     return ['birth_year', 'nationality', 'company', 'name_initials', 'name_length']
+  }
+  if (personType === 'actor') {
+    return ['birth_year', 'nationality', 'notable_films', 'name_initials', 'name_length']
   }
   return ['birth_year', 'nationality', 'name_initials', 'name_length']
 }
@@ -319,6 +314,11 @@ function buildVisibleProfile(person: WikiPersonRow): { type: 'politician'; roles
   careerHighlights: Array<{ label: string; value: string }>
   nationalTeam: SportspersonData['national_team']
 } | {
+  type: 'actor'
+  notableFilms: string | null
+  notableFilmsParts: string[]
+  occupation: string | null
+} | {
   type: 'generic'
   domain: string | null
   notableWork: string | null
@@ -372,6 +372,15 @@ function buildVisibleProfile(person: WikiPersonRow): { type: 'politician'; roles
       sport: s.sport,
       careerHighlights: (s.career_highlights ?? []).slice(0, 6),
       nationalTeam: s.national_team,
+    }
+  }
+  if (person.person_type === 'actor') {
+    const a = data as { birth_year: number | null; nationality: string | null; notable_films: string | null; occupation: string | null }
+    return {
+      type: 'actor',
+      notableFilms: a.notable_films,
+      notableFilmsParts: a.notable_films ? a.notable_films.split(' · ').map(s => s.trim()).filter(Boolean).slice(0, 6) : [],
+      occupation: a.occupation,
     }
   }
   const g = data as GenericPersonData
@@ -430,6 +439,24 @@ function resolveHint(key: string, person: WikiPersonRow): { type: string; value:
         return { type: 'wiki_nationality', value: s.nationality }
       case 'position':
         return { type: 'wiki_position', value: s.position }
+      case 'name_initials':
+        return { type: 'wiki_name_initials', value: computeInitials(person.name) }
+      case 'name_length':
+        return { type: 'wiki_name_length', value: computeNameLength(person.name) }
+    }
+  }
+
+  if (person.person_type === 'actor') {
+    const a = data as { birth_year: number | null; nationality: string | null; notable_films: string | null; occupation: string | null }
+    switch (key) {
+      case 'birth_year':
+        return { type: 'wiki_birth_year', value: a.birth_year }
+      case 'nationality':
+        return { type: 'wiki_nationality', value: a.nationality }
+      case 'notable_films':
+        return { type: 'wiki_notable_films', value: a.notable_films }
+      case 'occupation':
+        return { type: 'wiki_occupation', value: a.occupation }
       case 'name_initials':
         return { type: 'wiki_name_initials', value: computeInitials(person.name) }
       case 'name_length':

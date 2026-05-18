@@ -53,6 +53,7 @@ import {
   normalizeSeriesHintScheduleJson,
 } from '../services/challenge.service.js';
 import { maybeSendPlanningAlert } from '../lib/planningAlert.js';
+import { getTodayParis } from '../lib/dates.js';
 import {
   inferSportspersonInfoboxClubYears,
   normalizeWikiPersonInfoboxForStore,
@@ -206,7 +207,7 @@ interface WikiPersonRow {
   id: number;
   name: string;
   name_aliases: string;
-  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic';
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic' | 'actor';
   wikipedia_slug: string;
   infobox_data: string;
   hint_schedule: string;
@@ -518,10 +519,6 @@ function formatChallengesBatch(rows: ChallengeRow[]): ReturnType<typeof formatCh
       film: formatFilm(film, usedDatesMap[`film:${film.id}`] ?? []),
       series: null, wiki: null, mediaType: 'film' as const }
   })
-}
-
-function getTodayParis(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
 }
 
 function renumberChallenges(mediaType: 'film' | 'series' | 'wiki'): void {

@@ -1,5 +1,15 @@
 import Foundation
 
+extension DateFormatter {
+    static let parisDate: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = TimeZone(identifier: "Europe/Paris")
+        f.locale = Locale(identifier: "en_CA")
+        return f
+    }()
+}
+
 /// Shared reactive store for game stats.
 /// - When logged in: stats come from the server (source of truth).
 /// - When logged out: stats come from UserDefaults (local fallback).
@@ -50,12 +60,17 @@ final class StatsManager {
         if let w = await wiki   { wikiStats   = w.toLocalStats() }
     }
 
-    /// Import local stats for all modes to server (called once at login).
+    /// Import local stats and history for all modes to server (called once at login).
     func importLocalToServer() async {
         for mode in [GameMode.film, .series, .wiki] {
             let local = loadLocal(mode)
-            guard local.gamesPlayed > 0 else { continue }
-            try? await APIClient.shared.importStats(local, for: mode)
+            if local.gamesPlayed > 0 {
+                try? await APIClient.shared.importStats(local, for: mode)
+            }
+            let history = loadLocalHistory(mode)
+            if !history.isEmpty {
+                try? await APIClient.shared.importHistory(type: mode.statsKey, history: history)
+            }
         }
         await refreshFromServer()
     }
@@ -80,5 +95,9 @@ final class StatsManager {
             return LocalStats()
         }
         return s
+    }
+
+    private func loadLocalHistory(_ mode: GameMode) -> [String: String] {
+        UserDefaults.standard.dictionary(forKey: "history_\(mode.statsKey)") as? [String: String] ?? [:]
     }
 }

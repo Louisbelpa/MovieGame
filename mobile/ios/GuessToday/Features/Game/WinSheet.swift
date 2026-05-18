@@ -4,15 +4,18 @@ import UniformTypeIdentifiers
 import UserNotifications
 
 struct WinSheet: View {
-    @ObservedObject var vm: GameViewModel
+    var vm: GameViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("notif_prompt_shown") private var notifPromptShown = false
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Theme.background.ignoresSafeArea()
-                ConfettiOverlay()
+                if !reduceMotion {
+                    ConfettiOverlay()
+                }
 
                 ScrollView {
                     VStack(spacing: Theme.spacing20) {
@@ -42,7 +45,7 @@ struct WinSheet: View {
                                 Image(systemName: "flame.fill")
                                     .foregroundColor(Theme.amber)
                                 Text("Série de \(stats.currentStreak) !")
-                                    .font(.system(size: 14, weight: .medium))
+                                    .font(Theme.inter(size: 14, weight: .medium))
                                     .foregroundColor(Theme.text)
                             }
                         }
@@ -95,7 +98,7 @@ struct WinSheet: View {
 }
 
 struct LoseSheet: View {
-    @ObservedObject var vm: GameViewModel
+    var vm: GameViewModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -153,10 +156,14 @@ struct LoseSheet: View {
 // MARK: - Confetti
 
 private struct ConfettiOverlay: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var particles: [ConfettiParticle] = []
     @State private var startTime: Date? = nil
 
     var body: some View {
+        if reduceMotion {
+            EmptyView()
+        } else {
         GeometryReader { geo in
             TimelineView(.animation(minimumInterval: 1/60, paused: startTime == nil)) { tl in
                 Canvas { ctx, size in
@@ -216,6 +223,7 @@ private struct ConfettiOverlay: View {
             }
         }
         .allowsHitTesting(false)
+        }
     }
 }
 
@@ -258,7 +266,7 @@ private struct WinHeaderView: View {
 
             if let c = challenge {
                 Text("En \(c.attemptsUsed) tentative\(c.attemptsUsed > 1 ? "s" : "")")
-                    .font(.system(size: 15))
+                    .font(Theme.inter(size: 15))
                     .foregroundColor(Theme.textDim)
                     .opacity(appeared ? 1 : 0)
             }
@@ -302,7 +310,7 @@ private struct LoseHeaderView: View {
                 .offset(y: appeared ? 0 : 8)
 
             Text("La bonne réponse était…")
-                .font(.system(size: 15))
+                .font(Theme.inter(size: 15))
                 .foregroundColor(Theme.textDim)
                 .opacity(appeared ? 1 : 0)
         }
@@ -342,13 +350,13 @@ struct FilmResultCard: View {
 
                     if let year = result.year {
                         Text("\(year)")
-                            .font(.system(size: 13))
+                            .font(Theme.inter(size: 13))
                             .foregroundColor(Theme.textDim)
                     }
 
                     if let director = result.director ?? result.creator {
                         Label(director, systemImage: "person.fill")
-                            .font(.system(size: 13))
+                            .font(Theme.inter(size: 13))
                             .foregroundColor(Theme.textDim)
                     }
 
@@ -361,7 +369,7 @@ struct FilmResultCard: View {
 
             if let synopsis = result.synopsis, !synopsis.isEmpty {
                 Text(synopsis)
-                    .font(.system(size: 13))
+                    .font(Theme.inter(size: 13))
                     .foregroundColor(Theme.textDim)
                     .lineLimit(4)
             }
@@ -370,7 +378,7 @@ struct FilmResultCard: View {
                let tmdbURL = URL(string: "https://www.themoviedb.org/\(result.mediaType == "series" ? "tv" : "movie")/\(tmdbId)") {
                 Link(destination: tmdbURL) {
                     Label("Voir sur TMDB", systemImage: "arrow.up.right.square")
-                        .font(.system(size: 13))
+                        .font(Theme.inter(size: 13))
                         .foregroundColor(Theme.gold)
                 }
             }
@@ -404,7 +412,7 @@ struct WikiResultCard: View {
                         .foregroundColor(Theme.text)
 
                     Text(personTypeLabel(result.personType))
-                        .font(.system(size: 12, weight: .medium))
+                        .font(Theme.inter(size: 12, weight: .medium))
                         .foregroundColor(Theme.gold)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
@@ -416,7 +424,7 @@ struct WikiResultCard: View {
 
             if let bio = result.bio, !bio.isEmpty {
                 Text(bio)
-                    .font(.system(size: 13))
+                    .font(Theme.inter(size: 13))
                     .foregroundColor(Theme.textDim)
                     .lineLimit(4)
             }
@@ -424,7 +432,7 @@ struct WikiResultCard: View {
             if let wikiUrl = result.wikipediaUrl, let url = URL(string: wikiUrl) {
                 Link(destination: url) {
                     Label("Voir sur Wikipedia", systemImage: "arrow.up.right.square")
-                        .font(.system(size: 13))
+                        .font(Theme.inter(size: 13))
                         .foregroundColor(Theme.gold)
                 }
             }
@@ -478,7 +486,7 @@ struct StatBox: View {
                     )
                 )
             Text(label)
-                .font(.system(size: 10, weight: .medium))
+                .font(Theme.inter(size: 10, weight: .medium))
                 .foregroundColor(Theme.textDim)
                 .textCase(.uppercase)
                 .tracking(0.5)
@@ -490,7 +498,7 @@ struct StatBox: View {
 // MARK: - Share buttons
 
 struct ShareResultButtons: View {
-    @ObservedObject var vm: GameViewModel
+    var vm: GameViewModel
     @State private var shareImage: ShareableImage? = nil
 
     var body: some View {
@@ -549,7 +557,7 @@ struct ShareSheet: UIViewControllerRepresentable {
 // MARK: - Share result card (rendered to image)
 
 struct ShareResultCard: View {
-    @ObservedObject var vm: GameViewModel
+    var vm: GameViewModel
 
     private var modeLabel: String {
         switch vm.mode {
@@ -586,7 +594,7 @@ struct ShareResultCard: View {
                 )
                 Spacer()
                 Text(modeLabel)
-                    .font(.system(size: 12))
+                    .font(Theme.inter(size: 12))
                     .foregroundColor(Theme.textDim)
             }
             .padding(Theme.spacing16)
@@ -606,7 +614,7 @@ struct ShareResultCard: View {
                     .tracking(4)
 
                 Text(scoreLabel)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(Theme.inter(size: 14, weight: .medium))
                     .foregroundColor(vm.challenge?.won == true ? Theme.green : Theme.red)
             }
             .padding(Theme.spacing20)
@@ -615,7 +623,7 @@ struct ShareResultCard: View {
 
             // Footer
             Text("guesstoday.fr")
-                .font(.system(size: 11))
+                .font(Theme.inter(size: 11))
                 .foregroundColor(Theme.muted)
                 .padding(.vertical, Theme.spacing12)
         }
@@ -637,7 +645,7 @@ struct FlowTags: View {
         ) {
             ForEach(tags, id: \.self) { tag in
                 Text(tag)
-                    .font(.system(size: 11))
+                    .font(Theme.inter(size: 11))
                     .foregroundColor(Theme.textDim)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)

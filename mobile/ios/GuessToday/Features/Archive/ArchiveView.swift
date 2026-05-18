@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @Observable
 @MainActor
@@ -148,6 +149,7 @@ struct ArchiveView: View {
                                             date: date,
                                             outcome: vm.outcome(for: date, mode: vm.selectedMode)
                                         ) {
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                             selectedDate = date
                                             showGame = true
                                         }

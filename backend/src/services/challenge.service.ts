@@ -8,21 +8,13 @@ import db from '../db/database.js';
 import { activeChallengeOrdinalByDate } from '../lib/dailyChallengeOrdinal.js';
 import { normalise, isGuessCorrect } from '../lib/matching.js';
 import { escapeHtml } from '../lib/utils.js';
+import { getTodayParis } from '../lib/dates.js';
+import { parseAttempts } from '../lib/session.js';
 import {
   getOrCreateGameSession,
   findGameSession,
   type GameSessionRow,
 } from './game-session.service.js';
-
-function parseAttempts(raw: string): AttemptEntry[] {
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) throw new Error('not an array');
-    return parsed as AttemptEntry[];
-  } catch {
-    throw Object.assign(new Error('Corrupted session data'), { status: 500 });
-  }
-}
 
 const MAX_ATTEMPTS = parseInt(process.env.MAX_ATTEMPTS ?? '5', 10);
 const WIKI_MAX_ATTEMPTS = parseInt(process.env.WIKI_MAX_ATTEMPTS ?? '5', 10);
@@ -121,10 +113,6 @@ export function resolveImageUrl(raw: string): string {
   return raw; // local path served by Express static middleware
 }
 
-/** Returns current date in Europe/Paris timezone as YYYY-MM-DD */
-function getTodayParis(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
-}
 
 function hasAdjacentScheduledChallenge(
   date: string,

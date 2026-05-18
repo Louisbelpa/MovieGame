@@ -46,9 +46,11 @@ enum Theme {
     static let spacing4: CGFloat  = 4
     static let spacing8: CGFloat  = 8
     static let spacing12: CGFloat = 12
+    static let spacing14: CGFloat = 14
     static let spacing16: CGFloat = 16
     static let spacing20: CGFloat = 20
     static let spacing24: CGFloat = 24
+    static let spacing28: CGFloat = 28
 
     // MARK: - Corner radius
     static let radiusS: CGFloat   = 6
@@ -92,7 +94,7 @@ struct PrimaryButtonStyle: ButtonStyle {
             }
             configuration.label
         }
-        .font(.system(size: 15, weight: .semibold))
+        .font(Theme.inter(size: 15, weight: .semibold))
         .foregroundColor(Theme.background)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
@@ -108,7 +110,7 @@ struct PrimaryButtonStyle: ButtonStyle {
 struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 15, weight: .medium))
+            .font(Theme.inter(size: 15, weight: .medium))
             .foregroundColor(Theme.text)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
@@ -220,11 +222,5 @@ struct ModeAtmosphere: View {
         .allowsHitTesting(false)
     }
 
-    private var haloColor: Color {
-        switch mode {
-        case .film:   return Theme.modeFilm
-        case .series: return Theme.modeSeries
-        case .wiki:   return Theme.modeWiki
-        }
-    }
+    private var haloColor: Color { mode.color }
 }

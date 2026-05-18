@@ -6,116 +6,156 @@ struct RulesSheet: View {
     @State private var appeared = false
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Theme.background.ignoresSafeArea()
+        ZStack(alignment: .bottom) {
+            Theme.background.ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: Theme.spacing24) {
-                        // Icon
-                        ZStack {
-                            Circle()
-                                .fill(modeColor.opacity(0.12))
-                                .frame(width: 80, height: 80)
-                            Image(systemName: modeIcon)
-                                .font(.system(size: 34))
-                                .foregroundColor(modeColor)
-                        }
-                        .scaleEffect(appeared ? 1 : 0.5)
-                        .opacity(appeared ? 1 : 0)
-                        .padding(.top, Theme.spacing24)
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Hero header
+                    ZStack {
+                        // Gradient background
+                        LinearGradient(
+                            colors: [modeColor.opacity(0.28), modeColor.opacity(0.06), Theme.background],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 220)
 
-                        // Title
-                        VStack(spacing: 6) {
-                            Text("Comment jouer")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(Theme.textDim)
-                                .textCase(.uppercase)
-                                .tracking(1.2)
-                            Text(mode.title)
-                                .font(Theme.fraunces(size: 26))
-                                .fontWeight(.bold)
-                                .foregroundColor(Theme.text)
-                        }
-                        .opacity(appeared ? 1 : 0)
-                        .offset(y: appeared ? 0 : 8)
-
-                        // Rules list
                         VStack(spacing: Theme.spacing12) {
-                            ForEach(Array(rules.enumerated()), id: \.offset) { i, rule in
-                                RuleRow(number: i + 1, text: rule)
-                                    .opacity(appeared ? 1 : 0)
-                                    .offset(y: appeared ? 0 : 12)
-                                    .animation(.spring(response: 0.4, dampingFraction: 0.8).delay(0.1 + Double(i) * 0.07), value: appeared)
+                            // Icon ring
+                            ZStack {
+                                Circle()
+                                    .fill(modeColor.opacity(0.15))
+                                    .frame(width: 90, height: 90)
+                                Circle()
+                                    .stroke(modeColor.opacity(0.30), lineWidth: 1.5)
+                                    .frame(width: 90, height: 90)
+                                Image(systemName: modeIcon)
+                                    .font(.system(size: 38, weight: .medium))
+                                    .foregroundColor(modeColor)
                             }
-                        }
-                        .padding(.horizontal, Theme.spacing16)
+                            .scaleEffect(appeared ? 1 : 0.55)
+                            .opacity(appeared ? 1 : 0)
 
-                        // Hint legend (film/series only)
-                        if !mode.isWiki {
-                            HintLegend()
-                                .padding(.horizontal, Theme.spacing16)
-                                .opacity(appeared ? 1 : 0)
-                                .animation(.easeOut.delay(0.4), value: appeared)
+                            VStack(spacing: 4) {
+                                Text("Comment jouer")
+                                    .font(Theme.inter(size: 11, weight: .semibold))
+                                    .foregroundColor(modeColor.opacity(0.8))
+                                    .textCase(.uppercase)
+                                    .tracking(1.5)
+                                Text(mode.title)
+                                    .font(Theme.fraunces(size: 28))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(Theme.text)
+                            }
+                            .opacity(appeared ? 1 : 0)
+                            .offset(y: appeared ? 0 : 10)
                         }
-
-                        Spacer(minLength: Theme.spacing24)
+                        .padding(.top, Theme.spacing24)
                     }
+
+                    // Rules steps
+                    VStack(spacing: Theme.spacing8) {
+                        ForEach(Array(steps.enumerated()), id: \.offset) { i, step in
+                            StepCard(
+                                number: i + 1,
+                                icon: step.icon,
+                                title: step.title,
+                                description: step.description,
+                                color: modeColor
+                            )
+                            .opacity(appeared ? 1 : 0)
+                            .offset(y: appeared ? 0 : 16)
+                            .animation(.spring(response: 0.45, dampingFraction: 0.8).delay(0.12 + Double(i) * 0.07), value: appeared)
+                        }
+                    }
+                    .padding(.horizontal, Theme.spacing16)
+                    .padding(.top, Theme.spacing8)
+
+                    // Hint legend (film/series only)
+                    if !mode.isWiki {
+                        AttemptLegend(color: modeColor)
+                            .padding(.horizontal, Theme.spacing16)
+                            .padding(.top, Theme.spacing16)
+                            .opacity(appeared ? 1 : 0)
+                            .animation(.easeOut.delay(0.45), value: appeared)
+                    }
+
+                    // Bottom padding for the fixed button
+                    Color.clear.frame(height: 100)
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        markSeen()
-                        dismiss()
-                    } label: {
-                        Text("C'est parti !")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(Theme.gold)
-                    }
-                    .accessibilityLabel("Fermer les règles et commencer")
+
+            // Fixed CTA button
+            VStack(spacing: 0) {
+                LinearGradient(
+                    colors: [Theme.background.opacity(0), Theme.background],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .frame(height: 32)
+
+                Button {
+                    markSeen()
+                    dismiss()
+                } label: {
+                    Text("C'est parti !")
+                        .font(Theme.inter(size: 16, weight: .bold))
+                        .foregroundColor(Color(hex: "#1a0f00"))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(hex: "#e8c06a"), Color(hex: "#d4a64a"), Color(hex: "#a07030")],
+                                startPoint: .top, endPoint: .bottom
+                            )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusM))
                 }
+                .padding(.horizontal, Theme.spacing16)
+                .padding(.bottom, Theme.spacing24)
+                .background(Theme.background)
             }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationBackground(Theme.background)
         .onAppear {
-            markSeen()
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.05)) {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.72).delay(0.05)) {
                 appeared = true
             }
         }
     }
 
-    // MARK: - Content by mode
+    // MARK: - Steps
 
-    private var rules: [String] {
+    private struct Step {
+        let icon: String
+        let title: String
+        let description: String
+    }
+
+    private var steps: [Step] {
         switch mode {
         case .film:
             return [
-                "Devinez le film mystère du jour.",
-                "L'image est floue au départ — elle se dévoile progressivement à chaque mauvaise réponse.",
-                "Jusqu'à 3 indices sont révélés : année, réalisateur, acteur principal…",
-                "Vous avez \(maxAttempts) tentatives. Utilisez la barre de recherche pour proposer un titre.",
-                "Un nouveau défi chaque jour à minuit (heure de Paris) !",
+                Step(icon: "photo.fill", title: "Image floue", description: "Une scène du film s'affiche, fortement floutée. Elle se dévoile progressivement à chaque mauvaise réponse."),
+                Step(icon: "list.bullet", title: "Indices progressifs", description: "Jusqu'à 3 indices sont révélés : année de sortie, réalisateur, acteur principal."),
+                Step(icon: "magnifyingglass", title: "Proposez un titre", description: "Utilisez la barre de recherche pour saisir votre réponse. Vous avez \(maxAttempts) tentatives."),
+                Step(icon: "clock.fill", title: "Un défi par jour", description: "Un nouveau film mystère chaque jour à minuit, heure de Paris. Revenez demain !"),
             ]
         case .series:
             return [
-                "Devinez la série mystère du jour.",
-                "L'image est floue au départ — elle se dévoile progressivement à chaque mauvaise réponse.",
-                "Jusqu'à 3 indices sont révélés : année, créateur, acteur principal…",
-                "Vous avez \(maxAttempts) tentatives. Utilisez la barre de recherche pour proposer un titre.",
-                "Un nouveau défi chaque jour à minuit (heure de Paris) !",
+                Step(icon: "photo.fill", title: "Image floue", description: "Une scène de la série s'affiche, fortement floutée. Elle se dévoile progressivement à chaque mauvaise réponse."),
+                Step(icon: "list.bullet", title: "Indices progressifs", description: "Jusqu'à 3 indices sont révélés : année de sortie, créateur, acteur principal."),
+                Step(icon: "magnifyingglass", title: "Proposez un titre", description: "Utilisez la barre de recherche pour saisir votre réponse. Vous avez \(maxAttempts) tentatives."),
+                Step(icon: "clock.fill", title: "Un défi par jour", description: "Une nouvelle série mystère chaque jour à minuit, heure de Paris. Revenez demain !"),
             ]
         case .wiki:
             return [
-                "Devinez la personnalité mystère du jour.",
-                "Sa photo reste masquée jusqu'à la fin de la partie.",
-                "Des indices sur sa carrière, ses fonctions ou ses clubs sont révélés progressivement.",
-                "Vous avez \(maxAttempts) tentatives. Utilisez la barre de recherche pour proposer un nom.",
-                "Un nouveau défi chaque jour à minuit (heure de Paris) !",
+                Step(icon: "eye.slash.fill", title: "Photo masquée", description: "La photo de la personnalité reste cachée tout au long de la partie — découvrez-la à la fin."),
+                Step(icon: "list.bullet", title: "Indices progressifs", description: "Des indices sur sa carrière, ses fonctions, ses clubs ou sa vie sont révélés après chaque mauvaise réponse."),
+                Step(icon: "magnifyingglass", title: "Proposez un nom", description: "Utilisez la barre de recherche pour saisir votre réponse. Vous avez \(maxAttempts) tentatives."),
+                Step(icon: "clock.fill", title: "Un défi par jour", description: "Une nouvelle personnalité mystère chaque jour à minuit, heure de Paris. Revenez demain !"),
             ]
         }
     }
@@ -124,19 +164,13 @@ struct RulesSheet: View {
 
     private var modeIcon: String {
         switch mode {
-        case .film:   return "film"
-        case .series: return "tv"
-        case .wiki:   return "building.columns"
+        case .film:   return "film.fill"
+        case .series: return "tv.fill"
+        case .wiki:   return "person.fill"
         }
     }
 
-    private var modeColor: Color {
-        switch mode {
-        case .film:   return Theme.gold
-        case .series: return Color(hex: "#8b6ff0")
-        case .wiki:   return Theme.green
-        }
-    }
+    private var modeColor: Color { mode.color }
 
     private func markSeen() {
         UserDefaults.standard.set(true, forKey: "rules_seen_\(mode.statsKey)")
@@ -147,73 +181,110 @@ private extension GameMode {
     var isWiki: Bool { self == .wiki }
 }
 
-// MARK: - Rule row
+// MARK: - Step card
 
-private struct RuleRow: View {
+private struct StepCard: View {
     let number: Int
-    let text: String
+    let icon: String
+    let title: String
+    let description: String
+    let color: Color
 
     var body: some View {
         HStack(alignment: .top, spacing: Theme.spacing12) {
-            Text("\(number)")
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
-                .foregroundColor(Theme.gold)
-                .frame(width: 24, height: 24)
-                .background(Theme.gold.opacity(0.12))
-                .clipShape(Circle())
+            // Number + icon badge
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(color.opacity(0.12))
+                    .frame(width: 44, height: 44)
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(color)
+            }
 
-            Text(text)
-                .font(.system(size: 15))
-                .foregroundColor(Theme.text)
-                .lineSpacing(3)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text("\(number)")
+                        .font(Theme.inter(size: 10, weight: .bold))
+                        .foregroundColor(color)
+                        .frame(width: 16, height: 16)
+                        .background(color.opacity(0.15))
+                        .clipShape(Circle())
+                    Text(title)
+                        .font(Theme.inter(size: 14, weight: .semibold))
+                        .foregroundColor(Theme.text)
+                }
+                Text(description)
+                    .font(Theme.inter(size: 13))
+                    .foregroundColor(Theme.textDim)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
-            Spacer()
+            Spacer(minLength: 0)
         }
         .padding(Theme.spacing12)
         .background(Theme.surface)
         .cornerRadius(Theme.radiusM)
-        .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(Theme.border, lineWidth: 1))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.radiusM)
+                .stroke(Theme.border, lineWidth: 1)
+        )
     }
 }
 
-// MARK: - Hint legend
+// MARK: - Attempt legend
 
-private struct HintLegend: View {
+private struct AttemptLegend: View {
+    let color: Color
+
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.spacing8) {
-            Text("Légende des tentatives")
-                .font(.system(size: 11, weight: .semibold))
+        VStack(alignment: .leading, spacing: Theme.spacing12) {
+            Text("Résultat de chaque tentative")
+                .font(Theme.inter(size: 11, weight: .semibold))
                 .foregroundColor(Theme.textDim)
                 .textCase(.uppercase)
                 .tracking(1)
 
-            HStack(spacing: Theme.spacing12) {
-                LegendItem(color: Theme.green,  symbol: "●", label: "Bonne réponse")
-                LegendItem(color: Theme.red,    symbol: "●", label: "Mauvaise réponse")
-                LegendItem(color: Theme.muted,  symbol: "○", label: "Tour passé")
+            HStack(spacing: 0) {
+                LegendDot(color: Theme.green,  label: "Bonne\nréponse")
+                Spacer()
+                LegendDot(color: Theme.red,    label: "Mauvaise\nréponse")
+                Spacer()
+                LegendDot(color: Theme.muted,  label: "Tour\npassé", hollow: true)
             }
         }
-        .padding(Theme.spacing12)
+        .padding(Theme.spacing16)
         .background(Theme.surface)
         .cornerRadius(Theme.radiusM)
-        .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(Theme.border, lineWidth: 1))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.radiusM)
+                .stroke(Theme.border, lineWidth: 1)
+        )
     }
 }
 
-private struct LegendItem: View {
+private struct LegendDot: View {
     let color: Color
-    let symbol: String
     let label: String
+    var hollow: Bool = false
 
     var body: some View {
-        HStack(spacing: 5) {
-            Text(symbol)
-                .font(.system(size: 10))
-                .foregroundColor(color)
+        VStack(spacing: 6) {
+            if hollow {
+                Circle()
+                    .stroke(color, lineWidth: 2)
+                    .frame(width: 20, height: 20)
+            } else {
+                Circle()
+                    .fill(color)
+                    .frame(width: 20, height: 20)
+            }
             Text(label)
-                .font(.system(size: 11))
+                .font(Theme.inter(size: 11))
                 .foregroundColor(Theme.textDim)
+                .multilineTextAlignment(.center)
+                .lineSpacing(1)
         }
     }
 }

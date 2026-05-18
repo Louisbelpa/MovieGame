@@ -19,6 +19,7 @@ import {
   getWikiGlobalStats,
 } from '../services/wiki-challenge.service.js'
 import { attachUserToGameSession } from '../services/game-session.service.js'
+import { getTodayParis } from '../lib/dates.js'
 
 export const wikiChallengeRouter = Router()
 
@@ -44,7 +45,7 @@ wikiChallengeRouter.get('/date/:date', async (req: Request, res: Response, next:
       res.status(400).json({ error: 'Date must be in YYYY-MM-DD format.' })
       return
     }
-    const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
+    const todayParis = getTodayParis()
     if (date > todayParis) {
       res.status(400).json({ error: 'Cannot access future challenges.' })
       return
@@ -131,7 +132,7 @@ wikiChallengeRouter.get('/result', async (req: Request, res: Response, next: Nex
 wikiChallengeRouter.get('/dates', (req: Request, res: Response, next: NextFunction) => {
   try {
     const days = Math.min(Math.max(1, parseInt((req.query.days as string) ?? '90', 10)), 365)
-    const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
+    const todayParis = getTodayParis()
     const from = new Date(todayParis + 'T12:00:00Z')
     from.setUTCDate(from.getUTCDate() - days)
     const fromStr = from.toISOString().slice(0, 10)
@@ -162,7 +163,7 @@ wikiChallengeRouter.get('/adjacent', (req: Request, res: Response, next: NextFun
     if (direction !== 'prev' && direction !== 'next') {
       res.status(400).json({ error: 'direction must be "prev" or "next"' }); return
     }
-    const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
+    const todayParis = getTodayParis()
     const row = direction === 'prev'
       ? db.prepare<[string, string], { challenge_date: string }>(
           `SELECT challenge_date FROM daily_challenges

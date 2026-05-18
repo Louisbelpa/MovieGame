@@ -147,6 +147,7 @@ CREATE TABLE IF NOT EXISTS daily_challenges (
 CREATE INDEX IF NOT EXISTS idx_daily_challenges_date      ON daily_challenges (challenge_date);
 CREATE INDEX IF NOT EXISTS idx_daily_challenges_film_id   ON daily_challenges (film_id);
 -- series_id and media_type indexes created by incremental migrations after those columns are added
+CREATE INDEX IF NOT EXISTS idx_dc_date_type_active ON daily_challenges (challenge_date, media_type, is_active);
 
 -- ---------------------------------------------------------------------------
 -- game_sessions

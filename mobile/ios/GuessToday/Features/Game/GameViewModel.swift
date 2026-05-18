@@ -1,6 +1,5 @@
 import Foundation
 import SwiftUI
-import Combine
 
 enum GameMode {
     case film, series, wiki
@@ -28,42 +27,63 @@ enum GameMode {
         case .wiki:   return "wiki"
         }
     }
+
+    var color: Color {
+        switch self {
+        case .film:   return Theme.gold
+        case .series: return Color(hex: "#6b7cff")
+        case .wiki:   return Color(hex: "#e85788")
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .film:   return "film"
+        case .series: return "tv"
+        case .wiki:   return "person.text.rectangle"
+        }
+    }
 }
 
+@Observable
 @MainActor
-final class GameViewModel: ObservableObject {
+final class GameViewModel {
     let mode: GameMode
 
     // Challenge state
-    @Published var challenge: ChallengePayload?
-    @Published var filmResult: ChallengeResult?
-    @Published var wikiResult: WikiResult?
+    var challenge: ChallengePayload?
+    var filmResult: ChallengeResult?
+    var wikiResult: WikiResult?
 
     // UI state
-    @Published var isLoading = false
-    @Published var error: String?
-    @Published var inputText = ""
-    @Published var searchResults: [SearchResultItem] = []
-    @Published var isSearching = false
-    @Published var previousHintsRevealed = 0
+    var isLoading = false
+    var error: String?
+    var inputText = ""
+    var searchResults: [SearchResultItem] = []
+    var isSearching = false
+    var previousHintsRevealed = 0
 
     // Game outcome sheet
-    @Published var showWinSheet = false
-    @Published var showLoseSheet = false
+    var showWinSheet = false
+    var showLoseSheet = false
 
     // Date navigation
-    @Published var viewingDate: String?
-    @Published var notFound = false
+    var viewingDate: String?
+    var notFound = false
 
     // Shake animation trigger
-    @Published var shakeAmount: Double = 0
+    var shakeAmount: Double = 0
 
     // Flash feedback color (green = correct, red = wrong)
-    @Published var flashColor: Color? = nil
+    var flashColor: Color? = nil
 
     // Haptic feedback
-    private let haptic = UIImpactFeedbackGenerator(style: .medium)
-    private let successHaptic = UINotificationFeedbackGenerator()
+    private let successHaptic  = UINotificationFeedbackGenerator()
+    private let errorHaptic    = UINotificationFeedbackGenerator()
+    private let lightImpact    = UIImpactFeedbackGenerator(style: .light)
+    private let mediumImpact   = UIImpactFeedbackGenerator(style: .medium)
+    private let heavyImpact    = UIImpactFeedbackGenerator(style: .heavy)
+    private let selectionHaptic = UISelectionFeedbackGenerator()
 
     private var searchTask: Task<Void, Never>?
 
@@ -73,26 +93,29 @@ final class GameViewModel: ObservableObject {
 
     // MARK: - Load
 
-    func loadToday() async {
+    func loadToday(isRefresh: Bool = false) async {
         viewingDate = nil
-        await fetchChallenge(date: nil)
+        await fetchChallenge(date: nil, isRefresh: isRefresh)
     }
 
-    func loadDate(_ date: String) async {
+    func loadDate(_ date: String, isRefresh: Bool = false) async {
         viewingDate = date
-        await fetchChallenge(date: date)
+        await fetchChallenge(date: date, isRefresh: isRefresh)
     }
 
-    private func fetchChallenge(date: String?) async {
-        isLoading = true
-        challenge = nil  // force view remount so stale HintCard @State doesn't linger
+    private func fetchChallenge(date: String?, isRefresh: Bool = false) async {
+        // On refresh: keep challenge visible, skip loading state, suppress errors silently
+        if !isRefresh {
+            challenge = nil  // force view remount so stale HintCard @State doesn't linger
+            filmResult = nil
+            wikiResult = nil
+            inputText = ""
+            searchResults = []
+            previousHintsRevealed = 0
+        }
+        isLoading = !isRefresh
         error = nil
         notFound = false
-        filmResult = nil
-        wikiResult = nil
-        inputText = ""
-        searchResults = []
-        previousHintsRevealed = 0
 
         do {
             let payload: ChallengePayload
@@ -109,20 +132,23 @@ final class GameViewModel: ObservableObject {
 
             if payload.isGameOver {
                 await fetchResult(challengeId: payload.challengeId)
-                if payload.won {
-                    showWinSheet = true
-                } else if payload.lost {
-                    showLoseSheet = true
+                if !isRefresh {
+                    if payload.won { showWinSheet = true }
+                    else if payload.lost { showLoseSheet = true }
                 }
             }
         } catch let e as APIError {
             if case .httpError(let code, _) = e, code == 404 {
                 notFound = true
-            } else {
+            } else if !isRefresh {
                 error = e.localizedDescription
             }
+            // On refresh: silent failure — keeps existing challenge visible
         } catch {
-            self.error = error.localizedDescription
+            if !isRefresh {
+                self.error = error.localizedDescription
+            }
+            // On refresh: silent failure — network drop/cancellation doesn't wipe the game
         }
 
         isLoading = false
@@ -149,16 +175,22 @@ final class GameViewModel: ObservableObject {
                 SoundManager.shared.playSuccess()
                 triggerFlash(.green)
                 await fetchResult(challengeId: response.challenge.challengeId)
+                heavyImpact.impactOccurred()           // impact fort à l'ouverture de WinSheet
                 showWinSheet = true
                 recordStats(won: true, attemptsUsed: response.challenge.attemptsUsed)
             } else {
-                haptic.impactOccurred()
+                errorHaptic.notificationOccurred(.warning)
                 SoundManager.shared.playError()
                 triggerShake()
                 triggerFlash(.red)
+                // Hint débloqué après une mauvaise réponse
+                if response.challenge.hintsRevealed > previousHintsRevealed {
+                    lightImpact.impactOccurred()
+                }
                 if response.challenge.isGameOver {
                     await fetchResult(challengeId: response.challenge.challengeId)
                     SoundManager.shared.playLose()
+                    errorHaptic.notificationOccurred(.error)   // impact erreur à l'ouverture de LoseSheet
                     showLoseSheet = true
                     recordStats(won: false, attemptsUsed: response.challenge.attemptsUsed)
                 }
@@ -171,6 +203,7 @@ final class GameViewModel: ObservableObject {
     }
 
     func skipAttempt() async {
+        mediumImpact.impactOccurred()
         await submitGuess("")
     }
 
@@ -202,6 +235,7 @@ final class GameViewModel: ObservableObject {
     }
 
     func selectSearchResult(_ item: SearchResultItem) {
+        selectionHaptic.selectionChanged()
         inputText = item.title
         searchResults = []
     }
@@ -222,27 +256,45 @@ final class GameViewModel: ObservableObject {
 
     func navigatePrev() async {
         let refDate = challenge?.date ?? viewingDate ?? todayParis()
-        let canPrev = challenge?.hasPrevChallenge ?? true
-        guard canPrev else { return }
+        guard challenge?.hasPrevChallenge ?? true else { return }
+        lightImpact.impactOccurred()
         do {
-            if let prevDate = try await APIClient.shared.adjacentDate(date: refDate, direction: "prev", type: mode == .wiki ? "wiki" : mode.apiType) {
-                await loadDate(prevDate)
+            let prevDate: String?
+            if mode == .wiki {
+                prevDate = try await APIClient.shared.wikiAdjacentDate(date: refDate, direction: "prev")
+            } else {
+                prevDate = try await APIClient.shared.adjacentDate(date: refDate, direction: "prev", type: mode.apiType)
             }
-        } catch {}
+            if let prevDate { await loadDate(prevDate) }
+        } catch let e as APIError {
+            error = e.localizedDescription
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
     func navigateNext() async {
         let refDate = challenge?.date ?? viewingDate ?? todayParis()
         let canNext = challenge.map { $0.hasNextChallenge && $0.isPastChallenge } ?? (refDate < todayParis())
         guard canNext else { return }
+        lightImpact.impactOccurred()
         do {
-            if let nextDate = try await APIClient.shared.adjacentDate(date: refDate, direction: "next", type: mode == .wiki ? "wiki" : mode.apiType) {
-                await loadDate(nextDate)
+            let nextDate: String?
+            if mode == .wiki {
+                nextDate = try await APIClient.shared.wikiAdjacentDate(date: refDate, direction: "next")
+            } else {
+                nextDate = try await APIClient.shared.adjacentDate(date: refDate, direction: "next", type: mode.apiType)
             }
-        } catch {}
+            if let nextDate { await loadDate(nextDate) }
+        } catch let e as APIError {
+            error = e.localizedDescription
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
     func returnToToday() async {
+        lightImpact.impactOccurred()
         await loadToday()
     }
 
@@ -291,6 +343,7 @@ final class GameViewModel: ObservableObject {
             stats.maxStreak = max(stats.maxStreak, stats.currentStreak)
             stats.distribution["\(attemptsUsed)", default: 0] += 1
             triggerMilestoneHaptic(for: stats.currentStreak)
+            AppStoreReview.recordWin()
         } else {
             // Loss today breaks the streak only if they haven't won today
             if stats.lastWonDate != today {
@@ -310,18 +363,11 @@ final class GameViewModel: ObservableObject {
     }
 
     private func todayParis() -> String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.timeZone = TimeZone(identifier: "Europe/Paris")
-        return f.string(from: Date())
+        DateFormatter.parisDate.string(from: Date())
     }
 
     private func yesterdayParis() -> String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.timeZone = TimeZone(identifier: "Europe/Paris")
-        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
-        return f.string(from: yesterday)
+        DateFormatter.parisDate.string(from: Calendar.current.date(byAdding: .day, value: -1, to: Date())!)
     }
 
     private func triggerMilestoneHaptic(for streak: Int) {

@@ -7,7 +7,7 @@ struct ProfileView: View {
     @State private var showLogin = false
     @State private var showChangePassword = false
     @State private var showEditName = false
-    @State private var selectedMode: GameMode = .film
+    @State private var selectedMode: GameMode? = nil   // nil = tous les modes
 
     var body: some View {
         NavigationStack {
@@ -19,7 +19,7 @@ struct ProfileView: View {
                 } else if let currentUser = auth.user {
                     LoggedInProfileView(
                         user: currentUser,
-                        selectedMode: $selectedMode,
+                        selectedMode: $selectedMode,   // GameMode? — nil = Tous
                         showChangePassword: $showChangePassword,
                         showEditName: $showEditName
                     )
@@ -104,6 +104,13 @@ private struct GuestProfileView: View {
             .buttonStyle(PrimaryButtonStyle())
             .padding(.horizontal, Theme.spacing24)
             Spacer()
+            NavigationLink(destination: AboutView()) {
+                Text("À propos · Confidentialité · Mentions légales")
+                    .font(.system(size: 12))
+                    .foregroundColor(Theme.muted)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.bottom, Theme.spacing24)
         }
     }
 }
@@ -112,7 +119,7 @@ private struct GuestProfileView: View {
 
 private struct LoggedInProfileView: View {
     let user: User
-    @Binding var selectedMode: GameMode
+    @Binding var selectedMode: GameMode?   // nil = Tous
     @Binding var showChangePassword: Bool
     @Binding var showEditName: Bool
 
@@ -120,6 +127,9 @@ private struct LoggedInProfileView: View {
     @State private var avatarItem: PhotosPickerItem?
     @State private var avatarUploading = false
     @State private var avatarError: String?
+    @State private var showDeleteConfirm = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
 
     var body: some View {
         ScrollView {
@@ -173,18 +183,31 @@ private struct LoggedInProfileView: View {
                                 .foregroundColor(Theme.textDim)
                         }
 
-                        if user.emailVerified == false {
-                            EmailVerificationBanner()
-                        }
                     }
                 }
                 .padding(.top, Theme.spacing16)
 
                 // Mode tabs — pill style
                 HStack(spacing: 4) {
+                    // "Tous" tab
+                    let isTotalActive = selectedMode == nil
+                    Button("Tous") {
+                        withAnimation(.easeInOut(duration: 0.18)) { selectedMode = nil }
+                    }
+                    .font(.system(size: 13, weight: isTotalActive ? .semibold : .regular))
+                    .foregroundColor(isTotalActive ? Theme.text : Theme.textDim)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(isTotalActive ? Theme.text.opacity(0.10) : Color.clear)
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(isTotalActive ? Theme.border : Color.clear, lineWidth: 1)
+                    )
+
                     ForEach([GameMode.film, .series, .wiki], id: \.title) { mode in
                         let isActive = selectedMode == mode
-                        let activeColor = modeColor(mode)
+                        let activeColor = mode.color
                         Button(mode.title) {
                             withAnimation(.easeInOut(duration: 0.18)) { selectedMode = mode }
                         }
@@ -205,12 +228,16 @@ private struct LoggedInProfileView: View {
                 .cornerRadius(Theme.radiusM)
                 .padding(.horizontal, Theme.spacing16)
 
-                // Stats for selected mode
+                // Stats for selected mode (nil = aggregate)
                 StatsPanel(mode: selectedMode)
                     .padding(.horizontal, Theme.spacing16)
 
                 // Achievements
                 AchievementsSection()
+                    .padding(.horizontal, Theme.spacing16)
+
+                // Notification promo (shown only when not yet enabled)
+                NotificationPromoCard()
                     .padding(.horizontal, Theme.spacing16)
 
                 // Navigation links
@@ -229,20 +256,57 @@ private struct LoggedInProfileView: View {
                         ProfileNavRow(icon: "lock", label: "Changer le mot de passe", color: Theme.textDim)
                     }
                     .buttonStyle(.plain)
+
+                    NavigationLink(destination: AboutView()) {
+                        ProfileNavRow(icon: "info.circle", label: "À propos & légal", color: Theme.textDim)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        showDeleteConfirm = true
+                    } label: {
+                        ProfileNavRow(icon: "trash", label: "Supprimer mon compte", color: Theme.red)
+                    }
+                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, Theme.spacing16)
 
                 Spacer(minLength: Theme.spacing24)
             }
         }
+        .task { await StatsManager.shared.refreshFromServer() }
+        .alert("Erreur", isPresented: .init(
+            get: { deleteError != nil },
+            set: { if !$0 { deleteError = nil } }
+        )) {
+            Button("OK", role: .cancel) { deleteError = nil }
+        } message: {
+            Text(deleteError ?? "")
+        }
+        .confirmationDialog(
+            "Supprimer mon compte",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Supprimer définitivement", role: .destructive) {
+                Task { await deleteAccount() }
+            }
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("Cette action est irréversible. Toutes vos données seront supprimées.")
+        }
     }
 
-    private func modeColor(_ mode: GameMode) -> Color {
-        switch mode {
-        case .film:   return Theme.gold
-        case .series: return Color(hex: "#6b7cff")
-        case .wiki:   return Color(hex: "#e85788")
+    private func deleteAccount() async {
+        isDeleting = true
+        do {
+            try await auth.deleteAccount()
+        } catch let e as APIError {
+            deleteError = e.localizedDescription
+        } catch {
+            deleteError = error.localizedDescription
         }
+        isDeleting = false
     }
 
     private func uploadAvatar(_ item: PhotosPickerItem) async {
@@ -271,8 +335,29 @@ private struct LoggedInProfileView: View {
 // MARK: - Stats panel
 
 private struct StatsPanel: View {
-    let mode: GameMode
-    private var stats: LocalStats { StatsManager.shared.stats(for: mode) }
+    let mode: GameMode?   // nil = agrégat tous modes
+
+    private var stats: LocalStats {
+        guard let mode else { return aggregateStats() }
+        return StatsManager.shared.stats(for: mode)
+    }
+
+    private func aggregateStats() -> LocalStats {
+        let film   = StatsManager.shared.stats(for: .film)
+        let series = StatsManager.shared.stats(for: .series)
+        let wiki   = StatsManager.shared.stats(for: .wiki)
+        var total  = LocalStats()
+        total.gamesPlayed    = film.gamesPlayed + series.gamesPlayed + wiki.gamesPlayed
+        total.wins           = film.wins + series.wins + wiki.wins
+        total.currentStreak  = max(film.currentStreak, series.currentStreak, wiki.currentStreak)
+        total.maxStreak      = max(film.maxStreak, series.maxStreak, wiki.maxStreak)
+        var dist: [String: Int] = [:]
+        for (k, v) in film.distribution   { dist[k, default: 0] += v }
+        for (k, v) in series.distribution { dist[k, default: 0] += v }
+        for (k, v) in wiki.distribution   { dist[k, default: 0] += v }
+        total.distribution = dist
+        return total
+    }
 
     var body: some View {
         VStack(spacing: Theme.spacing16) {
@@ -282,9 +367,9 @@ private struct StatsPanel: View {
                 Divider().frame(height: 36).background(Theme.border)
                 StatBox(label: "Victoires", value: "\(stats.wins)")
                 Divider().frame(height: 36).background(Theme.border)
-                StatBox(label: "Série actuelle", value: "\(stats.currentStreak)")
+                StatBox(label: "En cours", value: "\(stats.currentStreak)")
                 Divider().frame(height: 36).background(Theme.border)
-                StatBox(label: "Meilleure série", value: "\(stats.maxStreak)")
+                StatBox(label: "Record", value: "\(stats.maxStreak)")
             }
             .padding(Theme.spacing12)
             .cardStyle()
@@ -405,14 +490,123 @@ struct AvatarView: View {
     }
 }
 
+// MARK: - Notification promo card
+
+struct NotificationPromoCard: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var authStatus: UNAuthorizationStatus = .notDetermined
+    @State private var isRequesting = false
+
+    var body: some View {
+        Group {
+            if authStatus != .authorized {
+                VStack(spacing: 0) {
+                    HStack(spacing: Theme.spacing12) {
+                        ZStack {
+                            Circle()
+                                .fill(Theme.gold.opacity(0.15))
+                                .frame(width: 44, height: 44)
+                            Image(systemName: "bell.badge.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(Theme.gold)
+                        }
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Rappels quotidiens")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(Theme.text)
+                            Text("Ne manquez aucun défi. On vous prévient quand le nouveau défi arrive.")
+                                .font(.system(size: 12))
+                                .foregroundColor(Theme.textDim)
+                                .lineSpacing(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer(minLength: 4)
+                    }
+                    .padding(Theme.spacing16)
+
+                    Divider().background(Theme.border)
+
+                    if authStatus == .denied {
+                        Button {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        } label: {
+                            Text("Ouvrir les Réglages")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(Theme.gold)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                        }
+                    } else {
+                        Button {
+                            requestPermission()
+                        } label: {
+                            HStack(spacing: 6) {
+                                if isRequesting {
+                                    ProgressView().scaleEffect(0.7).tint(Theme.background)
+                                }
+                                Text("Activer les notifications")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .foregroundColor(Theme.background)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color(hex: "#e8c06a"), Color(hex: "#d4a64a"), Color(hex: "#a07030")],
+                                    startPoint: .top, endPoint: .bottom
+                                )
+                            )
+                        }
+                        .disabled(isRequesting)
+                    }
+                }
+                .background(Theme.surface)
+                .cornerRadius(Theme.radiusM)
+                .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(Theme.gold.opacity(0.3), lineWidth: 1))
+            }
+        }
+        .onAppear { checkStatus() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { checkStatus() }
+        }
+    }
+
+    private func checkStatus() {
+        NotificationManager.shared.checkAuthorizationStatus { status in
+            authStatus = status
+            if status == .authorized {
+                NotificationManager.shared.isEnabled = true
+            }
+        }
+    }
+
+    private func requestPermission() {
+        isRequesting = true
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+            DispatchQueue.main.async {
+                isRequesting = false
+                authStatus = granted ? .authorized : .denied
+                if granted {
+                    NotificationManager.shared.isEnabled = true
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Notification settings
 
 private struct NotificationSettingsSection: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var isEnabled = NotificationManager.shared.isEnabled
     @State private var authStatus: UNAuthorizationStatus = .notDetermined
     @State private var reminderHour = NotificationManager.shared.reminderHour
 
-    private let hours = Array(5...23)
+    private let hours = NotificationManager.availableHours
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.spacing8) {
@@ -450,7 +644,7 @@ private struct NotificationSettingsSection: View {
                 if isEnabled && authStatus != .denied {
                     Divider().background(Theme.border).padding(.horizontal, Theme.spacing12)
 
-                    // Hour picker
+                    // Time picker
                     HStack {
                         Label("Heure du rappel", systemImage: "clock")
                             .font(.system(size: 14))
@@ -458,7 +652,7 @@ private struct NotificationSettingsSection: View {
                         Spacer()
                         Picker("", selection: $reminderHour) {
                             ForEach(hours, id: \.self) { h in
-                                Text(String(format: "%02d:00", h)).tag(h)
+                                Text(String(format: "%02dh00", h)).tag(h)
                             }
                         }
                         .pickerStyle(.menu)
@@ -475,12 +669,19 @@ private struct NotificationSettingsSection: View {
             .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(Theme.border, lineWidth: 1))
         }
         .onAppear { checkStatus() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { checkStatus() }
+        }
     }
 
     private func checkStatus() {
         NotificationManager.shared.checkAuthorizationStatus { status in
             authStatus = status
-            if status == .denied { isEnabled = false }
+            if status == .denied {
+                isEnabled = false
+            } else if status == .authorized {
+                isEnabled = NotificationManager.shared.isEnabled
+            }
         }
     }
 
@@ -542,8 +743,7 @@ private struct AchievementsSection: View {
     private let sm = StatsManager.shared
     private var achievements: [Achievement] { Achievement.build(from: sm) }
     private var earned: [Achievement] { achievements.filter(\.isEarned) }
-    private var locked: [Achievement] { achievements.filter { !$0.isEarned } }
-    @State private var selectedLocked: Achievement?
+    @State private var selected: Achievement?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.spacing8) {
@@ -559,19 +759,22 @@ private struct AchievementsSection: View {
                     .foregroundColor(Theme.muted)
             }
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: Theme.spacing8) {
-                ForEach(earned) { badge in
-                    AchievementBadge(achievement: badge, earned: true)
-                }
-                ForEach(locked) { badge in
-                    Button { selectedLocked = badge } label: {
-                        AchievementBadge(achievement: badge, earned: false)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Theme.spacing8) {
+                    ForEach(achievements) { badge in
+                        Button { if !badge.isEarned { selected = badge } } label: {
+                            AchievementBadge(achievement: badge, earned: badge.isEarned)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(badge.isEarned)
                     }
-                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, Theme.spacing16)
+                .padding(.vertical, 4)
             }
+            .padding(.horizontal, -Theme.spacing16) // déborde jusqu'aux bords
         }
-        .sheet(item: $selectedLocked) { achievement in
+        .sheet(item: $selected) { achievement in
             AchievementDetailSheet(achievement: achievement)
         }
     }
@@ -607,13 +810,13 @@ private struct AchievementBadge: View {
                     .lineLimit(2)
             }
         }
-        .frame(maxWidth: .infinity)
+        .frame(width: 80)
         .padding(.vertical, Theme.spacing8)
         .padding(.horizontal, 4)
         .background(earned ? Theme.surface : Theme.surfaceAlt.opacity(0.3))
         .cornerRadius(Theme.radiusM)
         .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(earned ? achievement.color.opacity(0.25) : Theme.border.opacity(0.3), lineWidth: 1))
-        .opacity(earned ? 1 : 0.5)
+        .opacity(earned ? 1 : 0.45)
         .scaleEffect(appeared ? 1 : 0.88)
         .onAppear {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.7).delay(earned ? 0.1 : 0)) {
@@ -727,44 +930,6 @@ private struct AchievementDetailSheet: View {
     }
 }
 
-// MARK: - Email verification banner
-
-private struct EmailVerificationBanner: View {
-    @State private var isSending = false
-    @State private var sent = false
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.circle")
-                .font(.system(size: 12))
-                .foregroundColor(Theme.amber)
-            Text(sent ? "Email envoyé !" : "Email non vérifié")
-                .font(.system(size: 12))
-                .foregroundColor(Theme.amber)
-            Spacer()
-            if !sent {
-                Button(isSending ? "Envoi…" : "Renvoyer") {
-                    guard !isSending else { return }
-                    Task {
-                        isSending = true
-                        try? await APIClient.shared.resendVerificationEmail()
-                        sent = true
-                        isSending = false
-                    }
-                }
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Theme.gold)
-                .disabled(isSending)
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(Theme.amber.opacity(0.08))
-        .cornerRadius(8)
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.amber.opacity(0.25), lineWidth: 1))
-    }
-}
-
 // MARK: - Edit name sheet
 
 struct EditNameView: View {
@@ -818,6 +983,349 @@ struct EditNameView: View {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+}
+
+// MARK: - About view
+
+struct AboutView: View {
+    private let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    private let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+
+    var body: some View {
+        ZStack {
+            Theme.background.ignoresSafeArea()
+            ScrollView {
+                VStack(spacing: Theme.spacing24) {
+
+                    // App identity
+                    VStack(spacing: Theme.spacing8) {
+                        ApertureIconView(size: 64)
+                        (
+                            Text("Guess")
+                                .font(Theme.fraunces(size: 28)).foregroundColor(Theme.text)
+                            + Text("today")
+                                .font(Theme.fraunces(size: 28, italic: true))
+                                .foregroundStyle(LinearGradient(
+                                    colors: [Color(hex: "#e8c06a"), Color(hex: "#d4a64a"), Color(hex: "#a07030")],
+                                    startPoint: .top, endPoint: .bottom
+                                ))
+                        )
+                        Text("Version \(appVersion) (\(buildNumber))")
+                            .font(.system(size: 12))
+                            .foregroundColor(Theme.muted)
+                    }
+                    .padding(.top, Theme.spacing8)
+
+                    // Sources de données
+                    AboutSection(title: "Sources de données") {
+                        AboutLinkRow(
+                            icon: "film.fill",
+                            iconColor: Theme.gold,
+                            title: "The Movie Database",
+                            subtitle: "Films & séries — données, images",
+                            url: URL(string: "https://www.themoviedb.org")!,
+                            note: "Ce produit utilise l'API TMDB mais n'est pas approuvé ou certifié par TMDB."
+                        )
+                        Divider().background(Theme.border).padding(.leading, 52)
+                        AboutLinkRow(
+                            icon: "person.fill",
+                            iconColor: Theme.modeWiki,
+                            title: "Wikipédia",
+                            subtitle: "Personnalités — biographies, données",
+                            url: URL(string: "https://www.wikipedia.org")!,
+                            note: "Contenu sous licence Creative Commons Attribution-ShareAlike."
+                        )
+                    }
+                    .padding(.horizontal, Theme.spacing16)
+
+                    // Contact
+                    AboutSection(title: "Contact") {
+                        AboutLinkRow(
+                            icon: "envelope.fill",
+                            iconColor: Theme.gold,
+                            title: "Nous écrire",
+                            subtitle: "contact@guesstoday.fr",
+                            url: URL(string: "mailto:contact@guesstoday.fr")!
+                        )
+                    }
+                    .padding(.horizontal, Theme.spacing16)
+
+                    // Légal
+                    AboutSection(title: "Légal") {
+                        NavigationLink(destination: PrivacyView()) {
+                            AboutNavRow(
+                                icon: "lock.shield.fill",
+                                iconColor: Theme.textDim,
+                                title: "Politique de confidentialité"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        Divider().background(Theme.border).padding(.leading, 52)
+                        AboutLinkRow(
+                            icon: "doc.text.fill",
+                            iconColor: Theme.textDim,
+                            title: "Conditions d'utilisation",
+                            subtitle: "guesstoday.fr/cgu",
+                            url: URL(string: "https://guesstoday.fr/cgu")!
+                        )
+                        Divider().background(Theme.border).padding(.leading, 52)
+                        AboutLinkRow(
+                            icon: "globe",
+                            iconColor: Theme.textDim,
+                            title: "Site web",
+                            subtitle: "guesstoday.fr",
+                            url: URL(string: "https://guesstoday.fr")!
+                        )
+                    }
+                    .padding(.horizontal, Theme.spacing16)
+
+                    Text("Fait avec ♥ à Paris")
+                        .font(.system(size: 12))
+                        .foregroundColor(Theme.muted)
+                        .padding(.bottom, Theme.spacing24)
+                }
+                .padding(.top, Theme.spacing16)
+            }
+        }
+        .navigationTitle("À propos")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Theme.background, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+    }
+}
+
+private struct AboutSection<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.spacing8) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(Theme.textDim)
+                .textCase(.uppercase)
+                .tracking(1)
+
+            VStack(alignment: .leading, spacing: 0) {
+                content()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.surface)
+            .cornerRadius(Theme.radiusM)
+            .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(Theme.border, lineWidth: 1))
+        }
+    }
+}
+
+private struct AboutLinkRow: View {
+    let icon: String
+    var iconColor: Color = Theme.textDim
+    let title: String
+    var subtitle: String? = nil
+    let url: URL
+    var note: String? = nil
+
+    var body: some View {
+        Link(destination: url) {
+            HStack(spacing: Theme.spacing12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(iconColor.opacity(0.12))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: icon)
+                        .font(.system(size: 16))
+                        .foregroundColor(iconColor)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(Theme.text)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 12))
+                            .foregroundColor(Theme.textDim)
+                    }
+                    if let note {
+                        Text(note)
+                            .font(.system(size: 11))
+                            .foregroundColor(Theme.muted)
+                            .multilineTextAlignment(.leading)
+                            .lineSpacing(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 2)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(Theme.muted)
+            }
+            .padding(.horizontal, Theme.spacing16)
+            .padding(.vertical, 12)
+        }
+    }
+}
+
+private struct AboutNavRow: View {
+    let icon: String
+    var iconColor: Color = Theme.textDim
+    let title: String
+
+    var body: some View {
+        HStack(spacing: Theme.spacing12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(iconColor.opacity(0.12))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                    .foregroundColor(iconColor)
+            }
+
+            Text(title)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(Theme.text)
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(Theme.muted)
+        }
+        .padding(.horizontal, Theme.spacing16)
+        .padding(.vertical, 12)
+    }
+}
+
+// MARK: - Privacy view
+
+struct PrivacyView: View {
+    var body: some View {
+        ZStack {
+            Theme.background.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.spacing24) {
+
+                    PrivacySection(title: "Données collectées") {
+                        PrivacyItem(
+                            icon: "person.badge.key.fill",
+                            title: "Compte utilisateur",
+                            text: "Si vous créez un compte : adresse e-mail et nom d'affichage uniquement."
+                        )
+                        PrivacyItem(
+                            icon: "clock.fill",
+                            title: "Statistiques de jeu",
+                            text: "Vos résultats quotidiens (victoires, tentatives, série) sont sauvegardés sur nos serveurs si vous êtes connecté, en local sinon."
+                        )
+                        PrivacyItem(
+                            icon: "chart.bar.fill",
+                            title: "Statistiques anonymes",
+                            text: "Des compteurs agrégés et anonymisés (nombre total de parties, distribution des tentatives) alimentent les statistiques communautaires."
+                        )
+                    }
+
+                    PrivacySection(title: "Ce que nous ne collectons pas") {
+                        PrivacyItem(
+                            icon: "xmark.shield.fill",
+                            title: "Aucune donnée personnelle",
+                            text: "Pas de nom réel, pas de localisation, pas d'identifiant publicitaire, pas de données de santé."
+                        )
+                        PrivacyItem(
+                            icon: "eye.slash.fill",
+                            title: "Aucun suivi publicitaire",
+                            text: "GuessToday ne contient aucun SDK publicitaire ni aucun traceur tiers."
+                        )
+                    }
+
+                    PrivacySection(title: "Cookies & session") {
+                        PrivacyItem(
+                            icon: "lock.fill",
+                            title: "Un seul cookie de session",
+                            text: "Un cookie HTTP-only signé et chiffré, valable 30 jours, servant uniquement à maintenir votre connexion. Il n'est jamais partagé."
+                        )
+                    }
+
+                    PrivacySection(title: "Sources tierces") {
+                        PrivacyItem(
+                            icon: "film.fill",
+                            title: "The Movie Database (TMDB)",
+                            text: "Les données de films et séries (titres, images, directeurs, casting) proviennent de l'API TMDB. Leur utilisation est soumise aux conditions d'utilisation de TMDB."
+                        )
+                        PrivacyItem(
+                            icon: "person.fill",
+                            title: "Wikipédia & Wikidata",
+                            text: "Les biographies et informations sur les personnalités sont issues de Wikipédia et Wikidata, sous licence Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0). GuessToday n'est pas affilié à la Wikimedia Foundation."
+                        )
+                    }
+
+                    Text("Dernière mise à jour : mai 2026")
+                        .font(.system(size: 12))
+                        .foregroundColor(Theme.muted)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.bottom, Theme.spacing24)
+                }
+                .padding(.horizontal, Theme.spacing16)
+                .padding(.top, Theme.spacing16)
+            }
+        }
+        .navigationTitle("Confidentialité")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Theme.background, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+    }
+}
+
+private struct PrivacySection<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.spacing8) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(Theme.textDim)
+                .textCase(.uppercase)
+                .tracking(1)
+
+            VStack(alignment: .leading, spacing: 0) {
+                content()
+            }
+            .background(Theme.surface)
+            .cornerRadius(Theme.radiusM)
+            .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(Theme.border, lineWidth: 1))
+        }
+    }
+}
+
+private struct PrivacyItem: View {
+    let icon: String
+    let title: String
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Theme.spacing12) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundColor(Theme.textDim)
+                .frame(width: 20)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(Theme.text)
+                Text(text)
+                    .font(.system(size: 13))
+                    .foregroundColor(Theme.textDim)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, Theme.spacing16)
+        .padding(.vertical, 12)
     }
 }
 

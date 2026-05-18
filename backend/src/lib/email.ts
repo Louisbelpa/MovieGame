@@ -12,6 +12,15 @@
 import { Resend } from 'resend';
 import { logger } from './logger.js';
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 let resendClient: Resend | null = null;
 
 function getClient(): Resend {
@@ -40,7 +49,7 @@ export async function sendPasswordResetEmail(
       html: `
         <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#0d0d0d;color:#e5e5e5;border-radius:12px">
           <h1 style="font-size:22px;margin-bottom:8px;color:#d4a64a">GuessToday</h1>
-          <p style="margin-bottom:16px">Salut <strong>${displayName}</strong>,</p>
+          <p style="margin-bottom:16px">Salut <strong>${escapeHtml(displayName)}</strong>,</p>
           <p style="margin-bottom:24px">Tu as demandé à réinitialiser ton mot de passe. Clique sur le bouton ci-dessous — ce lien est valable <strong>1 heure</strong>.</p>
           <a href="${url}" style="display:inline-block;background:#d4a64a;color:#1a0f00;font-weight:600;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:15px">
             Réinitialiser mon mot de passe

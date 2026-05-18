@@ -25,7 +25,7 @@ final class APIClient {
     #if NRT
     static let baseURL = "https://moviegame-staging.up.railway.app"
     #elseif DEBUG
-    static let baseURL = "http://192.168.1.14:3001"
+    static let baseURL = "http://localhost:3001"
     #else
     static let baseURL = "https://guesstoday.fr"
     #endif
@@ -43,6 +43,8 @@ final class APIClient {
         config.httpCookieStorage = .shared
         config.httpShouldSetCookies = true
         config.httpCookieAcceptPolicy = .always
+        config.timeoutIntervalForRequest = 20
+        config.timeoutIntervalForResource = 60
         return URLSession(configuration: config)
     }()
 
@@ -62,7 +64,7 @@ final class APIClient {
             throw APIError.invalidURL
         }
 
-        var req = URLRequest(url: url)
+        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -179,6 +181,11 @@ extension APIClient {
         let r: DatesPayload = try await request("/api/wiki/dates?days=\(days)")
         return r.dates
     }
+
+    func wikiAdjacentDate(date: String, direction: String) async throws -> String? {
+        let r: AdjacentDatePayload = try await request("/api/wiki/adjacent?date=\(date)&direction=\(direction)")
+        return r.date
+    }
 }
 
 // MARK: - Auth Endpoints
@@ -272,8 +279,6 @@ extension APIClient {
         struct Body: Encodable { let provider: String; let providerId: String; let email: String; let displayName: String; let avatarUrl: String? }
         let r: AuthResponse = try await request("/api/auth/oauth/callback", method: "POST", body: Body(provider: provider, providerId: providerId, email: email, displayName: displayName, avatarUrl: avatarUrl))
         sessionToken = r.sessionToken
-        // Fetch current user after OAuth login
-        if let fetched = try? await me() { _ = fetched }
     }
 
     func gameHistory(type: String) async throws -> [String: String] {
@@ -282,8 +287,8 @@ extension APIClient {
         return r.history
     }
 
-    func resendVerificationEmail() async throws {
-        try await requestVoid("/api/auth/verify-email/send", method: "POST")
+    func deleteAccount() async throws {
+        try await requestVoid("/api/auth/account", method: "DELETE")
     }
 
     func registerPushToken(_ token: String) async throws {
@@ -291,28 +296,6 @@ extension APIClient {
         try await requestVoid("/api/auth/push-token", method: "POST", body: Body(token: token, platform: "ios"))
     }
 
-    func importStats(type: String, stats: LocalStats) async throws {
-        struct Body: Encodable {
-            let type: String
-            let stats: StatsBody
-            struct StatsBody: Encodable {
-                let gamesPlayed: Int
-                let wins: Int
-                let currentStreak: Int
-                let maxStreak: Int
-            }
-        }
-        try await requestVoid(
-            "/api/auth/import-stats",
-            method: "POST",
-            body: Body(type: type, stats: .init(
-                gamesPlayed: stats.gamesPlayed,
-                wins: stats.wins,
-                currentStreak: stats.currentStreak,
-                maxStreak: stats.maxStreak
-            ))
-        )
-    }
 }
 
 // MARK: - Stats Endpoints
@@ -344,6 +327,11 @@ extension APIClient {
                 distribution: stats.distribution
             ))
         )
+    }
+
+    func importHistory(type: String, history: [String: String]) async throws {
+        struct Body: Encodable { let type: String; let history: [String: String] }
+        try await requestVoid("/api/auth/import-history", method: "POST", body: Body(type: type, history: history))
     }
 }
 

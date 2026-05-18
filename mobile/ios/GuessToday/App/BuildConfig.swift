@@ -8,7 +8,7 @@ enum BuildConfig {
     #elseif DEBUG
     static let isNRT = false
     static let environment = "Debug"
-    static let baseURL = "http://192.168.1.14:3001"
+    static let baseURL = "http://localhost:3001"
     #else
     static let isNRT = false
     static let environment = "Production"
