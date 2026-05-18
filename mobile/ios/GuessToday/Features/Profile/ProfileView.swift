@@ -104,6 +104,19 @@ private struct GuestProfileView: View {
             .buttonStyle(PrimaryButtonStyle())
             .padding(.horizontal, Theme.spacing24)
             Spacer()
+            #if DEBUG || NRT
+            NavigationLink(destination: DebugMenuView()) {
+                HStack(spacing: 5) {
+                    Image(systemName: "wrench.and.screwdriver")
+                        .font(.system(size: 11))
+                    Text("Debug — \(EnvironmentManager.shared.current.displayName)")
+                        .font(.system(size: 12))
+                }
+                .foregroundColor(Theme.amber)
+            }
+            .padding(.bottom, Theme.spacing8)
+            #endif
+
             NavigationLink(destination: AboutView()) {
                 Text("À propos · Confidentialité · Mentions légales")
                     .font(.system(size: 12))
@@ -261,6 +274,13 @@ private struct LoggedInProfileView: View {
                         ProfileNavRow(icon: "info.circle", label: "À propos & légal", color: Theme.textDim)
                     }
                     .buttonStyle(.plain)
+
+                    #if DEBUG || NRT
+                    NavigationLink(destination: DebugMenuView()) {
+                        ProfileNavRow(icon: "wrench.and.screwdriver", label: "Debug (\(EnvironmentManager.shared.current.displayName))", color: Theme.amber)
+                    }
+                    .buttonStyle(.plain)
+                    #endif
 
                     Button {
                         showDeleteConfirm = true

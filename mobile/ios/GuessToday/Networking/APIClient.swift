@@ -22,10 +22,8 @@ final class APIClient {
     static let shared = APIClient()
     private init() {}
 
-    #if NRT
-    static let baseURL = "https://moviegame-staging.up.railway.app"
-    #elseif DEBUG
-    static let baseURL = "http://localhost:3001"
+    #if DEBUG || NRT
+    static var baseURL: String { EnvironmentManager.shared.baseURL }
     #else
     static let baseURL = "https://guesstoday.fr"
     #endif
@@ -36,6 +34,11 @@ final class APIClient {
             if let v = newValue { KeychainHelper.shared.set(key: "session_token", value: v) }
             else { KeychainHelper.shared.delete(key: "session_token") }
         }
+    }
+
+    func clearSession() {
+        sessionToken = nil
+        HTTPCookieStorage.shared.removeCookies(since: Date.distantPast)
     }
 
     private let urlSession: URLSession = {
