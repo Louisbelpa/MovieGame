@@ -186,8 +186,7 @@ final class GameViewModel {
                 triggerFlash(.red)
                 if response.challenge.hintsRevealed > previousHintsRevealed {
                     lightImpact.prepare()
-                    lightImpact.prepare()
-        lightImpact.impactOccurred()
+                    lightImpact.impactOccurred()
                 }
                 if response.challenge.isGameOver {
                     await fetchResult(challengeId: response.challenge.challengeId)

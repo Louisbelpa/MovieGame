@@ -57,7 +57,7 @@ struct GameView: View {
                             BlurImageView(
                                 url: challenge.displayImageUrl,
                                 blurRadius: challenge.blurRadius,
-                                isWiki: challenge.isWiki,
+                                mediaType: challenge.mediaType,
                                 flashColor: vm.flashColor
                             )
                             .padding(.horizontal, -Theme.spacing16)

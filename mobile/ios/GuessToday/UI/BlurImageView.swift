@@ -3,8 +3,11 @@ import SwiftUI
 struct BlurImageView: View {
     let url: String?
     let blurRadius: Double
-    let isWiki: Bool
+    let mediaType: String  // "film", "series", "wiki"
     var flashColor: Color? = nil
+
+    private var isWiki: Bool { mediaType == "wiki" }
+    private var badgeIcon: String { mediaType == "series" ? "tv" : "film" }
 
     var body: some View {
         Group {
@@ -46,7 +49,7 @@ struct BlurImageView: View {
         .overlay(alignment: .topLeading) {
             if !isWiki {
                 HStack(spacing: 4) {
-                    Image(systemName: "film")
+                    Image(systemName: badgeIcon)
                         .font(.system(size: 9, weight: .medium))
                     Text("Scène")
                         .font(Theme.inter(size: 10, weight: .medium))
