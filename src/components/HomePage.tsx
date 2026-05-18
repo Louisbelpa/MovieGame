@@ -157,54 +157,64 @@ function GameCard({ href, icon, modeLabel, description, accentColor, accentSoft,
       <Tag
         {...(!disabled ? { href } : {})}
         className={`group hidden lg:flex flex-col rounded-2xl overflow-hidden transition-all duration-200 ${
-          disabled ? 'opacity-50 cursor-default' : 'cursor-pointer hover:-translate-y-0.5 hover:shadow-xl'
+          disabled ? 'opacity-40 cursor-default' : 'cursor-pointer hover:-translate-y-1 hover:shadow-2xl'
         }`}
         style={{
-          border: `1px solid ${
-            todayStatus === 'won' ? 'rgba(76,176,120,0.4)'
-            : todayStatus === 'lost' ? 'rgba(212,96,74,0.35)'
+          background: 'var(--color-film-surface)',
+          border: `1.5px solid ${
+            todayStatus === 'won' ? 'rgba(30,132,73,0.35)'
+            : todayStatus === 'lost' ? 'rgba(192,57,43,0.30)'
             : accentRing
           }`,
+          boxShadow: `0 2px 12px rgba(28,24,22,0.07), 0 0 0 0 ${accentColor}`,
         }}
       >
-        {/* Visual area */}
+        {/* Visual area — fond coloré plein */}
         <div
-          className="relative flex items-center justify-center"
+          className="relative flex flex-col items-center justify-center gap-3"
           style={{
             aspectRatio: '4 / 3',
-            background: `linear-gradient(155deg, ${accentSoft} 0%, var(--color-film-gray) 100%)`,
+            background: `linear-gradient(160deg, ${accentColor}22 0%, ${accentColor}10 100%)`,
+            borderBottom: `1px solid ${accentRing}`,
           }}
         >
+          {/* Accent strip top */}
+          <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: accentColor }} />
+
           {todayStatus === 'won' && (
-            <span className="absolute top-3 left-3 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-film-green bg-film-green/10 border border-film-green/30 px-2 py-1 rounded-full">
+            <span className="absolute top-4 left-3 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-film-green bg-film-green/10 border border-film-green/30 px-2 py-1 rounded-full">
               <CheckCircle2 size={11} /> Gagné
             </span>
           )}
           {todayStatus === 'lost' && (
-            <span className="absolute top-3 left-3 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-film-red bg-film-red/10 border border-film-red/30 px-2 py-1 rounded-full">
+            <span className="absolute top-4 left-3 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-film-red bg-film-red/10 border border-film-red/30 px-2 py-1 rounded-full">
               <XCircle size={11} /> Perdu
             </span>
           )}
           {badge && !todayStatus && (
             <span
-              className="absolute top-3 right-3 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
-              style={{ background: accentSoft, color: accentColor, border: `1px solid ${accentRing}` }}
+              className="absolute top-4 right-3 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
+              style={{ background: accentColor, color: '#fff' }}
             >
               {badge}
             </span>
           )}
 
           <div
-            className={`transition-opacity duration-300 ${showPlayButton ? 'opacity-35 group-hover:opacity-20' : 'opacity-25'}`}
+            className="transition-transform duration-300 group-hover:scale-110"
             style={{ color: accentColor }}
           >
-            {React.cloneElement(icon as React.ReactElement<{ size?: number }>, { size: 52 })}
+            {React.cloneElement(icon as React.ReactElement<{ size?: number }>, { size: 56 })}
           </div>
 
+          <p className="font-title text-lg font-semibold" style={{ color: accentColor }}>
+            {modeLabel}
+          </p>
+
           {showPlayButton && (
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[1px]">
               <span
-                className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full text-film-black shadow-lg"
+                className="flex items-center gap-1.5 text-sm font-bold px-6 py-2.5 rounded-full shadow-lg text-white"
                 style={{ background: accentColor }}
               >
                 Jouer →
@@ -214,11 +224,8 @@ function GameCard({ href, icon, modeLabel, description, accentColor, accentSoft,
         </div>
 
         {/* Info bar */}
-        <div className="px-4 py-3.5" style={{ background: 'var(--color-film-dark)' }}>
-          <span className="text-[10px] font-mono uppercase tracking-widest text-film-text-dim/50">
-            {modeLabel}
-          </span>
-          <p className="text-xs text-film-text-dim/70 leading-snug mt-0.5">
+        <div className="px-4 py-3">
+          <p className="text-xs text-film-text-dim leading-snug">
             {description}
           </p>
         </div>
@@ -227,52 +234,57 @@ function GameCard({ href, icon, modeLabel, description, accentColor, accentSoft,
       {/* ── Mobile row ── */}
       <Tag
         {...(!disabled ? { href } : {})}
-        className={`lg:hidden flex items-center gap-3.5 rounded-xl px-4 py-3.5 transition-all active:opacity-80 ${
+        className={`lg:hidden relative flex items-center gap-0 rounded-xl overflow-hidden transition-all active:opacity-80 ${
           disabled ? 'opacity-50 cursor-default' : 'cursor-pointer'
         }`}
         style={{
-          background: 'var(--color-film-dark)',
-          border: `1px solid ${
-            todayStatus === 'won' ? 'rgba(76,176,120,0.3)'
-            : todayStatus === 'lost' ? 'rgba(212,96,74,0.25)'
+          background: 'var(--color-film-surface)',
+          border: `1.5px solid ${
+            todayStatus === 'won' ? 'rgba(30,132,73,0.30)'
+            : todayStatus === 'lost' ? 'rgba(192,57,43,0.25)'
             : accentRing
           }`,
+          boxShadow: '0 1px 4px rgba(28,24,22,0.06)',
         }}
       >
+        {/* Left accent strip */}
+        <div className="w-1 self-stretch shrink-0" style={{ background: accentColor }} />
+
+        {/* Icon */}
         <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: accentSoft, color: accentColor }}
+          className="w-12 h-12 flex items-center justify-center shrink-0 m-3 rounded-xl"
+          style={{ background: `${accentColor}18`, color: accentColor }}
         >
-          {React.cloneElement(icon as React.ReactElement<{ size?: number }>, { size: 20 })}
+          {React.cloneElement(icon as React.ReactElement<{ size?: number }>, { size: 22 })}
         </div>
 
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-mono uppercase tracking-widest text-film-text-dim/50 leading-none mb-0.5">
+        <div className="flex-1 min-w-0 py-3.5">
+          <p className="text-sm font-bold leading-tight" style={{ color: accentColor }}>
             {modeLabel}
           </p>
-          <p className="text-sm font-semibold text-film-text leading-tight">
-            {disabled ? 'Bientôt disponible'
-              : todayStatus === 'won' ? 'Gagné ✓'
-              : todayStatus === 'lost' ? 'Perdu'
-              : 'À jouer'}
-          </p>
-          <p className="text-xs text-film-text-dim/55 leading-snug mt-0.5 line-clamp-2">{description}</p>
+          <p className="text-xs text-film-text-dim leading-snug mt-0.5 line-clamp-1">{description}</p>
         </div>
 
-        {showPlayButton ? (
-          <span
-            className="text-xs font-semibold px-3 py-1.5 rounded-lg shrink-0 text-film-black"
-            style={{ background: accentColor }}
-          >
-            Jouer →
-          </span>
-        ) : todayStatus === 'won' ? (
-          <CheckCircle2 size={18} className="text-film-green shrink-0" />
-        ) : todayStatus === 'lost' ? (
-          <XCircle size={18} className="text-film-red/70 shrink-0" />
-        ) : (
-          <ChevronRight size={16} className="text-film-text-dim/40 shrink-0" />
-        )}
+        <div className="pr-3.5 shrink-0">
+          {showPlayButton ? (
+            <span
+              className="flex items-center gap-1 text-xs font-bold px-3.5 py-2 rounded-lg text-white"
+              style={{ background: accentColor }}
+            >
+              Jouer <ChevronRight size={13} />
+            </span>
+          ) : todayStatus === 'won' ? (
+            <span className="flex items-center gap-1 text-xs font-semibold text-film-green bg-film-green/10 border border-film-green/25 px-2.5 py-1.5 rounded-lg">
+              <CheckCircle2 size={13} /> Gagné
+            </span>
+          ) : todayStatus === 'lost' ? (
+            <span className="flex items-center gap-1 text-xs font-semibold text-film-red bg-film-red/8 border border-film-red/20 px-2.5 py-1.5 rounded-lg">
+              <XCircle size={13} /> Perdu
+            </span>
+          ) : (
+            <ChevronRight size={16} className="text-film-text-dim/40" />
+          )}
+        </div>
       </Tag>
     </>
   )

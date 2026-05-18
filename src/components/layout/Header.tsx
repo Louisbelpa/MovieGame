@@ -98,33 +98,8 @@ export function Header({ mode }: HeaderProps) {
           )}
         </div>
 
-        {/* ── Center: mode tabs (desktop only) ── */}
-        {MODE_TABS.length > 1 && (
-          <nav className="hidden lg:flex items-center gap-1" aria-label="Mode de jeu">
-            {MODE_TABS.map(({ id, label, to, Icon, color }) => {
-              const isActive = id === activeTabId
-              return (
-                <a
-                  key={id}
-                  href={to}
-                  aria-current={isActive ? 'page' : undefined}
-                  className="flex items-center gap-1.5 rounded-lg text-[13px] font-medium transition-all duration-150"
-                  style={isActive ? {
-                    color,
-                    background: `color-mix(in srgb, ${color} 14%, transparent)`,
-                    padding: '7px 14px',
-                  } : {
-                    color: 'var(--color-film-text-dim)',
-                    padding: '7px 14px',
-                  }}
-                >
-                  <Icon size={14} aria-hidden />
-                  {label}
-                </a>
-              )
-            })}
-          </nav>
-        )}
+        {/* ── Center: spacer (mode tabs removed) ── */}
+        <div className="flex-1" />
 
         {/* ── Right: actions ── */}
         <div className="flex items-center gap-1">
