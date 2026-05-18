@@ -116,7 +116,85 @@ CREATE TABLE IF NOT EXISTS users (
   avatar_url    TEXT,
   password_hash TEXT,
   is_banned     INTEGER NOT NULL DEFAULT 0,
-  email_verified INTEGER NOT NULL DEFAULT 0
+  email_verified INTEGER NOT NULL DEFAULT 0,
+  friend_code   TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_friend_code ON users (friend_code);
+
+CREATE TABLE IF NOT EXISTS oauth_accounts (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  provider    TEXT NOT NULL,
+  provider_id TEXT NOT NULL,
+  UNIQUE(provider, provider_id)
+);
+
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  used_at    TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash ON password_reset_tokens (token_hash);
+
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  used_at    TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_hash ON email_verification_tokens (token_hash);
+
+CREATE TABLE IF NOT EXISTS friendships (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  requester_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  addressee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status       TEXT NOT NULL CHECK(status IN ('pending','accepted')) DEFAULT 'pending',
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+  UNIQUE(requester_id, addressee_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_friendships_addressee ON friendships (addressee_id, status);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  key        TEXT NOT NULL PRIMARY KEY,
+  value      TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+INSERT OR IGNORE INTO app_settings (key, value) VALUES ('wiki_prefetch_enabled', '1');
+
+CREATE TABLE IF NOT EXISTS wiki_sessions (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_token   TEXT NOT NULL,
+  challenge_id    INTEGER NOT NULL REFERENCES daily_challenges (id) ON DELETE CASCADE,
+  attempts        TEXT NOT NULL DEFAULT '[]',
+  hints_revealed  INTEGER NOT NULL DEFAULT 0,
+  outcome         TEXT CHECK (outcome IN ('won', 'lost')),
+  started_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+  finished_at     TEXT,
+  user_id         INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  UNIQUE (session_token, challenge_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wiki_sessions_token     ON wiki_sessions (session_token);
+CREATE INDEX IF NOT EXISTS idx_wiki_sessions_challenge ON wiki_sessions (challenge_id);
+CREATE INDEX IF NOT EXISTS idx_wiki_sessions_user_challenge ON wiki_sessions (user_id, challenge_id);
+
+CREATE TABLE IF NOT EXISTS push_tokens (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token      TEXT    NOT NULL,
+  platform   TEXT    NOT NULL CHECK (platform IN ('ios', 'android')),
+  created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(user_id, platform)
 );
 
 CREATE TABLE IF NOT EXISTS user_sessions (
@@ -251,8 +329,14 @@ beforeAll(() => {
 afterEach(() => {
   // Delete in FK-safe order (children before parents)
   db.exec(`
+    DELETE FROM wiki_sessions;
     DELETE FROM game_sessions;
     DELETE FROM user_challenge_results;
+    DELETE FROM email_verification_tokens;
+    DELETE FROM password_reset_tokens;
+    DELETE FROM push_tokens;
+    DELETE FROM friendships;
+    DELETE FROM oauth_accounts;
     DELETE FROM user_sessions;
     DELETE FROM users;
     DELETE FROM active_admin_tokens;

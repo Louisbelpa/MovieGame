@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react'
-import { CheckCircle2, XCircle, Film, Tv, Landmark, ChevronRight, LogIn, Flame, Users } from 'lucide-react'
+import { CheckCircle2, XCircle, Film, Tv, User, ChevronRight, LogIn, Flame, Users, Smartphone } from 'lucide-react'
 import { ApertureIcon } from '@/components/ui/ApertureIcon'
 import { Footer } from '@/components/layout/Footer'
 import { TopNav } from '@/components/layout/TopNav'
 import { AuthModal, useAuthModal } from '@/components/modals/AuthModal'
-import { FEATURES } from '@/config/features'
+import { FEATURES, IOS_APP_STORE_URL } from '@/config/features'
 import { useAuthStore } from '@/store/authStore'
-import { loadStats, loadHistory } from '@/lib/storage'
-import { friendsGetAll, type FriendEntry } from '@/api/client'
+import { loadStats, loadHistory, setHistoryEntry } from '@/lib/storage'
+import { friendsGetAll, fetchChallenge, type FriendEntry } from '@/api/client'
+import { fetchWikiChallenge } from '@/api/wikiClient'
 import { FriendsSidebar } from '@/components/home/FriendsSidebar'
 import {
   NewModesAnnouncementModal,
@@ -58,8 +59,15 @@ function useCountdown(): string {
   return str
 }
 
-function winsCount(entry: FriendEntry): number {
-  return [entry.scores.film, entry.scores.series, entry.scores.wiki].filter((s) => s?.won).length
+
+type TodayStatus = 'won' | 'lost' | null
+
+function outcomeFromChallenge(payload: {
+  isGameOver: boolean
+  outcome: 'won' | 'lost' | null
+}): TodayStatus {
+  if (!payload.isGameOver || payload.outcome == null) return null
+  return payload.outcome
 }
 
 // ─── Mobile header ────────────────────────────────────────────────────────────
@@ -93,7 +101,8 @@ function MobileHeader() {
             href="/profile"
             className="flex items-center gap-1 px-2.5 py-1 rounded-full border border-amber-500/30 bg-amber-500/10 text-xs font-semibold text-amber-400"
           >
-            🔥{maxStreak}
+            <Flame size={12} aria-hidden />
+            {maxStreak}
           </a>
         )}
         {isLoading ? (
@@ -370,14 +379,32 @@ function MobileAuthNudge() {
 
 function FriendsMiniBar({ friends }: { friends: FriendEntry[] }) {
   const isLoading = useAuthStore((s) => s.isLoading)
-  if (isLoading || friends.length === 0) return null
+  const user = useAuthStore((s) => s.user)
+  if (isLoading || !user) return null
 
-  const played = friends.filter((e) => e.scores.film || e.scores.series || e.scores.wiki)
+  const others = friends.filter((e) => !e.isMe)
+
+  // No real friends — show add CTA
+  if (others.length === 0) {
+    return (
+      <a
+        href="/friends"
+        className="lg:hidden flex items-center gap-3 rounded-xl border border-film-border bg-white/[0.02] hover:bg-white/[0.04] px-4 py-3 transition-colors mt-3"
+      >
+        <div className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center shrink-0">
+          <Users size={15} className="text-film-text-dim" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-film-text leading-tight">Ajouter des amis</p>
+          <p className="text-xs text-film-text-dim/60 mt-0.5">Compare tes scores chaque jour</p>
+        </div>
+        <ChevronRight size={14} className="text-film-text-dim/40 shrink-0" />
+      </a>
+    )
+  }
+
+  const played = others.filter((e) => e.scores.film || e.scores.series || e.scores.wiki)
   if (played.length === 0) return null
-
-  const sorted = [...friends].sort((a, b) => winsCount(b) - winsCount(a))
-  const userIdx = sorted.findIndex((e) => e.isMe)
-  const userRank = userIdx >= 0 ? userIdx + 1 : null
 
   return (
     <a
@@ -397,10 +424,62 @@ function FriendsMiniBar({ friends }: { friends: FriendEntry[] }) {
       <span className="flex-1 text-sm text-film-text-dim">
         <strong className="text-film-text">{played.length} ami{played.length > 1 ? 's' : ''}</strong>{' '}
         {played.length > 1 ? 'ont' : 'a'} déjà joué
-        {userRank !== null && userRank > 0 && <span> — tu es {userRank}<sup>e</sup></span>}
       </span>
       <ChevronRight size={14} className="text-film-text-dim/40 shrink-0" />
     </a>
+  )
+}
+
+// ─── iOS app banner ───────────────────────────────────────────────────────────
+
+function AppStoreBadge({ className }: { className?: string }) {
+  return (
+    <img
+      src="/app-store-badge-fr.svg"
+      alt="Télécharger dans l'App Store"
+      className={className}
+      height={46}
+    />
+  )
+}
+
+function IosAppBanner() {
+  if (!FEATURES.enableIosBanner) return null
+
+  return (
+    <div className="mt-8">
+      <a
+        href={IOS_APP_STORE_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group flex items-center gap-3.5 rounded-xl px-4 py-3.5 transition-all hover:brightness-110 active:opacity-80"
+      style={{
+        background: 'linear-gradient(135deg, rgba(212,166,74,0.10) 0%, rgba(107,124,255,0.08) 100%)',
+        border: '1px solid rgba(212,166,74,0.22)',
+      }}
+    >
+      {/* Icon */}
+      <div
+        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+        style={{ background: 'rgba(212,166,74,0.12)', color: '#d4a64a' }}
+      >
+        <Smartphone size={20} />
+      </div>
+
+      {/* Text */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-film-text leading-tight">
+          GuessToday sur iOS
+        </p>
+        <p className="text-xs text-film-text-dim/60 mt-0.5 leading-snug">
+          Gratuit — iPhone &amp; iPad
+        </p>
+      </div>
+
+      {/* Official App Store badge */}
+      <AppStoreBadge className="shrink-0 h-8 w-auto" />
+    </a>
+    </div>
   )
 }
 
@@ -411,6 +490,11 @@ export function HomePage() {
   const [showNewBadge, setShowNewBadge] = useState(false)
   const [friends, setFriends] = useState<FriendEntry[]>([])
   const [friendsLoading, setFriendsLoading] = useState(false)
+  const [serverToday, setServerToday] = useState<{
+    film: TodayStatus
+    series: TodayStatus
+    wiki: TodayStatus
+  } | null>(null)
 
   const fetchMe     = useAuthStore((s) => s.fetchMe)
   const user        = useAuthStore((s) => s.user)
@@ -418,9 +502,12 @@ export function HomePage() {
 
   const today        = getTodayParis()
   const todayLabel   = getTodayLabel()
-  const filmStatus   = loadHistory('film')[today]   ?? null
-  const seriesStatus = loadHistory('series')[today] ?? null
-  const wikiStatus   = loadHistory('wiki')[today]   ?? null
+  const localFilm    = loadHistory('film')[today]   ?? null
+  const localSeries  = loadHistory('series')[today] ?? null
+  const localWiki    = loadHistory('wiki')[today]   ?? null
+  const filmStatus   = serverToday?.film   ?? localFilm
+  const seriesStatus = serverToday?.series ?? localSeries
+  const wikiStatus   = serverToday?.wiki   ?? localWiki
   const countdown    = useCountdown()
 
   const currentStreak = Math.max(
@@ -430,6 +517,49 @@ export function HomePage() {
   )
 
   useEffect(() => { void fetchMe() }, [fetchMe])
+
+  useEffect(() => {
+    if (!user) {
+      setServerToday(null)
+      return
+    }
+
+    let cancelled = false
+
+    async function syncTodayFromServer() {
+      const [filmRes, seriesRes, wikiRes] = await Promise.allSettled([
+        fetchChallenge('film'),
+        FEATURES.enableSeries ? fetchChallenge('series') : Promise.resolve(null),
+        FEATURES.enableWiki ? fetchWikiChallenge() : Promise.resolve(null),
+      ])
+
+      if (cancelled) return
+
+      const film = filmRes.status === 'fulfilled' ? outcomeFromChallenge(filmRes.value) : null
+      const series =
+        seriesRes.status === 'fulfilled' && seriesRes.value
+          ? outcomeFromChallenge(seriesRes.value)
+          : null
+      const wiki =
+        wikiRes.status === 'fulfilled' && wikiRes.value
+          ? outcomeFromChallenge(wikiRes.value)
+          : null
+
+      setServerToday({ film, series, wiki })
+
+      if (film) setHistoryEntry(today, film, 'film')
+      if (series) setHistoryEntry(today, series, 'series')
+      if (wiki) setHistoryEntry(today, wiki, 'wiki')
+    }
+
+    void syncTodayFromServer()
+    const onFocus = () => { void syncTodayFromServer() }
+    window.addEventListener('focus', onFocus)
+    return () => {
+      cancelled = true
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [user, today])
 
   useEffect(() => {
     if (!user) { setFriends([]); return }
@@ -483,12 +613,15 @@ export function HomePage() {
                   Films, séries, personnalités — un nouveau défi chaque jour.
                 </p>
                 {user && currentStreak > 0 && (
-                  <div className="inline-flex items-center gap-1.5 mt-3 px-2.5 py-1 rounded-full border border-amber-500/25 bg-amber-500/10">
-                    <span className="text-sm">🔥</span>
+                  <a
+                    href="/profile"
+                    className="inline-flex items-center gap-1.5 mt-3 px-2.5 py-1 rounded-full border border-amber-500/25 bg-amber-500/10 hover:bg-amber-500/15 transition-colors"
+                  >
+                    <Flame size={13} className="text-amber-400" aria-hidden />
                     <span className="text-xs font-semibold text-amber-400">
                       {currentStreak} jour{currentStreak > 1 ? 's' : ''} de série
                     </span>
-                  </div>
+                  </a>
                 )}
               </div>
               {countdown && (
@@ -544,7 +677,7 @@ export function HomePage() {
               {FEATURES.enableWiki ? (
                 <GameCard
                   href="/wiki"
-                  icon={<Landmark />}
+                  icon={<User />}
                   modeLabel="Personnalités"
                   description="Devine une personnalité célèbre à partir d'indices sur sa carrière"
                   accentColor="#e85788"
@@ -556,7 +689,7 @@ export function HomePage() {
               ) : (
                 <GameCard
                   href="/wiki"
-                  icon={<Landmark />}
+                  icon={<User />}
                   modeLabel="Personnalités"
                   description="Devine une personnalité célèbre à partir d'indices sur sa carrière"
                   accentColor="#e85788"
@@ -578,6 +711,9 @@ export function HomePage() {
 
             {/* Friends mini bar — mobile only */}
             <FriendsMiniBar friends={friends} />
+
+            {/* iOS app banner — bottom of column, after all game/social content */}
+            <IosAppBanner />
           </div>
 
           {/* ── Right sidebar — desktop only ── */}

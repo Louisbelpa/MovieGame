@@ -45,6 +45,7 @@ const PERSON_TYPE_LABEL: Record<WikipediaFetchPayload['person_type'], string> = 
   writer: 'Écrivain',
   historical_figure: 'Figure historique',
   generic: 'Générique',
+  actor: 'Acteur',
 }
 
 function poolEntryDisplayName(entry: WikiPrefetchPoolEntry): string {

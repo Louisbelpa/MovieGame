@@ -7,7 +7,7 @@
 
 import { useRef } from 'react'
 import { BarChart2, CalendarDays, LogIn, Flame, UserRound } from 'lucide-react'
-import { Film, Tv, Landmark } from 'lucide-react'
+import { Film, Tv, User } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useLocation } from 'react-router-dom'
 import { useGameStore } from '@/store/gameStore'
@@ -25,7 +25,7 @@ interface HeaderProps {
 const MODE_TABS = [
   { id: 'film',   label: 'Films',        to: '/films',  Icon: Film,     color: 'var(--sg-films)',  enabled: true },
   { id: 'series', label: 'Séries',       to: '/series', Icon: Tv,       color: 'var(--sg-series)', enabled: FEATURES.enableSeries },
-  { id: 'wiki',   label: 'Personnalités', to: '/wiki',  Icon: Landmark, color: 'var(--sg-wiki)',   enabled: FEATURES.enableWiki },
+  { id: 'wiki',   label: 'Personnalités', to: '/wiki',  Icon: User, color: 'var(--sg-wiki)',   enabled: FEATURES.enableWiki },
 ].filter((t) => t.enabled)
 
 export function Header({ mode }: HeaderProps) {

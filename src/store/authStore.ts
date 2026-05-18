@@ -12,12 +12,15 @@ import {
   authGetMe,
   authUpdateProfile,
   authImportStats,
+  authImportHistory,
   authAppleSignIn,
   authOAuthCallback,
   authGetStats,
+  type AuthSessionPayload,
 } from '@/api/client'
 import type { ServerStatsData } from '@/api/client'
-import { loadStats, saveStats } from '@/lib/storage'
+import { loadStats, loadHistory, saveStats } from '@/lib/storage'
+import { buildMobileReturnURL } from '@/lib/mobileAuthHandoff'
 import { defaultStats } from '@/lib/utils'
 import type { User } from '@/types'
 
@@ -27,6 +30,8 @@ interface AuthStore {
   user: User | null
   isLoading: boolean
   serverStats: ServerStatsMap
+  /** Set after mobile auth handoff — URL to open the native app. Cleared by the consumer. */
+  mobileReturnURL: string | null
   fetchMe: () => Promise<void>
   refreshServerStats: () => Promise<void>
   login: (email: string, password: string) => Promise<void>
@@ -36,6 +41,7 @@ interface AuthStore {
   logout: () => Promise<void>
   updateProfile: (data: { displayName?: string; avatarUrl?: string }) => Promise<void>
   setUser: (user: User) => void
+  clearMobileReturnURL: () => void
 }
 
 function statsPayload(type: 'film' | 'series' | 'wiki') {
@@ -56,6 +62,15 @@ async function importAllLocalStats() {
     const payload = statsPayload(type)
     if (payload.gamesPlayed > 0) {
       await authImportStats(type, payload).catch(() => {})
+    }
+  }
+}
+
+async function importAllLocalHistory() {
+  for (const type of ['film', 'series', 'wiki'] as const) {
+    const history = loadHistory(type) as Record<string, 'won' | 'lost'>
+    if (Object.keys(history).length > 0) {
+      await authImportHistory(type, history).catch(() => {})
     }
   }
 }
@@ -81,10 +96,32 @@ async function fetchAllServerStats(): Promise<ServerStatsMap> {
   }
 }
 
+/**
+ * Import web local stats, then either:
+ * - Set mobileReturnURL so the UI can show a button (iOS Safari blocks programmatic deep links)
+ * - Or log the user in normally (web flow)
+ */
+async function finishAuthSession(
+  { user, sessionToken }: AuthSessionPayload,
+  set: (partial: Partial<AuthStore>) => void,
+): Promise<void> {
+  await Promise.all([importAllLocalStats(), importAllLocalHistory()])
+  const mobileReturnURL = buildMobileReturnURL(sessionToken)
+  if (mobileReturnURL) {
+    // Don't navigate — store URL so UI renders a tappable button (user gesture required by iOS Safari)
+    set({ mobileReturnURL })
+    return
+  }
+  set({ user })
+  clearLocalStats()
+  fetchAllServerStats().then((serverStats) => set({ serverStats })).catch(() => {})
+}
+
 export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
   isLoading: true,
   serverStats: NULL_STATS_MAP,
+  mobileReturnURL: null,
 
   fetchMe: async () => {
     set({ isLoading: true })
@@ -105,35 +142,22 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   login: async (email, password) => {
-    const { user } = await authLogin(email, password)
-    set({ user })
-    await importAllLocalStats()
-    clearLocalStats()
-    fetchAllServerStats().then((serverStats) => set({ serverStats })).catch(() => {})
+    await finishAuthSession(await authLogin(email, password), set)
   },
 
   register: async (email, password, displayName) => {
-    const { user } = await authRegister(email, password, displayName)
-    set({ user })
-    await importAllLocalStats()
-    clearLocalStats()
-    fetchAllServerStats().then((serverStats) => set({ serverStats })).catch(() => {})
+    await finishAuthSession(await authRegister(email, password, displayName), set)
   },
 
   loginWithApple: async (identityToken, displayName) => {
-    const { user } = await authAppleSignIn(identityToken, displayName)
-    set({ user })
-    await importAllLocalStats()
-    clearLocalStats()
-    fetchAllServerStats().then((serverStats) => set({ serverStats })).catch(() => {})
+    await finishAuthSession(await authAppleSignIn(identityToken, displayName), set)
   },
 
   loginWithGoogle: async (providerId, email, displayName, avatarUrl) => {
-    const { user } = await authOAuthCallback({ provider: 'google', providerId, email, displayName, avatarUrl })
-    set({ user })
-    await importAllLocalStats()
-    clearLocalStats()
-    fetchAllServerStats().then((serverStats) => set({ serverStats })).catch(() => {})
+    await finishAuthSession(
+      await authOAuthCallback({ provider: 'google', providerId, email, displayName, avatarUrl }),
+      set,
+    )
   },
 
   logout: async () => {
@@ -147,4 +171,5 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   setUser: (user) => set({ user }),
+  clearMobileReturnURL: () => set({ mobileReturnURL: null }),
 }))

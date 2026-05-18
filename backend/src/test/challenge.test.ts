@@ -249,4 +249,97 @@ describe('POST /api/challenge/guess — validation', () => {
       .send({ challengeId }); // no guess field
     expect(res.status).toBe(422);
   });
+
+  it('returns 400, 404, or 422 when challengeId is missing', async () => {
+    const res = await request(app)
+      .post('/api/challenge/guess')
+      .send({ guess: 'Inception' });
+    expect([400, 404, 422]).toContain(res.status);
+  });
+
+  it('returns 404 for non-existent challengeId', async () => {
+    const agent = request.agent(app);
+    // seed a session first so the agent has a token
+    const filmId = createFilm();
+    createChallenge({ filmId, date: today() });
+    await agent.get('/api/challenge/today');
+
+    const res = await agent
+      .post('/api/challenge/guess')
+      .send({ challengeId: 999999, guess: 'Inception' });
+    expect(res.status).toBe(404);
+  });
+});
+
+// ─── Alias matching ───────────────────────────────────────────────────────────
+
+describe('POST /api/challenge/guess — alias matching', () => {
+  it('accepts alias title as correct answer', async () => {
+    const agent = request.agent(app);
+    const filmId = createFilm({
+      title: 'Le Roi Lion',
+      title_aliases: '["Lion King","roi lion"]',
+    });
+    createChallenge({ filmId, date: today() });
+
+    const todayRes = await agent.get('/api/challenge/today');
+    const { challengeId } = todayRes.body as { challengeId: number };
+
+    const guessRes = await agent
+      .post('/api/challenge/guess')
+      .send({ challengeId, guess: 'Lion King' });
+    expect(guessRes.status).toBe(200);
+    expect(guessRes.body.correct).toBe(true);
+    expect(guessRes.body.outcome).toBe('won');
+  });
+
+  it('accepts accent-insensitive guess', async () => {
+    const agent = request.agent(app);
+    const filmId = createFilm({ title: 'Intouchables' });
+    createChallenge({ filmId, date: today() });
+
+    const todayRes = await agent.get('/api/challenge/today');
+    const { challengeId } = todayRes.body as { challengeId: number };
+
+    const guessRes = await agent
+      .post('/api/challenge/guess')
+      .send({ challengeId, guess: 'intouchables' });
+    expect(guessRes.status).toBe(200);
+    expect(guessRes.body.correct).toBe(true);
+  });
+});
+
+// ─── Archive: dates list ──────────────────────────────────────────────────────
+
+describe('GET /api/challenge/dates', () => {
+  it('returns { dates: [...] } with active challenge dates', async () => {
+    const filmId = createFilm({ title: 'Archive Film' });
+    createChallenge({ filmId, date: yesterday() });
+
+    const res = await request(app).get('/api/challenge/dates?days=7');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.dates)).toBe(true);
+    expect(res.body.dates).toContain(yesterday());
+  });
+});
+
+// ─── Search / autocomplete ────────────────────────────────────────────────────
+
+describe('GET /api/films/search', () => {
+  it('returns matching films', async () => {
+    createFilm({ title: 'AutocompleteUniqueFilm' });
+
+    const res = await request(app).get('/api/films/search?q=AutocompleteUnique');
+    expect(res.status).toBe(200);
+    const results = (res.body.results ?? res.body) as { title: string }[];
+    expect(Array.isArray(results)).toBe(true);
+    expect(results.some((f) => f.title === 'AutocompleteUniqueFilm')).toBe(true);
+  });
+
+  it('returns empty results when no match', async () => {
+    const res = await request(app).get('/api/films/search?q=ZZZNOMATCH999');
+    expect(res.status).toBe(200);
+    const results = (res.body.results ?? res.body) as unknown[];
+    expect(results).toHaveLength(0);
+  });
 });

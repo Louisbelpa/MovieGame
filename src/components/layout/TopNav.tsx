@@ -1,4 +1,4 @@
-import { Film, Tv, Landmark, LogIn } from 'lucide-react'
+import { Film, Tv, User, LogIn, Flame } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useAuthModal } from '@/components/modals/AuthModal'
 import { loadStats } from '@/lib/storage'
@@ -54,7 +54,7 @@ export function TopNav() {
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors"
             style={{ color: 'var(--sg-wiki)' }}
           >
-            <Landmark size={14} />
+            <User size={14} />
             Personnalités
           </a>
         ) : null}
@@ -67,7 +67,8 @@ export function TopNav() {
             href="/profile"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-sm font-semibold text-amber-400 hover:bg-amber-500/15 transition-colors"
           >
-            🔥 {maxStreak} jour{maxStreak > 1 ? 's' : ''}
+            <Flame size={13} aria-hidden />
+            {maxStreak} jour{maxStreak > 1 ? 's' : ''}
           </a>
         )}
 

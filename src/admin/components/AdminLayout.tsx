@@ -6,7 +6,7 @@
 
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Film, Tv, Calendar, LayoutDashboard, LogOut, Menu, X, ScrollText, Upload, ShieldAlert, BarChart2, Landmark, Database, Settings, ExternalLink, Users } from 'lucide-react'
+import { Film, Tv, Calendar, LayoutDashboard, LogOut, Menu, X, ScrollText, Upload, ShieldAlert, BarChart2, User, Database, Settings, ExternalLink, Users } from 'lucide-react'
 import { adminLogout } from '../api'
 
 const navItems = [
@@ -15,7 +15,7 @@ const navItems = [
   { to: '/admin/analytics', label: 'Analytiques', icon: BarChart2, exact: false },
   { to: '/admin/films', label: 'Films', icon: Film, exact: false },
   { to: '/admin/series', label: 'Séries', icon: Tv, exact: false },
-  { to: '/admin/wiki', label: 'Personnalités', icon: Landmark, exact: false },
+  { to: '/admin/wiki', label: 'Personnalités', icon: User, exact: false },
   { to: '/admin/wiki-pool', label: 'Pool personnalités', icon: Database, exact: false },
   { to: '/admin/calendar', label: 'Planning', icon: Calendar, exact: false },
   { to: '/admin/import', label: 'Import CSV', icon: Upload, exact: false },

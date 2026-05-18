@@ -17,10 +17,13 @@
 		482A64E02CB7FF32938F094D /* FriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B0997D679B5BFECEA4268F9 /* FriendsView.swift */; };
 		4A2AB10FB5B80863AC077BA7 /* Inter-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2EA3632B6A2C0C40E553ABB5 /* Inter-Regular.ttf */; };
 		4E21D13FE8A29BFDD6FC44C6 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1489878DBF383B642A4C2C44 /* HomeView.swift */; };
+		51FD361594E7FA1322C02A3E /* aperture-splash.json in Resources */ = {isa = PBXBuildFile; fileRef = CDB925E5A75AA97E905D75A3 /* aperture-splash.json */; };
+		674E384133DE87E8F6400776 /* OfflineBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53EED89BA68A287712C205CC /* OfflineBanner.swift */; };
 		6A36BDAB4685FF663BA12F37 /* ApertureIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 710937888B1108493D436CFA /* ApertureIconView.swift */; };
 		6B2B0C1AC42CA4EFAA643772 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26FAF04863D7FAE2F5896718 /* Theme.swift */; };
 		8142B5E1D22BBC9ECD87A439 /* Inter-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3D469FD0742D72CD46DBD466 /* Inter-Bold.ttf */; };
 		82BBB968D9F4D7DDE313AB80 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 30F29D8502C661CDDFA2CF8C /* GoogleSignIn */; };
+		83D7B1C45C771DE16E69394E /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 378ADADBF893DFC860BB4B6E /* Lottie */; };
 		8584240025E56C21ACC4F3AA /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2818C9F3B5B1FB2826C5754C /* AuthViewModel.swift */; };
 		87141A846891D68B791D9770 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBA083E1E76D11C4369073F1 /* LoginView.swift */; };
 		89BE70339B96F40672B8B7D2 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 565589AFD7C4ABC773E28ABC /* KeychainHelper.swift */; };
@@ -31,9 +34,12 @@
 		AA5281C3B92955321F44B4A3 /* Inter-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 322A726B91B2ADCB28C95D92 /* Inter-SemiBold.ttf */; };
 		B512FCBDA6DAF357AC68AC1D /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EED2214FDA6453571AE8AA0B /* NotificationManager.swift */; };
 		B58759E05B6D350446316B27 /* Fraunces-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F5C394B981FCA883979D1143 /* Fraunces-Medium.ttf */; };
+		B689A056C972331FCE923E16 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47D122976E90FF52AAD2B462 /* NetworkMonitor.swift */; };
 		B75BB78043CCBBAE41A1BB5B /* ArchiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0814D34E725430D4C3BB56E1 /* ArchiveView.swift */; };
+		B94469B0CDA487A9811AAFF6 /* MobileAuthHandoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2E1471BA5C9C5883D39956D /* MobileAuthHandoff.swift */; };
 		BDD65EFC54FE1582A74255EC /* GuessRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C21B31109C71115D699DFD40 /* GuessRow.swift */; };
 		C661562B589E6E6B2EFDC23D /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91823833C2B124DEF198968 /* OnboardingView.swift */; };
+		C69A2497BE426611AD7010CA /* AppStoreReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409EB42C000B819CE3ED4EF8 /* AppStoreReview.swift */; };
 		CE2AE652BEC03E7B6886EE24 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2D0422A581B887044FC86C5 /* RootView.swift */; };
 		D3DC4D2946F6A9F2B7FBEAD7 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95B867BABC0E98F0EFF8DC2E /* APIClient.swift */; };
 		DB5833C2E918A69A2548E399 /* Inter-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E8B2F7EF1842A7904A7851D8 /* Inter-Medium.ttf */; };
@@ -55,7 +61,10 @@
 		2EA3632B6A2C0C40E553ABB5 /* Inter-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-Regular.ttf"; sourceTree = "<group>"; };
 		322A726B91B2ADCB28C95D92 /* Inter-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-SemiBold.ttf"; sourceTree = "<group>"; };
 		3D469FD0742D72CD46DBD466 /* Inter-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-Bold.ttf"; sourceTree = "<group>"; };
+		409EB42C000B819CE3ED4EF8 /* AppStoreReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreReview.swift; sourceTree = "<group>"; };
+		47D122976E90FF52AAD2B462 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
 		4B0997D679B5BFECEA4268F9 /* FriendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsView.swift; sourceTree = "<group>"; };
+		53EED89BA68A287712C205CC /* OfflineBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineBanner.swift; sourceTree = "<group>"; };
 		565589AFD7C4ABC773E28ABC /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 		669A6B2A1898DA17D7EF4C5D /* BlurImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlurImageView.swift; sourceTree = "<group>"; };
 		6901429F14A91DCA0DE03E99 /* StatsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsManager.swift; sourceTree = "<group>"; };
@@ -72,7 +81,9 @@
 		B9B34FCEA47684C53E1FA646 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		C07D245E2D7E923B260299F9 /* SoundManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundManager.swift; sourceTree = "<group>"; };
 		C21B31109C71115D699DFD40 /* GuessRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuessRow.swift; sourceTree = "<group>"; };
+		CDB925E5A75AA97E905D75A3 /* aperture-splash.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "aperture-splash.json"; sourceTree = "<group>"; };
 		D2D0422A581B887044FC86C5 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		D2E1471BA5C9C5883D39956D /* MobileAuthHandoff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileAuthHandoff.swift; sourceTree = "<group>"; };
 		E8B2F7EF1842A7904A7851D8 /* Inter-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-Medium.ttf"; sourceTree = "<group>"; };
 		E91823833C2B124DEF198968 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		EC9637AB60AAA549E0040A67 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -90,6 +101,7 @@
 			files = (
 				82BBB968D9F4D7DDE313AB80 /* GoogleSignIn in Frameworks */,
 				9B277194B2AA6985F4497E41 /* GoogleSignInSwift in Frameworks */,
+				83D7B1C45C771DE16E69394E /* Lottie in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -108,6 +120,7 @@
 		2CD6D270A61F56D112F24A4A /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				CDB925E5A75AA97E905D75A3 /* aperture-splash.json */,
 				EC9637AB60AAA549E0040A67 /* Assets.xcassets */,
 				A7514A4A8F95B55309358F0D /* Fonts */,
 			);
@@ -161,6 +174,7 @@
 				669A6B2A1898DA17D7EF4C5D /* BlurImageView.swift */,
 				C21B31109C71115D699DFD40 /* GuessRow.swift */,
 				A7271D978D4554CA16BB369E /* HintCard.swift */,
+				53EED89BA68A287712C205CC /* OfflineBanner.swift */,
 				B848C94AEF8F0C1CE0E25077 /* SearchDropdown.swift */,
 				26FAF04863D7FAE2F5896718 /* Theme.swift */,
 			);
@@ -203,10 +217,13 @@
 		AC4CFC469466BF20BF5C40F9 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				409EB42C000B819CE3ED4EF8 /* AppStoreReview.swift */,
 				83093350B6FE060ADE477849 /* BuildConfig.swift */,
 				211724C3FEF93290803711F3 /* GuessToday.entitlements */,
 				2B3E48B553933BCFA5426BE2 /* GuessTodayApp.swift */,
 				A90D00E135137A7F92D816E7 /* Info.plist */,
+				D2E1471BA5C9C5883D39956D /* MobileAuthHandoff.swift */,
+				47D122976E90FF52AAD2B462 /* NetworkMonitor.swift */,
 				EED2214FDA6453571AE8AA0B /* NotificationManager.swift */,
 				E91823833C2B124DEF198968 /* OnboardingView.swift */,
 				D2D0422A581B887044FC86C5 /* RootView.swift */,
@@ -271,6 +288,7 @@
 			packageProductDependencies = (
 				30F29D8502C661CDDFA2CF8C /* GoogleSignIn */,
 				E559EAECD2960846C9A70DD1 /* GoogleSignInSwift */,
+				378ADADBF893DFC860BB4B6E /* Lottie */,
 			);
 			productName = GuessToday;
 			productReference = 8F1C3C3D173A0AA0322FB2B0 /* GuessToday.app */;
@@ -301,6 +319,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				10B9FB53AC5FCC56B7FD0F8D /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				C6F898084AA4FF851503AF04 /* XCRemoteSwiftPackageReference "lottie-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D57D32F2BB02D9DBAF18FBF9 /* Products */;
@@ -324,6 +343,7 @@
 				DB5833C2E918A69A2548E399 /* Inter-Medium.ttf in Resources */,
 				4A2AB10FB5B80863AC077BA7 /* Inter-Regular.ttf in Resources */,
 				AA5281C3B92955321F44B4A3 /* Inter-SemiBold.ttf in Resources */,
+				51FD361594E7FA1322C02A3E /* aperture-splash.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -336,6 +356,7 @@
 			files = (
 				D3DC4D2946F6A9F2B7FBEAD7 /* APIClient.swift in Sources */,
 				6A36BDAB4685FF663BA12F37 /* ApertureIconView.swift in Sources */,
+				C69A2497BE426611AD7010CA /* AppStoreReview.swift in Sources */,
 				B75BB78043CCBBAE41A1BB5B /* ArchiveView.swift in Sources */,
 				8584240025E56C21ACC4F3AA /* AuthViewModel.swift in Sources */,
 				215FE53674B866740ACFC4C7 /* BlurImageView.swift in Sources */,
@@ -349,8 +370,11 @@
 				4E21D13FE8A29BFDD6FC44C6 /* HomeView.swift in Sources */,
 				89BE70339B96F40672B8B7D2 /* KeychainHelper.swift in Sources */,
 				87141A846891D68B791D9770 /* LoginView.swift in Sources */,
+				B94469B0CDA487A9811AAFF6 /* MobileAuthHandoff.swift in Sources */,
 				8F11792D8949988007FC63BC /* Models.swift in Sources */,
+				B689A056C972331FCE923E16 /* NetworkMonitor.swift in Sources */,
 				B512FCBDA6DAF357AC68AC1D /* NotificationManager.swift in Sources */,
+				674E384133DE87E8F6400776 /* OfflineBanner.swift in Sources */,
 				C661562B589E6E6B2EFDC23D /* OnboardingView.swift in Sources */,
 				F5A485111D769D4E33CCD1C3 /* ProfileView.swift in Sources */,
 				CE2AE652BEC03E7B6886EE24 /* RootView.swift in Sources */,
@@ -547,7 +571,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = YOUR_TEAM_ID;
+				DEVELOPMENT_TEAM = Z5JH565RAL;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = GuessToday/App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -661,6 +685,14 @@
 				minimumVersion = 8.0.0;
 			};
 		};
+		C6F898084AA4FF851503AF04 /* XCRemoteSwiftPackageReference "lottie-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/airbnb/lottie-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -668,6 +700,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 10B9FB53AC5FCC56B7FD0F8D /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignIn;
+		};
+		378ADADBF893DFC860BB4B6E /* Lottie */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C6F898084AA4FF851503AF04 /* XCRemoteSwiftPackageReference "lottie-ios" */;
+			productName = Lottie;
 		};
 		E559EAECD2960846C9A70DD1 /* GoogleSignInSwift */ = {
 			isa = XCSwiftPackageProductDependency;

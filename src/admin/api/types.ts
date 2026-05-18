@@ -4,7 +4,7 @@ export interface WikipediaFetchPayload {
   photo_url: string | null
   wikipedia_url: string
   infobox_data: Record<string, unknown>
-  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic'
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic' | 'actor'
   hint_schedule: string[]
   parse_quality_score: number
   parse_warnings: string[]
@@ -59,7 +59,7 @@ export interface AdminWikiPerson {
   name: string
   title: string
   name_aliases: string[]
-  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic'
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic' | 'actor'
   wikipedia_slug: string
   infobox_data: Record<string, unknown>
   hint_schedule: string[]
@@ -75,7 +75,7 @@ export interface AdminWikiPerson {
 export interface WikiPersonPayload {
   name: string
   name_aliases: string[]
-  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic'
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic' | 'actor'
   wikipedia_slug: string
   infobox_data: Record<string, unknown>
   hint_schedule: string[]

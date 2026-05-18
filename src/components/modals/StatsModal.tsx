@@ -53,7 +53,7 @@ export function StatsModal(props: StatsModalProps) {
       {personalDistribution && (
         <div>
           <p className="text-sm font-semibold text-film-text-dim uppercase tracking-wider mb-3">
-            Ma distribution
+            Mes tentatives
           </p>
           <DistributionChart
             distribution={Object.fromEntries(

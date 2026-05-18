@@ -65,6 +65,8 @@ struct HintItem: Codable {
         case "wiki_sport":        return "Sport"
         case "wiki_domain":       return "Domaine"
         case "wiki_notable_work": return "Œuvre notable"
+        case "wiki_notable_films": return "Films notables"
+        case "wiki_occupation":   return "Profession"
         case "wiki_company":      return "Entreprise"
         case "wiki_name_initials":return "Initiales"
         case "wiki_name_length":  return "Lettres dans le nom"
@@ -152,6 +154,11 @@ struct WikiProfile: Codable {
     let sport: String?
     let careerHighlights: [WikiHighlight]?
     let nationalTeam: WikiNationalTeam?
+
+    // Actor
+    let notableFilms: String?
+    let notableFilmsParts: [String]?
+    let occupation: String?
 
     // Generic / others
     let domain: String?

@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react'
-import { ChevronDown, Sparkles, Film, Tv, X, Landmark, LayoutList, LayoutGrid, Eye, EyeOff } from 'lucide-react'
+import { ChevronDown, Sparkles, Film, Tv, X, User, LayoutList, LayoutGrid, Eye, EyeOff } from 'lucide-react'
 import {
   getChallenges,
   getFilms,
@@ -293,7 +293,7 @@ export function CalendarPage() {
         options={[
           { id: 'film', label: 'Films', icon: <Film size={14} /> },
           { id: 'series', label: 'Séries', icon: <Tv size={14} /> },
-          { id: 'wiki', label: 'Personnalités', icon: <Landmark size={14} /> },
+          { id: 'wiki', label: 'Personnalités', icon: <User size={14} /> },
         ]}
       />
 

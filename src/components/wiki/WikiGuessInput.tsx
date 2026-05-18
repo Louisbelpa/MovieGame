@@ -101,10 +101,6 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
       <p id={errorId} className="sr-only" role={hasError ? 'alert' : undefined}>
         {hasError ? 'Réponse invalide, veuillez réessayer.' : ''}
       </p>
-
-      <p className="mt-1.5 text-[10.5px] text-film-text-dim/60 hidden sm:block">
-        ↵ Deviner · Esc Passer
-      </p>
       <p className="sr-only" aria-live="polite">
         {attemptsLeft} tentative{attemptsLeft > 1 ? 's' : ''} restante{attemptsLeft > 1 ? 's' : ''}
       </p>

@@ -38,7 +38,7 @@ function parseUsedDates(value: unknown): string[] {
 
 function mapWikiPerson(raw: Record<string, unknown>): AdminWikiPerson {
   const personTypeRaw = String(raw.person_type ?? 'generic')
-  const validTypes = ['politician', 'sportsperson', 'artist', 'scientist', 'entrepreneur', 'writer', 'historical_figure', 'generic']
+  const validTypes = ['politician', 'sportsperson', 'artist', 'actor', 'scientist', 'entrepreneur', 'writer', 'historical_figure', 'generic']
   const person_type: AdminWikiPerson['person_type'] = validTypes.includes(personTypeRaw)
     ? personTypeRaw as AdminWikiPerson['person_type']
     : 'generic'

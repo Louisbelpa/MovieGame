@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Users, Trophy, Film, Tv, Landmark, UserPlus, ChevronRight } from 'lucide-react'
+import { Users, Trophy, Film, Tv, User, UserPlus, ChevronRight } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useAuthModal } from '@/components/modals/AuthModal'
 import { friendsGetAll, type FriendEntry } from '@/api/client'
@@ -18,7 +18,7 @@ function hasPlayed(entry: FriendEntry): boolean {
 function ModeIcon({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
   const cls = 'shrink-0'
   if (mode === 'series') return <Tv size={11} className={cls} style={{ color: 'var(--sg-series)' }} />
-  if (mode === 'wiki')   return <Landmark size={11} className={cls} style={{ color: 'var(--sg-wiki)' }} />
+  if (mode === 'wiki')   return <User size={11} className={cls} style={{ color: 'var(--sg-wiki)' }} />
   return <Film size={11} className={cls} style={{ color: 'var(--sg-films)' }} />
 }
 
@@ -89,12 +89,13 @@ export function FriendsSidebar({ friends: friendsProp, loading: loadingProp }: F
     )
   }
 
-  const sorted = [...friends].sort((a, b) => winsCount(b) - winsCount(a))
-  const playedCount = friends.filter(hasPlayed).length
-  const totalCount  = friends.length
+  const others = friends.filter((e) => !e.isMe)
+  const sorted = [...others].sort((a, b) => winsCount(b) - winsCount(a))
+  const playedCount = others.filter(hasPlayed).length
+  const totalCount  = others.length
 
   // Insight: is the user leading the leaderboard?
-  const userEntry = sorted.find((e) => e.isMe)
+  const userEntry = friends.find((e) => e.isMe)
   const isLeading = userEntry && sorted[0]?.isMe && winsCount(userEntry) > 0
 
   // How many wins needed for gold (top score + 1)

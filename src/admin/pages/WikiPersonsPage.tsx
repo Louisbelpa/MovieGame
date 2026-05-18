@@ -37,6 +37,7 @@ function personTypeLabel(personType: PersonType): string {
     case 'entrepreneur': return 'Entrepreneur'
     case 'writer': return 'Ecrivain'
     case 'historical_figure': return 'Historique'
+    case 'actor': return 'Acteur'
     case 'generic': return 'Générique'
     default: return 'Profil'
   }
@@ -48,7 +49,7 @@ type ModalState =
   | { type: 'delete'; person: AdminWikiPerson }
   | null
 
-type PersonType = 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic'
+type PersonType = 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic' | 'actor'
 
 interface WikiRoleFormRow {
   title: string
@@ -142,6 +143,8 @@ const HINT_KEY_LABELS: Record<string, string> = {
   position: 'Poste',
   domain: 'Domaine',
   notable_work: 'Œuvre notable',
+  notable_films: 'Films notables',
+  occupation: 'Métier',
   company: 'Entreprise(s)',
   name_initials: 'Initiales du nom',
   name_length: 'Longueur du nom',
@@ -162,6 +165,9 @@ function getWikiHintKeysSelectable(personType: PersonType): string[] {
   if (personType === 'entrepreneur') {
     return ['birth_year', 'nationality', 'domain', 'notable_work', 'company', 'name_initials', 'name_length']
   }
+  if (personType === 'actor') {
+    return ['birth_year', 'nationality', 'notable_films', 'occupation', 'name_initials', 'name_length']
+  }
   return ['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials', 'name_length']
 }
 
@@ -175,6 +181,9 @@ function getDefaultWikiHintSchedule(personType: PersonType): string[] {
   }
   if (personType === 'entrepreneur') {
     return ['birth_year', 'nationality', 'company', 'name_initials', 'name_length']
+  }
+  if (personType === 'actor') {
+    return ['birth_year', 'nationality', 'notable_films', 'name_initials', 'name_length']
   }
   return ['birth_year', 'nationality', 'name_initials', 'name_length']
 }
@@ -327,6 +336,8 @@ function WikiPersonForm({
   const [notableWork, setNotableWork] = useState('')
   const [company, setCompany] = useState('')
   const [era, setEra] = useState('')
+  const [notableFilms, setNotableFilms] = useState('')
+  const [actorOccupation, setActorOccupation] = useState('')
   const [wikiLang, setWikiLang] = useState<'fr' | 'en'>('fr')
   const [loadingWiki, setLoadingWiki] = useState(false)
   const [loadingRandomWiki, setLoadingRandomWiki] = useState(false)
@@ -389,6 +400,24 @@ function WikiPersonForm({
       setNotableWork('')
       setCompany('')
       setEra('')
+    } else if (currentType === 'actor') {
+      const a = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {}
+      setBirthYear(typeof a.birth_year === 'number' ? String(a.birth_year) : '')
+      setNationality(typeof a.nationality === 'string' ? a.nationality : '')
+      setNotableFilms(typeof a.notable_films === 'string' ? a.notable_films.replace(/ · /g, '\n') : '')
+      setActorOccupation(typeof a.occupation === 'string' ? a.occupation : '')
+      setDomain('')
+      setNotableWork('')
+      setCompany('')
+      setEra('')
+      setCareerHighlightsText('')
+      setClubsText('')
+      setClubsYouthText('')
+      setSport('')
+      setPosition('')
+      setNationalTeamName('')
+      setNationalTeamCaps('')
+      setNationalTeamGoals('')
     } else {
       const g = parseGenericInfobox(raw)
       setBirthYear(g.birth_year != null ? String(g.birth_year) : '')
@@ -405,6 +434,8 @@ function WikiPersonForm({
       setNationalTeamName('')
       setNationalTeamCaps('')
       setNationalTeamGoals('')
+      setNotableFilms('')
+      setActorOccupation('')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial?.id])
@@ -495,6 +526,29 @@ function WikiPersonForm({
       return
     }
 
+    if (data.person_type === 'actor') {
+      const a = data.infobox_data
+      setBirthYear(typeof a.birth_year === 'number' ? String(a.birth_year) : '')
+      setNationality(typeof a.nationality === 'string' ? a.nationality : '')
+      setNotableFilms(typeof a.notable_films === 'string' ? a.notable_films.replace(/ · /g, '\n') : '')
+      setActorOccupation(typeof a.occupation === 'string' ? a.occupation : '')
+      setDomain('')
+      setNotableWork('')
+      setCompany('')
+      setEra('')
+      setParty('')
+      setRolesText('')
+      setSport('')
+      setPosition('')
+      setClubsText('')
+      setClubsYouthText('')
+      setNationalTeamName('')
+      setNationalTeamCaps('')
+      setNationalTeamGoals('')
+      setCareerHighlightsText('')
+      return
+    }
+
     const g = parseGenericInfobox(data.infobox_data)
     setBirthYear(g.birth_year != null ? String(g.birth_year) : '')
     setNationality(g.nationality ?? '')
@@ -503,6 +557,8 @@ function WikiPersonForm({
     setCompany(g.company ?? '')
     setEra(g.era ?? '')
     setCareerHighlightsText(careerHighlightsToLines(g.highlights))
+    setNotableFilms('')
+    setActorOccupation('')
     setParty('')
     setRolesText('')
     setSport('')
@@ -645,6 +701,18 @@ function WikiPersonForm({
           : null,
         birth_year: toNullableNumber(birthYear),
         nationality: toNullableString(nationality),
+      }
+    } else if (personType === 'actor') {
+      // notable_films stored as "Film1 · Film2 · Film3" (lines → joined with ·)
+      const filmsList = notableFilms
+        .split('\n')
+        .map(s => s.trim())
+        .filter(Boolean)
+      data = {
+        birth_year: toNullableNumber(birthYear),
+        nationality: toNullableString(nationality),
+        notable_films: filmsList.length > 0 ? filmsList.join(' · ') : null,
+        occupation: toNullableString(actorOccupation),
       }
     } else {
       const hl = parseCareerHighlightsLines(careerHighlightsText)
@@ -828,10 +896,11 @@ function WikiPersonForm({
             <option value="politician">Politicien</option>
             <option value="sportsperson">Sportif</option>
             <option value="artist">Artiste</option>
+            <option value="actor">Acteur</option>
             <option value="scientist">Scientifique</option>
             <option value="entrepreneur">Entrepreneur</option>
             <option value="writer">Ecrivain</option>
-            <option value="historical_figure">Personnalite historique</option>
+            <option value="historical_figure">Personnalité historique</option>
             <option value="generic">Générique</option>
           </select>
           <p className="mt-1 text-xs text-gray-500">Pilote les clés d’indices disponibles et le rendu du profil sous la photo.</p>
@@ -927,6 +996,32 @@ function WikiPersonForm({
               <label className="block text-sm font-medium text-gray-700 mb-1">Buts</label>
               <input value={nationalTeamGoals} onChange={(e) => setNationalTeamGoals(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
             </div>
+          </div>
+        </div>
+      ) : personType === 'actor' ? (
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nationalité</label>
+            <input value={nationality} onChange={(e) => setNationality(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Année de naissance</label>
+            <input value={birthYear} onChange={(e) => setBirthYear(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Métier / rôle</label>
+            <input value={actorOccupation} onChange={(e) => setActorOccupation(e.target.value)} placeholder="ex. Actrice, Réalisatrice" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Films / séries notables</label>
+            <p className="text-xs text-gray-500 mb-1">Un film ou série par ligne — affiché en liste à puces en jeu.</p>
+            <textarea
+              rows={6}
+              value={notableFilms}
+              onChange={(e) => setNotableFilms(e.target.value)}
+              placeholder={"Sauve qui peut (la vie)\nLa Balance\nVénus Beauté (Institut)"}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
+            />
           </div>
         </div>
       ) : (

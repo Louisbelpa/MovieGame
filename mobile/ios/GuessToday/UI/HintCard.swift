@@ -10,26 +10,26 @@ struct HintCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(hint.displayLabel)
-                .font(.system(size: 10, weight: .semibold))
+                .font(Theme.inter(size: 10, weight: .semibold))
                 .foregroundColor(Theme.gold)
                 .textCase(.uppercase)
                 .tracking(0.8)
 
             if hint.isSynopsis {
                 Text(hint.value.displayText)
-                    .font(.system(size: 13))
+                    .font(Theme.inter(size: 13))
                     .foregroundColor(Theme.text)
                     .lineLimit(4)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text(hint.value.displayText)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(Theme.inter(size: 14, weight: .medium))
                     .foregroundColor(Theme.text)
                     .lineLimit(2)
             }
         }
         .padding(Theme.spacing12)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 64, maxHeight: .infinity, alignment: .leading)
         .background(Theme.surface)
         .cornerRadius(Theme.radiusM)
         .overlay(
@@ -52,7 +52,7 @@ struct LockedHintCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Indice \(index)")
-                .font(.system(size: 10, weight: .semibold))
+                .font(Theme.inter(size: 10, weight: .semibold))
                 .foregroundColor(.white.opacity(0.25))
                 .textCase(.uppercase)
                 .tracking(0.8)
@@ -62,7 +62,7 @@ struct LockedHintCard: View {
                 .foregroundColor(.white.opacity(0.30))
         }
         .padding(Theme.spacing12)
-        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 64, maxHeight: .infinity, alignment: .leading)
         .background(Color.clear)
         .cornerRadius(Theme.radiusM)
         .overlay(
@@ -81,40 +81,57 @@ struct HintsGrid: View {
     let hintsRevealed: Int
     let previousRevealCount: Int
 
-    private var lockedCount: Int {
-        max(0, hintsAvailable - hintsRevealed)
+    private var lockedCount: Int { max(0, hintsAvailable - hintsRevealed) }
+
+    private enum GridItem: Identifiable {
+        case revealed(index: Int)
+        case locked(slot: Int)
+        var id: String {
+            switch self {
+            case .revealed(let i): return "revealed_\(i)"
+            case .locked(let s):   return "locked_\(s)"
+            }
+        }
     }
 
-    private var regularIndices: [Int] { hints.indices.filter { !hints[$0].isSynopsis } }
-    private var synopsisIndices: [Int] { hints.indices.filter { hints[$0].isSynopsis } }
+    private var regularHints: [HintItem]  { hints.filter { !$0.isSynopsis } }
+    private var synopsisHints: [HintItem] { hints.filter { $0.isSynopsis } }
+
+    private var gridItems: [GridItem] {
+        let revealed = regularHints.indices.map { GridItem.revealed(index: $0) }
+        let locked   = (0..<lockedCount).map { GridItem.locked(slot: $0) }
+        return revealed + locked
+    }
 
     var body: some View {
         VStack(spacing: Theme.spacing8) {
-            if !regularIndices.isEmpty || lockedCount > 0 {
+            if !gridItems.isEmpty {
                 LazyVGrid(
-                    columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
+                    columns: [SwiftUI.GridItem(.flexible()), SwiftUI.GridItem(.flexible()), SwiftUI.GridItem(.flexible())],
                     spacing: Theme.spacing8
                 ) {
-                    ForEach(regularIndices, id: \.self) { i in
-                        let isNew = i >= previousRevealCount
-                        HintCard(
-                            hint: hints[i],
-                            isNew: isNew,
-                            staggerDelay: isNew ? Double(i - previousRevealCount) * 0.09 : 0
-                        )
-                    }
-                    ForEach(0..<lockedCount, id: \.self) { i in
-                        LockedHintCard(index: hintsRevealed + i)
+                    ForEach(gridItems) { item in
+                        switch item {
+                        case .revealed(let i):
+                            let isNew = i >= previousRevealCount
+                            HintCard(
+                                hint: regularHints[i],
+                                isNew: isNew,
+                                staggerDelay: isNew ? Double(i - previousRevealCount) * 0.09 : 0
+                            )
+                        case .locked(let slot):
+                            LockedHintCard(index: hintsRevealed + slot + 1)
+                        }
                     }
                 }
             }
 
-            ForEach(synopsisIndices, id: \.self) { i in
-                let isNew = i >= previousRevealCount
+            ForEach(Array(synopsisHints.enumerated()), id: \.offset) { i, hint in
+                let isNew = (regularHints.count + i) >= previousRevealCount
                 HintCard(
-                    hint: hints[i],
+                    hint: hint,
                     isNew: isNew,
-                    staggerDelay: isNew ? Double(i - previousRevealCount) * 0.09 : 0
+                    staggerDelay: isNew ? Double((regularHints.count + i) - previousRevealCount) * 0.09 : 0
                 )
             }
         }

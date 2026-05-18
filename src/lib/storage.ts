@@ -28,6 +28,15 @@ export function addToHistory(date: string, outcome: 'won' | 'lost', type: 'film'
   } catch {}
 }
 
+/** Set outcome for a date (overwrites). Used when syncing from the server account. */
+export function setHistoryEntry(date: string, outcome: 'won' | 'lost', type: 'film' | 'series' | 'wiki' = 'film'): void {
+  try {
+    const history = loadHistory(type)
+    history[date] = outcome
+    localStorage.setItem(keys(type).HISTORY, JSON.stringify(history))
+  } catch {}
+}
+
 export function loadGameState(type: 'film' | 'series' | 'wiki' = 'film'): PersistedGameState | null {
   try {
     const raw = localStorage.getItem(keys(type).GAME)

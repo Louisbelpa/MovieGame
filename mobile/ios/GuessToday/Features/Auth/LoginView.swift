@@ -1,7 +1,6 @@
 import SwiftUI
 import AuthenticationServices
 import GoogleSignIn
-import GoogleSignInSwift
 
 struct LoginView: View {
     @Environment(AuthViewModel.self) var auth
@@ -71,11 +70,25 @@ struct LoginView: View {
                         }
 
                         // Google Sign In
-                        GoogleSignInButton(scheme: .dark, style: .wide, state: .normal) {
+                        Button {
                             Task { await loginWithGoogle() }
+                        } label: {
+                            HStack(spacing: 10) {
+                                GoogleLogoMark()
+                                Text("Continuer avec Google")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(Color(hex: "#1f1f1f"))
+                                    .tracking(0.25)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 40)
+                            .background(Color.white)
+                            .cornerRadius(4)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color(hex: "#747775"), lineWidth: 1)
+                            )
                         }
-                        .frame(height: 50)
-                        .cornerRadius(Theme.radiusM)
                         .padding(.horizontal, Theme.spacing16)
 
                         // Apple Sign In
@@ -130,6 +143,9 @@ struct LoginView: View {
             }
             .sheet(isPresented: $showForgotPassword) {
                 ForgotPasswordView()
+            }
+            .onChange(of: auth.isLoggedIn) { _, isLoggedIn in
+                if isLoggedIn { dismiss() }
             }
         }
     }
@@ -363,7 +379,7 @@ struct WebDataTransferNotice: View {
             .foregroundColor(Theme.text.opacity(0.85))
             .lineSpacing(3)
 
-            Link(destination: URL(string: "https://guesstoday.fr?auth=register")!) {
+            Link(destination: MobileAuthHandoff.webRegisterURL) {
                 HStack(spacing: 5) {
                     Text("Aller sur guesstoday.fr")
                         .font(.system(size: 13, weight: .semibold))
@@ -416,5 +432,95 @@ struct AuthTextField: View {
             RoundedRectangle(cornerRadius: Theme.radiusM)
                 .stroke(Theme.border, lineWidth: 1)
         )
+    }
+}
+
+// MARK: - Google "G" logo mark (official SVG paths)
+
+private struct GoogleLogoMark: View {
+    var size: CGFloat = 20
+
+    var body: some View {
+        // Official Google SVG (48×48 viewBox) scaled to `size`
+        Canvas { ctx, sz in
+            let scale = sz.width / 48.0
+            ctx.scaleBy(x: scale, y: scale)
+
+            // Red — top arc
+            var red = Path()
+            red.move(to: CGPoint(x: 24, y: 9.5))
+            red.addCurve(to: CGPoint(x: 33.21, y: 13.1),
+                         control1: CGPoint(x: 27.54, y: 9.5),
+                         control2: CGPoint(x: 30.71, y: 10.72))
+            red.addLine(to: CGPoint(x: 40.06, y: 6.25))
+            red.addCurve(to: CGPoint(x: 24, y: 0),
+                         control1: CGPoint(x: 35.9, y: 2.38),
+                         control2: CGPoint(x: 30.47, y: 0))
+            red.addCurve(to: CGPoint(x: 2.56, y: 13.22),
+                         control1: CGPoint(x: 14.62, y: 0),
+                         control2: CGPoint(x: 6.51, y: 5.38))
+            red.addLine(to: CGPoint(x: 10.54, y: 19.41))
+            red.addCurve(to: CGPoint(x: 24, y: 9.5),
+                         control1: CGPoint(x: 12.43, y: 13.72),
+                         control2: CGPoint(x: 17.74, y: 9.5))
+            ctx.fill(red, with: .color(Color(hex: "#EA4335")))
+
+            // Blue — right arc + crossbar
+            var blue = Path()
+            blue.move(to: CGPoint(x: 46.98, y: 24.55))
+            blue.addCurve(to: CGPoint(x: 46.6, y: 20),
+                          control1: CGPoint(x: 46.98, y: 22.98),
+                          control2: CGPoint(x: 46.83, y: 21.46))
+            blue.addLine(to: CGPoint(x: 24, y: 20))
+            blue.addLine(to: CGPoint(x: 24, y: 29.02))
+            blue.addLine(to: CGPoint(x: 36.94, y: 29.02))
+            blue.addCurve(to: CGPoint(x: 32.16, y: 36.2),
+                          control1: CGPoint(x: 36.36, y: 31.98),
+                          control2: CGPoint(x: 34.68, y: 34.5))
+            blue.addLine(to: CGPoint(x: 39.89, y: 42.2))
+            blue.addCurve(to: CGPoint(x: 46.98, y: 24.55),
+                          control1: CGPoint(x: 44.4, y: 38.02),
+                          control2: CGPoint(x: 46.98, y: 31.84))
+            ctx.fill(blue, with: .color(Color(hex: "#4285F4")))
+
+            // Yellow — left arc
+            var yellow = Path()
+            yellow.move(to: CGPoint(x: 10.53, y: 28.59))
+            yellow.addCurve(to: CGPoint(x: 9.77, y: 24),
+                            control1: CGPoint(x: 10.05, y: 27.14),
+                            control2: CGPoint(x: 9.77, y: 25.6))
+            yellow.addCurve(to: CGPoint(x: 10.53, y: 19.41),
+                            control1: CGPoint(x: 9.77, y: 22.4),
+                            control2: CGPoint(x: 10.05, y: 20.86))
+            yellow.addLine(to: CGPoint(x: 2.56, y: 13.22))
+            yellow.addCurve(to: CGPoint(x: 0, y: 24),
+                            control1: CGPoint(x: 0.92, y: 16.46),
+                            control2: CGPoint(x: 0, y: 20.12))
+            yellow.addCurve(to: CGPoint(x: 2.56, y: 34.78),
+                            control1: CGPoint(x: 0, y: 27.88),
+                            control2: CGPoint(x: 0.92, y: 31.54))
+            yellow.addLine(to: CGPoint(x: 10.53, y: 28.59))
+            ctx.fill(yellow, with: .color(Color(hex: "#FBBC05")))
+
+            // Green — bottom arc
+            var green = Path()
+            green.move(to: CGPoint(x: 24, y: 48))
+            green.addCurve(to: CGPoint(x: 39.89, y: 42.19),
+                           control1: CGPoint(x: 30.48, y: 48),
+                           control2: CGPoint(x: 35.93, y: 45.87))
+            green.addLine(to: CGPoint(x: 32.16, y: 36.19))
+            green.addCurve(to: CGPoint(x: 24, y: 38.49),
+                           control1: CGPoint(x: 30.01, y: 37.64),
+                           control2: CGPoint(x: 27.24, y: 38.49))
+            green.addCurve(to: CGPoint(x: 10.53, y: 28.58),
+                           control1: CGPoint(x: 17.74, y: 38.49),
+                           control2: CGPoint(x: 12.43, y: 34.27))
+            green.addLine(to: CGPoint(x: 2.56, y: 34.77))
+            green.addCurve(to: CGPoint(x: 24, y: 48),
+                           control1: CGPoint(x: 6.51, y: 42.62),
+                           control2: CGPoint(x: 14.62, y: 48))
+            ctx.fill(green, with: .color(Color(hex: "#34A853")))
+        }
+        .frame(width: size, height: size)
     }
 }

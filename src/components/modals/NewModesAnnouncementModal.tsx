@@ -1,4 +1,4 @@
-import { Tv, Landmark } from 'lucide-react'
+import { Tv, User } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
@@ -82,7 +82,7 @@ export function NewModesAnnouncementModal({ isOpen, onClose, variant }: NewModes
                 className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center border border-[#e85788]/45"
                 style={{ background: 'rgba(232, 87, 136, 0.18)' }}
               >
-                <Landmark size={18} className="text-[#e85788]" aria-hidden />
+                <User size={18} className="text-[#e85788]" aria-hidden />
               </span>
               <span className="text-film-text-dim leading-relaxed pt-1">
                 <span className="text-film-text font-medium">Personnalités</span> — devine la personnalité à partir de son

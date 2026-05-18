@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users,
@@ -8,8 +9,9 @@ import {
   X,
   Film,
   Tv,
-  Landmark,
+  User,
   ChevronDown,
+  ChevronLeft,
   UserPlus,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
@@ -29,7 +31,6 @@ import {
 import { FEATURES } from '@/config/features'
 import { Footer } from '@/components/layout/Footer'
 import { TopNav } from '@/components/layout/TopNav'
-import { ApertureIcon } from '@/components/ui/ApertureIcon'
 import { loadStats } from '@/lib/storage'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -86,18 +87,19 @@ function friendToRow(entry: FriendEntry, mode: ModeFilter): TableRow {
 
 function leaderboardToRow(entry: LeaderboardEntry, mode: ModeFilter): TableRow {
   let wins: number
-  if (mode === 'film') wins = entry.filmWins
-  else if (mode === 'series') wins = entry.seriesWins
-  else if (mode === 'wiki') wins = entry.wikiWins
-  else wins = entry.totalWins
+  let played: number
+  if (mode === 'film') { wins = entry.filmWins; played = entry.filmPlayed }
+  else if (mode === 'series') { wins = entry.seriesWins; played = entry.seriesPlayed }
+  else if (mode === 'wiki') { wins = entry.wikiWins; played = entry.wikiPlayed }
+  else { wins = entry.totalWins; played = entry.totalPlayed }
   return {
     id: entry.id,
     displayName: entry.displayName,
     avatarUrl: entry.avatarUrl,
     isMe: entry.isMe,
     wins,
-    played: entry.totalPlayed,
-    winPct: Math.round(entry.winRate * 100),
+    played,
+    winPct: played > 0 ? Math.round((wins / played) * 100) : 0,
     avgAttempts: entry.avgAttempts ?? null,
     streak: entry.currentStreak,
   }
@@ -584,6 +586,7 @@ function IncomingBanner({
 export function FriendsPage() {
   const user = useAuthStore((s) => s.user)
   const { open: openAuth } = useAuthModal()
+  const navigate = useNavigate()
 
   const [modeFilter, setModeFilter] = useState<ModeFilter>('all')
   const [period, setPeriod] = useState<Period>('7d')
@@ -642,7 +645,10 @@ export function FriendsPage() {
       return sortRows(friendsData.friends.map((f) => friendToRow(f, modeFilter)))
     }
     if (!leaderboard) return []
-    return sortRows(leaderboard.map((e) => leaderboardToRow(e, modeFilter)))
+    const rows = leaderboard.map((e) => leaderboardToRow(e, modeFilter))
+    // Hide the "me" entry if there are no actual friends (only self in the list)
+    const hasOtherPlayers = rows.some((r) => !r.isMe)
+    return sortRows(hasOtherPlayers ? rows : rows.filter((r) => !r.isMe))
   })()
 
   const loading = period === 'today' ? loadingFriends : loadingLeaderboard
@@ -655,7 +661,7 @@ export function FriendsPage() {
     { key: 'all', label: 'Tous les modes', icon: Users },
     { key: 'film', label: 'Films', icon: Film, color: 'var(--sg-films)' },
     ...(FEATURES.enableSeries ? [{ key: 'series' as ModeFilter, label: 'Séries', icon: Tv, color: 'var(--sg-series)' }] : []),
-    ...(FEATURES.enableWiki ? [{ key: 'wiki' as ModeFilter, label: 'Personnalités', icon: Landmark, color: 'var(--sg-wiki)' }] : []),
+    ...(FEATURES.enableWiki ? [{ key: 'wiki' as ModeFilter, label: 'Personnalités', icon: User, color: 'var(--sg-wiki)' }] : []),
   ]
 
   return (
@@ -666,14 +672,29 @@ export function FriendsPage() {
       {/* Mobile header */}
       <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-film-border bg-film-black sticky top-0 z-10">
         <div className="flex items-center gap-2">
-          <a href="/" className="flex items-center gap-2">
-            <ApertureIcon size={20} />
-          </a>
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            aria-label="Retour"
+            className="text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
+          >
+            <ChevronLeft size={22} />
+          </button>
           <h1 className="font-semibold text-film-text text-base">Amis</h1>
         </div>
         <div className="flex items-center gap-2">
           {maxStreak > 0 && (
             <span className="text-xs font-semibold text-amber-400">🔥 {maxStreak}</span>
+          )}
+          {user && (
+            <button
+              type="button"
+              onClick={() => setShowAddModal(true)}
+              aria-label="Ajouter un ami"
+              className="w-7 h-7 rounded-full border border-film-border/60 bg-white/[0.04] flex items-center justify-center text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
+            >
+              <UserPlus size={14} />
+            </button>
           )}
           {user ? (
             <a href="/profile" className="w-7 h-7 rounded-full bg-film-gold/20 border border-film-gold/40 flex items-center justify-center text-xs font-bold text-film-gold overflow-hidden">
@@ -683,14 +704,6 @@ export function FriendsPage() {
               }
             </a>
           ) : null}
-          <button
-            type="button"
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1 rounded-full border border-film-gold/40 bg-film-gold/10 px-2.5 py-1 text-xs font-semibold text-film-gold cursor-pointer"
-          >
-            <UserPlus size={11} />
-            Inviter
-          </button>
         </div>
       </header>
 
@@ -759,7 +772,7 @@ export function FriendsPage() {
             )}
 
             {/* Filter bar */}
-            <div className="flex items-center justify-between gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-6">
               <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
                 {modeTabs.map((tab) => {
                   const Icon = tab.icon
@@ -798,13 +811,15 @@ export function FriendsPage() {
             {/* Content grid */}
             {!loading && (
               <div className="grid lg:grid-cols-[340px_1fr] gap-5 items-start">
-                {/* Podium card */}
-                <div className="rounded-2xl border border-film-border bg-[#0e1219] overflow-hidden">
-                  <PodiumChart rows={tableRows} period={period} />
-                </div>
+                {/* Podium card — only shown when there are players */}
+                {tableRows.length > 0 && (
+                  <div className="rounded-2xl border border-film-border bg-[#0e1219] overflow-hidden">
+                    <PodiumChart rows={tableRows} period={period} />
+                  </div>
+                )}
 
                 {/* Table card */}
-                <div className="rounded-2xl border border-film-border bg-[#0e1219] overflow-hidden">
+                <div className={`rounded-2xl border border-film-border bg-[#0e1219] overflow-hidden ${tableRows.length === 0 ? 'lg:col-span-2' : ''}`}>
                   {tableRows.length === 0 ? (
                     <div className="flex flex-col items-center gap-3 py-12 text-center px-6">
                       <Users size={32} className="text-film-text-dim/30" />
