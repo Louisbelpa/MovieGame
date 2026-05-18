@@ -3,15 +3,28 @@ import Foundation
 enum BuildConfig {
     #if NRT
     static let isNRT = true
-    static let environment = "NRT"
-    static let baseURL = "https://moviegame-staging.up.railway.app"
+    static let schemeName = "NRT"
     #elseif DEBUG
     static let isNRT = false
-    static let environment = "Debug"
-    static let baseURL = "http://localhost:3001"
+    static let schemeName = "Debug"
     #else
     static let isNRT = false
-    static let environment = "Production"
-    static let baseURL = "https://guesstoday.fr"
+    static let schemeName = "Release"
     #endif
+
+    static var environment: String {
+        #if DEBUG || NRT
+        return EnvironmentManager.shared.current.displayName
+        #else
+        return "Production"
+        #endif
+    }
+
+    static var baseURL: String {
+        #if DEBUG || NRT
+        return EnvironmentManager.shared.baseURL
+        #else
+        return "https://guesstoday.fr"
+        #endif
+    }
 }

@@ -30,7 +30,7 @@ struct RulesSheet: View {
                                 Circle()
                                     .stroke(modeColor.opacity(0.30), lineWidth: 1.5)
                                     .frame(width: 90, height: 90)
-                                Image(systemName: modeIcon)
+                                Image(systemName: mode.iconFilled)
                                     .font(.system(size: 38, weight: .medium))
                                     .foregroundColor(modeColor)
                             }
@@ -138,37 +138,29 @@ struct RulesSheet: View {
         switch mode {
         case .film:
             return [
-                Step(icon: "photo.fill", title: "Image floue", description: "Une scène du film s'affiche, fortement floutée. Elle se dévoile progressivement à chaque mauvaise réponse."),
+                Step(icon: "eye.slash.fill", title: "Scène révélée", description: "Une scène du film s'affiche, fortement floutée. Elle se dévoile progressivement à chaque mauvaise réponse."),
                 Step(icon: "list.bullet", title: "Indices progressifs", description: "Jusqu'à 3 indices sont révélés : année de sortie, réalisateur, acteur principal."),
-                Step(icon: "magnifyingglass", title: "Proposez un titre", description: "Utilisez la barre de recherche pour saisir votre réponse. Vous avez \(maxAttempts) tentatives."),
+                Step(icon: "film", title: "Proposez un titre", description: "Saisissez votre réponse dans le champ prévu. Vous avez \(maxAttempts) tentatives."),
                 Step(icon: "clock.fill", title: "Un défi par jour", description: "Un nouveau film mystère chaque jour à minuit, heure de Paris. Revenez demain !"),
             ]
         case .series:
             return [
-                Step(icon: "photo.fill", title: "Image floue", description: "Une scène de la série s'affiche, fortement floutée. Elle se dévoile progressivement à chaque mauvaise réponse."),
+                Step(icon: "eye.slash.fill", title: "Scène révélée", description: "Une scène de la série s'affiche, fortement floutée. Elle se dévoile progressivement à chaque mauvaise réponse."),
                 Step(icon: "list.bullet", title: "Indices progressifs", description: "Jusqu'à 3 indices sont révélés : année de sortie, créateur, acteur principal."),
-                Step(icon: "magnifyingglass", title: "Proposez un titre", description: "Utilisez la barre de recherche pour saisir votre réponse. Vous avez \(maxAttempts) tentatives."),
+                Step(icon: "tv", title: "Proposez un titre", description: "Saisissez votre réponse dans le champ prévu. Vous avez \(maxAttempts) tentatives."),
                 Step(icon: "clock.fill", title: "Un défi par jour", description: "Une nouvelle série mystère chaque jour à minuit, heure de Paris. Revenez demain !"),
             ]
         case .wiki:
             return [
                 Step(icon: "eye.slash.fill", title: "Photo masquée", description: "La photo de la personnalité reste cachée tout au long de la partie — découvrez-la à la fin."),
                 Step(icon: "list.bullet", title: "Indices progressifs", description: "Des indices sur sa carrière, ses fonctions, ses clubs ou sa vie sont révélés après chaque mauvaise réponse."),
-                Step(icon: "magnifyingglass", title: "Proposez un nom", description: "Utilisez la barre de recherche pour saisir votre réponse. Vous avez \(maxAttempts) tentatives."),
+                Step(icon: "person.bust", title: "Proposez un nom", description: "Saisissez votre réponse dans le champ prévu. Vous avez \(maxAttempts) tentatives."),
                 Step(icon: "clock.fill", title: "Un défi par jour", description: "Une nouvelle personnalité mystère chaque jour à minuit, heure de Paris. Revenez demain !"),
             ]
         }
     }
 
     private let maxAttempts = 5
-
-    private var modeIcon: String {
-        switch mode {
-        case .film:   return "film.fill"
-        case .series: return "tv.fill"
-        case .wiki:   return "person.fill"
-        }
-    }
 
     private var modeColor: Color { mode.color }
 

@@ -40,7 +40,15 @@ enum GameMode {
         switch self {
         case .film:   return "film"
         case .series: return "tv"
-        case .wiki:   return "person.text.rectangle"
+        case .wiki:   return "person.bust"
+        }
+    }
+
+    var iconFilled: String {
+        switch self {
+        case .film:   return "film.fill"
+        case .series: return "tv.fill"
+        case .wiki:   return "person.bust.fill"
         }
     }
 }
@@ -59,8 +67,6 @@ final class GameViewModel {
     var isLoading = false
     var error: String?
     var inputText = ""
-    var searchResults: [SearchResultItem] = []
-    var isSearching = false
     var previousHintsRevealed = 0
 
     // Game outcome sheet
@@ -78,14 +84,11 @@ final class GameViewModel {
     var flashColor: Color? = nil
 
     // Haptic feedback
-    private let successHaptic  = UINotificationFeedbackGenerator()
-    private let errorHaptic    = UINotificationFeedbackGenerator()
-    private let lightImpact    = UIImpactFeedbackGenerator(style: .light)
-    private let mediumImpact   = UIImpactFeedbackGenerator(style: .medium)
-    private let heavyImpact    = UIImpactFeedbackGenerator(style: .heavy)
-    private let selectionHaptic = UISelectionFeedbackGenerator()
-
-    private var searchTask: Task<Void, Never>?
+    @ObservationIgnored private let successHaptic  = UINotificationFeedbackGenerator()
+    @ObservationIgnored private let errorHaptic    = UINotificationFeedbackGenerator()
+    @ObservationIgnored private let lightImpact    = UIImpactFeedbackGenerator(style: .light)
+    @ObservationIgnored private let mediumImpact   = UIImpactFeedbackGenerator(style: .medium)
+    @ObservationIgnored private let heavyImpact    = UIImpactFeedbackGenerator(style: .heavy)
 
     init(mode: GameMode) {
         self.mode = mode
@@ -110,7 +113,6 @@ final class GameViewModel {
             filmResult = nil
             wikiResult = nil
             inputText = ""
-            searchResults = []
             previousHintsRevealed = 0
         }
         isLoading = !isRefresh
@@ -132,10 +134,7 @@ final class GameViewModel {
 
             if payload.isGameOver {
                 await fetchResult(challengeId: payload.challengeId)
-                if !isRefresh {
-                    if payload.won { showWinSheet = true }
-                    else if payload.lost { showLoseSheet = true }
-                }
+                // Sheets shown only from submitGuess to avoid reopening on tab switch / profile navigation
             }
         } catch let e as APIError {
             if case .httpError(let code, _) = e, code == 404 {
@@ -160,7 +159,6 @@ final class GameViewModel {
         guard let c = challenge, !c.isGameOver else { return }
 
         inputText = ""
-        searchResults = []
 
         do {
             previousHintsRevealed = c.hintsRevealed
@@ -171,26 +169,30 @@ final class GameViewModel {
             challenge = response.challenge
 
             if response.correct {
+                successHaptic.prepare()
                 successHaptic.notificationOccurred(.success)
                 SoundManager.shared.playSuccess()
                 triggerFlash(.green)
                 await fetchResult(challengeId: response.challenge.challengeId)
-                heavyImpact.impactOccurred()           // impact fort à l'ouverture de WinSheet
+                heavyImpact.prepare()
+                heavyImpact.impactOccurred()
                 showWinSheet = true
                 recordStats(won: true, attemptsUsed: response.challenge.attemptsUsed)
             } else {
+                errorHaptic.prepare()
                 errorHaptic.notificationOccurred(.warning)
                 SoundManager.shared.playError()
                 triggerShake()
                 triggerFlash(.red)
-                // Hint débloqué après une mauvaise réponse
                 if response.challenge.hintsRevealed > previousHintsRevealed {
+                    lightImpact.prepare()
                     lightImpact.impactOccurred()
                 }
                 if response.challenge.isGameOver {
                     await fetchResult(challengeId: response.challenge.challengeId)
                     SoundManager.shared.playLose()
-                    errorHaptic.notificationOccurred(.error)   // impact erreur à l'ouverture de LoseSheet
+                    errorHaptic.prepare()
+                    errorHaptic.notificationOccurred(.error)
                     showLoseSheet = true
                     recordStats(won: false, attemptsUsed: response.challenge.attemptsUsed)
                 }
@@ -203,6 +205,7 @@ final class GameViewModel {
     }
 
     func skipAttempt() async {
+        mediumImpact.prepare()
         mediumImpact.impactOccurred()
         await submitGuess("")
     }
@@ -211,33 +214,6 @@ final class GameViewModel {
 
     func onInputChange(_ text: String) {
         inputText = text
-        searchTask?.cancel()
-
-        guard text.count >= 2 else {
-            searchResults = []
-            return
-        }
-
-        searchTask = Task {
-            try? await Task.sleep(for: .milliseconds(250))
-            guard !Task.isCancelled else { return }
-
-            isSearching = true
-            defer { isSearching = false }
-            do {
-                let results = mode == .wiki
-                    ? try await APIClient.shared.searchWikiPersons(query: text)
-                    : try await APIClient.shared.searchFilms(query: text, type: mode.apiType)
-                guard !Task.isCancelled else { return }
-                searchResults = results
-            } catch {}
-        }
-    }
-
-    func selectSearchResult(_ item: SearchResultItem) {
-        selectionHaptic.selectionChanged()
-        inputText = item.title
-        searchResults = []
     }
 
     // MARK: - Result
@@ -257,6 +233,7 @@ final class GameViewModel {
     func navigatePrev() async {
         let refDate = challenge?.date ?? viewingDate ?? todayParis()
         guard challenge?.hasPrevChallenge ?? true else { return }
+        lightImpact.prepare()
         lightImpact.impactOccurred()
         do {
             let prevDate: String?
@@ -277,6 +254,7 @@ final class GameViewModel {
         let refDate = challenge?.date ?? viewingDate ?? todayParis()
         let canNext = challenge.map { $0.hasNextChallenge && $0.isPastChallenge } ?? (refDate < todayParis())
         guard canNext else { return }
+        lightImpact.prepare()
         lightImpact.impactOccurred()
         do {
             let nextDate: String?
@@ -294,6 +272,7 @@ final class GameViewModel {
     }
 
     func returnToToday() async {
+        lightImpact.prepare()
         lightImpact.impactOccurred()
         await loadToday()
     }

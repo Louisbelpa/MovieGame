@@ -416,6 +416,16 @@ struct APIErrorResponse: Codable {
             return "Ce compte a été suspendu."
         case "too many requests", "rate limit exceeded":
             return "Trop de tentatives. Réessaie dans quelques minutes."
+        case "user not found":
+            return "Aucun utilisateur trouvé avec ce code."
+        case "friendship already exists or pending":
+            return "Tu es déjà ami avec cette personne ou une demande est en attente."
+        case "code is required":
+            return "Le code ami est requis."
+        case "pending friendship not found":
+            return "Demande d'amitié introuvable."
+        case "cannot add yourself":
+            return "Tu ne peux pas t'ajouter toi-même."
         default:
             return raw.isEmpty ? "Une erreur est survenue." : raw
         }
