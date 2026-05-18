@@ -289,88 +289,75 @@ private struct GuessInputSection: View {
                     .foregroundColor(Theme.textDim)
             }
 
-            // Search field + dropdown
-            ZStack(alignment: .bottom) {
-                HStack(spacing: Theme.spacing8) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 14))
-                            .foregroundColor(inputFocused.wrappedValue ? Theme.gold : Theme.muted)
+            // Search field
+            HStack(spacing: Theme.spacing8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 14))
+                        .foregroundColor(inputFocused.wrappedValue ? Theme.gold : Theme.muted)
 
-                        TextField("Votre réponse…", text: Binding(
-                            get: { vm.inputText },
-                            set: { vm.onInputChange($0) }
-                        ))
-                        .textFieldStyle(.plain)
-                        .font(Theme.inter(size: 15))
-                        .foregroundColor(Theme.text)
-                        .tint(Theme.gold)
-                        .autocorrectionDisabled()
-                        .focused(inputFocused)
-                        .onSubmit {
-                            guard canGuess else { return }
-                            Task { await vm.submitGuess(vm.inputText) }
-                        }
-
-                        if vm.isSearching {
-                            ProgressView().tint(Theme.gold).scaleEffect(0.7)
-                        } else if !vm.inputText.isEmpty {
-                            Button { vm.onInputChange("") } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(Theme.muted)
-                                    .font(.system(size: 14))
-                            }
-                        }
-                    }
-                    .padding(.horizontal, Theme.spacing12)
-                    .padding(.vertical, 13)
-                    .background(Theme.surface)
-                    .cornerRadius(Theme.radiusM)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Theme.radiusM)
-                            .stroke(inputFocused.wrappedValue ? Theme.gold.opacity(0.55) : Theme.border, lineWidth: 1)
-                    )
-                    .shadow(
-                        color: inputFocused.wrappedValue ? Theme.gold.opacity(0.18) : .clear,
-                        radius: 6, x: 0, y: 0
-                    )
-                    .animation(.easeInOut(duration: 0.18), value: inputFocused.wrappedValue)
-                    .modifier(ShakeEffect(amount: vm.shakeAmount))
-
-                    Button {
-                        inputFocused.wrappedValue = false
+                    TextField("Votre réponse…", text: Binding(
+                        get: { vm.inputText },
+                        set: { vm.onInputChange($0) }
+                    ))
+                    .textFieldStyle(.plain)
+                    .font(Theme.inter(size: 15))
+                    .foregroundColor(Theme.text)
+                    .tint(Theme.gold)
+                    .autocorrectionDisabled()
+                    .focused(inputFocused)
+                    .onSubmit {
+                        guard canGuess else { return }
                         Task { await vm.submitGuess(vm.inputText) }
-                    } label: {
-                        Text("Deviner")
-                            .font(Theme.inter(size: 13, weight: .bold))
-                            .foregroundColor(canGuess ? Color(hex: "#1a0f00") : Theme.muted)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 11)
-                            .background(
-                                canGuess
-                                ? LinearGradient(
-                                    colors: [Color(hex: "#e8c06a"), Color(hex: "#d4a64a"), Color(hex: "#a07030")],
-                                    startPoint: .top, endPoint: .bottom
-                                  )
-                                : LinearGradient(
-                                    colors: [Theme.surfaceAlt, Theme.surfaceAlt],
-                                    startPoint: .top, endPoint: .bottom
-                                  )
-                            )
-                            .cornerRadius(Theme.radiusM)
                     }
-                    .disabled(!canGuess)
-                    .animation(.easeInOut(duration: 0.15), value: canGuess)
-                }
 
-                // Autocomplete dropdown (floats above)
-                if !vm.searchResults.isEmpty {
-                    SearchDropdown(results: vm.searchResults) { item in
-                        vm.selectSearchResult(item)
-                        inputFocused.wrappedValue = false
+                    if !vm.inputText.isEmpty {
+                        Button { vm.onInputChange("") } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(Theme.muted)
+                                .font(.system(size: 14))
+                        }
                     }
-                    .offset(y: -58)
                 }
+                .padding(.horizontal, Theme.spacing12)
+                .padding(.vertical, 13)
+                .background(Theme.surface)
+                .cornerRadius(Theme.radiusM)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.radiusM)
+                        .stroke(inputFocused.wrappedValue ? Theme.gold.opacity(0.55) : Theme.border, lineWidth: 1)
+                )
+                .shadow(
+                    color: inputFocused.wrappedValue ? Theme.gold.opacity(0.18) : .clear,
+                    radius: 6, x: 0, y: 0
+                )
+                .animation(.easeInOut(duration: 0.18), value: inputFocused.wrappedValue)
+                .modifier(ShakeEffect(amount: vm.shakeAmount))
+
+                Button {
+                    inputFocused.wrappedValue = false
+                    Task { await vm.submitGuess(vm.inputText) }
+                } label: {
+                    Text("Deviner")
+                        .font(Theme.inter(size: 13, weight: .bold))
+                        .foregroundColor(canGuess ? Color(hex: "#1a0f00") : Theme.muted)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                        .background(
+                            canGuess
+                            ? LinearGradient(
+                                colors: [Color(hex: "#e8c06a"), Color(hex: "#d4a64a"), Color(hex: "#a07030")],
+                                startPoint: .top, endPoint: .bottom
+                              )
+                            : LinearGradient(
+                                colors: [Theme.surfaceAlt, Theme.surfaceAlt],
+                                startPoint: .top, endPoint: .bottom
+                              )
+                        )
+                        .cornerRadius(Theme.radiusM)
+                }
+                .disabled(!canGuess)
+                .animation(.easeInOut(duration: 0.15), value: canGuess)
             }
 
             // Skip button

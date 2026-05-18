@@ -181,6 +181,7 @@ struct HomeView: View {
     @State private var vm = HomeViewModel()
     @State private var selectedMode: GameMode? = nil
     @State private var deepLinkDate: String? = nil
+    @State private var cardsAppeared = true
     private var statsManager: StatsManager { StatsManager.shared }
 
     var body: some View {
@@ -240,6 +241,8 @@ struct HomeView: View {
                                 .padding(.horizontal, Theme.spacing16)
                             }
                         }
+                        .opacity(cardsAppeared ? 1 : 0)
+                        .offset(y: cardsAppeared ? 0 : 18)
                         .padding(.bottom, Theme.spacing20)
 
                         // ── Stats + Countdown ────────────────────
@@ -282,8 +285,14 @@ struct HomeView: View {
             if phase == .active { Task { await vm.load() } }
         }
         .onChange(of: selectedMode) { _, mode in
-            // User returned from a game — silently refresh statuses
-            if mode == nil { Task { await vm.load(isRefresh: true) } }
+            // User returned from a game — animate cards back in and refresh statuses
+            if mode == nil {
+                cardsAppeared = false
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.78).delay(0.12)) {
+                    cardsAppeared = true
+                }
+                Task { await vm.load(isRefresh: true) }
+            }
         }
         .onChange(of: statsManager.filmStats.gamesPlayed)    { _, _ in vm.refreshStats() }
         .onChange(of: statsManager.seriesStats.gamesPlayed) { _, _ in vm.refreshStats() }
