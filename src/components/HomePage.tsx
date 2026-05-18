@@ -147,7 +147,7 @@ interface GameCardProps {
   todayStatus?: 'won' | 'lost' | null
 }
 
-function GameCard({ href, icon, modeLabel, description, accentColor, accentRing, disabled, badge, todayStatus }: GameCardProps) {
+function GameCard({ href, icon, modeLabel, description, accentColor, disabled, badge, todayStatus }: GameCardProps) {
   const showPlayButton = !todayStatus && !disabled
   const Tag = disabled ? 'div' : 'a'
 
@@ -157,132 +157,130 @@ function GameCard({ href, icon, modeLabel, description, accentColor, accentRing,
       <Tag
         {...(!disabled ? { href } : {})}
         className={`group hidden lg:flex flex-col rounded-2xl overflow-hidden transition-all duration-200 ${
-          disabled ? 'opacity-40 cursor-default' : 'cursor-pointer hover:-translate-y-1 hover:shadow-2xl'
+          disabled ? 'opacity-40 cursor-default' : 'cursor-pointer hover:-translate-y-2 hover:shadow-2xl'
         }`}
         style={{
-          background: 'var(--color-film-surface)',
-          border: `1.5px solid ${
-            todayStatus === 'won' ? 'rgba(30,132,73,0.35)'
-            : todayStatus === 'lost' ? 'rgba(192,57,43,0.30)'
-            : accentRing
-          }`,
-          boxShadow: `0 2px 12px rgba(28,24,22,0.07), 0 0 0 0 ${accentColor}`,
+          background: '#2c2c54',
+          border: `1.5px solid ${accentColor}55`,
+          boxShadow: '0 4px 24px rgba(44,44,84,0.18)',
         }}
       >
-        {/* Visual area — fond coloré plein */}
-        <div
-          className="relative flex flex-col items-center justify-center gap-3"
-          style={{
-            aspectRatio: '4 / 3',
-            background: `linear-gradient(160deg, ${accentColor}22 0%, ${accentColor}10 100%)`,
-            borderBottom: `1px solid ${accentRing}`,
-          }}
-        >
-          {/* Accent strip top */}
-          <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: accentColor }} />
+        {/* Trait accent top */}
+        <div className="h-[3px]" style={{ background: accentColor }} />
 
+        {/* Zone visuelle centrale */}
+        <div
+          className="relative flex flex-col items-center justify-center gap-5 flex-1 py-12 px-6"
+          style={{ background: `radial-gradient(ellipse 90% 70% at 50% 110%, ${accentColor}30, transparent 65%)` }}
+        >
+          {/* Badges statut */}
           {todayStatus === 'won' && (
-            <span className="absolute top-4 left-3 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-film-green bg-film-green/10 border border-film-green/30 px-2 py-1 rounded-full">
-              <CheckCircle2 size={11} /> Gagné
+            <span className="absolute top-4 right-4 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full"
+              style={{ background: 'rgba(33,140,116,0.25)', color: '#33d9b2', border: '1px solid rgba(33,140,116,0.4)' }}>
+              <CheckCircle2 size={10} /> Gagné
             </span>
           )}
           {todayStatus === 'lost' && (
-            <span className="absolute top-4 left-3 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-film-red bg-film-red/10 border border-film-red/30 px-2 py-1 rounded-full">
-              <XCircle size={11} /> Perdu
+            <span className="absolute top-4 right-4 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full"
+              style={{ background: 'rgba(179,57,57,0.22)', color: '#ff7070', border: '1px solid rgba(179,57,57,0.35)' }}>
+              <XCircle size={10} /> Perdu
             </span>
           )}
           {badge && !todayStatus && (
-            <span
-              className="absolute top-4 right-3 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
-              style={{ background: accentColor, color: '#fff' }}
-            >
+            <span className="absolute top-4 left-4 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wide"
+              style={{ background: accentColor, color: '#2c2c54' }}>
               {badge}
             </span>
           )}
 
+          {/* Icône dans un carré */}
           <div
-            className="transition-transform duration-300 group-hover:scale-110"
-            style={{ color: accentColor }}
+            className="p-4 rounded-2xl transition-transform duration-300 group-hover:scale-110"
+            style={{ background: `${accentColor}22`, color: accentColor }}
           >
-            {React.cloneElement(icon as React.ReactElement<{ size?: number }>, { size: 56 })}
+            {React.cloneElement(icon as React.ReactElement<{ size?: number }>, { size: 48 })}
           </div>
 
-          <p className="font-title text-lg font-semibold" style={{ color: accentColor }}>
-            {modeLabel}
-          </p>
-
-          {showPlayButton && (
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[1px]">
-              <span
-                className="flex items-center gap-1.5 text-sm font-bold px-6 py-2.5 rounded-full shadow-lg text-white"
-                style={{ background: accentColor }}
-              >
-                Jouer →
-              </span>
-            </div>
-          )}
+          {/* Nom + description */}
+          <div className="text-center">
+            <p className="font-title text-2xl font-bold text-white leading-tight">{modeLabel}</p>
+            <p className="text-xs mt-2 leading-relaxed" style={{ color: 'rgba(255,255,255,0.42)' }}>{description}</p>
+          </div>
         </div>
 
-        {/* Info bar */}
-        <div className="px-4 py-3">
-          <p className="text-xs text-film-text-dim leading-snug">
-            {description}
-          </p>
+        {/* CTA bottom */}
+        <div className="px-5 pb-5 pt-3">
+          {showPlayButton ? (
+            <div
+              className="w-full py-2.5 rounded-xl text-sm font-bold text-center transition-all duration-200 group-hover:brightness-110"
+              style={{ background: accentColor, color: '#2c2c54' }}
+            >
+              Jouer →
+            </div>
+          ) : todayStatus === 'won' ? (
+            <div className="w-full py-2.5 rounded-xl text-sm font-semibold text-center"
+              style={{ background: 'rgba(33,140,116,0.15)', color: '#33d9b2', border: '1px solid rgba(33,140,116,0.25)' }}>
+              ✓ Terminé
+            </div>
+          ) : todayStatus === 'lost' ? (
+            <div className="w-full py-2.5 rounded-xl text-sm font-semibold text-center"
+              style={{ background: 'rgba(179,57,57,0.12)', color: '#ff7070', border: '1px solid rgba(179,57,57,0.22)' }}>
+              Réessayer demain
+            </div>
+          ) : null}
         </div>
       </Tag>
 
       {/* ── Mobile row ── */}
       <Tag
         {...(!disabled ? { href } : {})}
-        className={`lg:hidden relative flex items-center gap-0 rounded-xl overflow-hidden transition-all active:opacity-80 ${
+        className={`lg:hidden relative flex items-center gap-0 rounded-2xl overflow-hidden transition-all active:scale-[0.98] ${
           disabled ? 'opacity-50 cursor-default' : 'cursor-pointer'
         }`}
         style={{
-          background: 'var(--color-film-surface)',
-          border: `1.5px solid ${
-            todayStatus === 'won' ? 'rgba(30,132,73,0.30)'
-            : todayStatus === 'lost' ? 'rgba(192,57,43,0.25)'
-            : accentRing
-          }`,
-          boxShadow: '0 1px 4px rgba(28,24,22,0.06)',
+          background: '#2c2c54',
+          border: `1.5px solid ${accentColor}50`,
+          boxShadow: '0 2px 12px rgba(44,44,84,0.14)',
         }}
       >
-        {/* Left accent strip */}
-        <div className="w-1 self-stretch shrink-0" style={{ background: accentColor }} />
+        {/* Trait accent gauche */}
+        <div className="w-[3px] self-stretch shrink-0" style={{ background: accentColor }} />
 
-        {/* Icon */}
+        {/* Icône */}
         <div
-          className="w-12 h-12 flex items-center justify-center shrink-0 m-3 rounded-xl"
-          style={{ background: `${accentColor}18`, color: accentColor }}
+          className="w-12 h-12 flex items-center justify-center shrink-0 m-3.5 rounded-xl"
+          style={{ background: `${accentColor}22`, color: accentColor }}
         >
           {React.cloneElement(icon as React.ReactElement<{ size?: number }>, { size: 22 })}
         </div>
 
-        <div className="flex-1 min-w-0 py-3.5">
-          <p className="text-sm font-bold leading-tight" style={{ color: accentColor }}>
-            {modeLabel}
-          </p>
-          <p className="text-xs text-film-text-dim leading-snug mt-0.5 line-clamp-1">{description}</p>
+        {/* Texte */}
+        <div className="flex-1 min-w-0 py-4">
+          <p className="text-sm font-bold text-white leading-tight">{modeLabel}</p>
+          <p className="text-xs mt-0.5 line-clamp-1" style={{ color: 'rgba(255,255,255,0.42)' }}>{description}</p>
         </div>
 
-        <div className="pr-3.5 shrink-0">
+        {/* Bouton / statut */}
+        <div className="pr-4 shrink-0">
           {showPlayButton ? (
             <span
-              className="flex items-center gap-1 text-xs font-bold px-3.5 py-2 rounded-lg text-white"
-              style={{ background: accentColor }}
+              className="flex items-center gap-1 text-xs font-bold px-3.5 py-2 rounded-xl"
+              style={{ background: accentColor, color: '#2c2c54' }}
             >
               Jouer <ChevronRight size={13} />
             </span>
           ) : todayStatus === 'won' ? (
-            <span className="flex items-center gap-1 text-xs font-semibold text-film-green bg-film-green/10 border border-film-green/25 px-2.5 py-1.5 rounded-lg">
+            <span className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg"
+              style={{ color: '#33d9b2', background: 'rgba(33,140,116,0.2)', border: '1px solid rgba(33,140,116,0.3)' }}>
               <CheckCircle2 size={13} /> Gagné
             </span>
           ) : todayStatus === 'lost' ? (
-            <span className="flex items-center gap-1 text-xs font-semibold text-film-red bg-film-red/8 border border-film-red/20 px-2.5 py-1.5 rounded-lg">
+            <span className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg"
+              style={{ color: '#ff7070', background: 'rgba(179,57,57,0.15)', border: '1px solid rgba(179,57,57,0.25)' }}>
               <XCircle size={13} /> Perdu
             </span>
           ) : (
-            <ChevronRight size={16} className="text-film-text-dim/40" />
+            <ChevronRight size={16} style={{ color: 'rgba(255,255,255,0.3)' }} />
           )}
         </div>
       </Tag>
@@ -307,23 +305,23 @@ function StatsStrip() {
   const winPct = Math.round((wins / total) * 100)
 
   const items = [
-    { label: 'Joués',     value: String(total) },
-    { label: 'Victoires', value: `${winPct}%` },
-    { label: 'Série',     value: `${streak}${streak > 0 ? '🔥' : ''}` },
-    { label: 'Record',    value: String(record) },
+    { label: 'joués',     value: String(total) },
+    { label: 'victoires', value: `${winPct}%` },
+    { label: 'série',     value: streak > 0 ? `${streak} 🔥` : '0' },
+    { label: 'record',    value: String(record) },
   ]
 
   return (
-    <div className="hidden lg:grid grid-cols-4 gap-2.5 w-full mt-5">
-      {items.map(({ label, value }) => (
-        <div
-          key={label}
-          className="flex flex-col items-center rounded-xl py-4 gap-0.5"
-          style={{ background: 'var(--color-film-dark)', border: '1px solid var(--color-film-border)' }}
-        >
-          <span className="font-title text-[22px] font-bold text-film-gold leading-none">{value}</span>
-          <span className="text-[10.5px] text-film-text-dim uppercase tracking-widest font-mono mt-1">{label}</span>
-        </div>
+    <div className="hidden lg:flex items-center justify-center gap-2 w-full mt-6 py-3.5 rounded-2xl"
+      style={{ background: '#2c2c54', border: '1px solid rgba(255,177,66,0.18)' }}>
+      {items.map(({ label, value }, i) => (
+        <React.Fragment key={label}>
+          {i > 0 && <span className="text-white/20 select-none">·</span>}
+          <span className="flex items-baseline gap-1.5">
+            <strong className="font-title text-lg font-bold" style={{ color: 'var(--sg-films)' }}>{value}</strong>
+            <span className="text-xs font-mono uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.35)' }}>{label}</span>
+          </span>
+        </React.Fragment>
       ))}
     </div>
   )
@@ -546,7 +544,7 @@ export function HomePage() {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'radial-gradient(clamp(28rem,44vw,52rem) clamp(18rem,30vw,34rem) at 12% 5%, rgba(212,166,74,0.09), transparent 62%), radial-gradient(clamp(26rem,42vw,50rem) clamp(16rem,28vw,32rem) at 90% 80%, rgba(107,124,255,0.07), transparent 64%)',
+            'radial-gradient(clamp(28rem,44vw,52rem) clamp(18rem,30vw,34rem) at 12% 5%, rgba(255,177,66,0.08), transparent 62%), radial-gradient(clamp(26rem,42vw,50rem) clamp(16rem,28vw,32rem) at 90% 80%, rgba(112,111,211,0.07), transparent 64%)',
         }}
       />
 
@@ -595,7 +593,7 @@ export function HomePage() {
             </div>
 
             {/* Game cards */}
-            <div className={`grid gap-3 lg:gap-4 ${FEATURES.enableSeries || FEATURES.enableWiki ? 'lg:grid-cols-3' : 'lg:grid-cols-1 lg:max-w-sm'}`}>
+            <div className={`flex flex-col gap-3 lg:grid lg:gap-4 ${FEATURES.enableSeries || FEATURES.enableWiki ? 'lg:grid-cols-3' : 'lg:grid-cols-1 lg:max-w-sm'}`}>
               <GameCard
                 href="/films"
                 icon={<Film />}

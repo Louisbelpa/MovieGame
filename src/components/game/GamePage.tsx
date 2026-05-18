@@ -3,7 +3,6 @@ import { ChevronLeft, ChevronRight, Calendar, Share2, HelpCircle } from 'lucide-
 import { GuessInput } from './GuessInput'
 import { GuessList } from './GuessList'
 import { HintPanel } from './HintPanel'
-import { ModeTabs } from './ModeTabs'
 import { AttemptTracker } from './AttemptTracker'
 import { MovieImage } from './MovieImage'
 import { FriendsLive } from './FriendsLive'
@@ -538,48 +537,33 @@ export function GamePage({ mode }: GamePageProps) {
       data-mode={mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : undefined}
     >
       {/* ── Mobile layout (stack) ── */}
-      <div className="lg:hidden max-w-2xl mx-auto flex flex-col gap-3 sm:gap-5">
-        <div className="flex justify-center pt-1">
-          <ModeTabs />
-        </div>
+      <div className="lg:hidden max-w-2xl mx-auto flex flex-col gap-3 sm:gap-4 pb-24">
         {dateNavBar}
 
+        {/* Image full-bleed */}
         {!isWiki && (
-          <MovieImage
-            imageUrl={challenge.photoUrl ?? null}
-            attempt={Math.min(guesses.length + 1, challenge.maxAttempts)}
-            maxAttempts={challenge.maxAttempts}
-          />
+          <div className="-mx-3 sm:-mx-4">
+            <MovieImage
+              imageUrl={challenge.photoUrl ?? null}
+              attempt={Math.min(guesses.length + 1, challenge.maxAttempts)}
+              maxAttempts={challenge.maxAttempts}
+              fullBleed
+            />
+          </div>
         )}
         {isWiki && (
-          <WikiChallengeImage
-            imageUrl={challenge.photoUrl ?? null}
-            isRevealed={isGameOver}
-          />
+          <div className="-mx-3 sm:-mx-4">
+            <WikiChallengeImage
+              imageUrl={challenge.photoUrl ?? null}
+              isRevealed={isGameOver}
+            />
+          </div>
         )}
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between px-1">
           <AttemptTracker guesses={guessesForTracker} maxAttempts={challenge.maxAttempts} />
           <span className="text-sm text-film-text-dim font-mono">{guesses.length}/{challenge.maxAttempts}</span>
         </div>
-
-        {!isGameOver && (
-          isWiki ? (
-            <WikiGuessInput
-              onSubmit={submitGuess}
-              onSkip={skipAttempt}
-              attemptsLeft={attemptsLeft}
-              disabled={isSubmitting}
-            />
-          ) : (
-            <GuessInput
-              onSubmit={submitGuess}
-              onSkip={skipAttempt}
-              attemptsLeft={attemptsLeft}
-              disabled={isSubmitting}
-            />
-          )
-        )}
 
         {gameOverBanner}
 
@@ -633,6 +617,34 @@ export function GamePage({ mode }: GamePageProps) {
           />
         )}
       </div>
+
+      {/* ── Mobile sticky input bar ── */}
+      {!isGameOver && (
+        <div
+          className="lg:hidden fixed bottom-0 left-0 right-0 z-30 px-3 pt-3 pb-4"
+          style={{
+            background: 'var(--color-film-black)',
+            borderTop: '1px solid var(--color-film-border)',
+            boxShadow: '0 -4px 20px rgba(44,44,84,0.08)',
+          }}
+        >
+          {isWiki ? (
+            <WikiGuessInput
+              onSubmit={submitGuess}
+              onSkip={skipAttempt}
+              attemptsLeft={attemptsLeft}
+              disabled={isSubmitting}
+            />
+          ) : (
+            <GuessInput
+              onSubmit={submitGuess}
+              onSkip={skipAttempt}
+              attemptsLeft={attemptsLeft}
+              disabled={isSubmitting}
+            />
+          )}
+        </div>
+      )}
 
       {/* ── Desktop 2-col layout ── */}
       <div

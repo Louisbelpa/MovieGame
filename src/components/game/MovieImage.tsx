@@ -14,17 +14,20 @@ interface MovieImageProps {
   className?: string
   /** Fill the parent container instead of enforcing aspect-video */
   fill?: boolean
+  /** Remove border/shadow/radius — for full-bleed rendering */
+  fullBleed?: boolean
 }
 
-export function MovieImage({ imageUrl, attempt, maxAttempts, className, fill }: MovieImageProps) {
+export function MovieImage({ imageUrl, attempt, maxAttempts, className, fill, fullBleed }: MovieImageProps) {
   return (
     <div
       className={cn(
-        'relative w-full overflow-hidden rounded-xl bg-film-gray',
+        'relative w-full overflow-hidden bg-film-gray',
+        !fullBleed && 'rounded-xl',
         fill ? 'h-full' : 'aspect-video',
         className
       )}
-      style={{
+      style={fullBleed ? undefined : {
         border: '1px solid var(--mode-ring)',
         boxShadow: '0 0 0 4px var(--mode-soft)',
       }}

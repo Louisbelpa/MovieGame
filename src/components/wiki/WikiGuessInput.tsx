@@ -88,8 +88,9 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
             disabled={disabled || !inputValue.trim()}
             className="shrink-0 rounded-lg text-[12.5px] font-bold transition-opacity disabled:opacity-40 cursor-pointer"
             style={{
-              background: 'linear-gradient(180deg, #e8c06a, #d4a64a, #a07030)',
-              color: '#1a0f00',
+              background: '#2c2c54',
+              color: 'var(--mode-color)',
+              border: '1.5px solid var(--mode-color)',
               padding: '8px 14px',
             }}
           >
