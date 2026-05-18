@@ -1020,7 +1020,7 @@ struct AboutView: View {
                     // Sources de données
                     AboutSection(title: "Sources de données") {
                         AboutLinkRow(
-                            icon: "film.fill",
+                            icon: "film",
                             iconColor: Theme.gold,
                             title: "The Movie Database",
                             subtitle: "Films & séries — données, images",
@@ -1029,7 +1029,7 @@ struct AboutView: View {
                         )
                         Divider().background(Theme.border).padding(.leading, 52)
                         AboutLinkRow(
-                            icon: "person.fill",
+                            icon: "person.bust",
                             iconColor: Theme.modeWiki,
                             title: "Wikipédia",
                             subtitle: "Personnalités — biographies, données",
@@ -1250,12 +1250,12 @@ struct PrivacyView: View {
 
                     PrivacySection(title: "Sources tierces") {
                         PrivacyItem(
-                            icon: "film.fill",
+                            icon: "film",
                             title: "The Movie Database (TMDB)",
                             text: "Les données de films et séries (titres, images, directeurs, casting) proviennent de l'API TMDB. Leur utilisation est soumise aux conditions d'utilisation de TMDB."
                         )
                         PrivacyItem(
-                            icon: "person.fill",
+                            icon: "person.bust",
                             title: "Wikipédia & Wikidata",
                             text: "Les biographies et informations sur les personnalités sont issues de Wikipédia et Wikidata, sous licence Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0). GuessToday n'est pas affilié à la Wikimedia Foundation."
                         )

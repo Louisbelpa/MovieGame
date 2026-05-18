@@ -394,6 +394,7 @@ private struct WikiProfileView: View {
                 GenericProfileView(profile: profile)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Theme.spacing12)
         .cardStyle()
     }
