@@ -596,7 +596,7 @@ export function GamePage({ mode }: GamePageProps) {
       </div>
 
       {/* ── IMAGE HERO — full viewport width ─────────────────────────────── */}
-      <div className="relative" style={{ maxHeight: '52vh' }}>
+      <div className="relative overflow-hidden" style={{ height: 'min(52vh, 480px)' }}>
         {!isWiki ? (
           <MovieImage
             imageUrl={challenge.photoUrl ?? null}
