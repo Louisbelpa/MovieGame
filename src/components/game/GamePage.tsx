@@ -611,127 +611,92 @@ export function GamePage({ mode }: GamePageProps) {
       </div>
 
       {/* ── CONTENT ──────────────────────────────────────────────────────── */}
-      <div className="px-3 sm:px-4 lg:px-8 py-4 lg:py-6">
-        <div className="max-w-5xl mx-auto">
+      <div className="px-3 sm:px-4 py-4 sm:py-6 pb-28 sm:pb-32 lg:pb-8">
+        <div className="max-w-2xl mx-auto flex flex-col gap-5">
 
-          {/* Reveal card — spans full width */}
-          {revealCard && <div className="mb-5">{revealCard}</div>}
+          {/* Reveal card */}
+          {revealCard}
 
-          {/* ── Desktop 2-col / Mobile stack ── */}
-          <div className="flex flex-col lg:grid lg:items-start gap-5 lg:gap-6"
-            style={{ gridTemplateColumns: 'minmax(0,1fr) 340px' }}>
-
-            {/* ── LEFT: wiki profile + hints ── */}
-            <div className="flex flex-col gap-4 pb-28 lg:pb-0">
-              {isWiki && (
-                <WikiHintPanel
-                  profile={wikiProfile}
-                  hints={[]}
-                  hintsAvailable={hintsAvailable}
-                  hintsRevealed={hintsRevealed}
-                  showHints={false}
-                  wikiPersonType={wikiPersonType}
+          {/* Attempts tracker */}
+          <div className="flex items-center gap-1.5">
+            {Array.from({ length: challenge.maxAttempts }).map((_, i) => {
+              const g = guesses[i]
+              return (
+                <span
+                  key={i}
+                  className="flex-1 h-1.5 rounded-full transition-colors"
+                  style={{
+                    background: g
+                      ? g.correct
+                        ? 'var(--color-film-green)'
+                        : g.guess === ''
+                          ? 'rgba(255,255,255,0.15)'
+                          : 'var(--color-film-red)'
+                      : 'rgba(255,255,255,0.10)',
+                  }}
                 />
-              )}
-
-              <div>
-                {hintsHeader}
-                {isWiki ? (
-                  <WikiHintPanel
-                    profile={wikiProfile}
-                    hints={challenge.hints as WikiHintPayload[]}
-                    hintsAvailable={hintsAvailable}
-                    hintsRevealed={hintsRevealed}
-                    showProfile={false}
-                  />
-                ) : (
-                  <HintPanel
-                    hints={challenge.hints as HintPayload[]}
-                    hintsAvailable={hintsAvailable}
-                    hintsRevealed={hintsRevealed}
-                  />
-                )}
-              </div>
-
-              {/* Guesses list — mobile only (desktop has it in right panel) */}
-              {guesses.length > 0 && (
-                <div className="lg:hidden">
-                  <p className="text-[10px] font-mono font-semibold uppercase tracking-widest mb-2" style={{ color: 'rgba(236,233,226,0.35)' }}>
-                    Tes tentatives
-                  </p>
-                  <GuessList
-                    guesses={guesses.map((g) => ({ value: g.guess, status: g.correct ? 'correct' as const : 'wrong' as const, timestamp: 0 }))}
-                    maxAttempts={challenge.maxAttempts}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* ── RIGHT: sticky input panel (desktop only) ── */}
-            <div className="hidden lg:block">
-              <div
-                className="sticky flex flex-col gap-4 rounded-2xl p-5"
-                style={{ top: '72px', background: 'var(--color-film-surface)', border: '1px solid rgba(255,255,255,0.07)' }}
-              >
-                {/* Attempts pills */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {Array.from({ length: challenge.maxAttempts }).map((_, i) => {
-                    const g = guesses[i]
-                    return (
-                      <span
-                        key={i}
-                        className="flex-1 h-1.5 rounded-full transition-colors"
-                        style={{
-                          background: g
-                            ? g.correct
-                              ? 'var(--color-film-green)'
-                              : g.guess === ''
-                                ? 'rgba(255,255,255,0.15)'
-                                : 'var(--color-film-red)'
-                            : 'rgba(255,255,255,0.10)',
-                        }}
-                      />
-                    )
-                  })}
-                </div>
-
-                {/* Input */}
-                {inputSection}
-
-                {/* Remaining count */}
-                {!isGameOver && (
-                  <p className="text-center text-[11px] font-mono text-film-text-dim/50">
-                    {attemptsLeft} essai{attemptsLeft !== 1 ? 's' : ''} restant{attemptsLeft !== 1 ? 's' : ''}
-                  </p>
-                )}
-
-                {/* Guess list */}
-                {guesses.length > 0 && (
-                  <div>
-                    <p className="text-[10px] font-mono font-semibold uppercase tracking-widest mb-2" style={{ color: 'rgba(236,233,226,0.35)' }}>
-                      Tes tentatives
-                    </p>
-                    <GuessList
-                      guesses={guesses.map((g) => ({ value: g.guess, status: g.correct ? 'correct' as const : 'wrong' as const, timestamp: 0 }))}
-                      maxAttempts={challenge.maxAttempts}
-                    />
-                  </div>
-                )}
-
-                {/* Friends live */}
-                <div className={guesses.length > 0 ? 'pt-1 border-t' : ''} style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
-                  <FriendsLive mode={isWiki ? 'wiki' : mode as 'film' | 'series'} />
-                </div>
-              </div>
-            </div>
+              )
+            })}
           </div>
+
+          {/* Input (desktop only — mobile uses sticky bar) */}
+          {!isGameOver && <div className="hidden sm:block">{inputSection}</div>}
+
+          {/* Wiki profile */}
+          {isWiki && (
+            <WikiHintPanel
+              profile={wikiProfile}
+              hints={[]}
+              hintsAvailable={hintsAvailable}
+              hintsRevealed={hintsRevealed}
+              showHints={false}
+              wikiPersonType={wikiPersonType}
+            />
+          )}
+
+          {/* Hints */}
+          <div>
+            {hintsHeader}
+            {isWiki ? (
+              <WikiHintPanel
+                profile={wikiProfile}
+                hints={challenge.hints as WikiHintPayload[]}
+                hintsAvailable={hintsAvailable}
+                hintsRevealed={hintsRevealed}
+                showProfile={false}
+              />
+            ) : (
+              <HintPanel
+                hints={challenge.hints as HintPayload[]}
+                hintsAvailable={hintsAvailable}
+                hintsRevealed={hintsRevealed}
+              />
+            )}
+          </div>
+
+          {/* Guess list */}
+          {guesses.length > 0 && (
+            <div>
+              <p className="text-[10px] font-mono font-semibold uppercase tracking-widest mb-2" style={{ color: 'rgba(236,233,226,0.35)' }}>
+                Tes tentatives
+              </p>
+              <GuessList
+                guesses={guesses.map((g) => ({ value: g.guess, status: g.correct ? 'correct' as const : 'wrong' as const, timestamp: 0 }))}
+                maxAttempts={challenge.maxAttempts}
+              />
+            </div>
+          )}
+
+          {/* Friends live */}
+          <FriendsLive mode={isWiki ? 'wiki' : mode as 'film' | 'series'} />
+
         </div>
       </div>
 
       {/* ── MOBILE sticky input bar ── */}
       {!isGameOver && (
         <div
-          className="lg:hidden fixed bottom-0 left-0 right-0 z-30 px-3 pt-3 pb-4"
+          className="sm:hidden fixed bottom-0 left-0 right-0 z-30 px-3 pt-3 pb-4"
           style={{
             background: 'rgba(11,11,26,0.95)',
             backdropFilter: 'blur(16px)',
