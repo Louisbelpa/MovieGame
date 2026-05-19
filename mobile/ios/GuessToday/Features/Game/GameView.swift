@@ -101,7 +101,8 @@ struct GameView: View {
                                 GameResultBanner(
                                     challenge: challenge,
                                     filmResult: vm.filmResult,
-                                    wikiResult: vm.wikiResult
+                                    wikiResult: vm.wikiResult,
+                                    vm: vm
                                 )
                                 .padding(.top, Theme.spacing8)
                             }
@@ -925,6 +926,7 @@ private struct GameResultBanner: View {
     let challenge: ChallengePayload
     let filmResult: ChallengeResult?
     let wikiResult: WikiResult?
+    var vm: GameViewModel
 
     private var title: String {
         if let r = wikiResult { return r.name }
@@ -1005,6 +1007,10 @@ private struct GameResultBanner: View {
                     .lineSpacing(3)
                     .lineLimit(4)
             }
+
+            // Share buttons — accessibles même quand on revient sur un jeu terminé
+            ShareResultButtons(vm: vm)
+                .padding(.top, Theme.spacing4)
         }
         .padding(Theme.spacing16)
         .background(Theme.surface)
