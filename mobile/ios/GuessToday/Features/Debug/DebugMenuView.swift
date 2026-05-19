@@ -7,6 +7,7 @@ struct DebugMenuView: View {
     @State private var showConfirm = false
     @State private var currentEnv: AppEnvironment = EnvironmentManager.shared.current
     @State private var customURLDraft: String = EnvironmentManager.shared.customBaseURL
+    @State private var useMockData: Bool = FeatureFlags.shared.useMockData
 
     var body: some View {
         ZStack {
@@ -19,6 +20,10 @@ struct DebugMenuView: View {
 
                     // Build info card
                     DebugBuildInfoCard()
+                        .padding(.horizontal, Theme.spacing16)
+
+                    // Feature flags
+                    DebugFeatureFlagsSection(useMockData: $useMockData)
                         .padding(.horizontal, Theme.spacing16)
 
                     // Environment picker
@@ -400,6 +405,73 @@ private struct DebugSectionLabel: View {
             .font(Theme.inter(size: 11, weight: .semibold))
             .foregroundColor(Theme.textDim)
             .tracking(1)
+    }
+}
+
+// MARK: - Feature Flags
+
+private struct DebugFeatureFlagsSection: View {
+    @Binding var useMockData: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.spacing8) {
+            DebugSectionLabel("Feature Flags")
+
+            VStack(spacing: 0) {
+                DebugFlagRow(
+                    icon: "person.2.fill",
+                    iconColor: Color(hex: "#a78bfa"),
+                    title: "Données mockées",
+                    subtitle: "Amis & classement fictifs (pas d'appel réseau)",
+                    isOn: $useMockData,
+                    onChange: { FeatureFlags.shared.useMockData = $0 }
+                )
+            }
+            .background(Theme.surface)
+            .cornerRadius(Theme.radiusM)
+            .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(Theme.border, lineWidth: 1))
+        }
+    }
+}
+
+private struct DebugFlagRow: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    let subtitle: String
+    @Binding var isOn: Bool
+    let onChange: (Bool) -> Void
+
+    var body: some View {
+        HStack(spacing: Theme.spacing12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(iconColor.opacity(isOn ? 0.20 : 0.10))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.system(size: 15))
+                    .foregroundColor(iconColor)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(Theme.inter(size: 15, weight: isOn ? .semibold : .regular))
+                    .foregroundColor(isOn ? iconColor : Theme.text)
+                Text(subtitle)
+                    .font(Theme.inter(size: 11))
+                    .foregroundColor(Theme.textDim)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .tint(iconColor)
+                .onChange(of: isOn) { _, newValue in onChange(newValue) }
+        }
+        .padding(.horizontal, Theme.spacing16)
+        .padding(.vertical, 13)
     }
 }
 #endif

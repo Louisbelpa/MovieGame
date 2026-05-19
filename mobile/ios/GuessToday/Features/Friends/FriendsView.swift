@@ -19,6 +19,14 @@ final class FriendsViewModel {
     func load() async {
         isLoading = true
         error = nil
+        #if DEBUG || NRT
+        if FeatureFlags.shared.useMockData {
+            try? await Task.sleep(nanoseconds: 400_000_000) // simule latence réseau
+            payload = MockData.friendsPayload
+            isLoading = false
+            return
+        }
+        #endif
         do {
             payload = try await APIClient.shared.friends(date: nil)
         } catch let e as APIError {
@@ -604,6 +612,14 @@ private struct GlobalLeaderboardView: View {
     private func load() async {
         isLoading = true
         error = nil
+        #if DEBUG || NRT
+        if FeatureFlags.shared.useMockData {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            entries = MockData.leaderboardPayload.leaderboard
+            isLoading = false
+            return
+        }
+        #endif
         do {
             let payload = try await APIClient.shared.friendsLeaderboard()
             entries = payload.leaderboard
