@@ -240,6 +240,7 @@ export function GamePage({ mode }: GamePageProps) {
           name: data.title,
           year: data.year,
           photoUrl: data.imageUrl ?? null,
+          extract: data.synopsis ?? null,
           genres: data.genres,
           director: data.director ?? undefined,
           tmdbId: data.tmdbId ?? null,
@@ -500,8 +501,30 @@ export function GamePage({ mode }: GamePageProps) {
               )}
             </p>
           )}
+          {/* Genres + director row */}
+          {!isWiki && (resultDetails?.genres?.length || resultDetails?.director) && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+              {resultDetails?.director && (
+                <span className="text-[11px] text-film-text-dim">
+                  {resultDetails.director}
+                </span>
+              )}
+              {resultDetails?.director && resultDetails?.genres?.length ? (
+                <span className="text-film-text-dim/30 text-[11px]">·</span>
+              ) : null}
+              {resultDetails?.genres?.slice(0, 3).map((g) => (
+                <span
+                  key={g}
+                  className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+                  style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(236,233,226,0.55)' }}
+                >
+                  {g}
+                </span>
+              ))}
+            </div>
+          )}
           {resultDetails?.extract && (
-            <p className="text-xs text-film-text-dim mt-1 line-clamp-2 leading-relaxed">{resultDetails.extract}</p>
+            <p className="text-xs text-film-text-dim mt-1.5 line-clamp-3 leading-relaxed">{resultDetails.extract}</p>
           )}
         </div>
 
