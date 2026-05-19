@@ -561,7 +561,7 @@ export function GamePage({ mode }: GamePageProps) {
 
   return (
     <main
-      className={`game-page game-page--${mode} atmosphere-${mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : 'film'} min-h-screen`}
+      className={`atmosphere-${mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : 'film'} min-h-screen overflow-x-hidden`}
       data-mode={mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : undefined}
     >
       {/* ── IMAGE HERO — full viewport width ─────────────────────────────── */}

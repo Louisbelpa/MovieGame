@@ -84,6 +84,7 @@
   body {
     min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
   }
 
   ::selection {
