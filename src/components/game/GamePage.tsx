@@ -565,7 +565,7 @@ export function GamePage({ mode }: GamePageProps) {
         <nav className="inline-flex items-center gap-1 rounded-xl p-1" style={{ background: 'rgba(255,255,255,0.05)' }}>
           <a
             href="/films"
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+            className={`mode-tab px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${mode === 'film' ? 'mode-tab--active' : ''}`}
             style={mode === 'film' ? { background: 'var(--sg-films)', color: '#0b0b1a' } : { color: 'rgba(236,233,226,0.5)' }}
           >
             Films
@@ -573,7 +573,7 @@ export function GamePage({ mode }: GamePageProps) {
           {FEATURES.enableSeries && (
             <a
               href="/series"
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              className={`mode-tab px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${mode === 'series' ? 'mode-tab--active' : ''}`}
               style={mode === 'series' ? { background: 'var(--sg-series)', color: '#0b0b1a' } : { color: 'rgba(236,233,226,0.5)' }}
             >
               Séries
@@ -582,7 +582,7 @@ export function GamePage({ mode }: GamePageProps) {
           {FEATURES.enableWiki && (
             <a
               href="/wiki"
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              className={`mode-tab px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${mode === 'wiki' ? 'mode-tab--active' : ''}`}
               style={mode === 'wiki' ? { background: 'var(--sg-wiki)', color: '#0b0b1a' } : { color: 'rgba(236,233,226,0.5)' }}
             >
               Perso

@@ -313,19 +313,31 @@
   background-size: 100% 100%;
 }
 
-/* ─── Hover animals effect (desktop only) ─────────────────────────────────── */
+/* ─── Hover states globaux ─────────────────────────────────────────────────── */
 @media (hover: hover) {
-  @keyframes float-animal {
-    0%   { transform: translateY(0) scale(1); opacity: 1; }
-    100% { transform: translateY(-72px) scale(0.35); opacity: 0; }
+  /* Bouton Deviner — fill au hover */
+  .btn-guess:hover {
+    background: var(--mode-color) !important;
+    color: #0b0b1a !important;
+    box-shadow: 0 0 12px color-mix(in srgb, var(--mode-color) 40%, transparent);
   }
-  .animal-particle {
-    position: absolute;
-    pointer-events: none;
-    font-size: 1.25rem;
-    z-index: 30;
-    animation: float-animal 0.85s ease-out forwards;
-    will-change: transform, opacity;
+
+  /* Bouton Passer — bg visible au hover */
+  .btn-skip:hover {
+    background: rgba(255,255,255,0.08) !important;
+    color: var(--color-film-text) !important;
+  }
+
+  /* Tabs Films/Séries/Perso */
+  .mode-tab:not(.mode-tab--active):hover {
+    background: rgba(255,255,255,0.08);
+    color: rgba(236,233,226,0.85);
+  }
+
+  /* Cards homepage — lift subtil */
+  .game-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
   }
 }
 

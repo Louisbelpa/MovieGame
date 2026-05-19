@@ -77,7 +77,7 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
             type="button"
             onClick={onSkip}
             disabled={disabled}
-            className="shrink-0 text-[12.5px] font-medium text-film-text-dim hover:text-film-text transition-colors px-2 py-1 rounded disabled:opacity-40 cursor-pointer"
+            className="btn-skip shrink-0 text-[12.5px] font-medium text-film-text-dim transition-all px-2 py-1 rounded disabled:opacity-40 cursor-pointer"
           >
             Passer
           </button>
@@ -86,7 +86,7 @@ export function WikiGuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: Wik
             type="button"
             onClick={handleSubmit}
             disabled={disabled || !inputValue.trim()}
-            className="shrink-0 rounded-lg text-[12.5px] font-bold transition-opacity disabled:opacity-40 cursor-pointer"
+            className="btn-guess shrink-0 rounded-lg text-[12.5px] font-bold transition-all disabled:opacity-40 cursor-pointer"
             style={{
               background: 'var(--color-film-surface)',
               color: 'var(--mode-color)',

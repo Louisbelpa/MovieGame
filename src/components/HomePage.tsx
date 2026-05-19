@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { CheckCircle2, XCircle, Film, Tv, User, LogIn, Smartphone } from 'lucide-react'
 import { ApertureIcon } from '@/components/ui/ApertureIcon'
 import { Footer } from '@/components/layout/Footer'
@@ -17,7 +17,6 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const CARD_ANIMALS = ['🐱','🦊','🐸','🦁','🐯','🐨','🐼','🐭','✨','⭐','🎬','🍿','🎭','🌟']
 
 function getTodayParis(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
@@ -141,26 +140,21 @@ interface GameCardProps {
 function GameCard({ href, icon, modeLabel, description, accentColor, disabled, badge, todayStatus }: GameCardProps) {
   const showPlay = !todayStatus && !disabled
   const Tag = disabled ? 'div' : 'a'
-  const [sparks, setSparks] = useState<{ id: number; emoji: string; x: number; delay: number }[]>([])
-  const sparkId = useRef(0)
+  const [spot, setSpot] = useState({ x: 50, y: 50, on: false })
 
-  const handleMouseEnter = () => {
-    if (disabled || !window.matchMedia('(hover: hover)').matches) return
-    const picks = Array.from({ length: 5 }, () => ({
-      id: sparkId.current++,
-      emoji: CARD_ANIMALS[Math.floor(Math.random() * CARD_ANIMALS.length)],
-      x: 8 + Math.random() * 84,
-      delay: Math.random() * 0.18,
-    }))
-    setSparks(picks)
-    setTimeout(() => setSparks([]), 1000)
+  const handleMouseMove = (e: React.MouseEvent<HTMLElement>) => {
+    if (disabled) return
+    const r = e.currentTarget.getBoundingClientRect()
+    setSpot({ x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100, on: true })
   }
+  const handleMouseLeave = () => setSpot(p => ({ ...p, on: false }))
 
   return (
     <Tag
       {...(!disabled ? { href } : {})}
-      onMouseEnter={handleMouseEnter}
-      className={`relative flex flex-col justify-between p-4 sm:p-5 lg:p-8 overflow-hidden transition-all duration-200 ${
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      className={`game-card relative flex flex-col justify-between p-4 sm:p-5 lg:p-8 overflow-hidden transition-all duration-200 ${
         disabled ? 'opacity-50 cursor-default' : 'cursor-pointer'
       }`}
       style={{
@@ -177,16 +171,14 @@ function GameCard({ href, icon, modeLabel, description, accentColor, disabled, b
         }}
       />
 
-      {/* Hover animals */}
-      {sparks.map(s => (
-        <span
-          key={s.id}
-          className="animal-particle"
-          style={{ left: `${s.x}%`, bottom: '30%', animationDelay: `${s.delay}s` }}
-        >
-          {s.emoji}
-        </span>
-      ))}
+      {/* Spotlight souris */}
+      <div
+        className="absolute inset-0 pointer-events-none transition-opacity duration-300"
+        style={{
+          background: `radial-gradient(circle 180px at ${spot.x}% ${spot.y}%, rgba(255,255,255,0.055), transparent 70%)`,
+          opacity: spot.on ? 1 : 0,
+        }}
+      />
 
       {/* Texture subtile (points) */}
       <div
