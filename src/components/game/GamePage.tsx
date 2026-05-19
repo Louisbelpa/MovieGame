@@ -565,7 +565,7 @@ export function GamePage({ mode }: GamePageProps) {
       data-mode={mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : undefined}
     >
       {/* ── MODE TABS ────────────────────────────────────────────────────── */}
-      <div className="px-3 sm:px-4 pt-3 pb-2 max-w-2xl mx-auto w-full">
+      <div className="px-3 sm:px-4 pt-3 pb-2 max-w-2xl mx-auto w-full flex justify-center">
         <nav className="inline-flex items-center gap-1 rounded-xl p-1" style={{ background: 'rgba(255,255,255,0.05)' }}>
           <a
             href="/films"
