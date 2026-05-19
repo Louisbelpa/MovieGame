@@ -155,7 +155,7 @@ function GameCard({ href, icon, modeLabel, description, accentColor, disabled, b
       {...(!disabled ? { href } : {})}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      className={`game-card group relative flex flex-col justify-between p-4 sm:p-5 lg:p-8 overflow-hidden transition-all duration-200 ${
+      className={`game-card group relative flex flex-col justify-between p-4 sm:p-5 lg:p-8 overflow-hidden transition-all duration-200 min-h-[180px] lg:min-h-0 ${
         disabled ? 'opacity-50 cursor-default' : 'cursor-pointer'
       }`}
       style={{
@@ -565,8 +565,8 @@ export function HomePage() {
     <div className="min-h-dvh flex flex-col" style={{ background: '#0b0b1a' }}>
       <HomeHeader />
 
-      {/* 3 cartes : ~62dvh mobile pour peek, hauteur fixe desktop */}
-      <div className="grid grid-rows-3 lg:grid-rows-1 lg:grid-cols-3 h-[62dvh] lg:h-auto lg:min-h-[520px] lg:max-h-[600px]">
+      {/* 3 cartes : hauteur auto mobile, hauteur fixe desktop */}
+      <div className="grid grid-rows-3 lg:grid-rows-1 lg:grid-cols-3 lg:min-h-[520px] lg:max-h-[600px]">
         <GameCard
           href="/films"
           icon={<Film />}

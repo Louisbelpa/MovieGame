@@ -661,14 +661,12 @@ private struct DayChallengeCard: View {
     // MARK: - Colors & labels
 
     private var borderColor: Color {
-        if noChallenge { return Theme.border }
         if loadFailed  { return Theme.red.opacity(0.30) }
         if let s = status {
             if s.isWon  { return Theme.green.opacity(0.30) }
             if s.isLost { return Theme.red.opacity(0.22) }
         }
-        if isNextToPlay { return modeColor.opacity(0.60) }
-        return modeColor.opacity(0.18)
+        return Theme.border  // neutre comme sur le web (rgba(255,255,255,0.06))
     }
 
     private var modeIcon: String { mode.icon }

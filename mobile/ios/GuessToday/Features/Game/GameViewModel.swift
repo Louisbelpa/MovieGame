@@ -40,7 +40,7 @@ enum GameMode {
         switch self {
         case .film:   return "film"
         case .series: return "tv"
-        case .wiki:   return "person.bust"
+        case .wiki:   return "person"
         }
     }
 
@@ -48,7 +48,7 @@ enum GameMode {
         switch self {
         case .film:   return "film.fill"
         case .series: return "tv.fill"
-        case .wiki:   return "person.bust.fill"
+        case .wiki:   return "person.fill"
         }
     }
 }
