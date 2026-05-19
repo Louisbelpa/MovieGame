@@ -23,6 +23,8 @@ import { loadStats, loadHistory, saveStats } from '@/lib/storage'
 import { buildMobileReturnURL } from '@/lib/mobileAuthHandoff'
 import { defaultStats } from '@/lib/utils'
 import type { User } from '@/types'
+import { isMockEnabled } from '@/mock/mockFlags'
+import { MOCK_USER, MOCK_SERVER_STATS } from '@/mock/mockData'
 
 export type ServerStatsMap = Record<'film' | 'series' | 'wiki', ServerStatsData | null>
 
@@ -124,6 +126,10 @@ export const useAuthStore = create<AuthStore>((set) => ({
   mobileReturnURL: null,
 
   fetchMe: async () => {
+    if (isMockEnabled()) {
+      set({ user: MOCK_USER, serverStats: MOCK_SERVER_STATS, isLoading: false })
+      return
+    }
     set({ isLoading: true })
     try {
       const { user } = await authGetMe()

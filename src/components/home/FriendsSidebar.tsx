@@ -5,6 +5,8 @@ import { useAuthModal } from '@/components/modals/AuthModal'
 import { friendsGetAll, type FriendEntry } from '@/api/client'
 import { FEATURES } from '@/config/features'
 import { getTodayParis } from '@/store/gameStore'
+import { isMockEnabled } from '@/mock/mockFlags'
+import { MOCK_FRIENDS_RESPONSE } from '@/mock/mockData'
 
 function winsCount(entry: FriendEntry): number {
   return [entry.scores.film, entry.scores.series, entry.scores.wiki]
@@ -42,6 +44,10 @@ export function FriendsSidebar({ friends: friendsProp, loading: loadingProp }: F
   // Self-fetch only when used standalone (no props passed from parent)
   useEffect(() => {
     if (friendsProp !== undefined || !user) return
+    if (isMockEnabled()) {
+      setOwnFriends(MOCK_FRIENDS_RESPONSE.friends)
+      return
+    }
     setOwnLoading(true)
     friendsGetAll(getTodayParis())
       .then((r) => setOwnFriends(r.friends ?? []))

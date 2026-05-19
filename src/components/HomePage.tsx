@@ -14,6 +14,7 @@ import {
   NEW_MODES_ANNOUNCEMENT_STORAGE_KEY,
   type NewModesAnnouncementVariant,
 } from '@/components/modals/NewModesAnnouncementModal'
+import { MockDataBanner } from '@/components/dev/MockDataBanner'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -632,6 +633,8 @@ export function HomePage() {
           variant={announcementVariant}
         />
       )}
+
+      <MockDataBanner />
     </div>
   )
 }
