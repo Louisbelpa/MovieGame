@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { CheckCircle2, XCircle, Film, Tv, User, Smartphone, Sparkles } from 'lucide-react'
+import { CheckCircle2, XCircle, Film, Tv, User, Smartphone, UserRound } from 'lucide-react'
 import { ApertureIcon } from '@/components/ui/ApertureIcon'
 import { Footer } from '@/components/layout/Footer'
 import { AuthModal, useAuthModal } from '@/components/modals/AuthModal'
@@ -117,7 +117,7 @@ function HomeHeader() {
           className="btn-cta-register flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-200"
           style={{ background: 'rgba(255,255,255,0.08)', color: '#ece9e2', border: '1px solid rgba(255,255,255,0.12)' }}
         >
-          <Sparkles size={12} />
+          <UserRound size={14} aria-hidden />
           <span className="hidden sm:inline">Se connecter</span>
         </button>
       )}
