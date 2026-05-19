@@ -234,7 +234,7 @@ function GameCard({ href, icon, modeLabel, description, accentColor, disabled, b
         >
           {modeLabel}
         </p>
-        <p className="hidden sm:block text-sm mb-4 line-clamp-2" style={{ color: 'rgba(255,255,255,0.45)' }}>
+        <p className="text-sm mb-4 line-clamp-2" style={{ color: 'rgba(255,255,255,0.45)' }}>
           {description}
         </p>
 
