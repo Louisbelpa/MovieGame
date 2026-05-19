@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Calendar, Share2, HelpCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Share2, HelpCircle, CheckCircle2, XCircle, Film, Tv, User, Calendar } from 'lucide-react'
 import { GuessInput } from './GuessInput'
 import { GuessList } from './GuessList'
 import { HintPanel } from './HintPanel'
@@ -87,83 +87,16 @@ async function shareResult(
   await navigator.clipboard.writeText(text)
 }
 
-interface DateNavBarProps {
-  showPrev: boolean
-  showNext: boolean
-  isLoading: boolean
-  isToday: boolean
-  hasPrev: boolean
-  currentDate: string
-  viewingDate: string | null
-  onPrev: () => void
-  onNext: () => void
-  onBackToday: () => void
+function ModeIcon({ mode, size = 14 }: { mode: string; size?: number }) {
+  if (mode === 'series') return <Tv size={size} aria-hidden />
+  if (mode === 'wiki') return <User size={size} aria-hidden />
+  return <Film size={size} aria-hidden />
 }
 
-function DateNavBar({
-  showPrev, showNext, isLoading, isToday, hasPrev,
-  currentDate, viewingDate, onPrev, onNext, onBackToday,
-}: DateNavBarProps) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <div className="flex items-center justify-between gap-2 py-1.5 px-1">
-        {showPrev ? (
-          <button
-            type="button"
-            onClick={onPrev}
-            disabled={isLoading}
-            aria-label="Défi précédent"
-            title="Défi précédent"
-            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
-          >
-            <ChevronLeft size={20} aria-hidden />
-          </button>
-        ) : (
-          <span className="inline-flex min-h-[44px] min-w-[44px]" aria-hidden />
-        )}
-
-        <div className="flex items-center gap-2 text-sm">
-          <Calendar size={13} className="text-film-text-dim" />
-          {isToday ? (
-            <span className="font-semibold text-film-gold">Aujourd'hui</span>
-          ) : (
-            <button
-              onClick={onBackToday}
-              className="text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
-              title="Retour à aujourd'hui"
-            >
-              {formatDateFr(currentDate)}
-            </button>
-          )}
-          {viewingDate && (
-            <span className="text-xs bg-film-surface border border-film-border px-1.5 py-0.5 rounded text-film-text-dim">
-              Ancien défi
-            </span>
-          )}
-        </div>
-
-        {showNext ? (
-          <button
-            type="button"
-            onClick={onNext}
-            disabled={isLoading}
-            aria-label="Défi suivant"
-            title="Défi suivant"
-            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-surface transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
-          >
-            <ChevronRight size={20} aria-hidden />
-          </button>
-        ) : (
-          <span className="inline-flex min-h-[44px] min-w-[44px]" aria-hidden />
-        )}
-      </div>
-      {isToday && hasPrev && (
-        <p className="text-center text-xs text-film-text-dim tracking-wide">
-          ← défis des jours précédents disponibles
-        </p>
-      )}
-    </div>
-  )
+function modeLabel(mode: string) {
+  if (mode === 'series') return 'Séries'
+  if (mode === 'wiki') return 'Personnalités'
+  return 'Films'
 }
 
 export function GamePage({ mode }: GamePageProps) {
@@ -475,176 +408,296 @@ export function GamePage({ mode }: GamePageProps) {
         ? 'Résultat indisponible'
         : getChallengeName(challenge))
 
-  // ── Shared sub-elements ──────────────────────────────────────────────────────
+  // ── Shared: glass nav overlay ────────────────────────────────────────────────
 
-  const dateNavBar = (
-    <DateNavBar
-      showPrev={showPrevNav}
-      showNext={showNextNav}
-      isLoading={isLoading}
-      isToday={isToday}
-      hasPrev={hasPrev}
-      currentDate={currentDate}
-      onPrev={() => void navigateDate('prev')}
-      onNext={() => void navigateDate('next')}
-      onBackToday={() => void loadDate(todayParis)}
-      viewingDate={viewingDate}
-    />
+  const glassBtn = 'inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors hover:bg-white/10 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed'
+  const glassTag = 'bg-black/50 backdrop-blur-md text-film-text rounded-full'
+
+  const imageOverlay = (
+    <>
+      {/* Top row: mode badge left, date nav right */}
+      <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between gap-2 pointer-events-none">
+        {/* Mode + number */}
+        <div className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold pointer-events-auto ${glassTag}`}>
+          <ModeIcon mode={mode} size={11} />
+          <span>{modeLabel(mode)}</span>
+          {challenge.challengeNumber && (
+            <span className="text-film-text-dim font-mono">#{challenge.challengeNumber}</span>
+          )}
+        </div>
+
+        {/* Date nav */}
+        <div className={`flex items-center gap-0.5 px-2 py-1 pointer-events-auto ${glassTag}`}>
+          {showPrevNav ? (
+            <button type="button" onClick={() => void navigateDate('prev')} disabled={isLoading} aria-label="Défi précédent" className={glassBtn}>
+              <ChevronLeft size={15} />
+            </button>
+          ) : <span className="w-8" />}
+          <button
+            type="button"
+            onClick={isToday ? undefined : () => void loadDate(todayParis)}
+            className={`px-2 text-xs font-medium leading-none ${isToday ? 'text-film-gold cursor-default' : 'text-film-text-dim hover:text-film-text cursor-pointer transition-colors'}`}
+          >
+            {isToday ? "Aujourd'hui" : formatDateFr(currentDate)}
+          </button>
+          {showNextNav ? (
+            <button type="button" onClick={() => void navigateDate('next')} disabled={isLoading} aria-label="Défi suivant" className={glassBtn}>
+              <ChevronRight size={15} />
+            </button>
+          ) : <span className="w-8" />}
+        </div>
+      </div>
+
+      {/* Bottom: gradient + attempts */}
+      <div className="absolute bottom-0 left-0 right-0 z-10 pointer-events-none">
+        <div className="h-24" style={{ background: 'linear-gradient(to top, var(--color-film-black) 0%, transparent 100%)' }} />
+      </div>
+      <div className="absolute bottom-3 left-0 right-0 z-20 flex justify-center">
+        <AttemptTracker guesses={guessesForTracker} maxAttempts={challenge.maxAttempts} />
+      </div>
+    </>
   )
 
-  const gameOverBanner = isGameOver ? (
+  // ── Game over reveal card ─────────────────────────────────────────────────────
+
+  const revealCard = isGameOver ? (
     <div
-      className={`flex flex-wrap items-center justify-between gap-2 py-2.5 px-4 rounded-lg text-sm font-semibold ${
-        status === 'won'
-          ? 'bg-film-green/10 border border-film-green/30 text-film-green'
-          : 'bg-film-red/10 border border-film-red/30 text-film-red'
-      }`}
+      className="rounded-2xl overflow-hidden animate-slide-up"
       role="status"
       aria-live="polite"
+      style={{
+        background: 'var(--color-film-surface)',
+        border: status === 'won' ? '1px solid rgba(47,200,122,0.28)' : '1px solid rgba(255,82,82,0.22)',
+      }}
     >
-      <span>
-        {status === 'won'
-          ? `Bravo ! Trouvé en ${guesses.findIndex((g) => g.correct) + 1}/${challenge.maxAttempts}`
-          : 'Pas cette fois…'}
-      </span>
-      {resolvedAnswerName && (
-        <span className="text-xs font-medium text-film-text-dim truncate max-w-[45%] text-center min-w-0">
-          {resolvedAnswerName}
-          {!isWiki && resultDetails?.year != null ? ` (${resultDetails.year})` : ''}
-        </span>
-      )}
-      {answerLabelPending && (
-        <span className="text-xs font-medium text-film-text-dim animate-pulse">Chargement…</span>
-      )}
-      {resultLoadError && (
-        <span className="text-xs font-medium text-film-text-dim">Résultat indisponible</span>
-      )}
-      <button
-        type="button"
-        onClick={() => openModal(status === 'won' ? 'win' : 'lose')}
-        className="flex items-center gap-1.5 text-xs font-medium opacity-70 hover:opacity-100 transition-opacity cursor-pointer shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold rounded"
-        title="Voir les détails du défi"
-      >
-        <Share2 size={13} aria-hidden />
-        Voir le résultat
-      </button>
+      <div className="flex items-start gap-4 p-4 sm:p-5">
+        {/* Thumbnail */}
+        {(resultDetails?.photoUrl ?? challenge.photoUrl) && (
+          <img
+            src={resultDetails?.photoUrl ?? challenge.photoUrl ?? ''}
+            alt=""
+            aria-hidden
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover shrink-0"
+            style={{ border: '1px solid rgba(255,255,255,0.08)' }}
+          />
+        )}
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            {status === 'won'
+              ? <CheckCircle2 size={14} className="text-film-green shrink-0" aria-hidden />
+              : <XCircle size={14} className="text-film-red shrink-0" aria-hidden />}
+            <span className={`text-xs font-semibold ${status === 'won' ? 'text-film-green' : 'text-film-red'}`}>
+              {status === 'won'
+                ? `Bravo ! Trouvé en ${guesses.findIndex((g) => g.correct) + 1}/${challenge.maxAttempts}`
+                : 'Pas cette fois…'}
+            </span>
+          </div>
+          {answerLabelPending ? (
+            <div className="h-6 w-40 rounded bg-film-gray animate-pulse" />
+          ) : (
+            <p className="font-title text-xl sm:text-2xl text-film-text leading-tight truncate">
+              {resolvedAnswerName ?? getChallengeName(challenge)}
+              {!isWiki && resultDetails?.year != null && (
+                <span className="text-film-text-dim font-sans text-sm font-normal ml-2">({resultDetails.year})</span>
+              )}
+            </p>
+          )}
+          {resultDetails?.extract && (
+            <p className="text-xs text-film-text-dim mt-1 line-clamp-2 leading-relaxed">{resultDetails.extract}</p>
+          )}
+        </div>
+
+        {/* CTA */}
+        <button
+          type="button"
+          onClick={() => openModal(status === 'won' ? 'win' : 'lose')}
+          className="shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg transition-colors cursor-pointer"
+          style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--color-film-text)', border: '1px solid rgba(255,255,255,0.1)' }}
+        >
+          <Share2 size={12} aria-hidden />
+          <span className="hidden sm:inline">Résultat</span>
+        </button>
+      </div>
     </div>
   ) : null
 
-  return (
-    <main
-      className={`game-page game-page--${mode} atmosphere-${mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : 'film'} min-h-screen px-3 sm:px-4 lg:px-8 py-3 sm:py-5 lg:py-6`}
-      data-mode={mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : undefined}
-    >
-      {/* ── Mobile layout (stack) ── */}
-      <div className="lg:hidden max-w-2xl mx-auto flex flex-col gap-3 sm:gap-4 pb-28">
-        {dateNavBar}
+  // ── Hints section header ──────────────────────────────────────────────────────
 
-        {/* Image full-bleed */}
-        {!isWiki && (
-          <div className="-mx-3 sm:-mx-4">
-            <div className="relative">
-              <MovieImage
-                imageUrl={challenge.photoUrl ?? null}
-                attempt={Math.min(guesses.length + 1, challenge.maxAttempts)}
-                maxAttempts={challenge.maxAttempts}
-                fullBleed
-              />
-              {/* Gradient overlay bottom */}
-              <div
-                className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none"
-                style={{ background: 'linear-gradient(to top, var(--color-film-black) 0%, transparent 100%)' }}
-              />
-              {/* AttemptTracker overlaid bottom-left */}
-              <div className="absolute bottom-3 left-3 z-10">
-                <AttemptTracker guesses={guessesForTracker} maxAttempts={challenge.maxAttempts} />
-              </div>
-              {/* Counter bottom-right */}
-              <div className="absolute bottom-3 right-3 z-10">
-                <span className="text-xs font-mono text-film-text-dim/80 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded">{guesses.length}/{challenge.maxAttempts}</span>
-              </div>
-            </div>
-          </div>
-        )}
-        {isWiki && (
-          <div className="-mx-3 sm:-mx-4">
-            <div className="relative">
-              <WikiChallengeImage
-                imageUrl={challenge.photoUrl ?? null}
-                isRevealed={isGameOver}
-              />
-              {/* Gradient overlay bottom */}
-              <div
-                className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none"
-                style={{ background: 'linear-gradient(to top, var(--color-film-black) 0%, transparent 100%)' }}
-              />
-              {/* AttemptTracker overlaid bottom-left */}
-              <div className="absolute bottom-3 left-3 z-10">
-                <AttemptTracker guesses={guessesForTracker} maxAttempts={challenge.maxAttempts} />
-              </div>
-              {/* Counter bottom-right */}
-              <div className="absolute bottom-3 right-3 z-10">
-                <span className="text-xs font-mono text-film-text-dim/80 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded">{guesses.length}/{challenge.maxAttempts}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {gameOverBanner}
-
-        {isWiki && (
-          <WikiHintPanel
-            profile={wikiProfile}
-            hints={[]}
-            hintsAvailable={hintsAvailable}
-            hintsRevealed={hintsRevealed}
-            showHints={false}
-            wikiPersonType={wikiPersonType}
-          />
-        )}
-
-        <div className="flex items-center justify-between mb-2 px-0.5">
-          <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: 'rgba(236,233,226,0.35)' }}>Indices</span>
-          <button
-            type="button"
-            onClick={() => openModal('rules')}
-            className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-widest transition-colors cursor-pointer"
-            style={{ color: 'rgba(236,233,226,0.35)' }}
-          >
-            <HelpCircle size={11} aria-hidden />
-            Règles
-          </button>
-        </div>
-
-        {isWiki ? (
-          <WikiHintPanel
-            profile={wikiProfile}
-            hints={challenge.hints as WikiHintPayload[]}
-            hintsAvailable={hintsAvailable}
-            hintsRevealed={hintsRevealed}
-            showProfile={false}
-          />
-        ) : (
-          <HintPanel
-            hints={challenge.hints as HintPayload[]}
-            hintsAvailable={hintsAvailable}
-            hintsRevealed={hintsRevealed}
-          />
-        )}
-
-        {guesses.length > 0 && (
-          <GuessList
-            guesses={guesses.map((g) => ({
-              value: g.guess,
-              status: g.correct ? 'correct' as const : 'wrong' as const,
-              timestamp: 0,
-            }))}
-            maxAttempts={challenge.maxAttempts}
-          />
+  const hintsHeader = (
+    <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-mono font-semibold uppercase tracking-widest" style={{ color: 'var(--mode-color, rgba(236,233,226,0.35))' }}>
+          Indices
+        </span>
+        {hintsAvailable > 0 && (
+          <span className="text-[10px] font-mono" style={{ color: 'rgba(236,233,226,0.3)' }}>
+            {hintsRevealed}/{hintsAvailable}
+          </span>
         )}
       </div>
+      <button
+        type="button"
+        onClick={() => openModal('rules')}
+        className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-widest transition-colors cursor-pointer"
+        style={{ color: 'rgba(236,233,226,0.35)' }}
+      >
+        <HelpCircle size={11} aria-hidden />
+        Règles
+      </button>
+    </div>
+  )
 
-      {/* ── Mobile sticky input bar ── */}
+  // ── Input section (shared mobile/desktop) ─────────────────────────────────────
+
+  const inputSection = !isGameOver && (
+    isWiki ? (
+      <WikiGuessInput onSubmit={submitGuess} onSkip={skipAttempt} attemptsLeft={attemptsLeft} disabled={isSubmitting} />
+    ) : (
+      <GuessInput onSubmit={submitGuess} onSkip={skipAttempt} attemptsLeft={attemptsLeft} disabled={isSubmitting} />
+    )
+  )
+
+  return (
+    <main
+      className={`game-page game-page--${mode} atmosphere-${mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : 'film'} min-h-screen`}
+      data-mode={mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : undefined}
+    >
+      {/* ── IMAGE HERO — full viewport width ─────────────────────────────── */}
+      <div className="relative">
+        {!isWiki ? (
+          <MovieImage
+            imageUrl={challenge.photoUrl ?? null}
+            attempt={Math.min(guesses.length + 1, challenge.maxAttempts)}
+            maxAttempts={challenge.maxAttempts}
+            fullBleed
+          />
+        ) : (
+          <WikiChallengeImage imageUrl={challenge.photoUrl ?? null} isRevealed={isGameOver} />
+        )}
+        {imageOverlay}
+      </div>
+
+      {/* ── CONTENT ──────────────────────────────────────────────────────── */}
+      <div className="px-3 sm:px-4 lg:px-8 py-4 lg:py-6">
+        <div className="max-w-5xl mx-auto">
+
+          {/* Reveal card — spans full width */}
+          {revealCard && <div className="mb-5">{revealCard}</div>}
+
+          {/* ── Desktop 2-col / Mobile stack ── */}
+          <div className="flex flex-col lg:grid lg:items-start gap-5 lg:gap-6"
+            style={{ gridTemplateColumns: 'minmax(0,1fr) 340px' }}>
+
+            {/* ── LEFT: wiki profile + hints ── */}
+            <div className="flex flex-col gap-4 pb-28 lg:pb-0">
+              {isWiki && (
+                <WikiHintPanel
+                  profile={wikiProfile}
+                  hints={[]}
+                  hintsAvailable={hintsAvailable}
+                  hintsRevealed={hintsRevealed}
+                  showHints={false}
+                  wikiPersonType={wikiPersonType}
+                />
+              )}
+
+              <div>
+                {hintsHeader}
+                {isWiki ? (
+                  <WikiHintPanel
+                    profile={wikiProfile}
+                    hints={challenge.hints as WikiHintPayload[]}
+                    hintsAvailable={hintsAvailable}
+                    hintsRevealed={hintsRevealed}
+                    showProfile={false}
+                  />
+                ) : (
+                  <HintPanel
+                    hints={challenge.hints as HintPayload[]}
+                    hintsAvailable={hintsAvailable}
+                    hintsRevealed={hintsRevealed}
+                  />
+                )}
+              </div>
+
+              {/* Guesses list — mobile only (desktop has it in right panel) */}
+              {guesses.length > 0 && (
+                <div className="lg:hidden">
+                  <p className="text-[10px] font-mono font-semibold uppercase tracking-widest mb-2" style={{ color: 'rgba(236,233,226,0.35)' }}>
+                    Tes tentatives
+                  </p>
+                  <GuessList
+                    guesses={guesses.map((g) => ({ value: g.guess, status: g.correct ? 'correct' as const : 'wrong' as const, timestamp: 0 }))}
+                    maxAttempts={challenge.maxAttempts}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* ── RIGHT: sticky input panel (desktop only) ── */}
+            <div className="hidden lg:block">
+              <div
+                className="sticky flex flex-col gap-4 rounded-2xl p-5"
+                style={{ top: '72px', background: 'var(--color-film-surface)', border: '1px solid rgba(255,255,255,0.07)' }}
+              >
+                {/* Attempts pills */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {Array.from({ length: challenge.maxAttempts }).map((_, i) => {
+                    const g = guesses[i]
+                    return (
+                      <span
+                        key={i}
+                        className="flex-1 h-1.5 rounded-full transition-colors"
+                        style={{
+                          background: g
+                            ? g.correct
+                              ? 'var(--color-film-green)'
+                              : g.guess === ''
+                                ? 'rgba(255,255,255,0.15)'
+                                : 'var(--color-film-red)'
+                            : 'rgba(255,255,255,0.10)',
+                        }}
+                      />
+                    )
+                  })}
+                </div>
+
+                {/* Input */}
+                {inputSection}
+
+                {/* Remaining count */}
+                {!isGameOver && (
+                  <p className="text-center text-[11px] font-mono text-film-text-dim/50">
+                    {attemptsLeft} essai{attemptsLeft !== 1 ? 's' : ''} restant{attemptsLeft !== 1 ? 's' : ''}
+                  </p>
+                )}
+
+                {/* Guess list */}
+                {guesses.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-mono font-semibold uppercase tracking-widest mb-2" style={{ color: 'rgba(236,233,226,0.35)' }}>
+                      Tes tentatives
+                    </p>
+                    <GuessList
+                      guesses={guesses.map((g) => ({ value: g.guess, status: g.correct ? 'correct' as const : 'wrong' as const, timestamp: 0 }))}
+                      maxAttempts={challenge.maxAttempts}
+                    />
+                  </div>
+                )}
+
+                {/* Friends live */}
+                <div className={guesses.length > 0 ? 'pt-1 border-t' : ''} style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+                  <FriendsLive mode={isWiki ? 'wiki' : mode as 'film' | 'series'} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── MOBILE sticky input bar ── */}
       {!isGameOver && (
         <div
           className="lg:hidden fixed bottom-0 left-0 right-0 z-30 px-3 pt-3 pb-4"
@@ -655,161 +708,9 @@ export function GamePage({ mode }: GamePageProps) {
             boxShadow: '0 -4px 32px rgba(0,0,0,0.4)',
           }}
         >
-          {isWiki ? (
-            <WikiGuessInput
-              onSubmit={submitGuess}
-              onSkip={skipAttempt}
-              attemptsLeft={attemptsLeft}
-              disabled={isSubmitting}
-            />
-          ) : (
-            <GuessInput
-              onSubmit={submitGuess}
-              onSkip={skipAttempt}
-              attemptsLeft={attemptsLeft}
-              disabled={isSubmitting}
-            />
-          )}
+          {inputSection}
         </div>
       )}
-
-      {/* ── Desktop 2-col layout ── */}
-      <div
-        className="hidden lg:grid max-w-5xl mx-auto items-start"
-        style={{ gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: '1.5rem' }}
-      >
-        {/* Left column: image 16/9 + attempt dots + hints */}
-        <div className="flex flex-col gap-3">
-          <div className="relative">
-            {!isWiki && (
-              <MovieImage
-                imageUrl={challenge.photoUrl ?? null}
-                attempt={Math.min(guesses.length + 1, challenge.maxAttempts)}
-                maxAttempts={challenge.maxAttempts}
-              />
-            )}
-            {isWiki && (
-              <WikiChallengeImage
-                imageUrl={challenge.photoUrl ?? null}
-                isRevealed={isGameOver}
-              />
-            )}
-            {/* Gradient overlay bottom */}
-            <div
-              className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none"
-              style={{ background: 'linear-gradient(to top, var(--color-film-black) 0%, transparent 100%)' }}
-            />
-            {/* AttemptTracker overlaid bottom-left */}
-            <div className="absolute bottom-3 left-3 z-10">
-              <AttemptTracker guesses={guessesForTracker} maxAttempts={challenge.maxAttempts} />
-            </div>
-            {/* Counter bottom-right */}
-            <div className="absolute bottom-3 right-3 z-10">
-              <span className="text-xs font-mono text-film-text-dim/80 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded">{guesses.length}/{challenge.maxAttempts}</span>
-            </div>
-          </div>
-
-          <div className="shrink-0 flex flex-col gap-2">
-            <div className="flex items-center justify-between mb-2 px-0.5">
-              <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: 'rgba(236,233,226,0.35)' }}>Indices</span>
-              <button
-                type="button"
-                onClick={() => openModal('rules')}
-                className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-widest transition-colors cursor-pointer"
-                style={{ color: 'rgba(236,233,226,0.35)' }}
-              >
-                <HelpCircle size={11} aria-hidden />
-                Règles
-              </button>
-            </div>
-            {isWiki ? (
-              <>
-                <WikiHintPanel
-                  profile={wikiProfile}
-                  hints={[]}
-                  hintsAvailable={hintsAvailable}
-                  hintsRevealed={hintsRevealed}
-                  showHints={false}
-                  wikiPersonType={wikiPersonType}
-                />
-                <WikiHintPanel
-                  profile={wikiProfile}
-                  hints={challenge.hints as WikiHintPayload[]}
-                  hintsAvailable={hintsAvailable}
-                  hintsRevealed={hintsRevealed}
-                  showProfile={false}
-                />
-              </>
-            ) : (
-              <HintPanel
-                hints={challenge.hints as HintPayload[]}
-                hintsAvailable={hintsAvailable}
-                hintsRevealed={hintsRevealed}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Right column: date nav + input + guesses + friends */}
-        <div
-          className="flex flex-col gap-4 rounded-2xl p-4"
-          style={{ background: 'var(--color-film-surface)', border: '1px solid rgba(255,255,255,0.07)' }}
-        >
-          {/* Date nav — desktop only */}
-          {dateNavBar}
-
-          {/* Guess input */}
-          <div>
-            {!isGameOver && (
-              isWiki ? (
-                <WikiGuessInput
-                  onSubmit={submitGuess}
-                  onSkip={skipAttempt}
-                  attemptsLeft={attemptsLeft}
-                  disabled={isSubmitting}
-                />
-              ) : (
-                <GuessInput
-                  onSubmit={submitGuess}
-                  onSkip={skipAttempt}
-                  attemptsLeft={attemptsLeft}
-                  disabled={isSubmitting}
-                />
-              )
-            )}
-            {gameOverBanner}
-          </div>
-
-          {/* Attempts counter */}
-          {!isGameOver && (
-            <div className="flex items-center justify-end text-[11px] font-mono text-film-text-dim/60 select-none">
-              <span>{attemptsLeft} essai{attemptsLeft !== 1 ? 's' : ''} restant{attemptsLeft !== 1 ? 's' : ''}</span>
-            </div>
-          )}
-
-          {/* Guess list */}
-          {guesses.length > 0 && (
-            <>
-              <div className="text-[10px] font-semibold tracking-widest text-film-text-dim uppercase">
-                Tes tentatives
-              </div>
-              <GuessList
-                guesses={guesses.map((g) => ({
-                  value: g.guess,
-                  status: g.correct ? 'correct' as const : 'wrong' as const,
-                  timestamp: 0,
-                }))}
-                maxAttempts={challenge.maxAttempts}
-              />
-            </>
-          )}
-
-          {/* Friends live — desktop only */}
-          <div className="mt-auto pt-2">
-            <FriendsLive mode={isWiki ? 'wiki' : mode as 'film' | 'series'} />
-          </div>
-        </div>
-      </div>
 
       {(() => {
         const today = getTodayParis()
