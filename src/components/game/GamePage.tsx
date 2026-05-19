@@ -565,7 +565,7 @@ export function GamePage({ mode }: GamePageProps) {
       data-mode={mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : undefined}
     >
       {/* ── MODE TABS ────────────────────────────────────────────────────── */}
-      <div className="px-3 sm:px-4 lg:px-8 pt-3 pb-2">
+      <div className="px-3 sm:px-4 pt-3 pb-2 max-w-2xl mx-auto w-full">
         <nav className="inline-flex items-center gap-1 rounded-xl p-1" style={{ background: 'rgba(255,255,255,0.05)' }}>
           <a
             href="/films"
@@ -595,19 +595,20 @@ export function GamePage({ mode }: GamePageProps) {
         </nav>
       </div>
 
-      {/* ── IMAGE HERO — full viewport width ─────────────────────────────── */}
-      <div className="relative overflow-hidden" style={{ height: 'min(52vh, 480px)' }}>
-        {!isWiki ? (
-          <MovieImage
-            imageUrl={challenge.photoUrl ?? null}
-            attempt={Math.min(guesses.length + 1, challenge.maxAttempts)}
-            maxAttempts={challenge.maxAttempts}
-            fullBleed
-          />
-        ) : (
-          <WikiChallengeImage imageUrl={challenge.photoUrl ?? null} isRevealed={isGameOver} />
-        )}
-        {imageOverlay}
+      {/* ── IMAGE HERO ───────────────────────────────────────────────────── */}
+      <div className="px-3 sm:px-4">
+        <div className="relative max-w-2xl mx-auto overflow-hidden rounded-xl">
+          {!isWiki ? (
+            <MovieImage
+              imageUrl={challenge.photoUrl ?? null}
+              attempt={Math.min(guesses.length + 1, challenge.maxAttempts)}
+              maxAttempts={challenge.maxAttempts}
+            />
+          ) : (
+            <WikiChallengeImage imageUrl={challenge.photoUrl ?? null} isRevealed={isGameOver} />
+          )}
+          {imageOverlay}
+        </div>
       </div>
 
       {/* ── CONTENT ──────────────────────────────────────────────────────── */}
