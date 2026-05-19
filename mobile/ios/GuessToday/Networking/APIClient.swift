@@ -28,6 +28,7 @@ final class APIClient {
     static let baseURL = "https://guesstoday.fr"
     #endif
 
+    // ── Auth token (joueur connecté) ───────────────────────────────────────
     var sessionToken: String? {
         get { KeychainHelper.shared.get(key: "session_token") }
         set {
@@ -36,8 +37,46 @@ final class APIClient {
         }
     }
 
+    // ── Game session token (session anonyme de jeu) ────────────────────────
+    // URLSession ne stocke pas fiablement les cookies de `localhost`.
+    // On extrait le token du Set-Cookie à la 1ère réponse et on le renvoi
+    // via X-Game-Session sur toutes les requêtes suivantes.
+    private var gameSessionToken: String? {
+        get { UserDefaults.standard.string(forKey: "game_session_token") }
+        set { UserDefaults.standard.set(newValue, forKey: "game_session_token") }
+    }
+
+    private func extractGameSessionCookie(from response: HTTPURLResponse) {
+        // Le backend envoie Set-Cookie: mg_session=s%3A<token>.<sig>
+        // On extrait la valeur brute du cookie pour la stocker nous-mêmes.
+        guard let fields = response.allHeaderFields as? [String: String],
+              let cookieHeader = fields["Set-Cookie"] else { return }
+        // Cherche mg_session=s%3A<uuid>
+        let parts = cookieHeader.components(separatedBy: ";")
+        for part in parts {
+            let kv = part.trimmingCharacters(in: .whitespaces)
+            if kv.hasPrefix("mg_session=") {
+                var value = String(kv.dropFirst("mg_session=".count))
+                // cookie-parser stocke "s:<token>.<sig>" — on a besoin du UUID brut
+                // Le header X-Game-Session n'est PAS signé : on envoie un UUID généré
+                // localement (créé une seule fois, persisté, envoyé comme token nu).
+                _ = value // on n'utilise pas la valeur signée côté client
+                return
+            }
+        }
+    }
+
+    /// Retourne le token de session de jeu existant, ou en génère un nouveau.
+    private func getOrCreateGameSessionToken() -> String {
+        if let t = gameSessionToken, !t.isEmpty { return t }
+        let t = UUID().uuidString
+        gameSessionToken = t
+        return t
+    }
+
     func clearSession() {
         sessionToken = nil
+        gameSessionToken = nil
         HTTPCookieStorage.shared.removeCookies(since: Date.distantPast)
     }
 
@@ -72,6 +111,9 @@ final class APIClient {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.setValue("ios", forHTTPHeaderField: "X-Platform")
+
+        // Token de session de jeu (anonyme) — fallback quand les cookies ne fonctionnent pas
+        req.setValue(getOrCreateGameSessionToken(), forHTTPHeaderField: "X-Game-Session")
 
         if let token = sessionToken {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
