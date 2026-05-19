@@ -146,14 +146,14 @@ export function Header({ mode }: HeaderProps) {
             </a>
           ) : (
             <>
-              {/* Mobile: icon only */}
+              {/* Mobile: icon only — w-8 h-8 like avatar to avoid header overflow */}
               <button
                 type="button"
                 onClick={() => openAuthModal()}
                 aria-label="Connexion ou inscription"
-                className={`lg:hidden ${iconBtn}`}
+                className="lg:hidden w-8 h-8 rounded-full flex items-center justify-center text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer"
               >
-                <UserRound size={20} aria-hidden />
+                <UserRound size={18} aria-hidden />
               </button>
               {/* Desktop: pill with label */}
               <button

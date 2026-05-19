@@ -79,6 +79,7 @@
     background-color: var(--color-film-black);
     color: var(--color-film-text);
     scroll-behavior: smooth;
+    overflow-x: hidden;
   }
 
   body {
