@@ -5,7 +5,7 @@
  *  - Desktop (lg+): logo left | mode tabs center | streak + controls right
  */
 
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { BarChart2, CalendarDays, LogIn, Flame, UserRound } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useGameStore } from '@/store/gameStore'
@@ -51,6 +51,27 @@ export function Header({ mode }: HeaderProps) {
 
   const iconBtn = 'inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold'
 
+  const [countdown, setCountdown] = useState('')
+  useEffect(() => {
+    function tick() {
+      const now = new Date()
+      const paris = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Paris' }))
+      const midnight = new Date(paris)
+      midnight.setHours(24, 0, 0, 0)
+      const diff = midnight.getTime() - paris.getTime()
+      const h = Math.floor(diff / 3600000)
+      const m = Math.floor((diff % 3600000) / 60000)
+      const s = Math.floor((diff % 60000) / 1000)
+      setCountdown(h > 0
+        ? `${h}h ${String(m).padStart(2, '0')}m`
+        : `${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
+      )
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
+
   return (
     <header className="w-full" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
@@ -84,6 +105,15 @@ export function Header({ mode }: HeaderProps) {
                 </motion.span>
               </AnimatePresence>
             </div>
+          )}
+        </div>
+
+        {/* ── Center: countdown ── */}
+        <div className="flex-1 flex items-center justify-center">
+          {countdown && (
+            <span className="text-[11px] font-mono text-film-text-dim/60 whitespace-nowrap">
+              Prochain jeu · <span className="text-film-text-dim">{countdown}</span>
+            </span>
           )}
         </div>
 
