@@ -78,17 +78,36 @@ final class APIClient {
         sessionToken = nil
         gameSessionToken = nil
         HTTPCookieStorage.shared.removeCookies(since: Date.distantPast)
+        urlSession = APIClient.makeSession()   // recrée avec le bon proxy config pour le nouvel env
     }
 
-    private let urlSession: URLSession = {
+    // URLSession recréée à chaque changement d'environnement (voir clearSession)
+    private var urlSession: URLSession = APIClient.makeSession()
+
+    private static func makeSession() -> URLSession {
         let config = URLSessionConfiguration.default
         config.httpCookieStorage = .shared
         config.httpShouldSetCookies = true
         config.httpCookieAcceptPolicy = .always
         config.timeoutIntervalForRequest = 20
         config.timeoutIntervalForResource = 60
+
+        // iCloud Private Relay bloque les connexions vers les IP locales (192.168.x.x)
+        // en les routant via mask.icloud.com → 503. On bypass le proxy système
+        // pour les envs de développement pointant vers une IP locale.
+        #if DEBUG || NRT
+        let url = EnvironmentManager.shared.baseURL
+        let isLocal = url.hasPrefix("http://localhost")
+            || url.hasPrefix("http://192.168")
+            || url.hasPrefix("http://10.")
+            || url.hasPrefix("http://172.")
+        if isLocal {
+            config.connectionProxyDictionary = [:]  // direct — ignore Private Relay & system proxy
+        }
+        #endif
+
         return URLSession(configuration: config)
-    }()
+    }
 
     private let decoder: JSONDecoder = {
         let d = JSONDecoder()
