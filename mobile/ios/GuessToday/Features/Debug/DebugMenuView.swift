@@ -6,6 +6,7 @@ struct DebugMenuView: View {
     @State private var pendingEnvironment: AppEnvironment? = nil
     @State private var showConfirm = false
     @State private var currentEnv: AppEnvironment = EnvironmentManager.shared.current
+    @State private var customURLDraft: String = EnvironmentManager.shared.customBaseURL
 
     var body: some View {
         ZStack {
@@ -13,7 +14,7 @@ struct DebugMenuView: View {
             ScrollView {
                 VStack(spacing: Theme.spacing20) {
                     // Active environment banner
-                    DebugActiveBanner(env: currentEnv)
+                    DebugActiveBanner(env: currentEnv, effectiveURL: EnvironmentManager.shared.baseURL)
                         .padding(.horizontal, Theme.spacing16)
 
                     // Build info card
@@ -30,6 +31,19 @@ struct DebugMenuView: View {
                         }
                     )
                     .padding(.horizontal, Theme.spacing16)
+
+                    // Custom URL input (visible seulement en mode .custom)
+                    if currentEnv == .custom {
+                        DebugCustomURLSection(
+                            urlDraft: $customURLDraft,
+                            onApply: {
+                                let trimmed = customURLDraft.trimmingCharacters(in: .whitespaces)
+                                EnvironmentManager.shared.customBaseURL = trimmed
+                                APIClient.shared.clearSession()
+                            }
+                        )
+                        .padding(.horizontal, Theme.spacing16)
+                    }
 
                     Spacer(minLength: Theme.spacing24)
                 }
@@ -50,13 +64,17 @@ struct DebugMenuView: View {
                     EnvironmentManager.shared.switchTo(env)
                     auth.user = nil
                     currentEnv = env
+                    customURLDraft = EnvironmentManager.shared.customBaseURL
                     pendingEnvironment = nil
                 }
             }
             Button("Annuler", role: .cancel) { pendingEnvironment = nil }
         } message: {
             if let env = pendingEnvironment {
-                Text("La session sera déconnectée. L'app pointera vers :\n\(env.baseURL)")
+                let url = env == .custom
+                    ? (EnvironmentManager.shared.customBaseURL.isEmpty ? env.defaultBaseURL : EnvironmentManager.shared.customBaseURL)
+                    : env.defaultBaseURL
+                Text("La session sera déconnectée. L'app pointera vers :\n\(url)")
             }
         }
     }
@@ -66,12 +84,14 @@ struct DebugMenuView: View {
 
 private struct DebugActiveBanner: View {
     let env: AppEnvironment
+    let effectiveURL: String
 
     private var color: Color {
         switch env {
-        case .localhost:  return Theme.green
-        case .staging:    return Theme.amber
-        case .production: return Theme.gold
+        case .localhost:   return Theme.green
+        case .custom:      return Color(hex: "#a78bfa")   // violet
+        case .staging:     return Theme.amber
+        case .production:  return Theme.gold
         }
     }
 
@@ -90,6 +110,11 @@ private struct DebugActiveBanner: View {
                 Text(env.displayName)
                     .font(Theme.inter(size: 17, weight: .semibold))
                     .foregroundColor(color)
+                Text(effectiveURL)
+                    .font(Theme.inter(size: 11))
+                    .foregroundColor(color.opacity(0.6))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
 
             Spacer()
@@ -109,6 +134,94 @@ private struct DebugActiveBanner: View {
         .background(color.opacity(0.08))
         .cornerRadius(Theme.radiusM)
         .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(color.opacity(0.3), lineWidth: 1))
+    }
+}
+
+// MARK: - Custom URL input
+
+private struct DebugCustomURLSection: View {
+    @Binding var urlDraft: String
+    let onApply: () -> Void
+    @FocusState private var focused: Bool
+
+    private var detectedIP: String? { EnvironmentManager.detectMacLANIP() }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.spacing8) {
+            DebugSectionLabel("URL personnalisée (device réel)")
+
+            VStack(spacing: 0) {
+                // Tip
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 13))
+                        .foregroundColor(Theme.textDim)
+                    Text("Sur device réel, utilise l'IP LAN de ton Mac : http://192.168.x.x:3001")
+                        .font(Theme.inter(size: 12))
+                        .foregroundColor(Theme.textDim)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(Theme.spacing12)
+                .background(Theme.surfaceAlt)
+                .cornerRadius(Theme.radiusS)
+                .padding(Theme.spacing12)
+
+                DebugDivider()
+
+                // Auto-detect (utile en simulateur)
+                if let ip = detectedIP {
+                    Button {
+                        urlDraft = "http://\(ip):3001"
+                        EnvironmentManager.shared.customBaseURL = urlDraft
+                        APIClient.shared.clearSession()
+                    } label: {
+                        HStack {
+                            Image(systemName: "wand.and.stars")
+                                .font(.system(size: 13))
+                                .foregroundColor(Theme.gold)
+                            Text("Utiliser IP détectée : \(ip)")
+                                .font(Theme.inter(size: 13))
+                                .foregroundColor(Theme.gold)
+                            Spacer()
+                        }
+                        .padding(.horizontal, Theme.spacing16)
+                        .padding(.vertical, 12)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    DebugDivider()
+                }
+
+                // Text field
+                HStack(spacing: Theme.spacing8) {
+                    TextField("http://192.168.x.x:3001", text: $urlDraft)
+                        .font(Theme.inter(size: 14))
+                        .foregroundColor(Theme.text)
+                        .tint(Theme.gold)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.URL)
+                        .focused($focused)
+                        .onSubmit { onApply(); focused = false }
+                        .padding(.leading, Theme.spacing16)
+                        .padding(.vertical, 13)
+
+                    Button("Appliquer") {
+                        onApply()
+                        focused = false
+                    }
+                    .font(Theme.inter(size: 13, weight: .semibold))
+                    .foregroundColor(urlDraft.isEmpty ? Theme.muted : Theme.gold)
+                    .disabled(urlDraft.isEmpty)
+                    .padding(.trailing, Theme.spacing16)
+                    .padding(.vertical, 13)
+                }
+            }
+            .background(Theme.surface)
+            .cornerRadius(Theme.radiusM)
+            .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(Theme.border, lineWidth: 1))
+        }
     }
 }
 
@@ -135,7 +248,7 @@ private struct DebugBuildInfoCard: View {
                 DebugDivider()
                 DebugInfoRow(label: "Schéma", value: scheme)
                 DebugDivider()
-                DebugInfoRow(label: "URL active", value: APIClient.baseURL)
+                DebugInfoRow(label: "URL active", value: EnvironmentManager.shared.baseURL)
             }
             .background(Theme.surface)
             .cornerRadius(Theme.radiusM)
@@ -180,10 +293,19 @@ private struct DebugEnvRow: View {
 
     private var envColor: Color {
         switch env {
-        case .localhost:  return Theme.green
-        case .staging:    return Theme.amber
-        case .production: return Theme.gold
+        case .localhost:   return Theme.green
+        case .custom:      return Color(hex: "#a78bfa")
+        case .staging:     return Theme.amber
+        case .production:  return Theme.gold
         }
+    }
+
+    private var subtitle: String {
+        if env == .custom {
+            let saved = EnvironmentManager.shared.customBaseURL
+            return saved.isEmpty ? env.defaultBaseURL : saved
+        }
+        return env.defaultBaseURL
     }
 
     var body: some View {
@@ -215,7 +337,7 @@ private struct DebugEnvRow: View {
                                 .cornerRadius(4)
                         }
                     }
-                    Text(env.baseURL)
+                    Text(subtitle)
                         .font(Theme.inter(size: 11))
                         .foregroundColor(Theme.textDim)
                         .lineLimit(1)
