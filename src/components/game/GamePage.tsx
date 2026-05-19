@@ -564,6 +564,37 @@ export function GamePage({ mode }: GamePageProps) {
       className={`atmosphere-${mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : 'film'} min-h-screen overflow-x-hidden`}
       data-mode={mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : undefined}
     >
+      {/* ── MODE TABS ────────────────────────────────────────────────────── */}
+      <div className="px-3 sm:px-4 lg:px-8 pt-3 pb-2">
+        <nav className="inline-flex items-center gap-1 rounded-xl p-1" style={{ background: 'rgba(255,255,255,0.05)' }}>
+          <a
+            href="/films"
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+            style={mode === 'film' ? { background: 'var(--sg-films)', color: '#0b0b1a' } : { color: 'rgba(236,233,226,0.5)' }}
+          >
+            Films
+          </a>
+          {FEATURES.enableSeries && (
+            <a
+              href="/series"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              style={mode === 'series' ? { background: 'var(--sg-series)', color: '#0b0b1a' } : { color: 'rgba(236,233,226,0.5)' }}
+            >
+              Séries
+            </a>
+          )}
+          {FEATURES.enableWiki && (
+            <a
+              href="/wiki"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              style={mode === 'wiki' ? { background: 'var(--sg-wiki)', color: '#0b0b1a' } : { color: 'rgba(236,233,226,0.5)' }}
+            >
+              Perso
+            </a>
+          )}
+        </nav>
+      </div>
+
       {/* ── IMAGE HERO — full viewport width ─────────────────────────────── */}
       <div className="relative">
         {!isWiki ? (

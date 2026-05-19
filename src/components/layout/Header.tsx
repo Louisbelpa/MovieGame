@@ -87,37 +87,6 @@ export function Header({ mode }: HeaderProps) {
           )}
         </div>
 
-        {/* ── Center: mode switcher ── */}
-        <div className="flex-1 flex items-center justify-center">
-          <nav className="flex items-center gap-1 rounded-xl p-1" style={{ background: 'rgba(255,255,255,0.05)' }}>
-            <a
-              href="/films"
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-              style={mode === 'film' ? { background: 'var(--sg-films)', color: '#0b0b1a' } : { color: 'rgba(236,233,226,0.5)' }}
-            >
-              Films
-            </a>
-            {FEATURES.enableSeries && (
-              <a
-                href="/series"
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                style={mode === 'series' ? { background: 'var(--sg-series)', color: '#0b0b1a' } : { color: 'rgba(236,233,226,0.5)' }}
-              >
-                Séries
-              </a>
-            )}
-            {FEATURES.enableWiki && (
-              <a
-                href="/wiki"
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                style={mode === 'wiki' ? { background: 'var(--sg-wiki)', color: '#0b0b1a' } : { color: 'rgba(236,233,226,0.5)' }}
-              >
-                Perso
-              </a>
-            )}
-          </nav>
-        </div>
-
         {/* ── Right: actions ── */}
         <div className="flex items-center gap-1">
           {/* Streak pill: desktop only */}
