@@ -3,7 +3,6 @@ import { ChevronLeft, ChevronRight, Share2, HelpCircle, CheckCircle2, XCircle, F
 import { GuessInput } from './GuessInput'
 import { GuessList } from './GuessList'
 import { HintPanel } from './HintPanel'
-import { AttemptTracker } from './AttemptTracker'
 import { MovieImage } from './MovieImage'
 import { FriendsLive } from './FriendsLive'
 import { WikiChallengeImage } from '@/components/wiki/WikiChallengeImage'
@@ -448,12 +447,9 @@ export function GamePage({ mode }: GamePageProps) {
         </div>
       </div>
 
-      {/* Bottom: gradient + attempts */}
+      {/* Bottom gradient */}
       <div className="absolute bottom-0 left-0 right-0 z-10 pointer-events-none">
         <div className="h-24" style={{ background: 'linear-gradient(to top, var(--color-film-black) 0%, transparent 100%)' }} />
-      </div>
-      <div className="absolute bottom-3 left-0 right-0 z-20 flex justify-center">
-        <AttemptTracker guesses={guessesForTracker} maxAttempts={challenge.maxAttempts} />
       </div>
     </>
   )
