@@ -313,6 +313,22 @@
   background-size: 100% 100%;
 }
 
+/* ─── Hover animals effect (desktop only) ─────────────────────────────────── */
+@media (hover: hover) {
+  @keyframes float-animal {
+    0%   { transform: translateY(0) scale(1); opacity: 1; }
+    100% { transform: translateY(-72px) scale(0.35); opacity: 0; }
+  }
+  .animal-particle {
+    position: absolute;
+    pointer-events: none;
+    font-size: 1.25rem;
+    z-index: 30;
+    animation: float-animal 0.85s ease-out forwards;
+    will-change: transform, opacity;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

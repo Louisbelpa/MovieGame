@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { CheckCircle2, XCircle, Film, Tv, User, LogIn, Smartphone } from 'lucide-react'
 import { ApertureIcon } from '@/components/ui/ApertureIcon'
 import { Footer } from '@/components/layout/Footer'
@@ -17,18 +17,12 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const CARD_ANIMALS = ['🐱','🦊','🐸','🦁','🐯','🐨','🐼','🐭','✨','⭐','🎬','🍿','🎭','🌟']
+
 function getTodayParis(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
 }
 
-function getTodayLabel(): string {
-  return new Intl.DateTimeFormat('fr-FR', {
-    timeZone: 'Europe/Paris',
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  }).format(new Date())
-}
 
 function useCountdown(): string {
   const [str, setStr] = useState('')
@@ -74,7 +68,6 @@ function HomeHeader() {
   const user = useAuthStore((s) => s.user)
   const isLoading = useAuthStore((s) => s.isLoading)
   const { open: openAuth } = useAuthModal()
-  const todayLabel = getTodayLabel()
   const countdown = useCountdown()
 
   return (
@@ -91,17 +84,12 @@ function HomeHeader() {
         </span>
       </a>
 
-      {/* Centre : date + countdown */}
-      <div className="hidden sm:flex flex-col items-center leading-none gap-0.5">
-        <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: 'rgba(236,233,226,0.4)' }}>
-          {todayLabel}
+      {/* Centre : countdown */}
+      {countdown && (
+        <span className="text-[11px] font-mono" style={{ color: 'rgba(236,233,226,0.55)' }}>
+          Prochain jeu · <span style={{ color: '#ece9e2' }}>{countdown}</span>
         </span>
-        {countdown && (
-          <span className="font-mono text-sm font-bold" style={{ color: '#ece9e2' }}>
-            {countdown}
-          </span>
-        )}
-      </div>
+      )}
 
       {/* Droite : avatar ou connexion */}
       {isLoading ? (
@@ -153,10 +141,25 @@ interface GameCardProps {
 function GameCard({ href, icon, modeLabel, description, accentColor, disabled, badge, todayStatus }: GameCardProps) {
   const showPlay = !todayStatus && !disabled
   const Tag = disabled ? 'div' : 'a'
+  const [sparks, setSparks] = useState<{ id: number; emoji: string; x: number; delay: number }[]>([])
+  const sparkId = useRef(0)
+
+  const handleMouseEnter = () => {
+    if (disabled || !window.matchMedia('(hover: hover)').matches) return
+    const picks = Array.from({ length: 5 }, () => ({
+      id: sparkId.current++,
+      emoji: CARD_ANIMALS[Math.floor(Math.random() * CARD_ANIMALS.length)],
+      x: 8 + Math.random() * 84,
+      delay: Math.random() * 0.18,
+    }))
+    setSparks(picks)
+    setTimeout(() => setSparks([]), 1000)
+  }
 
   return (
     <Tag
       {...(!disabled ? { href } : {})}
+      onMouseEnter={handleMouseEnter}
       className={`relative flex flex-col justify-between p-4 sm:p-5 lg:p-8 overflow-hidden transition-all duration-200 ${
         disabled ? 'opacity-50 cursor-default' : 'cursor-pointer'
       }`}
@@ -173,6 +176,17 @@ function GameCard({ href, icon, modeLabel, description, accentColor, disabled, b
           background: `radial-gradient(ellipse 100% 80% at 110% 120%, ${accentColor}45, transparent 55%)`,
         }}
       />
+
+      {/* Hover animals */}
+      {sparks.map(s => (
+        <span
+          key={s.id}
+          className="animal-particle"
+          style={{ left: `${s.x}%`, bottom: '30%', animationDelay: `${s.delay}s` }}
+        >
+          {s.emoji}
+        </span>
+      ))}
 
       {/* Texture subtile (points) */}
       <div
