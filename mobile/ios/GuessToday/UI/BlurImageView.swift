@@ -7,7 +7,6 @@ struct BlurImageView: View {
     var flashColor: Color? = nil
 
     private var isWiki: Bool { mediaType == "wiki" }
-    private var badgeIcon: String { mediaType == "series" ? "tv" : "film" }
 
     var body: some View {
         Group {
@@ -33,7 +32,9 @@ struct BlurImageView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: isWiki ? 280 : 240)
+        // Films/séries : format 16:9 (comme le web). Wiki : portrait carré-ish
+        .frame(height: isWiki ? 280 : nil)
+        .aspectRatio(isWiki ? nil : 16.0 / 9.0, contentMode: .fill)
         .clipped()
         .cornerRadius(Theme.radiusL)
         // Bottom gradient overlay — mirrors web GamePage image gradient
@@ -59,23 +60,6 @@ struct BlurImageView: View {
             RoundedRectangle(cornerRadius: Theme.radiusL)
                 .stroke(Theme.border, lineWidth: 1)
         )
-        // "Scène" badge top-left
-        .overlay(alignment: .topLeading) {
-            if !isWiki {
-                HStack(spacing: 4) {
-                    Image(systemName: badgeIcon)
-                        .font(.system(size: 9, weight: .medium))
-                    Text("Scène")
-                        .font(Theme.inter(size: 10, weight: .medium))
-                }
-                .foregroundColor(Theme.textDim)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(.ultraThinMaterial)
-                .cornerRadius(6)
-                .padding(8)
-            }
-        }
     }
 }
 

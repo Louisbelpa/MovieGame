@@ -89,8 +89,8 @@ struct GameView: View {
                                 .padding(.top, Theme.spacing16)
                             }
 
-                            // Attempt dots
-                            AttemptDots(
+                            // Barres de tentatives (vert/rouge/blanc-passe/gris)
+                            AttemptBars(
                                 attempts: challenge.attempts,
                                 maxAttempts: challenge.maxAttempts
                             )
@@ -276,19 +276,12 @@ private struct GuessInputSection: View {
     private func inputContent(challenge: ChallengePayload) -> some View {
         let attemptsLeft = challenge.maxAttempts - challenge.attemptsUsed
         VStack(spacing: Theme.spacing12) {
-            // Attempt counter
+            // Compteur tentatives restantes
             HStack {
-                HStack(spacing: 5) {
-                    ForEach(0..<challenge.maxAttempts, id: \.self) { i in
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(i < challenge.attemptsUsed ? Theme.red.opacity(0.8) : Theme.surfaceAlt)
-                            .frame(height: 4)
-                    }
-                }
-                Spacer()
                 Text("\(attemptsLeft) essai\(attemptsLeft > 1 ? "s" : "") restant\(attemptsLeft > 1 ? "s" : "")")
                     .font(Theme.inter(size: 12))
                     .foregroundColor(Theme.textDim)
+                Spacer()
             }
 
             // Search field
@@ -891,36 +884,29 @@ private struct ErrorView: View {
 
 // MARK: - Attempt dots
 
-private struct AttemptDots: View {
+// Barres colorées identiques au web (vert = correct, blanc-tamisé = passé, rouge = faux, gris = vide)
+private struct AttemptBars: View {
     let attempts: [AttemptEntry]
     let maxAttempts: Int
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             ForEach(0..<maxAttempts, id: \.self) { i in
-                if i < attempts.count {
-                    let attempt = attempts[i]
-                    Circle()
-                        .fill(attempt.correct ? Theme.green
-                              : attempt.guess.isEmpty ? Theme.muted.opacity(0.35)
-                              : Theme.red)
-                        .frame(width: 10, height: 10)
-                        .overlay(
-                            Circle().stroke(
-                                attempt.correct ? Theme.green.opacity(0.6)
-                                : attempt.guess.isEmpty ? Theme.muted.opacity(0.4)
-                                : Theme.red.opacity(0.6),
-                                lineWidth: 1
-                            )
-                        )
-                } else {
-                    Circle()
-                        .strokeBorder(Theme.border, lineWidth: 1.5)
-                        .frame(width: 10, height: 10)
-                }
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(color(for: i))
+                    .frame(height: 5)
+                    .animation(.easeOut(duration: 0.3), value: attempts.count)
             }
-            Spacer()
         }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func color(for index: Int) -> Color {
+        guard index < attempts.count else { return Color.white.opacity(0.10) }
+        let a = attempts[index]
+        if a.correct        { return Theme.green }
+        if a.guess.isEmpty  { return Color.white.opacity(0.38) }
+        return Theme.red
     }
 }
 
@@ -940,6 +926,14 @@ private struct GameResultBanner: View {
         return ""
     }
 
+    private var director: String? {
+        filmResult?.director ?? filmResult?.creator
+    }
+
+    private var genres: [String] {
+        filmResult?.genres?.prefix(3).map { $0 } ?? []
+    }
+
     private var synopsis: String? {
         if let bio = wikiResult?.bio, !bio.isEmpty { return bio }
         if let s = filmResult?.synopsis, !s.isEmpty { return s }
@@ -947,30 +941,60 @@ private struct GameResultBanner: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.spacing12) {
+        VStack(alignment: .leading, spacing: Theme.spacing8) {
+            // Status header
             HStack(spacing: Theme.spacing8) {
                 Image(systemName: challenge.won ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .font(.system(size: 18))
+                    .font(.system(size: 16))
                     .foregroundColor(challenge.won ? Theme.green : Theme.red)
-                Text(challenge.won ? "Bravo !" : "La réponse était…")
-                    .font(Theme.inter(size: 14, weight: .semibold))
-                    .foregroundColor(challenge.won ? Theme.green : Theme.text)
+                Text(challenge.won
+                     ? "Bravo ! Trouvé en \(challenge.attemptsUsed)/\(challenge.maxAttempts)"
+                     : "Pas cette fois…")
+                    .font(Theme.inter(size: 13, weight: .semibold))
+                    .foregroundColor(challenge.won ? Theme.green : Theme.red)
                 Spacer()
             }
 
+            // Title
             if !title.isEmpty {
                 Text(title)
-                    .font(Theme.fraunces(size: 20))
+                    .font(Theme.fraunces(size: 22))
                     .fontWeight(.bold)
                     .foregroundColor(Theme.text)
             }
 
+            // Director + genre tags (films/séries)
+            if director != nil || !genres.isEmpty {
+                HStack(spacing: 6) {
+                    if let d = director {
+                        Text(d)
+                            .font(Theme.inter(size: 12))
+                            .foregroundColor(Theme.textDim)
+                    }
+                    if director != nil && !genres.isEmpty {
+                        Text("·")
+                            .font(Theme.inter(size: 12))
+                            .foregroundColor(Theme.muted)
+                    }
+                    ForEach(genres, id: \.self) { g in
+                        Text(g)
+                            .font(Theme.inter(size: 11, weight: .medium))
+                            .foregroundColor(Theme.textDim)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.white.opacity(0.07))
+                            .cornerRadius(4)
+                    }
+                }
+            }
+
+            // Synopsis / bio
             if let synopsis {
                 Text(synopsis)
                     .font(Theme.inter(size: 13))
                     .foregroundColor(Theme.textDim)
                     .lineSpacing(3)
-                    .lineLimit(5)
+                    .lineLimit(4)
             }
         }
         .padding(Theme.spacing16)

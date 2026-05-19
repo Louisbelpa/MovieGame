@@ -39,10 +39,16 @@ struct ChallengePayload: Codable {
     var lost: Bool { outcome == "lost" }
 
     var blurRadius: Double {
-        // Films/séries : pas de flou (même règle que la version web)
-        guard isWiki else { return 0 }
-        // Wiki : photo entièrement masquée jusqu'à la fin de partie
-        return isGameOver ? 0 : 40
+        if isGameOver { return 0 }
+        if isWiki {
+            // Wiki : photo entièrement masquée jusqu'à la fin de partie
+            return 40
+        }
+        // Films/séries : flou progressif qui diminue à chaque tentative
+        // ex. 5 essais → [20, 16, 12, 7, 3, 0]
+        let maxBlur = 20.0
+        guard maxAttempts > 0 else { return 0 }
+        return max(0, maxBlur * (1.0 - Double(attemptsUsed) / Double(maxAttempts)))
     }
 }
 
