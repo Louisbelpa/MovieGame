@@ -627,7 +627,7 @@ export function GamePage({ mode }: GamePageProps) {
                       ? g.correct
                         ? 'var(--color-film-green)'
                         : g.guess === ''
-                          ? 'rgba(255,255,255,0.15)'
+                          ? 'rgba(255,255,255,0.38)'
                           : 'var(--color-film-red)'
                       : 'rgba(255,255,255,0.10)',
                   }}
