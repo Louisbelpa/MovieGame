@@ -154,7 +154,7 @@ function GameCard({ href, icon, modeLabel, description, accentColor, disabled, b
       {...(!disabled ? { href } : {})}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      className={`game-card relative flex flex-col justify-between p-4 sm:p-5 lg:p-8 overflow-hidden transition-all duration-200 ${
+      className={`game-card group relative flex flex-col justify-between p-4 sm:p-5 lg:p-8 overflow-hidden transition-all duration-200 ${
         disabled ? 'opacity-50 cursor-default' : 'cursor-pointer'
       }`}
       style={{
@@ -246,8 +246,8 @@ function GameCard({ href, icon, modeLabel, description, accentColor, disabled, b
 
         {showPlay ? (
           <div
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-all"
-            style={{ background: accentColor, color: '#0b0b1a' }}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-all duration-200 group-hover:scale-105 group-hover:shadow-lg"
+            style={{ background: accentColor, color: '#0b0b1a', boxShadow: `0 0 0 0 ${accentColor}` }}
           >
             Jouer →
           </div>
@@ -375,7 +375,7 @@ function BelowFoldGuest({ friends, friendsLoading }: { friends: FriendEntry[]; f
               <button
                 type="button"
                 onClick={() => openAuth('register')}
-                className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold transition-all"
+                className="btn-cta-register inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold transition-all duration-200"
                 style={{ background: 'var(--color-film-surface)', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--color-film-text)' }}
               >
                 Créer un compte gratuit →

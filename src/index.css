@@ -339,6 +339,15 @@
     transform: translateY(-2px);
     box-shadow: 0 8px 32px rgba(0,0,0,0.4);
   }
+
+  /* CTA "Créer un compte" — gold glow au hover */
+  .btn-cta-register:hover {
+    background: var(--sg-films) !important;
+    color: #0b0b1a !important;
+    border-color: var(--sg-films) !important;
+    box-shadow: 0 0 20px color-mix(in srgb, var(--sg-films) 35%, transparent);
+    transform: translateY(-1px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
