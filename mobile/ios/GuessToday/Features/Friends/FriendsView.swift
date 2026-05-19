@@ -334,55 +334,287 @@ private struct GuestFeatureRow: View {
 
 // MARK: - Your code card
 
+// MARK: - Your Code Card (tappable → FriendCodeSheet)
+
 private struct YourCodeCard: View {
     let code: String
+    @State private var showSheet = false
+
+    var body: some View {
+        Button { showSheet = true } label: {
+            HStack(spacing: Theme.spacing12) {
+                // QR thumbnail
+                QRCodeImage(content: code, size: 48)
+                    .cornerRadius(6)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Mon code ami")
+                        .font(Theme.inter(size: 11, weight: .semibold))
+                        .foregroundColor(Theme.textDim)
+                        .textCase(.uppercase)
+                        .tracking(0.8)
+                    Text(code)
+                        .font(.system(size: 20, weight: .bold, design: .monospaced))
+                        .foregroundColor(Theme.gold)
+                        .tracking(3)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Theme.muted)
+            }
+            .padding(Theme.spacing16)
+            .cardStyle()
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showSheet) {
+            FriendCodeSheet(code: code)
+        }
+    }
+}
+
+// MARK: - Friend Code Sheet (QR + partage)
+
+private struct FriendCodeSheet: View {
+    let code: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var showInfo = false
     @State private var copied = false
 
     private var shareText: String {
-        "Rejoins-moi sur GuessToday 🎬\nMon code ami : \(code)\nTélécharge l'app : https://apps.apple.com/app/guesstoday/id6745916981"
+        "Rejoins-moi sur GuessToday 🎬\nMon code ami : \(code)\nhttps://apps.apple.com/app/guesstoday/id6745916981"
     }
 
     var body: some View {
-        VStack(spacing: Theme.spacing8) {
-            Text("Mon code ami")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(Theme.textDim)
-                .textCase(.uppercase)
-                .tracking(1)
+        NavigationStack {
+            ZStack {
+                Theme.background.ignoresSafeArea()
 
-            Text(code)
-                .font(.system(size: 26, weight: .bold, design: .monospaced))
-                .foregroundColor(Theme.gold)
-                .tracking(4)
+                VStack(spacing: 0) {
+                    // Card blanche QR
+                    VStack(spacing: Theme.spacing16) {
+                        // Header card : nom app + ⓘ
+                        HStack {
+                            HStack(spacing: 8) {
+                                ApertureIconView(size: 22)
+                                Text("GuessToday")
+                                    .font(Theme.inter(size: 15, weight: .semibold))
+                                    .foregroundColor(Theme.text)
+                            }
+                            Spacer()
+                            Button {
+                                showInfo = true
+                            } label: {
+                                Image(systemName: "info.circle")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(Theme.textDim)
+                            }
+                        }
 
-            HStack(spacing: Theme.spacing12) {
-                Button {
-                    UIPasteboard.general.string = code
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-                    withAnimation { copied = true }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        withAnimation { copied = false }
+                        Divider().background(Theme.border)
+
+                        // Code + QR
+                        VStack(spacing: Theme.spacing12) {
+                            Text("Code ami")
+                                .font(Theme.inter(size: 12))
+                                .foregroundColor(Theme.textDim)
+
+                            Text(code)
+                                .font(.system(size: 28, weight: .bold, design: .monospaced))
+                                .foregroundColor(Theme.text)
+                                .tracking(4)
+
+                            QRCodeImage(content: code, size: 200)
+                                .cornerRadius(12)
+                                .padding(.top, Theme.spacing8)
+                        }
                     }
-                } label: {
-                    Label(copied ? "Copié !" : "Copier", systemImage: copied ? "checkmark" : "doc.on.doc")
-                        .font(.system(size: 13))
-                        .foregroundColor(copied ? Theme.green : Theme.textDim)
+                    .padding(Theme.spacing20)
+                    .background(Theme.surface)
+                    .cornerRadius(Theme.radiusL)
+                    .overlay(RoundedRectangle(cornerRadius: Theme.radiusL).stroke(Theme.border, lineWidth: 1))
+                    .padding(.horizontal, Theme.spacing20)
+                    .padding(.top, Theme.spacing8)
+
+                    Spacer()
+
+                    // Actions
+                    VStack(spacing: Theme.spacing8) {
+                        ShareLink(item: shareText) {
+                            Label("Partager mon code", systemImage: "square.and.arrow.up")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+
+                        Button {
+                            UIPasteboard.general.string = code
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                            withAnimation { copied = true }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { withAnimation { copied = false } }
+                        } label: {
+                            Label(copied ? "Copié !" : "Copier le code", systemImage: copied ? "checkmark" : "doc.on.doc")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
+                    }
+                    .padding(.horizontal, Theme.spacing20)
+                    .padding(.bottom, Theme.spacing24)
                 }
-
-                Divider()
-                    .frame(height: 16)
-                    .background(Theme.border)
-
-                ShareLink(item: shareText) {
-                    Label("Inviter", systemImage: "square.and.arrow.up")
-                        .font(.system(size: 13))
-                        .foregroundColor(Theme.gold)
+            }
+            .navigationTitle("Mon code ami")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Theme.background, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundColor(Theme.muted)
+                    }
                 }
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(Theme.spacing16)
-        .cardStyle()
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Theme.background)
+        .sheet(isPresented: $showInfo) {
+            FriendCodeInfoSheet()
+        }
+    }
+}
+
+// MARK: - Info sheet "Qu'est-ce qu'un code ami ?"
+
+private struct FriendCodeInfoSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Theme.background.ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Theme.spacing24) {
+                        // Illustration
+                        HStack {
+                            Spacer()
+                            Image(systemName: "person.2.fill")
+                                .font(.system(size: 72))
+                                .foregroundColor(Theme.gold.opacity(0.25))
+                                .padding(.vertical, Theme.spacing16)
+                            Spacer()
+                        }
+
+                        VStack(alignment: .leading, spacing: Theme.spacing12) {
+                            Text("Ton **code ami** est un identifiant unique qui te permet d'inviter tes proches sur GuessToday sans partager ton email ou ton numéro de téléphone.")
+                                .font(Theme.inter(size: 15))
+                                .foregroundColor(Theme.text)
+                                .lineSpacing(4)
+
+                            Text("Tu peux retrouver ton code et inviter des amis depuis l'onglet Amis à tout moment.")
+                                .font(Theme.inter(size: 15))
+                                .foregroundColor(Theme.text)
+                                .lineSpacing(4)
+                        }
+
+                        VStack(alignment: .leading, spacing: Theme.spacing16) {
+                            Text("Comment ça marche")
+                                .font(Theme.fraunces(size: 20))
+                                .fontWeight(.bold)
+                                .foregroundColor(Theme.text)
+
+                            InfoRow(icon: "lock.shield.fill", color: Theme.green,
+                                    title: "Privé et sécurisé",
+                                    subtitle: "Seul ton code est nécessaire pour t'ajouter — aucune info personnelle partagée.")
+
+                            InfoRow(icon: "gamecontroller.fill", color: Theme.gold,
+                                    title: "Compare tes résultats",
+                                    subtitle: "Vois les scores de tes amis chaque jour et compare vos streaks.")
+
+                            InfoRow(icon: "trophy.fill", color: Theme.amber,
+                                    title: "Classement global",
+                                    subtitle: "Retrouve-toi dans le classement général parmi tous les joueurs.")
+                        }
+                    }
+                    .padding(Theme.spacing20)
+                }
+            }
+            .navigationTitle("Qu'est-ce qu'un code ami ?")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Theme.background, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundColor(Theme.muted)
+                    }
+                }
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Theme.background)
+    }
+}
+
+private struct InfoRow: View {
+    let icon: String
+    let color: Color
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Theme.spacing12) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(color)
+                .frame(width: 32, height: 32)
+                .background(color.opacity(0.12))
+                .cornerRadius(8)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(Theme.inter(size: 14, weight: .semibold))
+                    .foregroundColor(Theme.text)
+                Text(subtitle)
+                    .font(Theme.inter(size: 13))
+                    .foregroundColor(Theme.textDim)
+                    .lineSpacing(2)
+            }
+        }
+    }
+}
+
+// MARK: - QR Code generator (CoreImage, pas de dépendance externe)
+
+private struct QRCodeImage: View {
+    let content: String
+    let size: CGFloat
+
+    private var qrImage: UIImage? {
+        guard let data = content.data(using: .ascii),
+              let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
+        filter.setValue(data, forKey: "inputMessage")
+        filter.setValue("M", forKey: "inputCorrectionLevel")
+        guard let output = filter.outputImage else { return nil }
+        let scale = size / output.extent.width * UIScreen.main.scale
+        let scaled = output.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        let context = CIContext()
+        guard let cgImage = context.createCGImage(scaled, from: scaled.extent) else { return nil }
+        return UIImage(cgImage: cgImage)
+    }
+
+    var body: some View {
+        if let img = qrImage {
+            Image(uiImage: img)
+                .interpolation(.none)
+                .resizable()
+                .frame(width: size, height: size)
+        } else {
+            Rectangle()
+                .fill(Theme.surfaceAlt)
+                .frame(width: size, height: size)
+        }
     }
 }
 
