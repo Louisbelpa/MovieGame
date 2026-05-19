@@ -6,7 +6,7 @@ import { AuthModal, useAuthModal } from '@/components/modals/AuthModal'
 import { FEATURES, IOS_APP_STORE_URL } from '@/config/features'
 import { useAuthStore } from '@/store/authStore'
 import { loadStats, loadHistory, setHistoryEntry } from '@/lib/storage'
-import { friendsGetAll, fetchChallenge, type FriendEntry } from '@/api/client'
+import { friendsGetAll, fetchChallenge, authGetStats, type FriendEntry } from '@/api/client'
 import { fetchWikiChallenge } from '@/api/wikiClient'
 import { FriendsSidebar } from '@/components/home/FriendsSidebar'
 import {
@@ -397,13 +397,34 @@ function BelowFoldGuest({ friends, friendsLoading }: { friends: FriendEntry[]; f
 // ─── BelowFold — connecté ─────────────────────────────────────────────────────
 
 function BelowFoldUser({ friends, friendsLoading }: { friends: FriendEntry[]; friendsLoading: boolean }) {
-  const film = loadStats('film')
-  const wiki = FEATURES.enableWiki ? loadStats('wiki') : { gamesPlayed: 0, gamesWon: 0, currentStreak: 0, maxStreak: 0 }
-  const series = FEATURES.enableSeries ? loadStats('series') : { gamesPlayed: 0, gamesWon: 0, currentStreak: 0, maxStreak: 0 }
+  const localFilm = loadStats('film')
+  const localWiki = FEATURES.enableWiki ? loadStats('wiki') : { gamesPlayed: 0, gamesWon: 0, currentStreak: 0, maxStreak: 0 }
+  const localSeries = FEATURES.enableSeries ? loadStats('series') : { gamesPlayed: 0, gamesWon: 0, currentStreak: 0, maxStreak: 0 }
 
-  const total = film.gamesPlayed + wiki.gamesPlayed + series.gamesPlayed
-  const wins = film.gamesWon + wiki.gamesWon + series.gamesWon
-  const streak = Math.max(film.currentStreak, wiki.currentStreak, series.currentStreak)
+  const [serverStats, setServerStats] = useState<{ total: number; wins: number; streak: number } | null>(null)
+
+  useEffect(() => {
+    const modes: Array<'film' | 'series' | 'wiki'> = ['film', ...(FEATURES.enableSeries ? ['series' as const] : []), ...(FEATURES.enableWiki ? ['wiki' as const] : [])]
+    Promise.allSettled(modes.map(m => authGetStats(m))).then(results => {
+      let total = 0, wins = 0, streak = 0
+      results.forEach(r => {
+        if (r.status === 'fulfilled') {
+          total += r.value.gamesPlayed
+          wins += r.value.wins
+          streak = Math.max(streak, r.value.currentStreak)
+        }
+      })
+      if (total > 0) setServerStats({ total, wins, streak })
+    }).catch(() => {})
+  }, [])
+
+  const localTotal = localFilm.gamesPlayed + localWiki.gamesPlayed + localSeries.gamesPlayed
+  const localWins = localFilm.gamesWon + localWiki.gamesWon + localSeries.gamesWon
+  const localStreak = Math.max(localFilm.currentStreak, localWiki.currentStreak, localSeries.currentStreak)
+
+  const total = serverStats?.total ?? localTotal
+  const wins = serverStats?.wins ?? localWins
+  const streak = serverStats?.streak ?? localStreak
   const pct = total > 0 ? Math.round((wins / total) * 100) : 0
 
   return (
