@@ -24,7 +24,7 @@ export function MovieImage({ imageUrl, attempt, maxAttempts, className, fill, fu
       className={cn(
         'relative w-full overflow-hidden bg-film-gray',
         !fullBleed && 'rounded-xl',
-        fill ? 'h-full' : 'aspect-video',
+        fill ? 'h-full' : fullBleed ? 'aspect-video max-h-full' : 'aspect-video',
         className
       )}
       style={fullBleed ? undefined : {
