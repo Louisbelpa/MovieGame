@@ -133,14 +133,14 @@ struct RulesSheet: View {
         switch mode {
         case .film:
             return [
-                Step(icon: "eye.slash.fill", title: "Scène révélée", description: "Une scène du film s'affiche, fortement floutée. Elle se dévoile progressivement à chaque mauvaise réponse."),
+                Step(icon: "photo.fill", title: "Scène révélée", description: "Une scène du film est affichée. Sers-t'en comme indice visuel pour identifier le film."),
                 Step(icon: "list.bullet", title: "Indices progressifs", description: "Jusqu'à 3 indices sont révélés : année de sortie, réalisateur, acteur principal."),
                 Step(icon: "film", title: "Proposez un titre", description: "Saisissez votre réponse dans le champ prévu. Vous avez \(maxAttempts) tentatives."),
                 Step(icon: "clock.fill", title: "Un défi par jour", description: "Un nouveau film mystère chaque jour à minuit, heure de Paris. Revenez demain !"),
             ]
         case .series:
             return [
-                Step(icon: "eye.slash.fill", title: "Scène révélée", description: "Une scène de la série s'affiche, fortement floutée. Elle se dévoile progressivement à chaque mauvaise réponse."),
+                Step(icon: "photo.fill", title: "Scène révélée", description: "Une scène de la série est affichée. Sers-t'en comme indice visuel pour identifier la série."),
                 Step(icon: "list.bullet", title: "Indices progressifs", description: "Jusqu'à 3 indices sont révélés : année de sortie, créateur, acteur principal."),
                 Step(icon: "tv", title: "Proposez un titre", description: "Saisissez votre réponse dans le champ prévu. Vous avez \(maxAttempts) tentatives."),
                 Step(icon: "clock.fill", title: "Un défi par jour", description: "Une nouvelle série mystère chaque jour à minuit, heure de Paris. Revenez demain !"),

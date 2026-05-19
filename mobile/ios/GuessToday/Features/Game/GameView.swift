@@ -111,6 +111,10 @@ struct GameView: View {
                                 .id("guessInput")
                                 .padding(.top, Theme.spacing16)
 
+                            // Sentinel : scroller ici garantit que tout GuessInputSection
+                            // (y compris les boutons) est visible au-dessus du clavier
+                            Color.clear.frame(height: 1).id("keyboardAnchor")
+
                             Spacer(minLength: Theme.spacing24)
                         }
                         .padding(.horizontal, Theme.spacing16)
@@ -125,14 +129,19 @@ struct GameView: View {
                     .scrollDismissesKeyboard(.interactively)
                     .onChange(of: inputFocused) { _, focused in
                         if focused {
-                            withAnimation(.easeOut(duration: 0.3)) {
-                                proxy.scrollTo("guessInput", anchor: .bottom)
+                            // Délai pour laisser l'animation du clavier se terminer (~0.3s)
+                            // avant de scroller, sinon le scroll view ne connaît pas encore
+                            // sa nouvelle hauteur et les boutons restent masqués
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    proxy.scrollTo("keyboardAnchor", anchor: .bottom)
+                                }
                             }
                         }
                     }
                     .onChange(of: challenge.attempts.count) { _, _ in
                         withAnimation(.easeOut(duration: 0.25)) {
-                            proxy.scrollTo("guessInput", anchor: .bottom)
+                            proxy.scrollTo("keyboardAnchor", anchor: .bottom)
                         }
                     }
                 }
@@ -935,7 +944,7 @@ private struct GameResultBanner: View {
     }
 
     private var synopsis: String? {
-        if let bio = wikiResult?.bio, !bio.isEmpty { return bio }
+        if let bio = wikiResult?.extract, !bio.isEmpty { return bio }
         if let s = filmResult?.synopsis, !s.isEmpty { return s }
         return nil
     }

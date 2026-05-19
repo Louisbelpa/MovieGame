@@ -217,7 +217,7 @@ struct ChallengeResult: Codable {
 struct WikiResult: Codable {
     let name: String
     let personType: String
-    let bio: String?
+    let extract: String?   // backend key: extract (bio était incorrect)
     let photoUrl: String?
     let wikipediaUrl: String?
 

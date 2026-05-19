@@ -51,15 +51,9 @@ struct WinSheet: View {
                         }
 
                         // Action buttons
-                        VStack(spacing: Theme.spacing8) {
-                            ShareResultButtons(vm: vm)
-                                .padding(.horizontal, Theme.spacing16)
-
-                            Button("Fermer") { dismiss() }
-                                .buttonStyle(SecondaryButtonStyle())
-                                .padding(.horizontal, Theme.spacing16)
-                        }
-                        .padding(.bottom, Theme.spacing24)
+                        ShareResultButtons(vm: vm)
+                            .padding(.horizontal, Theme.spacing16)
+                            .padding(.bottom, Theme.spacing24)
                     }
                 }
             }
@@ -124,15 +118,9 @@ struct LoseSheet: View {
                                 .padding(.horizontal, Theme.spacing16)
                         }
 
-                        VStack(spacing: Theme.spacing8) {
-                            ShareResultButtons(vm: vm)
-                                .padding(.horizontal, Theme.spacing16)
-
-                            Button("Fermer") { dismiss() }
-                                .buttonStyle(SecondaryButtonStyle())
-                                .padding(.horizontal, Theme.spacing16)
-                        }
-                        .padding(.bottom, Theme.spacing24)
+                        ShareResultButtons(vm: vm)
+                            .padding(.horizontal, Theme.spacing16)
+                            .padding(.bottom, Theme.spacing24)
                     }
                 }
             }
@@ -422,8 +410,8 @@ struct WikiResultCard: View {
                 Spacer()
             }
 
-            if let bio = result.bio, !bio.isEmpty {
-                Text(bio)
+            if let extract = result.extract, !extract.isEmpty {
+                Text(extract)
                     .font(Theme.inter(size: 13))
                     .foregroundColor(Theme.textDim)
                     .lineLimit(4)
