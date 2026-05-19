@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { CheckCircle2, XCircle, Film, Tv, User, LogIn, Smartphone } from 'lucide-react'
+import { CheckCircle2, XCircle, Film, Tv, User, Smartphone, Sparkles } from 'lucide-react'
 import { ApertureIcon } from '@/components/ui/ApertureIcon'
 import { Footer } from '@/components/layout/Footer'
 import { AuthModal, useAuthModal } from '@/components/modals/AuthModal'
@@ -85,9 +85,10 @@ function HomeHeader() {
 
       {/* Centre : countdown */}
       {countdown && (
-        <span className="text-[11px] font-mono" style={{ color: 'rgba(236,233,226,0.55)' }}>
-          Prochain jeu · <span style={{ color: '#ece9e2' }}>{countdown}</span>
-        </span>
+        <div className="flex flex-col items-center leading-none gap-0.5">
+          <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: 'rgba(236,233,226,0.4)' }}>Prochain jeu</span>
+          <span className="text-base font-mono font-bold" style={{ color: '#ece9e2' }}>{countdown}</span>
+        </div>
       )}
 
       {/* Droite : avatar ou connexion */}
@@ -113,10 +114,10 @@ function HomeHeader() {
         <button
           type="button"
           onClick={() => openAuth('login')}
-          className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+          className="btn-cta-register flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-200"
           style={{ background: 'rgba(255,255,255,0.08)', color: '#ece9e2', border: '1px solid rgba(255,255,255,0.12)' }}
         >
-          <LogIn size={12} />
+          <Sparkles size={12} />
           <span className="hidden sm:inline">Se connecter</span>
         </button>
       )}

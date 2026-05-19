@@ -111,9 +111,10 @@ export function Header({ mode }: HeaderProps) {
         {/* ── Center: countdown ── */}
         <div className="flex-1 flex items-center justify-center">
           {countdown && (
-            <span className="text-[11px] font-mono text-film-text-dim/60 whitespace-nowrap">
-              Prochain jeu · <span className="text-film-text-dim">{countdown}</span>
-            </span>
+            <div className="flex flex-col items-center leading-none gap-0.5">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-film-text-dim/50">Prochain jeu</span>
+              <span className="text-base font-mono font-bold text-film-text whitespace-nowrap">{countdown}</span>
+            </div>
           )}
         </div>
 
