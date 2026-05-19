@@ -42,7 +42,7 @@ export function MockDataBanner() {
     <div
       style={{
         position: 'fixed',
-        bottom: 20,
+        bottom: 'max(20px, env(safe-area-inset-bottom, 0px) + 8px)',
         right: 16,
         zIndex: 9999,
         display: 'flex',
