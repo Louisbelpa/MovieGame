@@ -351,8 +351,18 @@ function BelowFoldGuest({ friends, friendsLoading }: { friends: FriendEntry[]; f
               { n: '02', title: 'Indices progressifs', desc: 'Chaque mauvaise réponse ou passe débloque un indice supplémentaire : année, réalisateur, acteur, genre…' },
               { n: '03', title: '5 tentatives max', desc: "Trouve le titre ou la personnalité avant d'épuiser tes essais. Partage ton score avec tes amis." },
             ].map(({ n, title, desc }) => (
-              <div key={n} className="rounded-2xl p-5 flex flex-col gap-3" style={{ background: 'var(--color-film-surface)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <span className="font-mono font-bold text-lg leading-none" style={{ color: 'rgba(236,233,226,0.3)' }}>{n}</span>
+              <div key={n} className="relative rounded-2xl pt-8 pb-5 pr-5 pl-10 flex flex-col gap-3 overflow-visible" style={{ background: 'var(--color-film-surface)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <span
+                  className="absolute font-mono font-black leading-none select-none pointer-events-none"
+                  style={{
+                    top: '50%',
+                    left: 0,
+                    transform: 'translate(-30%, -50%)',
+                    fontSize: 'clamp(4rem, 8vw, 6rem)',
+                    color: 'rgba(236,233,226,0.06)',
+                    letterSpacing: '-0.04em',
+                  }}
+                >{n}</span>
                 <p className="font-semibold text-film-text text-sm leading-snug">{title}</p>
                 <p className="text-xs leading-relaxed" style={{ color: 'rgba(236,233,226,0.5)' }}>{desc}</p>
               </div>
