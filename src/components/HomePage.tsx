@@ -15,6 +15,8 @@ import {
   type NewModesAnnouncementVariant,
 } from '@/components/modals/NewModesAnnouncementModal'
 import { MockDataBanner } from '@/components/dev/MockDataBanner'
+import { isMockEnabled } from '@/mock/mockFlags'
+import { MOCK_FRIENDS_RESPONSE } from '@/mock/mockData'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -545,6 +547,10 @@ export function HomePage() {
 
   useEffect(() => {
     if (!user) { setFriends([]); return }
+    if (isMockEnabled()) {
+      setFriends(MOCK_FRIENDS_RESPONSE.friends)
+      return
+    }
     setFriendsLoading(true)
     friendsGetAll(today)
       .then((r) => setFriends(r.friends ?? []))
