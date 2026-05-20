@@ -16,6 +16,7 @@ import {
   Settings,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
+import { AuthModal, useAuthModal } from '@/components/modals/AuthModal'
 import type { ServerStatsMap } from '@/store/authStore'
 import { authDeleteAccount, authChangePassword, authUploadAvatar } from '@/api/client'
 import { loadStats } from '@/lib/storage'
@@ -454,6 +455,199 @@ function SettingsModal({ onClose, user, onSaveName, onChangePassword, onLogout, 
   )
 }
 
+// ─── Streak calendar (60 days) ───────────────────────────────────────────────
+
+function StreakCalendarProfile({ currentStreak, gamesPlayed }: { currentStreak: number; gamesPlayed: number }) {
+  const days = 60
+  return (
+    <div>
+      <p className="text-[11px] font-mono uppercase tracking-widest text-film-text-dim/60 mb-2">Activité (60 jours)</p>
+      <div className="flex flex-wrap gap-[3px]">
+        {Array.from({ length: days }, (_, i) => {
+          const dayIndex = days - 1 - i
+          const isWon = dayIndex < currentStreak
+          const isPlayed = dayIndex < Math.min(gamesPlayed, days)
+          return (
+            <div
+              key={i}
+              title={isWon ? 'Victoire' : isPlayed ? 'Défaite' : 'Non joué'}
+              className={`aspect-square rounded-[2px] ${
+                isWon ? 'streak-day-won' : isPlayed ? 'streak-day-lost' : 'streak-day-empty'
+              }`}
+              style={{ width: 'calc((100% - 59 * 3px) / 60)' }}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── #03 Auth Gate (new design) ───────────────────────────────────────────────
+
+export function AuthGateNewDesign({ context }: { context: 'profile' | 'friends' }) {
+  const { open: openAuth } = useAuthModal()
+  const isProfile = context === 'profile'
+
+  const filmStats = loadStats('film')
+  const wikiStats = FEATURES.enableWiki ? loadStats('wiki') : { gamesPlayed: 0, gamesWon: 0, currentStreak: 0, maxStreak: 0, guessDistribution: {} as Record<number, number> }
+  const seriesStats = FEATURES.enableSeries ? loadStats('series') : { gamesPlayed: 0, gamesWon: 0, currentStreak: 0, maxStreak: 0, guessDistribution: {} as Record<number, number> }
+
+  const totalPlayed = filmStats.gamesPlayed + wikiStats.gamesPlayed + seriesStats.gamesPlayed
+  const totalWins = filmStats.gamesWon + wikiStats.gamesWon + seriesStats.gamesWon
+  const maxStreak = Math.max(filmStats.currentStreak ?? 0, wikiStats.currentStreak ?? 0, seriesStats.currentStreak ?? 0)
+
+  const pitchTitle = isProfile ? 'Sauvegarde ton historique.' : 'Défie tes amis.'
+  const pitchLabel = isProfile ? 'Ton profil' : 'Tes amis'
+
+  const pitchDesc = totalPlayed > 0
+    ? `Tu joues depuis ${totalPlayed} jours. Crée un compte pour garder ta série et tes stats sur tous tes appareils.`
+    : isProfile
+      ? "Crée un compte gratuit pour sauvegarder tes stats, garder ta série et accéder à ton historique depuis n'importe quel appareil."
+      : "Crée un compte gratuit pour défier tes amis et comparer vos scores du jour."
+
+  const carrots = isProfile ? [
+    { icon: '🔥', title: `Garde ta série de ${maxStreak > 0 ? maxStreak : 'N'} jours`, desc: "Sans compte, elle disparaît si tu changes d'appareil", bg: 'rgba(245,211,88,0.14)' },
+    { icon: '👥', title: 'Compare-toi à tes amis', desc: 'Classement quotidien sur les 3 modes', bg: 'rgba(74,214,192,0.14)' },
+    { icon: '🏆', title: 'Débloque les succès', desc: '12 badges à collectionner', bg: 'rgba(255,90,138,0.14)' },
+  ] : [
+    { icon: '📊', title: 'Classement quotidien', desc: 'Compare tes scores avec tes amis chaque jour', bg: 'rgba(245,211,88,0.14)' },
+    { icon: '🔥', title: 'Garde ta série', desc: 'Synchronisée sur tous tes appareils', bg: 'rgba(74,214,192,0.14)' },
+    { icon: '🏆', title: '3 modes de jeu', desc: 'Films, Séries et Personnalités — tout en un', bg: 'rgba(255,90,138,0.14)' },
+  ]
+
+  // Build fake profile distribution from local stats
+  const distributionKeys = (['1', '2', '3', '4', '5'] as const)
+  const maxDistVal = Math.max(1, ...distributionKeys.map((k) => filmStats.guessDistribution[Number(k) as 1|2|3|4|5] ?? 0))
+
+  return (
+    <div
+      className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-7 max-w-4xl mx-auto px-4 py-12"
+    >
+      {/* Left — pitch */}
+      <div className="flex flex-col gap-5">
+        <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(159,163,173,0.5)' }}>
+          {pitchLabel}
+        </p>
+        <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 34, lineHeight: 1.05, color: '#e8eaed', margin: 0 }}>
+          {pitchTitle}
+        </h1>
+        <p style={{ fontSize: 14, color: 'rgba(159,163,173,0.7)', lineHeight: 1.6 }}>
+          {pitchDesc}
+        </p>
+
+        {/* Carrot cards */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {carrots.map((c) => (
+            <div
+              key={c.title}
+              style={{
+                display: 'flex', gap: 10, padding: '10px 12px', borderRadius: 10,
+                background: c.bg,
+                border: '1px solid rgba(255,255,255,0.07)',
+              }}
+            >
+              <span style={{ fontSize: 18, flexShrink: 0 }}>{c.icon}</span>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#e8eaed', margin: 0 }}>{c.title}</p>
+                <p style={{ fontSize: 11, color: 'rgba(159,163,173,0.6)', margin: 0, marginTop: 2 }}>{c.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* CTAs */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => openAuth('register')}
+            style={{
+              background: 'linear-gradient(180deg, #f5d570, #b8852e)',
+              color: '#15110a',
+              borderRadius: 10,
+              padding: '10px 20px',
+              fontSize: 14,
+              fontWeight: 700,
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            Créer un compte
+          </button>
+          <button
+            type="button"
+            onClick={() => openAuth('login')}
+            style={{
+              background: 'transparent',
+              color: 'rgba(159,163,173,0.7)',
+              borderRadius: 10,
+              padding: '10px 20px',
+              fontSize: 14,
+              fontWeight: 600,
+              border: '1px solid rgba(255,255,255,0.1)',
+              cursor: 'pointer',
+            }}
+          >
+            Se connecter
+          </button>
+        </div>
+      </div>
+
+      {/* Right — blurred preview */}
+      <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)', background: '#161c2f', minHeight: 320 }}>
+        {/* Fake profile content (blurred) */}
+        <div style={{ filter: 'blur(6px)', opacity: 0.65, padding: '24px', userSelect: 'none', pointerEvents: 'none' }}>
+          {/* Stats row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 20 }}>
+            {[
+              { v: totalPlayed, l: 'JOUÉS' },
+              { v: totalPlayed > 0 ? `${Math.round((totalWins / totalPlayed) * 100)}%` : '—', l: 'VICTOIRES' },
+              { v: filmStats.currentStreak, l: 'SÉRIE' },
+              { v: filmStats.maxStreak, l: 'MAX' },
+            ].map(({ v, l }) => (
+              <div key={l} style={{ textAlign: 'center', padding: '8px 4px', background: 'rgba(255,255,255,0.04)', borderRadius: 8 }}>
+                <p style={{ fontSize: 20, fontWeight: 700, color: '#d4a64a', margin: 0 }}>{v}</p>
+                <p style={{ fontSize: 9, color: 'rgba(159,163,173,0.5)', fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.08em', marginTop: 2 }}>{l}</p>
+              </div>
+            ))}
+          </div>
+          {/* Fake distribution */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {distributionKeys.map((k) => {
+              const count = filmStats.guessDistribution[Number(k) as 1|2|3|4|5] ?? 0
+              const pct = Math.round((count / maxDistVal) * 100)
+              return (
+                <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ width: 12, fontSize: 11, color: 'rgba(159,163,173,0.5)', fontFamily: 'monospace' }}>{k}</span>
+                  <div style={{ flex: 1, height: 16, background: 'rgba(255,255,255,0.05)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', borderRadius: 4, width: `${Math.max(pct, count > 0 ? 4 : 0)}%`, background: 'rgba(245,211,88,0.6)' }} />
+                  </div>
+                  <span style={{ width: 16, fontSize: 11, color: 'rgba(159,163,173,0.4)', textAlign: 'right' }}>{count}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Overlay */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(180deg, rgba(10,14,26,0.4), rgba(10,14,26,0.85))',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
+        }}>
+          <span style={{ fontSize: 32 }}>🔒</span>
+          <p style={{ fontSize: 14, fontWeight: 600, color: '#e8eaed', margin: 0 }}>
+            {isProfile ? 'Aperçu de ton profil' : 'Classement amis'}
+          </p>
+          <p style={{ fontSize: 12, color: 'rgba(159,163,173,0.6)', margin: 0 }}>
+            {totalPlayed} défis joués · {totalWins} victoires
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export function ProfilePage() {
@@ -466,7 +660,7 @@ export function ProfilePage() {
   const serverStats = useAuthStore((s) => s.serverStats)
 
   useEffect(() => {
-    if (!isLoading && user === null) navigate('/', { replace: true })
+    if (!isLoading && user === null && !FEATURES.newDesign) navigate('/', { replace: true })
   }, [user, isLoading, navigate])
 
   const [avatarLoading, setAvatarLoading] = useState(false)
@@ -552,11 +746,23 @@ export function ProfilePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverStats])
 
-  if (isLoading || !user) return (
+  if (isLoading) return (
     <div className="min-h-screen bg-film-black flex items-center justify-center">
       <div className="w-6 h-6 rounded-full border-2 border-film-gold border-t-transparent animate-spin" />
     </div>
   )
+
+  if (!user) {
+    if (FEATURES.newDesign) {
+      return (
+        <div className="min-h-screen bg-film-black text-film-text">
+          <AuthModal />
+          <AuthGateNewDesign context="profile" />
+        </div>
+      )
+    }
+    return null
+  }
 
   const initial = user.displayName.charAt(0).toUpperCase()
 
@@ -817,6 +1023,12 @@ export function ProfilePage() {
             </p>
             <DistributionChart distribution={stats.guessDistributionStr} losses={losses > 0 ? losses : undefined} />
           </div>
+
+          {/* Streak calendar */}
+          <StreakCalendarProfile
+            currentStreak={stats.currentStreak}
+            gamesPlayed={stats.gamesPlayed}
+          />
         </div>
 
         {/* ── Achievements — order 4 mobile, col 1 row 3 desktop ── */}

@@ -8,6 +8,60 @@ import { useAuthModal } from '@/components/modals/AuthModal'
 import { loadStats } from '@/lib/storage'
 import { NextGameCountdown } from '@/components/modals/NextGameCountdown'
 
+// Confetti component — CSS-only, 20 particles
+const CONFETTI_COLORS = ['#f5c842','#ffe07a','#10b981','#e63946','#6b7cff','#ff6b9d','#4ecdc4']
+function Confetti() {
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
+      {Array.from({ length: 20 }, (_, i) => {
+        const color = CONFETTI_COLORS[i % CONFETTI_COLORS.length]
+        const left = `${5 + (i * 4.75) % 90}%`
+        const delay = `${(i * 0.11).toFixed(2)}s`
+        const duration = `${0.9 + (i % 5) * 0.18}s`
+        const size = `${5 + (i % 4) * 2}px`
+        return (
+          <span
+            key={i}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left,
+              width: size,
+              height: size,
+              background: color,
+              borderRadius: i % 2 === 0 ? '50%' : '2px',
+              animation: `confetti-fall ${duration} ${delay} ease-in forwards`,
+            }}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+function PerformanceBadge({ attemptsUsed }: { attemptsUsed: number }) {
+  if (attemptsUsed === 1) return (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border bg-film-gold/20 border-film-gold/40 text-film-gold">
+      ⚡ Coup de maître
+    </span>
+  )
+  if (attemptsUsed === 2) return (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border border-film-green/30 text-film-green" style={{ background: 'rgba(16,185,129,0.15)' }}>
+      ✓ Excellent
+    </span>
+  )
+  if (attemptsUsed === 3) return (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border border-film-green/30 text-film-green" style={{ background: 'rgba(16,185,129,0.15)' }}>
+      ✓ Bien joué
+    </span>
+  )
+  return (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border border-film-border text-film-text-dim bg-film-gray">
+      Limite...
+    </span>
+  )
+}
+
 type GameMode = 'film' | 'series' | 'wiki'
 
 const MODE_META: Record<GameMode, { label: string; icon: React.ElementType }> = {
@@ -64,21 +118,30 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShar
       headerContent={
         <div className="flex items-center gap-2">
           <motion.div
-            initial={{ scale: 0, rotate: -15 }}
+            initial={{ scale: 0, rotate: -20 }}
             animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: 'spring', stiffness: 280, damping: 18, delay: 0.1 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 15, delay: 0.05 }}
             className="w-8 h-8 rounded-full bg-film-gold/15 border border-film-gold/30 flex items-center justify-center"
           >
             <Trophy size={16} className="text-film-gold" />
           </motion.div>
-          <span id={modalTitleId} className="font-title font-semibold text-film-text">Bravo !</span>
+          <span id={modalTitleId} className="font-title text-xl font-bold text-film-text">Bravo !</span>
         </div>
       }
       ariaLabelledBy={modalTitleId}
       ariaDescribedBy={modalDescId}
     >
-      <div className="flex flex-col items-center gap-4 text-center">
+      <div className="relative flex flex-col items-center gap-4 text-center">
+        {stats.attemptsUsed <= 3 && <Confetti />}
         <p id={modalDescId} className="sr-only">Résumé de victoire et actions de partage.</p>
+
+        {currentStreak > 0 && (
+          <p className="text-2xl font-black font-title text-amber-400 animate-streak-bounce">
+            🔥 {currentStreak}
+          </p>
+        )}
+
+        <PerformanceBadge attemptsUsed={stats.attemptsUsed} />
 
         <div className="w-full film-border rounded-xl overflow-hidden">
           {result.photoUrl && (
@@ -92,7 +155,7 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShar
           )}
           <div className="p-3 text-left">
             <div className="flex items-start justify-between gap-2">
-              <p className="font-title text-lg font-semibold text-film-text leading-tight">{result.name}</p>
+              <p className="font-title text-2xl sm:text-3xl font-black text-gradient-gold leading-tight">{result.name}</p>
               {learnMoreUrl && (
                 <a href={learnMoreUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 text-film-text-dim hover:text-film-text transition-colors mt-0.5">
                   <ExternalLink size={14} />
@@ -194,7 +257,7 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShar
           </a>
         )}
 
-        <p className="text-xs text-film-text-dim">
+        <p className="text-xs font-semibold text-film-text-dim">
           Prochain défi dans <NextGameCountdown />
         </p>
       </div>

@@ -34,6 +34,8 @@ import { TopNav } from '@/components/layout/TopNav'
 import { loadStats } from '@/lib/storage'
 import { isMockEnabled } from '@/mock/mockFlags'
 import { MOCK_FRIENDS_RESPONSE, MOCK_LEADERBOARD } from '@/mock/mockData'
+import { AuthModal } from '@/components/modals/AuthModal'
+import { AuthGateNewDesign } from '@/components/ProfilePage'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -725,32 +727,36 @@ export function FriendsPage() {
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6 lg:py-8">
         {/* Auth gate */}
         {!user && !loadingFriends && (
-          <div className="flex flex-col items-center gap-5 pt-16 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-film-gold/10 border border-film-gold/25 flex items-center justify-center">
-              <Users size={28} className="text-film-gold" />
+          FEATURES.newDesign ? (
+            <AuthGateNewDesign context="friends" />
+          ) : (
+            <div className="flex flex-col items-center gap-5 pt-16 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-film-gold/10 border border-film-gold/25 flex items-center justify-center">
+                <Users size={28} className="text-film-gold" />
+              </div>
+              <div>
+                <p className="font-semibold text-film-text text-lg">Défi entre amis</p>
+                <p className="text-film-text-dim text-sm mt-1 max-w-xs">
+                  Crée un compte pour défier tes amis et comparer vos scores du jour.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => openAuth('register')}
+                className="rounded-xl px-6 py-2.5 text-sm font-semibold text-film-black transition-colors cursor-pointer"
+                style={{ background: 'var(--sg-films)' }}
+              >
+                Créer un compte
+              </button>
+              <button
+                type="button"
+                onClick={() => openAuth('login')}
+                className="text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
+              >
+                Déjà un compte ? Se connecter
+              </button>
             </div>
-            <div>
-              <p className="font-semibold text-film-text text-lg">Défi entre amis</p>
-              <p className="text-film-text-dim text-sm mt-1 max-w-xs">
-                Crée un compte pour défier tes amis et comparer vos scores du jour.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openAuth('register')}
-              className="rounded-xl px-6 py-2.5 text-sm font-semibold text-film-black transition-colors cursor-pointer"
-              style={{ background: 'var(--sg-films)' }}
-            >
-              Créer un compte
-            </button>
-            <button
-              type="button"
-              onClick={() => openAuth('login')}
-              className="text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
-            >
-              Déjà un compte ? Se connecter
-            </button>
-          </div>
+          )
         )}
 
         {user && (
@@ -869,6 +875,9 @@ export function FriendsPage() {
       </main>
 
       <Footer />
+
+      {/* Auth modal (for new design auth gate) */}
+      {FEATURES.newDesign && <AuthModal />}
 
       {/* Add friend modal */}
       <AnimatePresence>

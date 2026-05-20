@@ -42,15 +42,16 @@ function HintCard({ hint, index }: { hint: HintPayload; index: number }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.92, y: 8 }}
+      initial={{ opacity: 0, scale: 0.88, y: 14 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: index * 0.05 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 22, delay: index * 0.04 }}
       className="flex flex-col gap-1 rounded-[10px] min-w-0"
       style={{
         padding: '10px 12px 10px 14px',
         background: 'var(--color-film-gray)',
         border: '1px solid rgba(255,255,255,0.07)',
         borderLeft: '3px solid var(--mode-color)',
+        boxShadow: '-2px 0 8px color-mix(in srgb, var(--mode-color) 25%, transparent)',
       }}
     >
       <p

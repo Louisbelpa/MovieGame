@@ -63,6 +63,8 @@ export function StatsModal(props: StatsModalProps) {
         </div>
       )}
 
+      <StreakCalendar currentStreak={personalStats.currentStreak} gamesPlayed={personalStats.gamesPlayed} />
+
       <div>
         <p className={`text-sm font-semibold text-film-text-dim uppercase tracking-wider ${communityDateLabel ? 'mb-1' : 'mb-3'}`}>
           Résultats de la communauté
@@ -144,6 +146,32 @@ function getModalTitle(mode: StatsModalProps['mode']): string {
     case 'wiki':   return 'Statistiques personnalités'
     default:       return 'Mes statistiques'
   }
+}
+
+function StreakCalendar({ currentStreak, gamesPlayed }: { currentStreak: number; gamesPlayed: number }) {
+  const days = 30
+  return (
+    <div>
+      <p className="text-sm font-semibold text-film-text-dim uppercase tracking-wider mb-2">Activité (30 jours)</p>
+      <div className="flex flex-wrap gap-1">
+        {Array.from({ length: days }, (_, i) => {
+          const dayIndex = days - 1 - i
+          const isWon = dayIndex < currentStreak
+          const isPlayed = dayIndex < Math.min(gamesPlayed, days)
+          return (
+            <div
+              key={i}
+              title={isWon ? 'Victoire' : isPlayed ? 'Défaite' : 'Non joué'}
+              className={`aspect-square rounded-[2px] ${
+                isWon ? 'streak-day-won' : isPlayed ? 'streak-day-lost' : 'streak-day-empty'
+              }`}
+              style={{ width: 'calc((100% - 29 * 4px) / 30)' }}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 function StatCell({ value, label }: { value: string | number; label: string }) {

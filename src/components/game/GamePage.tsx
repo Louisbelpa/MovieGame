@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Share2, HelpCircle, CheckCircle2, XCircle, Film, Tv, User, Calendar } from 'lucide-react'
 import { GuessInput } from './GuessInput'
 import { GuessList } from './GuessList'
@@ -11,14 +12,16 @@ import { WikiGuessInput } from '@/components/wiki/WikiGuessInput'
 import { Spinner } from '@/components/ui/Spinner'
 import { WinModal } from '@/components/modals/WinModal'
 import { LoseModal } from '@/components/modals/LoseModal'
-import { fetchResult } from '@/api/client'
+import { fetchResult, fetchChallengeCommunityStats, friendsGetAll } from '@/api/client'
 import { fetchWikiResult } from '@/api/wikiClient'
-import type { HintPayload } from '@/api/client'
+import type { HintPayload, GlobalStatsPayload } from '@/api/client'
 import type { WikiChallengePayload, WikiHintPayload, WikiVisibleProfile } from '@/api/wikiClient'
 import type { GuessEntry } from '@/types'
 import { useGameStore, getTodayParis } from '@/store/gameStore'
 import { useWikiStore } from '@/store/wikiStore'
+import { useAuthStore } from '@/store/authStore'
 import { loadHistory, loadGameState } from '@/lib/storage'
+import { Sounds } from '@/lib/sounds'
 import { buildShareText, buildAllShareText, type AllShareGame } from '@/lib/utils'
 import { FEATURES } from '@/config/features'
 
@@ -98,6 +101,220 @@ function modeLabel(mode: string) {
   return 'Films'
 }
 
+// ─── #01 Sidebar panels ───────────────────────────────────────────────────────
+
+function SidebarPanel({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay }}
+      style={{ background: '#161c2f', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10 }}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+function GuessHistorySide({
+  guesses,
+  maxAttempts,
+}: {
+  guesses: Array<{ guess: string; correct: boolean; hint?: string }>
+  maxAttempts: number
+}) {
+  return (
+    <SidebarPanel delay={0}>
+      <div style={{ padding: '11px 12px' }}>
+        <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(159,163,173,0.5)', textTransform: 'uppercase', marginBottom: 8 }}>
+          TES TENTATIVES · {guesses.length}/{maxAttempts}
+        </p>
+        {guesses.length === 0 ? (
+          <p style={{ fontSize: 12, color: 'rgba(159,163,173,0.35)' }}>Aucune tentative pour l'instant.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {guesses.map((g, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                  background: g.correct ? 'rgba(76,176,120,0.2)' : 'rgba(212,96,74,0.2)',
+                  border: `1px solid ${g.correct ? '#4cb078' : '#d4604a'}`,
+                  color: g.correct ? '#4cb078' : '#d4604a',
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 9, fontWeight: 700,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {i + 1}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 12, color: '#e8eaed', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {g.guess || <em style={{ color: 'rgba(159,163,173,0.4)', fontStyle: 'normal' }}>—Passé—</em>}
+                  </p>
+                  {g.hint && (
+                    <p style={{ fontSize: 10, color: 'rgba(159,163,173,0.5)', fontFamily: "'JetBrains Mono', monospace", marginTop: 1 }}>
+                      {g.hint}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </SidebarPanel>
+  )
+}
+
+function DailyChallengeStatsPanel({
+  challengeId,
+  challengeNumber,
+  accentColor,
+}: {
+  challengeId: number
+  challengeNumber?: number
+  accentColor: string
+}) {
+  const [stats, setStats] = useState<GlobalStatsPayload | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    function fetchStats() {
+      fetchChallengeCommunityStats(challengeId).then((s) => {
+        if (!cancelled) setStats(s)
+      }).catch(() => {})
+    }
+    fetchStats()
+    const interval = setInterval(fetchStats, 30000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [challengeId])
+
+  const maxBarVal = stats ? Math.max(1, ...Object.values(stats.winsByAttempt)) : 1
+  const maxKey = stats ? Object.entries(stats.winsByAttempt).reduce((best, [k, v]) => v > (stats.winsByAttempt[best] ?? 0) ? k : best, '1') : '1'
+
+  const avgAttempts = stats && stats.totalWins > 0
+    ? Math.round(Object.entries(stats.winsByAttempt).reduce((sum, [k, v]) => sum + Number(k) * v, 0) / stats.totalWins * 10) / 10
+    : null
+
+  return (
+    <SidebarPanel delay={0.07}>
+      <div style={{ padding: '11px 12px' }}>
+        <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(159,163,173,0.5)', textTransform: 'uppercase', marginBottom: 8 }}>
+          DÉFI {challengeNumber ? `#${challengeNumber}` : ''} · LIVE
+        </p>
+        {stats ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4cb078', display: 'inline-block' }} />
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', color: '#4cb078', fontWeight: 600 }}>
+                {stats.totalGames} joueurs
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+              {['1', '2', '3', '4', '5'].map((k) => {
+                const count = stats.winsByAttempt[k] ?? 0
+                const pct = Math.round((count / maxBarVal) * 100)
+                const isMax = k === maxKey && count > 0
+                return (
+                  <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 10, fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: 'rgba(159,163,173,0.5)', textAlign: 'right', flexShrink: 0 }}>{k}</span>
+                    <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          height: '100%',
+                          borderRadius: 3,
+                          width: `${Math.max(pct, count > 0 ? 4 : 0)}%`,
+                          background: isMax ? accentColor : `${accentColor}73`,
+                          transition: 'width 0.4s ease',
+                        }}
+                      />
+                    </div>
+                    <span style={{ width: 16, fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: 'rgba(159,163,173,0.4)', textAlign: 'right', flexShrink: 0 }}>{count}</span>
+                  </div>
+                )
+              })}
+            </div>
+            {avgAttempts !== null && (
+              <p style={{ fontSize: 10, color: 'rgba(159,163,173,0.45)', fontFamily: "'JetBrains Mono', monospace" }}>
+                Score moyen : {avgAttempts} essais
+              </p>
+            )}
+          </>
+        ) : (
+          <div style={{ height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)', borderTopColor: accentColor, animation: 'spin 1s linear infinite' }} />
+          </div>
+        )}
+      </div>
+    </SidebarPanel>
+  )
+}
+
+function FriendsTodayMiniPanel({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
+  const user = useAuthStore((s) => s.user)
+  const today = getTodayParis()
+  const [friends, setFriends] = useState<Array<{
+    id: number; displayName: string; avatarUrl: string | null
+    score: { won: boolean; attemptsUsed: number } | null; isMe: boolean
+  }>>([])
+
+  useEffect(() => {
+    if (!user) return
+    friendsGetAll(today).then((r) => {
+      const entries = r.friends.slice(0, 4).map((f) => ({
+        id: f.id,
+        displayName: f.displayName,
+        avatarUrl: f.avatarUrl,
+        score: f.scores[mode] ?? null,
+        isMe: f.isMe,
+      }))
+      setFriends(entries)
+    }).catch(() => {})
+  }, [user, today, mode])
+
+  if (!user || friends.length === 0) return null
+
+  return (
+    <SidebarPanel delay={0.14}>
+      <a href="/friends" style={{ display: 'block', textDecoration: 'none' }}>
+        <div style={{ padding: '11px 12px' }}>
+          <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(159,163,173,0.5)', textTransform: 'uppercase', marginBottom: 8 }}>
+            AMIS · AUJOURD'HUI
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {friends.map((f, i) => (
+              <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {i === 0 && f.score?.won ? (
+                  <span style={{ fontSize: 12, flexShrink: 0 }}>🥇</span>
+                ) : (
+                  <span style={{
+                    width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                    background: f.avatarUrl ? 'transparent' : 'rgba(255,255,255,0.06)',
+                    color: 'rgba(159,163,173,0.5)', fontSize: 9, fontWeight: 700,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    overflow: 'hidden',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                  }}>
+                    {f.avatarUrl
+                      ? <img src={f.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : f.displayName.charAt(0).toUpperCase()
+                    }
+                  </span>
+                )}
+                <span style={{ flex: 1, fontSize: 12, color: f.isMe ? '#d4a64a' : '#e8eaed', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {f.isMe ? 'Toi' : f.displayName}
+                </span>
+                <span style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600, flexShrink: 0, color: f.score === null ? 'rgba(159,163,173,0.2)' : f.score.won ? '#4cb078' : '#d4604a' }}>
+                  {f.score === null ? '—' : f.score.won ? `${f.score.attemptsUsed}/5` : '✗'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </a>
+    </SidebarPanel>
+  )
+}
+
 export function GamePage({ mode }: GamePageProps) {
   const isWiki = mode === 'wiki'
   const gameInit = useGameStore((s) => s.initGame)
@@ -162,6 +379,8 @@ export function GamePage({ mode }: GamePageProps) {
   const closeModal = isWiki ? wikiCloseModal : gameCloseModal
   const previousStatusRef = useRef<typeof status>('idle')
   const prevChallengeKeyRef = useRef<string | null>(null)
+  const prevGuessCountRef = useRef(0)
+  const prevHintsRevealedRef = useRef(0)
   const [resultDetails, setResultDetails] = useState<{
     name: string
     year?: number
@@ -205,9 +424,32 @@ export function GamePage({ mode }: GamePageProps) {
     previousStatusRef.current = status
 
     if (prev === 'playing' && (status === 'won' || status === 'lost')) {
+      if (status === 'won') Sounds.win()
+      else Sounds.lose()
       openModal(status === 'won' ? 'win' : 'lose')
     }
   }, [challenge, status, mode, openModal])
+
+  // Sound effects on hint reveal
+  useEffect(() => {
+    if (hintsRevealed > prevHintsRevealedRef.current && prevHintsRevealedRef.current > 0) {
+      Sounds.hint()
+    }
+    prevHintsRevealedRef.current = hintsRevealed
+  }, [hintsRevealed])
+
+  // Sound effects on new guess
+  useEffect(() => {
+    const count = guesses.length
+    if (count > prevGuessCountRef.current && count > 0 && status === 'playing') {
+      const last = guesses[count - 1]
+      if (last) {
+        if (last.correct) Sounds.correct()
+        else Sounds.wrong()
+      }
+    }
+    prevGuessCountRef.current = count
+  }, [guesses, status])
 
   useEffect(() => {
     const challengeId = challenge?.challengeId ?? challenge?.id
@@ -372,6 +614,7 @@ export function GamePage({ mode }: GamePageProps) {
     )
   }
 
+  const modeAccentColor = mode === 'film' ? '#f5d358' : mode === 'series' ? '#4ad6c0' : '#ff5a8a'
   const attemptsLeft = Math.max(challenge.maxAttempts - guesses.length, 0)
   const guessesForTracker = guesses.map((guess) => ({
     value: guess.guess,
@@ -481,7 +724,7 @@ export function GamePage({ mode }: GamePageProps) {
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             {status === 'won'
               ? <CheckCircle2 size={14} className="text-film-green shrink-0" aria-hidden />
               : <XCircle size={14} className="text-film-red shrink-0" aria-hidden />}
@@ -490,6 +733,12 @@ export function GamePage({ mode }: GamePageProps) {
                 ? `Bravo ! Trouvé en ${guesses.findIndex((g) => g.correct) + 1}/${challenge.maxAttempts}`
                 : 'Pas cette fois…'}
             </span>
+            {status === 'won' && (() => {
+              const n = guesses.findIndex((g) => g.correct) + 1
+              if (n === 1) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-film-gold/20 border border-film-gold/40 text-film-gold">⚡ Coup de maître</span>
+              if (n <= 3) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-film-green/30 text-film-green" style={{ background: 'rgba(16,185,129,0.15)' }}>✓ {n === 2 ? 'Excellent' : 'Bien joué'}</span>
+              return null
+            })()}
           </div>
           {answerLabelPending ? (
             <div className="h-6 w-40 rounded bg-film-gray animate-pulse" />
@@ -631,84 +880,105 @@ export function GamePage({ mode }: GamePageProps) {
       </div>
 
       {/* ── CONTENT ──────────────────────────────────────────────────────── */}
-      <div className="px-3 sm:px-4 py-4 sm:py-6 pb-28 sm:pb-32 lg:pb-8">
-        <div className="max-w-2xl mx-auto flex flex-col gap-5">
+      <div className={`px-3 sm:px-4 py-4 sm:py-6 pb-28 sm:pb-32 lg:pb-8 ${FEATURES.newDesign ? 'lg:max-w-6xl lg:mx-auto' : ''}`}>
+        <div className={FEATURES.newDesign ? 'lg:grid lg:grid-cols-[1fr_320px] lg:gap-6' : ''}>
 
-          {/* Reveal card */}
-          {revealCard}
+          {/* Main column */}
+          <div className="max-w-2xl mx-auto lg:mx-0 lg:max-w-none flex flex-col gap-5">
 
-          {/* Attempts tracker */}
-          <div className="flex items-center gap-1.5">
-            {Array.from({ length: challenge.maxAttempts }).map((_, i) => {
-              const g = guesses[i]
-              return (
-                <span
-                  key={i}
-                  className="flex-1 h-1.5 rounded-full transition-colors"
-                  style={{
-                    background: g
-                      ? g.correct
-                        ? 'var(--color-film-green)'
-                        : g.guess === ''
-                          ? 'rgba(255,255,255,0.38)'
-                          : 'var(--color-film-red)'
-                      : 'rgba(255,255,255,0.10)',
-                  }}
-                />
-              )
-            })}
-          </div>
+            {/* Reveal card */}
+            {revealCard}
 
-          {/* Input (desktop only — mobile uses sticky bar) */}
-          {!isGameOver && <div className="hidden sm:block">{inputSection}</div>}
+            {/* Attempts tracker */}
+            <div className="flex items-center gap-1.5">
+              {Array.from({ length: challenge.maxAttempts }).map((_, i) => {
+                const g = guesses[i]
+                return (
+                  <span
+                    key={i}
+                    className="flex-1 h-1.5 rounded-full transition-colors"
+                    style={{
+                      background: g
+                        ? g.correct
+                          ? 'var(--color-film-green)'
+                          : g.guess === ''
+                            ? 'rgba(255,255,255,0.38)'
+                            : 'var(--color-film-red)'
+                        : 'rgba(255,255,255,0.10)',
+                    }}
+                  />
+                )
+              })}
+            </div>
 
-          {/* Wiki profile */}
-          {isWiki && (
-            <WikiHintPanel
-              profile={wikiProfile}
-              hints={[]}
-              hintsAvailable={hintsAvailable}
-              hintsRevealed={hintsRevealed}
-              showHints={false}
-              wikiPersonType={wikiPersonType}
-            />
-          )}
+            {/* Input (desktop only — mobile uses sticky bar) */}
+            {!isGameOver && <div className="hidden sm:block">{inputSection}</div>}
 
-          {/* Hints */}
-          <div>
-            {hintsHeader}
-            {isWiki ? (
+            {/* Wiki profile */}
+            {isWiki && (
               <WikiHintPanel
                 profile={wikiProfile}
-                hints={challenge.hints as WikiHintPayload[]}
+                hints={[]}
                 hintsAvailable={hintsAvailable}
                 hintsRevealed={hintsRevealed}
-                showProfile={false}
-              />
-            ) : (
-              <HintPanel
-                hints={challenge.hints as HintPayload[]}
-                hintsAvailable={hintsAvailable}
-                hintsRevealed={hintsRevealed}
+                showHints={false}
+                wikiPersonType={wikiPersonType}
               />
             )}
+
+            {/* Hints */}
+            <div>
+              {hintsHeader}
+              {isWiki ? (
+                <WikiHintPanel
+                  profile={wikiProfile}
+                  hints={challenge.hints as WikiHintPayload[]}
+                  hintsAvailable={hintsAvailable}
+                  hintsRevealed={hintsRevealed}
+                  showProfile={false}
+                />
+              ) : (
+                <HintPanel
+                  hints={challenge.hints as HintPayload[]}
+                  hintsAvailable={hintsAvailable}
+                  hintsRevealed={hintsRevealed}
+                />
+              )}
+            </div>
+
+            {/* Guess list */}
+            {guesses.length > 0 && (
+              <div>
+                <p className="text-[10px] font-mono font-semibold uppercase tracking-widest mb-2" style={{ color: 'rgba(236,233,226,0.35)' }}>
+                  Tes tentatives
+                </p>
+                <GuessList
+                  guesses={guesses.map((g) => ({ value: g.guess, status: g.correct ? 'correct' as const : 'wrong' as const, timestamp: 0 }))}
+                  maxAttempts={challenge.maxAttempts}
+                />
+              </div>
+            )}
+
+            {/* Friends live */}
+            <FriendsLive mode={isWiki ? 'wiki' : mode as 'film' | 'series'} />
+
           </div>
 
-          {/* Guess list */}
-          {guesses.length > 0 && (
-            <div>
-              <p className="text-[10px] font-mono font-semibold uppercase tracking-widest mb-2" style={{ color: 'rgba(236,233,226,0.35)' }}>
-                Tes tentatives
-              </p>
-              <GuessList
-                guesses={guesses.map((g) => ({ value: g.guess, status: g.correct ? 'correct' as const : 'wrong' as const, timestamp: 0 }))}
+          {/* #01 — Sidebar (desktop lg+ only, new design) */}
+          {FEATURES.newDesign && (
+            <div className="hidden lg:flex flex-col gap-3 sticky top-4 overflow-y-auto max-h-[calc(100vh-80px)] self-start">
+              <GuessHistorySide
+                guesses={guesses.map((g) => ({ guess: g.guess, correct: g.correct }))}
                 maxAttempts={challenge.maxAttempts}
               />
+              <DailyChallengeStatsPanel
+                challengeId={challenge.challengeId ?? 0}
+                challengeNumber={challenge.challengeNumber}
+                accentColor={modeAccentColor}
+              />
+              <FriendsTodayMiniPanel mode={isWiki ? 'wiki' : mode as 'film' | 'series'} />
             </div>
           )}
-
-          {/* Friends live */}
-          <FriendsLive mode={isWiki ? 'wiki' : mode as 'film' | 'series'} />
 
         </div>
       </div>

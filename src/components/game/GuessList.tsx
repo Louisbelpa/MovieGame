@@ -50,17 +50,29 @@ function GuessSlot({ index, guess, hint }: GuessSlotProps) {
     <motion.li
       layout
       initial={guess ? { opacity: 0, x: -12 } : false}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.25, delay: 0.05 }}
+      animate={
+        !isEmpty && guess?.status === 'wrong'
+          ? { opacity: 1, x: [0, -10, 10, -7, 7, -3, 3, 0] }
+          : !isEmpty && guess?.status === 'correct'
+          ? { opacity: 1, x: 0, scale: [1, 1.03, 1] }
+          : { opacity: 1, x: 0 }
+      }
+      transition={
+        !isEmpty && guess?.status === 'wrong'
+          ? { duration: 0.45 }
+          : !isEmpty && guess?.status === 'correct'
+          ? { duration: 0.3, delay: 0.1 }
+          : { duration: 0.25, delay: 0.05 }
+      }
       className={cn(
         'flex items-center gap-3 px-3 py-3 sm:py-2.5 rounded-lg text-sm transition-colors',
         isEmpty
           ? 'border border-dashed border-film-border/50 text-film-text-dim/40'
           : guess.status === 'correct'
-          ? 'border border-film-green/30 bg-film-green/8'
+          ? 'border border-film-green/30 bg-film-green/10'
           : guess.status === 'skipped'
           ? 'border border-film-border bg-film-gray/50'
-          : 'border border-film-red/20 bg-film-red/5'
+          : 'border border-film-red/20 bg-[rgba(230,57,70,0.08)]'
       )}
       aria-label={
         isEmpty

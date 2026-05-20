@@ -18,6 +18,7 @@ import { loadStats } from './lib/storage'
 import { useAuthStore } from './store/authStore'
 import { AuthModal } from './components/modals/AuthModal'
 import { ResetPasswordPage } from './components/ResetPasswordPage'
+import { PalettePicker } from './components/PalettePicker'
 import { FriendsPage } from './components/FriendsPage'
 import { ProfilePage } from './components/ProfilePage'
 import { EmailVerificationBanner } from './components/EmailVerificationBanner'
@@ -178,6 +179,7 @@ function AuthShell({ children }: { children: React.ReactNode }) {
       <EmailVerificationBanner />
       {children}
       <AuthModal />
+      <PalettePicker />
     </>
   )
 }

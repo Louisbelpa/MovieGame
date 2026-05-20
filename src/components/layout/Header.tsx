@@ -6,7 +6,7 @@
  */
 
 import { useRef, useState, useEffect } from 'react'
-import { BarChart2, CalendarDays, LogIn, Flame, UserRound } from 'lucide-react'
+import { BarChart2, CalendarDays, LogIn, Flame, UserRound, Volume2, VolumeX } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useGameStore } from '@/store/gameStore'
 import { useWikiStore } from '@/store/wikiStore'
@@ -15,6 +15,7 @@ import { useAuthModal } from '@/components/modals/AuthModal'
 import { ApertureIcon } from '@/components/ui/ApertureIcon'
 import { loadStats } from '@/lib/storage'
 import { FEATURES } from '@/config/features'
+import { isSoundMuted, toggleSound } from '@/lib/sounds'
 
 interface HeaderProps {
   mode: 'film' | 'series' | 'wiki'
@@ -50,6 +51,8 @@ export function Header({ mode }: HeaderProps) {
   const maxStreak = Math.max(filmStreak, wikiStreak, seriesStreak)
 
   const iconBtn = 'inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold'
+
+  const [soundMuted, setSoundMuted] = useState(() => isSoundMuted())
 
   const [countdown, setCountdown] = useState('')
   useEffect(() => {
@@ -166,6 +169,16 @@ export function Header({ mode }: HeaderProps) {
               </button>
             </>
           )}
+
+          {/* Sound toggle */}
+          <button
+            type="button"
+            onClick={() => setSoundMuted(toggleSound())}
+            aria-label={soundMuted ? 'Activer les sons' : 'Couper les sons'}
+            className={`w-8 h-8 rounded-lg flex items-center justify-center text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold`}
+          >
+            {soundMuted ? <VolumeX size={16} aria-hidden /> : <Volume2 size={16} aria-hidden />}
+          </button>
 
           {/* Archive: always */}
           <button onClick={() => openModal('archive')} aria-label="Archives" className={iconBtn}>

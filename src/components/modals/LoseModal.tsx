@@ -74,13 +74,13 @@ export function LoseModal({ isOpen, onClose, mode, result, stats, onShare, onSha
           <div className="w-8 h-8 rounded-full bg-film-red/10 border border-film-red/30 flex items-center justify-center">
             <XCircle size={16} className="text-film-red" />
           </div>
-          <span id={modalTitleId} className="font-title font-semibold text-film-text">Pas cette fois...</span>
+          <span id={modalTitleId} className="font-title text-xl font-bold text-film-red">Raté...</span>
         </div>
       }
       ariaLabelledBy={modalTitleId}
       ariaDescribedBy={modalDescId}
     >
-      <div className="flex flex-col items-center gap-4 text-center">
+      <div className="flex flex-col items-center gap-4 text-center" style={{ background: 'linear-gradient(180deg, rgba(230,57,70,0.08) 0%, transparent 40%)' }}>
         <p id={modalDescId} className="sr-only">Résumé de défaite et actions de partage.</p>
 
         <div className="w-full film-border rounded-xl overflow-hidden">
@@ -95,7 +95,7 @@ export function LoseModal({ isOpen, onClose, mode, result, stats, onShare, onSha
           )}
           <div className="p-3 text-left">
             <div className="flex items-start justify-between gap-2">
-              <p className="font-title text-lg font-semibold text-film-text leading-tight">{result.name}</p>
+              <p className="font-title text-2xl sm:text-3xl font-black text-film-text leading-tight">{result.name}</p>
               {learnMoreUrl && (
                 <a href={learnMoreUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 text-film-text-dim hover:text-film-text transition-colors mt-0.5">
                   <ExternalLink size={14} />
