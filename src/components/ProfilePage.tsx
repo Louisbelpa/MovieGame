@@ -595,7 +595,7 @@ export function AuthGateNewDesign({ context }: { context: 'profile' | 'friends' 
       </div>
 
       {/* Right — blurred preview */}
-      <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)', background: '#161c2f', minHeight: 320 }}>
+      <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)', background: 'var(--color-film-surface)', minHeight: 320 }}>
         {/* Fake profile content (blurred) */}
         <div style={{ filter: 'blur(6px)', opacity: 0.65, padding: '24px', userSelect: 'none', pointerEvents: 'none' }}>
           {/* Stats row */}

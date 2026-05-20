@@ -11,6 +11,8 @@ export interface Palette {
   surfaceDark: string
   surfaceGray: string
   border: string
+  bodyGlowTop: string
+  bodyGlowBottom: string
 
   // Text
   text: string
@@ -53,6 +55,8 @@ export const PALETTES: Palette[] = [
     surfaceDark: '#0f0f22',
     surfaceGray: '#1a1a38',
     border: 'rgba(255,255,255,0.09)',
+    bodyGlowTop: 'rgba(245,200,66,0.07)',
+    bodyGlowBottom: 'rgba(78,205,196,0.04)',
     text: '#ece9e2',
     textDim: 'rgba(236,233,226,0.48)',
     films: '#f5c842',
@@ -83,6 +87,8 @@ export const PALETTES: Palette[] = [
     surfaceDark: '#1a1420',
     surfaceGray: '#261e30',
     border: 'rgba(255,255,255,0.08)',
+    bodyGlowTop: 'rgba(212,160,96,0.08)',
+    bodyGlowBottom: 'rgba(149,192,168,0.04)',
     text: '#f0e8db',
     textDim: 'rgba(240,232,219,0.48)',
     films: '#d4a060',
@@ -113,6 +119,8 @@ export const PALETTES: Palette[] = [
     surfaceDark: '#14102a',
     surfaceGray: '#221a38',
     border: 'rgba(255,255,255,0.10)',
+    bodyGlowTop: 'rgba(200,255,61,0.08)',
+    bodyGlowBottom: 'rgba(0,217,255,0.05)',
     text: '#f5f3ff',
     textDim: 'rgba(245,243,255,0.48)',
     films: '#c8ff3d',
@@ -143,6 +151,8 @@ export const PALETTES: Palette[] = [
     surfaceDark: '#e0d8c8',
     surfaceGray: '#d5ccba',
     border: 'rgba(31,26,20,0.12)',
+    bodyGlowTop: 'rgba(184,133,46,0.06)',
+    bodyGlowBottom: 'rgba(30,58,94,0.04)',
     text: '#1f1a14',
     textDim: 'rgba(31,26,20,0.48)',
     films: '#b8852e',
@@ -173,6 +183,8 @@ export const PALETTES: Palette[] = [
     surfaceDark: '#0c0c14',
     surfaceGray: '#18182a',
     border: 'rgba(255,255,255,0.07)',
+    bodyGlowTop: 'rgba(232,198,110,0.07)',
+    bodyGlowBottom: 'rgba(212,208,168,0.03)',
     text: '#ebebed',
     textDim: 'rgba(235,235,237,0.48)',
     films: '#e8c66e',
@@ -203,6 +215,8 @@ export const PALETTES: Palette[] = [
     surfaceDark: '#111c30',
     surfaceGray: '#1e2d4a',
     border: 'rgba(255,255,255,0.09)',
+    bodyGlowTop: 'rgba(255,137,102,0.08)',
+    bodyGlowBottom: 'rgba(108,208,177,0.05)',
     text: '#e6ecf3',
     textDim: 'rgba(230,236,243,0.48)',
     films: '#ff8966',
@@ -233,6 +247,8 @@ export const PALETTES: Palette[] = [
     surfaceDark: '#181510',
     surfaceGray: '#241f18',
     border: 'rgba(255,255,255,0.08)',
+    bodyGlowTop: 'rgba(232,177,74,0.08)',
+    bodyGlowBottom: 'rgba(90,138,82,0.05)',
     text: '#f0e4d0',
     textDim: 'rgba(240,228,208,0.48)',
     films: '#e8b14a',
@@ -283,6 +299,10 @@ export function applyPalette(palette: Palette): void {
   s('--color-film-gray', palette.surfaceGray)
   s('--color-film-surface', palette.surface)
   s('--color-film-border', palette.border)
+  s('--body-glow-top', palette.bodyGlowTop)
+  s('--body-glow-bottom', palette.bodyGlowBottom)
+  // Also set body bg directly so it picks up the new bg color
+  document.body.style.backgroundColor = palette.bg
 
   // Text
   s('--color-film-text', palette.text)

@@ -86,9 +86,10 @@
     min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
+    background-color: var(--color-film-black);
     background-image:
-      radial-gradient(ellipse 80% 50% at 50% 0%, rgba(245,200,66,0.07) 0%, transparent 60%),
-      radial-gradient(ellipse 60% 40% at 80% 100%, rgba(78,205,196,0.04) 0%, transparent 50%);
+      radial-gradient(ellipse 80% 50% at 50% 0%, var(--body-glow-top, rgba(245,200,66,0.07)) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 100%, var(--body-glow-bottom, rgba(78,205,196,0.04)) 0%, transparent 50%);
   }
 
   body::after {

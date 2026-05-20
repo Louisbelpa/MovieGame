@@ -76,13 +76,13 @@ function HomeHeader() {
   return (
     <header
       className="h-14 flex items-center justify-between px-4 lg:px-6 shrink-0"
-      style={{ background: '#0b0b1a', borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+      style={{ background: 'var(--color-film-black)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}
     >
       {/* Logo */}
       <a href="/" className="inline-flex items-center gap-2">
         <ApertureIcon size={20} />
         <span className="font-title text-lg leading-none">
-          <span className="font-[500]" style={{ color: '#ece9e2' }}>Guess</span>
+          <span className="font-[500]" style={{ color: 'var(--color-film-text)' }}>Guess</span>
           <span className="italic font-[700] text-gradient-gold">today</span>
         </span>
       </a>
@@ -91,7 +91,7 @@ function HomeHeader() {
       {countdown && (
         <div className="flex flex-col items-center leading-none gap-0.5">
           <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: 'rgba(236,233,226,0.4)' }}>Prochain jeu</span>
-          <span className="text-base font-mono font-bold" style={{ color: '#ece9e2' }}>{countdown}</span>
+          <span className="text-base font-mono font-bold" style={{ color: 'var(--color-film-text)' }}>{countdown}</span>
         </div>
       )}
 
@@ -119,7 +119,7 @@ function HomeHeader() {
           type="button"
           onClick={() => openAuth('login')}
           className="btn-cta-register flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-200"
-          style={{ background: 'rgba(255,255,255,0.08)', color: '#ece9e2', border: '1px solid rgba(255,255,255,0.12)' }}
+          style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--color-film-text)', border: '1px solid rgba(255,255,255,0.12)' }}
         >
           <UserRound size={14} aria-hidden />
           <span className="hidden sm:inline">Se connecter</span>
@@ -162,7 +162,7 @@ function ExplainerBand() {
       <div
         style={{
           display: 'inline-flex',
-          background: '#161c2f',
+          background: 'var(--color-film-surface)',
           border: '1px solid rgba(255,255,255,0.06)',
           borderRadius: '999px',
           padding: '10px 22px',
@@ -267,7 +267,7 @@ function GameCard({ href, icon, modeLabel, description, accentColor, disabled, b
         disabled ? 'opacity-50 cursor-default' : 'cursor-pointer'
       }`}
       style={{
-        background: '#13132b',
+        background: 'var(--color-film-surface)',
         borderRight: '1px solid rgba(255,255,255,0.06)',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}
@@ -330,7 +330,7 @@ function GameCard({ href, icon, modeLabel, description, accentColor, disabled, b
       {newDesign && !imageUrl && hintSnippets && hintSnippets.length > 0 && (
         <div
           className="relative overflow-hidden rounded-xl mb-3 flex flex-col justify-center gap-1.5 p-3"
-          style={{ aspectRatio: '16/10', background: '#161c2f', border: `1px solid ${accentColor}30` }}
+          style={{ aspectRatio: '16/10', background: 'var(--color-film-surface)', border: `1px solid ${accentColor}30` }}
         >
           {/* Silhouette SVG */}
           <div className="flex justify-center mb-1">
@@ -383,7 +383,7 @@ function GameCard({ href, icon, modeLabel, description, accentColor, disabled, b
         {badge && !todayStatus && (
           <span
             className="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide"
-            style={{ background: accentColor, color: '#0b0b1a' }}
+            style={{ background: accentColor, color: 'var(--color-film-black)' }}
           >
             {badge}
           </span>
@@ -405,7 +405,7 @@ function GameCard({ href, icon, modeLabel, description, accentColor, disabled, b
         {showPlay ? (
           <div
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-all duration-200 group-hover:scale-105"
-            style={{ background: accentColor, color: '#0b0b1a', boxShadow: `0 4px 20px ${accentColor}40` }}
+            style={{ background: accentColor, color: 'var(--color-film-black)', boxShadow: `0 4px 20px ${accentColor}40` }}
           >
             Jouer →
           </div>
@@ -481,7 +481,7 @@ function BelowFoldGuest({ friends, friendsLoading }: { friends: FriendEntry[]; f
   const { open: openAuth } = useAuthModal()
 
   return (
-    <div style={{ background: '#0b0b1a' }}>
+    <div style={{ background: 'var(--color-film-black)' }}>
       {/* ── Comment ça marche ── */}
       <div className="px-4 lg:px-8 py-10 lg:py-14" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
         <div className="max-w-3xl mx-auto">
@@ -581,7 +581,7 @@ function BelowFoldUser({ friends, friendsLoading }: { friends: FriendEntry[]; fr
   const pct = total > 0 ? Math.round((wins / total) * 100) : 0
 
   return (
-    <div style={{ background: '#0b0b1a' }}>
+    <div style={{ background: 'var(--color-film-black)' }}>
       {/* ── Barre de stats personnelle ── */}
       {total > 0 && (
         <div className="px-4 lg:px-8 py-6" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
@@ -797,7 +797,7 @@ export function HomePage() {
   }, [])
 
   return (
-    <div className="min-h-dvh flex flex-col" style={{ background: '#0b0b1a' }}>
+    <div className="min-h-dvh flex flex-col" style={{ background: 'var(--color-film-black)' }}>
       <HomeHeader />
 
       {/* #04 — Explainer band */}

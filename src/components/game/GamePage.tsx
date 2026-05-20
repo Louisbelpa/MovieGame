@@ -110,7 +110,7 @@ function SidebarPanel({ children, delay = 0 }: { children: React.ReactNode; dela
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay }}
-      style={{ background: '#161c2f', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10 }}
+      style={{ background: 'var(--color-film-surface)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10 }}
     >
       {children}
     </motion.div>
@@ -840,7 +840,7 @@ export function GamePage({ mode }: GamePageProps) {
           <a
             href="/films"
             className={`mode-tab px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${mode === 'film' ? 'mode-tab--active' : ''}`}
-            style={mode === 'film' ? { background: 'var(--sg-films)', color: '#0b0b1a' } : { color: 'rgba(236,233,226,0.5)' }}
+            style={mode === 'film' ? { background: 'var(--sg-films)', color: 'var(--color-film-black)' } : { color: 'rgba(236,233,226,0.5)' }}
           >
             Films
           </a>
@@ -848,7 +848,7 @@ export function GamePage({ mode }: GamePageProps) {
             <a
               href="/series"
               className={`mode-tab px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${mode === 'series' ? 'mode-tab--active' : ''}`}
-              style={mode === 'series' ? { background: 'var(--sg-series)', color: '#0b0b1a' } : { color: 'rgba(236,233,226,0.5)' }}
+              style={mode === 'series' ? { background: 'var(--sg-series)', color: 'var(--color-film-black)' } : { color: 'rgba(236,233,226,0.5)' }}
             >
               Séries
             </a>
@@ -857,7 +857,7 @@ export function GamePage({ mode }: GamePageProps) {
             <a
               href="/wiki"
               className={`mode-tab px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${mode === 'wiki' ? 'mode-tab--active' : ''}`}
-              style={mode === 'wiki' ? { background: 'var(--sg-wiki)', color: '#0b0b1a' } : { color: 'rgba(236,233,226,0.5)' }}
+              style={mode === 'wiki' ? { background: 'var(--sg-wiki)', color: 'var(--color-film-black)' } : { color: 'rgba(236,233,226,0.5)' }}
             >
               Perso
             </a>
