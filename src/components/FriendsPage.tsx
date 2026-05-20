@@ -32,6 +32,8 @@ import { FEATURES } from '@/config/features'
 import { Footer } from '@/components/layout/Footer'
 import { TopNav } from '@/components/layout/TopNav'
 import { loadStats } from '@/lib/storage'
+import { isMockEnabled } from '@/mock/mockFlags'
+import { MOCK_FRIENDS_RESPONSE, MOCK_LEADERBOARD } from '@/mock/mockData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -604,6 +606,11 @@ export function FriendsPage() {
   )
 
   const loadFriends = useCallback(() => {
+    if (isMockEnabled()) {
+      setFriendsData(MOCK_FRIENDS_RESPONSE)
+      setLoadingFriends(false)
+      return
+    }
     setLoadingFriends(true)
     friendsGetAll()
       .then(setFriendsData)
@@ -612,6 +619,11 @@ export function FriendsPage() {
   }, [])
 
   const loadLeaderboard = useCallback(() => {
+    if (isMockEnabled()) {
+      setLeaderboard(MOCK_LEADERBOARD)
+      setLoadingLeaderboard(false)
+      return
+    }
     setLoadingLeaderboard(true)
     friendsGetLeaderboard()
       .then((r) => setLeaderboard(r.leaderboard))
