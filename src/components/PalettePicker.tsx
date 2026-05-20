@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { PALETTES, applyPalette, getSavedPaletteId, savePaletteId } from '@/config/palettes'
 import type { Palette } from '@/config/palettes'
+import { useUiPrefsStore } from '@/store/uiPrefsStore'
 
 export function PalettePicker() {
   const [open, setOpen] = useState(false)
   const [activeId, setActiveId] = useState(() => getSavedPaletteId())
   const panelRef = useRef<HTMLDivElement>(null)
+  const newDesign = useUiPrefsStore((s) => s.newDesign)
+  const toggleNewDesign = useUiPrefsStore((s) => s.toggleNewDesign)
 
   // Apply palette on mount
   useEffect(() => {
@@ -61,6 +64,53 @@ export function PalettePicker() {
             boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
           }}
         >
+          {/* New design toggle */}
+          <button
+            onClick={toggleNewDesign}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              padding: '8px 10px',
+              borderRadius: '10px',
+              border: '1px solid var(--color-film-border)',
+              background: 'var(--color-film-surface)',
+              cursor: 'pointer',
+              marginBottom: '10px',
+            }}
+          >
+            <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--color-film-text)' }}>
+              Nouveau design
+            </span>
+            {/* Toggle switch */}
+            <div
+              style={{
+                width: '34px',
+                height: '18px',
+                borderRadius: '999px',
+                background: newDesign ? 'var(--color-film-gold)' : 'var(--color-film-gray)',
+                position: 'relative',
+                transition: 'background 0.2s',
+                flexShrink: 0,
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '2px',
+                  left: newDesign ? '18px' : '2px',
+                  width: '14px',
+                  height: '14px',
+                  borderRadius: '50%',
+                  background: '#fff',
+                  transition: 'left 0.2s',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                }}
+              />
+            </div>
+          </button>
+
           <p
             style={{
               fontFamily: 'var(--font-mono, monospace)',

@@ -21,6 +21,7 @@ import type { ServerStatsMap } from '@/store/authStore'
 import { authDeleteAccount, authChangePassword, authUploadAvatar } from '@/api/client'
 import { loadStats } from '@/lib/storage'
 import { FEATURES } from '@/config/features'
+import { useUiPrefsStore } from '@/store/uiPrefsStore'
 import type { GameStats } from '@/types'
 import { ApertureIcon } from '@/components/ui/ApertureIcon'
 import { Modal } from '@/components/ui/Modal'
@@ -652,6 +653,7 @@ export function AuthGateNewDesign({ context }: { context: 'profile' | 'friends' 
 
 export function ProfilePage() {
   const navigate = useNavigate()
+  const newDesign = useUiPrefsStore((s) => s.newDesign)
   const user = useAuthStore((s) => s.user)
   const isLoading = useAuthStore((s) => s.isLoading)
   const logout = useAuthStore((s) => s.logout)
@@ -660,7 +662,7 @@ export function ProfilePage() {
   const serverStats = useAuthStore((s) => s.serverStats)
 
   useEffect(() => {
-    if (!isLoading && user === null && !FEATURES.newDesign) navigate('/', { replace: true })
+    if (!isLoading && user === null && !newDesign) navigate('/', { replace: true })
   }, [user, isLoading, navigate])
 
   const [avatarLoading, setAvatarLoading] = useState(false)
@@ -753,7 +755,7 @@ export function ProfilePage() {
   )
 
   if (!user) {
-    if (FEATURES.newDesign) {
+    if (newDesign) {
       return (
         <div className="min-h-screen bg-film-black text-film-text">
           <AuthModal />

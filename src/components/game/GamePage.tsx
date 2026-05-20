@@ -24,6 +24,7 @@ import { loadHistory, loadGameState } from '@/lib/storage'
 import { Sounds } from '@/lib/sounds'
 import { buildShareText, buildAllShareText, type AllShareGame } from '@/lib/utils'
 import { FEATURES } from '@/config/features'
+import { useUiPrefsStore } from '@/store/uiPrefsStore'
 
 interface GamePageProps {
   mode: 'film' | 'series' | 'wiki'
@@ -317,6 +318,7 @@ function FriendsTodayMiniPanel({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
 
 export function GamePage({ mode }: GamePageProps) {
   const isWiki = mode === 'wiki'
+  const newDesign = useUiPrefsStore((s) => s.newDesign)
   const gameInit = useGameStore((s) => s.initGame)
   const gameChallenge = useGameStore((s) => s.challenge)
   const gameGuesses = useGameStore((s) => s.guesses)
@@ -880,8 +882,8 @@ export function GamePage({ mode }: GamePageProps) {
       </div>
 
       {/* ── CONTENT ──────────────────────────────────────────────────────── */}
-      <div className={`px-3 sm:px-4 py-4 sm:py-6 pb-28 sm:pb-32 lg:pb-8 ${FEATURES.newDesign ? 'lg:max-w-6xl lg:mx-auto' : ''}`}>
-        <div className={FEATURES.newDesign ? 'lg:grid lg:grid-cols-[1fr_320px] lg:gap-6' : ''}>
+      <div className={`px-3 sm:px-4 py-4 sm:py-6 pb-28 sm:pb-32 lg:pb-8 ${newDesign ? 'lg:max-w-6xl lg:mx-auto' : ''}`}>
+        <div className={newDesign ? 'lg:grid lg:grid-cols-[1fr_320px] lg:gap-6' : ''}>
 
           {/* Main column */}
           <div className="max-w-2xl mx-auto lg:mx-0 lg:max-w-none flex flex-col gap-5">
@@ -965,7 +967,7 @@ export function GamePage({ mode }: GamePageProps) {
           </div>
 
           {/* #01 — Sidebar (desktop lg+ only, new design) */}
-          {FEATURES.newDesign && (
+          {newDesign && (
             <div className="hidden lg:flex flex-col gap-3 sticky top-4 overflow-y-auto max-h-[calc(100vh-80px)] self-start">
               <GuessHistorySide
                 guesses={guesses.map((g) => ({ guess: g.guess, correct: g.correct }))}

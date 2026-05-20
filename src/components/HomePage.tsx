@@ -4,6 +4,7 @@ import { ApertureIcon } from '@/components/ui/ApertureIcon'
 import { Footer } from '@/components/layout/Footer'
 import { AuthModal, useAuthModal } from '@/components/modals/AuthModal'
 import { FEATURES, IOS_APP_STORE_URL } from '@/config/features'
+import { useUiPrefsStore } from '@/store/uiPrefsStore'
 import { useAuthStore } from '@/store/authStore'
 import { loadStats, loadHistory, setHistoryEntry } from '@/lib/storage'
 import { friendsGetAll, fetchChallenge, authGetStats, fetchGlobalStats, fetchChallengeCommunityStats, type FriendEntry } from '@/api/client'
@@ -248,6 +249,7 @@ function GameCard({ href, icon, modeLabel, description, accentColor, disabled, b
   const showPlay = !todayStatus && !disabled
   const Tag = disabled ? 'div' : 'a'
   const [spot, setSpot] = useState({ x: 50, y: 50, on: false })
+  const newDesign = useUiPrefsStore((s) => s.newDesign)
 
   const handleMouseMove = (e: React.MouseEvent<HTMLElement>) => {
     if (disabled) return
@@ -305,7 +307,7 @@ function GameCard({ href, icon, modeLabel, description, accentColor, disabled, b
       />
 
       {/* #02 — New design: challenge image preview (above icon row) */}
-      {FEATURES.newDesign && imageUrl && (
+      {newDesign && imageUrl && (
         <div className="relative overflow-hidden rounded-xl mb-3" style={{ aspectRatio: '16/10', border: `1px solid ${accentColor}4d`, boxShadow: `0 0 0 2px ${accentColor}24` }}>
           <img
             src={imageUrl}
@@ -325,7 +327,7 @@ function GameCard({ href, icon, modeLabel, description, accentColor, disabled, b
           )}
         </div>
       )}
-      {FEATURES.newDesign && !imageUrl && hintSnippets && hintSnippets.length > 0 && (
+      {newDesign && !imageUrl && hintSnippets && hintSnippets.length > 0 && (
         <div
           className="relative overflow-hidden rounded-xl mb-3 flex flex-col justify-center gap-1.5 p-3"
           style={{ aspectRatio: '16/10', background: '#161c2f', border: `1px solid ${accentColor}30` }}
@@ -355,7 +357,7 @@ function GameCard({ href, icon, modeLabel, description, accentColor, disabled, b
         </div>
 
         {/* #02 — New design: live ticker */}
-        {FEATURES.newDesign && liveTicker && (
+        {newDesign && liveTicker && (
           <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontFamily: "'JetBrains Mono', monospace", fontSize: '8.5px', color: 'rgba(159,163,173,0.7)' }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4cb078', display: 'inline-block', animation: 'pulse 2s infinite' }} aria-hidden />
             {liveTicker.count} joueurs · {liveTicker.avgAttempts.toFixed(1)} essais en moy.
@@ -627,6 +629,7 @@ function BelowFold({ friends, friendsLoading }: { friends: FriendEntry[]; friend
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export function HomePage() {
+  const newDesign = useUiPrefsStore((s) => s.newDesign)
   const [announcementVariant, setAnnouncementVariant] = useState<NewModesAnnouncementVariant | null>(null)
   const [showNewBadge, setShowNewBadge] = useState(false)
   const [friends, setFriends] = useState<FriendEntry[]>([])
@@ -759,7 +762,7 @@ export function HomePage() {
 
   // #02 — Fetch community stats per mode for live ticker, refresh every 30s
   useEffect(() => {
-    if (!FEATURES.newDesign) return
+    if (!newDesign) return
     const modes: Array<'film' | 'series' | 'wiki'> = ['film', ...(FEATURES.enableSeries ? ['series' as const] : []), ...(FEATURES.enableWiki ? ['wiki' as const] : [])]
 
     function fetchStats() {
@@ -798,7 +801,7 @@ export function HomePage() {
       <HomeHeader />
 
       {/* #04 — Explainer band */}
-      {FEATURES.newDesign && <ExplainerBand />}
+      {newDesign && <ExplainerBand />}
 
       {/* Hero — titre + streak */}
       <div className="relative px-4 lg:px-8 pt-10 pb-6 lg:pt-16 lg:pb-8 overflow-hidden">

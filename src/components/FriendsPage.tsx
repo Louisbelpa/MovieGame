@@ -29,6 +29,7 @@ import {
   type LeaderboardEntry,
 } from '@/api/client'
 import { FEATURES } from '@/config/features'
+import { useUiPrefsStore } from '@/store/uiPrefsStore'
 import { Footer } from '@/components/layout/Footer'
 import { TopNav } from '@/components/layout/TopNav'
 import { loadStats } from '@/lib/storage'
@@ -588,6 +589,7 @@ function IncomingBanner({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export function FriendsPage() {
+  const newDesign = useUiPrefsStore((s) => s.newDesign)
   const user = useAuthStore((s) => s.user)
   const { open: openAuth } = useAuthModal()
   const navigate = useNavigate()
@@ -727,7 +729,7 @@ export function FriendsPage() {
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6 lg:py-8">
         {/* Auth gate */}
         {!user && !loadingFriends && (
-          FEATURES.newDesign ? (
+          newDesign ? (
             <AuthGateNewDesign context="friends" />
           ) : (
             <div className="flex flex-col items-center gap-5 pt-16 text-center">
@@ -877,7 +879,7 @@ export function FriendsPage() {
       <Footer />
 
       {/* Auth modal (for new design auth gate) */}
-      {FEATURES.newDesign && <AuthModal />}
+      {newDesign && <AuthModal />}
 
       {/* Add friend modal */}
       <AnimatePresence>
