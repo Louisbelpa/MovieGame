@@ -355,9 +355,9 @@ function BelowFoldGuest({ friends, friendsLoading }: { friends: FriendEntry[]; f
                 <span
                   className="absolute font-mono font-black leading-none select-none pointer-events-none"
                   style={{
-                    top: '50%',
+                    top: 0,
                     left: 0,
-                    transform: 'translate(-30%, -50%)',
+                    transform: 'translate(-18%, -40%)',
                     fontSize: 'clamp(4rem, 8vw, 6rem)',
                     color: 'rgba(236,233,226,0.06)',
                     letterSpacing: '-0.04em',
