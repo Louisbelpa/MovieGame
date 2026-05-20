@@ -347,12 +347,12 @@ function BelowFoldGuest({ friends, friendsLoading }: { friends: FriendEntry[]; f
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
-              { n: '01', title: 'Une énigme par jour', desc: 'Extrait de film, scène de série ou profil de personnalité célèbre — un nouveau défi chaque jour à minuit (Paris).', color: 'var(--sg-films)' },
-              { n: '02', title: 'Indices progressifs', desc: 'Chaque mauvaise réponse ou passe débloque un indice supplémentaire : année, réalisateur, acteur, genre…', color: 'var(--sg-series)' },
-              { n: '03', title: '5 tentatives max', desc: "Trouve le titre ou la personnalité avant d'épuiser tes essais. Partage ton score avec tes amis.", color: 'var(--sg-wiki)' },
-            ].map(({ n, title, desc, color }) => (
+              { n: '01', title: 'Une énigme par jour', desc: 'Extrait de film, scène de série ou profil de personnalité célèbre — un nouveau défi chaque jour à minuit (Paris).' },
+              { n: '02', title: 'Indices progressifs', desc: 'Chaque mauvaise réponse ou passe débloque un indice supplémentaire : année, réalisateur, acteur, genre…' },
+              { n: '03', title: '5 tentatives max', desc: "Trouve le titre ou la personnalité avant d'épuiser tes essais. Partage ton score avec tes amis." },
+            ].map(({ n, title, desc }) => (
               <div key={n} className="rounded-2xl p-5 flex flex-col gap-3" style={{ background: 'var(--color-film-surface)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <span className="font-mono font-bold text-lg leading-none" style={{ color }}>{n}</span>
+                <span className="font-mono font-bold text-lg leading-none" style={{ color: 'rgba(236,233,226,0.3)' }}>{n}</span>
                 <p className="font-semibold text-film-text text-sm leading-snug">{title}</p>
                 <p className="text-xs leading-relaxed" style={{ color: 'rgba(236,233,226,0.5)' }}>{desc}</p>
               </div>
