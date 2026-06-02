@@ -217,9 +217,15 @@ export function Footer() {
             Trois devinettes par jour, le même défi pour tout le monde. Garde ta série en vie et défie tes amis.
           </p>
           <div className="cdy-foot-social">
-            <span title="Twitter/X">✦</span>
-            <span title="Instagram">◐</span>
-            <span title="TikTok">✈</span>
+            <span title="Twitter/X">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h3l-6.6 7.6L22 22h-6.3l-4.9-6.4L5 22H2l7-8.1L2 2h6.4l4.5 5.9L18 2zm-1.1 18h1.7L7.2 3.8H5.4L16.9 20z" /></svg>
+            </span>
+            <span title="Instagram">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" /></svg>
+            </span>
+            <span title="TikTok">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 3c.3 2 1.6 3.6 3.5 3.9v2.4c-1.3.1-2.5-.3-3.5-1v5.6a5.4 5.4 0 1 1-5.4-5.4c.2 0 .4 0 .6.05v2.5a2.9 2.9 0 1 0 2 2.75V3h2.8z" /></svg>
+            </span>
           </div>
         </div>
 

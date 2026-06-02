@@ -21,6 +21,7 @@ import { ResetPasswordPage } from './components/ResetPasswordPage'
 import { PalettePicker } from './components/PalettePicker'
 import { FriendsPage } from './components/FriendsPage'
 import { ProfilePage } from './components/ProfilePage'
+import { StatsPage } from './components/StatsPage'
 import { EmailVerificationBanner } from './components/EmailVerificationBanner'
 
 const EMPTY_GLOBAL_STATS: GlobalStatsPayload = {
@@ -158,6 +159,7 @@ export default function App() {
             {FEATURES.enableSeries && <Route path="/series/*" element={<GameLayout mode="series" />} />}
             {FEATURES.enableWiki && <Route path="/wiki/*" element={<GameLayout mode="wiki" />} />}
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/stats" element={<StatsPage />} />
             <Route path="/friends" element={<FriendsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/" element={<Navigate to="/films" replace />} />
