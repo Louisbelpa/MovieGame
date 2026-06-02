@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   Pencil,
   Check,
-  X,
   LogOut,
   Lock,
   Eye,
@@ -30,12 +29,19 @@ interface SettingsModalProps {
   onDeleteAccount: () => Promise<void>
 }
 
+const EDIT_HUES = [300, 30, 200, 150, 90, 260, 340, 50]
+
 function SettingsModal({ onClose, user, onSaveName, onChangePassword, onLogout, onDeleteAccount }: SettingsModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null)
 
   const [nameInput, setNameInput] = useState(user.displayName)
   const [nameLoading, setNameLoading] = useState(false)
   const [nameSaved, setNameSaved] = useState(false)
+
+  const [hue, setHue] = useState(300)
+  const [notifOn, setNotifOn] = useState(false)
+  const [leaderOn, setLeaderOn] = useState(true)
+  const [publicOn, setPublicOn] = useState(true)
 
   const [pwOpen, setPwOpen] = useState(false)
   const [pwCurrent, setPwCurrent] = useState('')
@@ -78,132 +84,170 @@ function SettingsModal({ onClose, user, onSaveName, onChangePassword, onLogout, 
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center"
+      className="fixed inset-0 z-50 flex items-end lg:items-center justify-center"
+      style={{ background: 'rgba(60,48,80,0.55)' }}
       onClick={handleOverlayClick}
     >
-      <div className="bg-film-black border border-film-border rounded-2xl p-6 max-w-sm w-full mx-4 mt-24 flex flex-col gap-5 lg:mx-auto fixed bottom-0 left-0 right-0 rounded-t-2xl rounded-b-none mx-0 lg:static lg:rounded-2xl lg:bottom-auto lg:left-auto lg:right-auto lg:mx-auto">
-        <div className="flex items-center justify-between">
-          <p className="font-title font-semibold text-film-text">Réglages</p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
-            aria-label="Fermer"
-          >
-            <X size={18} />
-          </button>
+      <div style={{ background: 'var(--bg)', borderRadius: '24px 24px 0 0', maxWidth: 480, width: '100%', padding: '24px 20px 32px', display: 'flex', flexDirection: 'column', gap: 0, maxHeight: '90dvh', overflowY: 'auto' }}
+        className="lg:rounded-3xl lg:m-4">
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <span style={{ fontWeight: 700, fontSize: 20 }}>Réglages</span>
+          <button type="button" onClick={onClose} className="cdy-archive-x" aria-label="Fermer">✕</button>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <label className="text-xs text-film-text-dim uppercase tracking-wide font-mono">Pseudo</label>
-          <div className="flex items-center gap-2">
-            <input
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') void handleSaveName() }}
-              className="flex-1 rounded-lg border border-film-border bg-film-gray px-3 py-2 text-sm text-film-text focus:outline-none focus:border-film-gold focus:ring-1 focus:ring-film-gold"
-              maxLength={40}
-              disabled={nameLoading}
-            />
-            <button
-              type="button"
-              onClick={() => void handleSaveName()}
-              disabled={nameLoading || !nameInput.trim() || nameInput.trim() === user.displayName}
-              className="text-film-green hover:opacity-80 disabled:opacity-30 cursor-pointer disabled:cursor-default"
-              aria-label="Enregistrer le pseudo"
+        {/* Avatar + hue picker */}
+        <div className="cdy-edit-card">
+          <h3>Avatar</h3>
+          <p className="ch">Choisis une couleur — tes initiales s'affichent dessus.</p>
+          <div className="cdy-edit-avatar">
+            <span
+              className="cdy-edit-av"
+              style={{ background: `oklch(0.66 0.16 ${hue})`, boxShadow: `0 6px 0 oklch(0.5 0.15 ${hue})` }}
             >
-              <Check size={18} />
-            </button>
+              {user.displayName.charAt(0).toUpperCase()}
+            </span>
+            <div className="cdy-edit-hues">
+              {EDIT_HUES.map((h) => (
+                <span
+                  key={h}
+                  className={`cdy-edit-hue${h === hue ? ' on' : ''}`}
+                  style={{ background: `oklch(0.66 0.16 ${h})` }}
+                  onClick={() => setHue(h)}
+                />
+              ))}
+            </div>
           </div>
-          {nameSaved && <p className="text-xs text-film-green">Pseudo mis à jour ✓</p>}
         </div>
 
+        {/* Nom affiché */}
+        <div className="cdy-edit-card">
+          <h3>Informations</h3>
+          <div className="cdy-fld">
+            <label htmlFor="settings-name">Nom affiché</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                id="settings-name"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') void handleSaveName() }}
+                className="inp"
+                style={{ flex: 1, padding: '13px 16px', borderRadius: 14, border: '2.5px solid var(--line)', background: 'var(--bg)', fontSize: 15.5, fontFamily: 'Fredoka, sans-serif', color: 'var(--ink)', outline: 'none' }}
+                maxLength={40}
+                disabled={nameLoading}
+                placeholder="Ton prénom ou pseudo"
+              />
+              <button
+                type="button"
+                onClick={() => void handleSaveName()}
+                disabled={nameLoading || !nameInput.trim() || nameInput.trim() === user.displayName}
+                className="cdy-btn cdy-btn-primary"
+                style={{ padding: '13px 18px', flexShrink: 0 }}
+                aria-label="Enregistrer"
+              >
+                <Check size={16} />
+              </button>
+            </div>
+            {nameSaved && <p style={{ fontSize: 12, color: 'var(--correct-d)', marginTop: 6 }}>Pseudo mis à jour ✓</p>}
+          </div>
+          {user.email && (
+            <div className="cdy-fld" style={{ marginBottom: 0 }}>
+              <label>E-mail</label>
+              <div className="inp ph" style={{ display: 'flex', alignItems: 'center', padding: '13px 16px', borderRadius: 14, border: '2.5px solid var(--line)', background: 'var(--bg)', fontSize: 15.5, color: 'var(--ink-3)' }}>
+                {user.email}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Préférences */}
+        <div className="cdy-edit-card">
+          <h3>Préférences</h3>
+          <div className="cdy-toggle-row" style={{ borderTop: 0 }}>
+            <div style={{ flex: 1 }}>
+              <div className="tt">Rappel quotidien</div>
+              <div className="ts">Notif à minuit pour le nouveau défi</div>
+            </div>
+            <div className={`cdy-toggle${notifOn ? ' on' : ''}`} onClick={() => setNotifOn((v) => !v)} />
+          </div>
+          <div className="cdy-toggle-row">
+            <div style={{ flex: 1 }}>
+              <div className="tt">Classement public</div>
+              <div className="ts">Ton score apparaît dans le classement global</div>
+            </div>
+            <div className={`cdy-toggle${leaderOn ? ' on' : ''}`} onClick={() => setLeaderOn((v) => !v)} />
+          </div>
+          <div className="cdy-toggle-row">
+            <div style={{ flex: 1 }}>
+              <div className="tt">Profil public</div>
+              <div className="ts">Les amis peuvent voir ton historique</div>
+            </div>
+            <div className={`cdy-toggle${publicOn ? ' on' : ''}`} onClick={() => setPublicOn((v) => !v)} />
+          </div>
+        </div>
+
+        {/* Mot de passe */}
         {user.email && (
-          <div className="flex flex-col gap-2">
+          <div className="cdy-edit-card">
             <button
               type="button"
               onClick={() => { setPwOpen((v) => !v); setPwError(null); setPwSuccess(false) }}
-              className="flex items-center justify-between text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Fredoka, sans-serif' }}
             >
-              <span className="flex items-center gap-2"><Lock size={14} /> Changer le mot de passe</span>
-              <ChevronRight size={14} className={`transition-transform ${pwOpen ? 'rotate-90' : ''}`} />
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>
+                <Lock size={15} /> Changer le mot de passe
+              </span>
+              <ChevronRight size={14} style={{ color: 'var(--ink-2)', transform: pwOpen ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }} />
             </button>
 
             {pwOpen && (
-              <div className="flex flex-col gap-3 border-t border-film-border pt-3 mt-1">
+              <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {pwSuccess ? (
-                  <p className="text-sm text-film-green text-center py-2">Mot de passe mis à jour ✓</p>
+                  <p style={{ fontSize: 13, color: 'var(--correct-d)', textAlign: 'center', padding: '8px 0' }}>Mot de passe mis à jour ✓</p>
                 ) : (
                   <>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs text-film-text-dim uppercase tracking-wide">Mot de passe actuel</label>
-                      <div className="relative">
-                        <input
-                          type={pwShowCurrent ? 'text' : 'password'}
-                          value={pwCurrent}
-                          onChange={(e) => setPwCurrent(e.target.value)}
-                          placeholder="••••••••"
-                          className="w-full rounded-lg border border-film-border bg-film-gray px-3 py-2 pr-10 text-sm text-film-text focus:outline-none focus:border-film-gold focus:ring-1 focus:ring-film-gold"
-                          disabled={pwLoading}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setPwShowCurrent((v) => !v)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-film-text-dim hover:text-film-text cursor-pointer"
-                          tabIndex={-1}
-                        >
-                          {pwShowCurrent ? <EyeOff size={15} /> : <Eye size={15} />}
-                        </button>
+                    {[
+                      { label: 'Mot de passe actuel', val: pwCurrent, setVal: setPwCurrent, show: pwShowCurrent, setShow: setPwShowCurrent },
+                      { label: 'Nouveau mot de passe', val: pwNew, setVal: setPwNew, show: pwShowNew, setShow: setPwShowNew },
+                    ].map(({ label, val, setVal, show, setShow }) => (
+                      <div key={label} className="cdy-fld" style={{ marginBottom: 0, position: 'relative' }}>
+                        <label>{label}</label>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            type={show ? 'text' : 'password'}
+                            value={val}
+                            onChange={(e) => setVal(e.target.value)}
+                            placeholder="••••••••"
+                            style={{ width: '100%', padding: '13px 44px 13px 16px', borderRadius: 14, border: '2.5px solid var(--line)', background: 'var(--bg)', fontSize: 15, fontFamily: 'Fredoka, sans-serif', color: 'var(--ink)', outline: 'none' }}
+                            disabled={pwLoading}
+                          />
+                          <button type="button" onClick={() => setShow((v) => !v)} tabIndex={-1}
+                            style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-2)' }}>
+                            {show ? <EyeOff size={15} /> : <Eye size={15} />}
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs text-film-text-dim uppercase tracking-wide">Nouveau mot de passe</label>
-                      <div className="relative">
-                        <input
-                          type={pwShowNew ? 'text' : 'password'}
-                          value={pwNew}
-                          onChange={(e) => setPwNew(e.target.value)}
-                          placeholder="8 caractères minimum"
-                          className="w-full rounded-lg border border-film-border bg-film-gray px-3 py-2 pr-10 text-sm text-film-text focus:outline-none focus:border-film-gold focus:ring-1 focus:ring-film-gold"
-                          disabled={pwLoading}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setPwShowNew((v) => !v)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-film-text-dim hover:text-film-text cursor-pointer"
-                          tabIndex={-1}
-                        >
-                          {pwShowNew ? <EyeOff size={15} /> : <Eye size={15} />}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs text-film-text-dim uppercase tracking-wide">Confirmer</label>
+                    ))}
+                    <div className="cdy-fld" style={{ marginBottom: 0 }}>
+                      <label>Confirmer</label>
                       <input
                         type="password"
                         value={pwConfirm}
                         onChange={(e) => setPwConfirm(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') void handleChangePw() }}
                         placeholder="••••••••"
-                        className="w-full rounded-lg border border-film-border bg-film-gray px-3 py-2 text-sm text-film-text focus:outline-none focus:border-film-gold focus:ring-1 focus:ring-film-gold"
+                        style={{ width: '100%', padding: '13px 16px', borderRadius: 14, border: '2.5px solid var(--line)', background: 'var(--bg)', fontSize: 15, fontFamily: 'Fredoka, sans-serif', color: 'var(--ink)', outline: 'none' }}
                         disabled={pwLoading}
                       />
                     </div>
-                    {pwError && <p className="text-sm text-film-red">{pwError}</p>}
-                    <div className="flex gap-2 mt-1">
-                      <button
-                        type="button"
-                        onClick={() => void handleChangePw()}
-                        disabled={pwLoading || !pwCurrent || !pwNew || !pwConfirm}
-                        className="flex-1 rounded-lg bg-film-gold text-film-black font-semibold text-sm py-2.5 hover:opacity-90 disabled:opacity-40 transition-opacity cursor-pointer disabled:cursor-default"
-                      >
+                    {pwError && <p style={{ fontSize: 13, color: 'var(--wrong-d)', background: 'var(--wrong-soft)', borderRadius: 12, padding: '10px 14px', margin: 0 }}>{pwError}</p>}
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button type="button" onClick={() => void handleChangePw()} disabled={pwLoading || !pwCurrent || !pwNew || !pwConfirm}
+                        className="cdy-btn cdy-btn-primary" style={{ flex: 1 }}>
                         {pwLoading ? 'Enregistrement…' : 'Mettre à jour'}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => { setPwOpen(false); setPwError(null); setPwCurrent(''); setPwNew(''); setPwConfirm('') }}
-                        className="px-4 rounded-lg border border-film-border text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
-                      >
+                      <button type="button" onClick={() => { setPwOpen(false); setPwError(null); setPwCurrent(''); setPwNew(''); setPwConfirm('') }}
+                        className="cdy-btn cdy-btn-soft" style={{ flexShrink: 0 }}>
                         Annuler
                       </button>
                     </div>
@@ -214,28 +258,25 @@ function SettingsModal({ onClose, user, onSaveName, onChangePassword, onLogout, 
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={() => void onLogout()}
-          className="flex items-center gap-2 text-sm text-film-red hover:opacity-80 transition-opacity cursor-pointer font-medium"
-        >
-          <LogOut size={15} />
-          Se déconnecter
-        </button>
+        {/* Danger zone */}
+        <div className="cdy-edit-card" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="cdy-edit-danger" style={{ flex: 1 }}>
+            <div>
+              <div className="dt">Zone de danger</div>
+              <div className="ds">Ces actions sont irréversibles.</div>
+            </div>
+          </div>
+          <div className="cdy-edit-actions">
+            <button type="button" onClick={() => void onLogout()} className="cdy-btn cdy-btn-soft" style={{ gap: 8 }}>
+              <LogOut size={15} /> Déconnexion
+            </button>
+            <button type="button" onClick={() => void onDeleteAccount()} className="cdy-btn cdy-btn-danger" style={{ fontSize: 13 }}>
+              Supprimer le compte
+            </button>
+          </div>
+        </div>
 
-        <button
-          type="button"
-          onClick={() => void onDeleteAccount()}
-          className="flex items-center gap-2 text-sm text-film-text-dim/50 hover:text-film-red transition-colors cursor-pointer text-left"
-        >
-          Supprimer mon compte
-        </button>
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer border border-film-border rounded-lg py-2.5"
-        >
+        <button type="button" onClick={onClose} className="cdy-btn cdy-btn-soft" style={{ width: '100%', marginTop: 4 }}>
           Fermer
         </button>
       </div>
@@ -249,162 +290,63 @@ export function AuthGateNewDesign({ context }: { context: 'profile' | 'friends' 
   const { open: openAuth } = useAuthModal()
   const isProfile = context === 'profile'
 
-  const filmStats = loadStats('film')
-  const wikiStats = FEATURES.enableWiki ? loadStats('wiki') : { gamesPlayed: 0, gamesWon: 0, currentStreak: 0, maxStreak: 0, guessDistribution: {} as Record<number, number> }
-  const seriesStats = FEATURES.enableSeries ? loadStats('series') : { gamesPlayed: 0, gamesWon: 0, currentStreak: 0, maxStreak: 0, guessDistribution: {} as Record<number, number> }
-
-  const totalPlayed = filmStats.gamesPlayed + wikiStats.gamesPlayed + seriesStats.gamesPlayed
-  const totalWins = filmStats.gamesWon + wikiStats.gamesWon + seriesStats.gamesWon
-  const maxStreak = Math.max(filmStats.currentStreak ?? 0, wikiStats.currentStreak ?? 0, seriesStats.currentStreak ?? 0)
-
-  const pitchTitle = isProfile ? 'Sauvegarde ton historique.' : 'Défie tes amis.'
-  const pitchLabel = isProfile ? 'Ton profil' : 'Tes amis'
-
-  const pitchDesc = totalPlayed > 0
-    ? `Tu joues depuis ${totalPlayed} jours. Crée un compte pour garder ta série et tes stats sur tous tes appareils.`
-    : isProfile
-      ? "Crée un compte gratuit pour sauvegarder tes stats, garder ta série et accéder à ton historique depuis n'importe quel appareil."
-      : "Crée un compte gratuit pour défier tes amis et comparer vos scores du jour."
-
-  const carrots = isProfile ? [
-    { icon: '🔥', title: `Garde ta série de ${maxStreak > 0 ? maxStreak : 'N'} jours`, desc: "Sans compte, elle disparaît si tu changes d'appareil", bg: 'rgba(245,211,88,0.14)' },
-    { icon: '👥', title: 'Compare-toi à tes amis', desc: 'Classement quotidien sur les 3 modes', bg: 'rgba(74,214,192,0.14)' },
-    { icon: '🏆', title: 'Débloque les succès', desc: '12 badges à collectionner', bg: 'rgba(255,90,138,0.14)' },
-  ] : [
-    { icon: '📊', title: 'Classement quotidien', desc: 'Compare tes scores avec tes amis chaque jour', bg: 'rgba(245,211,88,0.14)' },
-    { icon: '🔥', title: 'Garde ta série', desc: 'Synchronisée sur tous tes appareils', bg: 'rgba(74,214,192,0.14)' },
-    { icon: '🏆', title: '3 modes de jeu', desc: 'Films, Séries et Personnalités — tout en un', bg: 'rgba(255,90,138,0.14)' },
-  ]
-
-  // Build fake profile distribution from local stats
-  const distributionKeys = (['1', '2', '3', '4', '5'] as const)
-  const maxDistVal = Math.max(1, ...distributionKeys.map((k) => filmStats.guessDistribution[Number(k) as 1|2|3|4|5] ?? 0))
+  const cfg = isProfile ? {
+    icon: '👤',
+    title: "Ton profil t'attend",
+    body: "Crée un compte gratuit pour sauvegarder tes stats, garder ta série et accéder à ton historique depuis n'importe quel appareil.",
+    perks: ['🔥 Ta série', '📊 Tes stats', '🕑 Historique'],
+  } : {
+    icon: '👥',
+    title: 'Joue avec tes amis',
+    body: 'Crée un compte gratuit pour défier tes amis et comparer vos scores du jour.',
+    perks: ['➕ Ajouter des amis', '⚔️ Défis', '📊 Comparaison'],
+  }
 
   return (
-    <div
-      className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-7 max-w-4xl mx-auto px-4 py-12"
-    >
-      {/* Left — pitch */}
-      <div className="flex flex-col gap-5">
-        <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(159,163,173,0.5)' }}>
-          {pitchLabel}
-        </p>
-        <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 34, lineHeight: 1.05, color: '#e8eaed', margin: 0 }}>
-          {pitchTitle}
-        </h1>
-        <p style={{ fontSize: 14, color: 'rgba(159,163,173,0.7)', lineHeight: 1.6 }}>
-          {pitchDesc}
-        </p>
-
-        {/* Carrot cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {carrots.map((c) => (
-            <div
-              key={c.title}
-              style={{
-                display: 'flex', gap: 10, padding: '10px 12px', borderRadius: 10,
-                background: c.bg,
-                border: '1px solid rgba(255,255,255,0.07)',
-              }}
-            >
-              <span style={{ fontSize: 18, flexShrink: 0 }}>{c.icon}</span>
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 600, color: '#e8eaed', margin: 0 }}>{c.title}</p>
-                <p style={{ fontSize: 11, color: 'rgba(159,163,173,0.6)', margin: 0, marginTop: 2 }}>{c.desc}</p>
-              </div>
-            </div>
+    <>
+      {/* Mobile */}
+      <div className="cdym-locked lg:hidden">
+        <div className="lk">{cfg.icon}</div>
+        <h2>{cfg.title}</h2>
+        <p>{cfg.body}</p>
+        <div className="cdym-locked-perks">
+          {cfg.perks.map((p) => (
+            <span key={p} className="cdym-locked-perk">{p}</span>
           ))}
         </div>
-
-        {/* CTAs */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={() => openAuth('register')}
-            style={{
-              background: 'linear-gradient(180deg, #f5d570, #b8852e)',
-              color: '#15110a',
-              borderRadius: 10,
-              padding: '10px 20px',
-              fontSize: 14,
-              fontWeight: 700,
-              border: 'none',
-              cursor: 'pointer',
-            }}
-          >
-            Créer un compte
-          </button>
-          <button
-            type="button"
-            onClick={() => openAuth('login')}
-            style={{
-              background: 'transparent',
-              color: 'rgba(159,163,173,0.7)',
-              borderRadius: 10,
-              padding: '10px 20px',
-              fontSize: 14,
-              fontWeight: 600,
-              border: '1px solid rgba(255,255,255,0.1)',
-              cursor: 'pointer',
-            }}
-          >
-            Se connecter
-          </button>
-        </div>
+        <button type="button" onClick={() => openAuth('register')} className="cdy-btn cdy-btn-primary" style={{ width: '100%' }}>
+          Créer un compte gratuit
+        </button>
+        <button type="button" onClick={() => openAuth('login')} className="cdym-locked-ghost">
+          Se connecter
+        </button>
       </div>
 
-      {/* Right — blurred preview */}
-      <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)', background: 'var(--color-film-surface)', minHeight: 320 }}>
-        {/* Fake profile content (blurred) */}
-        <div style={{ filter: 'blur(6px)', opacity: 0.65, padding: '24px', userSelect: 'none', pointerEvents: 'none' }}>
-          {/* Stats row */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 20 }}>
-            {[
-              { v: totalPlayed, l: 'JOUÉS' },
-              { v: totalPlayed > 0 ? `${Math.round((totalWins / totalPlayed) * 100)}%` : '—', l: 'VICTOIRES' },
-              { v: filmStats.currentStreak, l: 'SÉRIE' },
-              { v: filmStats.maxStreak, l: 'MAX' },
-            ].map(({ v, l }) => (
-              <div key={l} style={{ textAlign: 'center', padding: '8px 4px', background: 'rgba(255,255,255,0.04)', borderRadius: 8 }}>
-                <p style={{ fontSize: 20, fontWeight: 700, color: '#d4a64a', margin: 0 }}>{v}</p>
-                <p style={{ fontSize: 9, color: 'rgba(159,163,173,0.5)', fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.08em', marginTop: 2 }}>{l}</p>
-              </div>
-            ))}
+      {/* Desktop */}
+      <div className="cdy-locked hidden lg:block">
+        <div className="cdy-locked-bg" aria-hidden />
+        <div className="cdy-locked-scrim">
+          <div className="cdy-locked-card">
+            <div className="lk">{cfg.icon}</div>
+            <h2>{cfg.title}</h2>
+            <p>{cfg.body}</p>
+            <div className="cdy-locked-perks">
+              {cfg.perks.map((p) => (
+                <span key={p} className="cdy-locked-perk">{p}</span>
+              ))}
+            </div>
+            <div className="cdy-locked-cta">
+              <button type="button" onClick={() => openAuth('register')} className="cdy-btn cdy-btn-primary" style={{ width: '100%' }}>
+                Créer un compte gratuit
+              </button>
+              <button type="button" onClick={() => openAuth('login')} className="cdy-locked-ghost">
+                Se connecter
+              </button>
+            </div>
           </div>
-          {/* Fake distribution */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {distributionKeys.map((k) => {
-              const count = filmStats.guessDistribution[Number(k) as 1|2|3|4|5] ?? 0
-              const pct = Math.round((count / maxDistVal) * 100)
-              return (
-                <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 12, fontSize: 11, color: 'rgba(159,163,173,0.5)', fontFamily: 'monospace' }}>{k}</span>
-                  <div style={{ flex: 1, height: 16, background: 'rgba(255,255,255,0.05)', borderRadius: 4, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', borderRadius: 4, width: `${Math.max(pct, count > 0 ? 4 : 0)}%`, background: 'rgba(245,211,88,0.6)' }} />
-                  </div>
-                  <span style={{ width: 16, fontSize: 11, color: 'rgba(159,163,173,0.4)', textAlign: 'right' }}>{count}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Overlay */}
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'linear-gradient(180deg, rgba(10,14,26,0.4), rgba(10,14,26,0.85))',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
-        }}>
-          <span style={{ fontSize: 32 }}>🔒</span>
-          <p style={{ fontSize: 14, fontWeight: 600, color: '#e8eaed', margin: 0 }}>
-            {isProfile ? 'Aperçu de ton profil' : 'Classement amis'}
-          </p>
-          <p style={{ fontSize: 12, color: 'rgba(159,163,173,0.6)', margin: 0 }}>
-            {totalPlayed} défis joués · {totalWins} victoires
-          </p>
         </div>
       </div>
-    </div>
+    </>
   )
 }
 

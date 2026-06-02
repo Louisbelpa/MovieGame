@@ -53,17 +53,17 @@ export function LoseModal({ isOpen, onClose, mode, result, onShare, onShareAll, 
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className={accentCls}>
-      <div className="cdym-result">
+      <div className="cdy-end">
 
         {/* 1. Tag statut */}
-        <span className="cdym-res-tag lose">PERDU POUR AUJOURD'HUI</span>
+        <div className="e-tag">PERDU POUR AUJOURD'HUI</div>
 
         {/* 2. Emoji défaite */}
-        <div style={{ fontSize: 52, lineHeight: 1 }}>🫥</div>
+        <div className="e-emoji">🫥</div>
 
         {/* 3. Réponse */}
-        <div className="cdym-res-answer">
-          <span className="cdym-res-poster">
+        <div className="e-answer">
+          <span className="e-poster">
             {result.photoUrl && (
               <img
                 src={result.photoUrl}
@@ -73,9 +73,9 @@ export function LoseModal({ isOpen, onClose, mode, result, onShare, onShareAll, 
               />
             )}
           </span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="l">La réponse était</div>
-            <div className="t">{result.name}</div>
+          <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+            <div className="e-alabel">La réponse était</div>
+            <div className="e-atitle">{result.name}</div>
             {result.year && (
               <div className="cdy-mono" style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{result.year}</div>
             )}
@@ -83,12 +83,10 @@ export function LoseModal({ isOpen, onClose, mode, result, onShare, onShareAll, 
         </div>
 
         {/* 4. Série remise à zéro */}
-        <div className="cdy-mono" style={{ fontSize: 12.5, color: 'var(--ink-2)', fontWeight: 600 }}>
-          Série remise à zéro · 🔥 0 jour
-        </div>
+        <div className="e-streak">Série remise à zéro · <b>🔥 0 jour</b></div>
 
         {/* 5. Message consolation */}
-        <p style={{ margin: 0, fontSize: 15, color: 'var(--ink-2)', fontWeight: 500, textAlign: 'center' }}>
+        <p style={{ margin: 0, fontSize: 15, color: 'var(--ink-2)', fontWeight: 500 }}>
           Pas de panique — un nouveau défi t'attend demain.
         </p>
 

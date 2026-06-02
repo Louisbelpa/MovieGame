@@ -8,7 +8,6 @@ import { useEffect, useState } from 'react'
 import { create } from 'zustand'
 import { useGoogleLogin } from '@react-oauth/google'
 import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
 import { useAuthStore } from '@/store/authStore'
 import { authForgotPassword } from '@/api/client'
 import { captureMobileReturnFromUrl } from '@/lib/mobileAuthHandoff'
@@ -36,37 +35,6 @@ const useAuthModalStore = create<AuthModalStore>((set) => ({
 export function useAuthModal() {
   const { isOpen, initialTab, open, close } = useAuthModalStore()
   return { isOpen, initialTab, open, close }
-}
-
-// ─── Form field ───────────────────────────────────────────────────────────────
-
-function Field({
-  label, id, type = 'text', value, onChange, autoComplete,
-}: {
-  label: string; id: string; type?: string; value: string
-  onChange: (v: string) => void; autoComplete?: string
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-2)' }}>
-        {label}
-      </label>
-      <input
-        id={id} type={type} value={value}
-        onChange={(e) => onChange(e.target.value)}
-        autoComplete={autoComplete}
-        style={{
-          width: '100%', borderRadius: 14, border: '2.5px solid var(--line)',
-          background: 'var(--bg)', padding: '12px 14px', fontSize: 15,
-          color: 'var(--ink)', outline: 'none', fontFamily: 'Fredoka, sans-serif',
-          boxShadow: '0 3px 0 var(--line-2)',
-          transition: 'border-color .15s',
-        }}
-        onFocus={(e) => { e.target.style.borderColor = 'var(--coral)' }}
-        onBlur={(e)  => { e.target.style.borderColor = 'var(--line)' }}
-      />
-    </div>
-  )
 }
 
 // ─── Login tab ────────────────────────────────────────────────────────────────
@@ -235,15 +203,22 @@ function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <p className="text-sm text-film-text-dim">
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-2)', lineHeight: 1.5 }}>
         Saisis ton adresse e-mail et on t'envoie un lien pour réinitialiser ton mot de passe.
       </p>
-      <Field label="Adresse e-mail" id="forgot-email" type="email" value={email} onChange={setEmail} autoComplete="email" />
-      <Button type="submit" size="lg" isLoading={isLoading} className="w-full mt-1">
-        Envoyer le lien
-      </Button>
-      <button type="button" onClick={onBack} className="text-center text-sm text-film-text-dim hover:text-film-text cursor-pointer">
+      <div className="cdym-field">
+        <label htmlFor="forgot-email">Adresse e-mail</label>
+        <input
+          id="forgot-email" type="email" value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email" placeholder="ton@email.com"
+        />
+      </div>
+      <button type="submit" disabled={isLoading} className="cdy-btn cdy-btn-primary" style={{ width: '100%', padding: '15px', marginTop: 4 }}>
+        {isLoading ? '…' : 'Envoyer le lien'}
+      </button>
+      <button type="button" onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--ink-3)', fontFamily: 'Fredoka, sans-serif', textAlign: 'center' }}>
         Retour
       </button>
     </form>

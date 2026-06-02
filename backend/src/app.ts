@@ -26,6 +26,7 @@ import { friendsRouter } from './routes/friends.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { createRateLimiter } from './middleware/rateLimiter.js';
+import { maintenanceMiddleware } from './middleware/maintenance.js';
 import { logger } from './lib/logger.js';
 import { ensureUploadsDir, getUploadsAbsDir } from './config/uploads.js';
 import db from './db/database.js';
@@ -94,6 +95,9 @@ export function createApp(): express.Application {
     logger.warn('CORS_ORIGIN is not set — all origins are allowed. Set this in production.');
   }
   app.use(cookieParser(cookieSecret ?? 'dev_secret'));
+
+  // Maintenance mode — laisse passer /health, /assets, /uploads, /admin (SPA) et /api/admin
+  app.use(maintenanceMiddleware);
 
   // Static files before CORS — same-origin assets don't need CORS headers
   ensureUploadsDir();
