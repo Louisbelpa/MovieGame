@@ -6,7 +6,13 @@ function envFlag(value: string | undefined, defaultValue: boolean): boolean {
 export const FEATURES = {
   enableSeries: envFlag(import.meta.env.VITE_ENABLE_SERIES, false),
   enableWiki: envFlag(import.meta.env.VITE_ENABLE_WIKI, true),
+  enableIosBanner: envFlag(import.meta.env.VITE_ENABLE_IOS_BANNER, false),
+  /** New design from Claude Design audit — #01 sidebar, #02 ticker, #03 auth gate, #04 explainer */
+  newDesign: envFlag(import.meta.env.VITE_NEW_DESIGN, false),
 } as const
+
+export const IOS_APP_STORE_URL: string =
+  (import.meta.env.VITE_IOS_APP_STORE_URL as string | undefined) ?? '#'
 
 export const BRAND_NAME = 'GuessToday'
 

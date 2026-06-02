@@ -117,16 +117,17 @@ export function Modal({
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-3 sm:p-4">
-          {/* Backdrop */}
+          {/* Backdrop — overlay Candy doux */}
           <motion.div
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            className="absolute inset-0 backdrop-blur-sm"
+            style={{ background: 'rgba(60,48,80,0.45)' }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={persistent ? undefined : onClose}
           />
 
-          {/* Panel */}
+          {/* Panel — carte Candy */}
           <motion.div
             ref={panelRef}
             role="dialog"
@@ -136,9 +137,16 @@ export function Modal({
             aria-label={fallbackLabel}
             tabIndex={-1}
             className={cn(
-              'relative z-10 w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto film-border rounded-2xl p-5 shadow-2xl sm:max-h-[85dvh] sm:p-6 focus:outline-none',
+              'relative z-10 w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto focus:outline-none',
               className
             )}
+            style={{
+              background: '#fff',
+              borderRadius: 24,
+              border: '2.5px solid var(--line)',
+              boxShadow: '0 10px 0 var(--line-2), 0 20px 60px rgba(60,48,80,0.18)',
+              padding: '1.25rem',
+            }}
             initial={{ opacity: 0, y: 32, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.97 }}
@@ -154,16 +162,17 @@ export function Modal({
                       <button
                         onClick={onClose}
                         aria-label="Fermer"
-                        className="justify-self-end inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+                        className="justify-self-end inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-[10px] transition-colors cursor-pointer"
+                        style={{ color: 'var(--ink-2)', background: 'var(--bg)', border: '2px solid var(--line)' }}
                       >
-                        <X size={20} aria-hidden />
+                        <X size={18} aria-hidden />
                       </button>
                     )}
                   </>
                 ) : (
                   <>
                     {title && (
-                      <h2 id={titleId} className="font-title text-xl text-film-text font-semibold">
+                      <h2 id={titleId} className="font-bold text-xl" style={{ color: 'var(--ink)' }}>
                         {title}
                       </h2>
                     )}
@@ -171,9 +180,10 @@ export function Modal({
                       <button
                         onClick={onClose}
                         aria-label="Fermer"
-                        className="ml-auto inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+                        className="ml-auto inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-[10px] transition-colors cursor-pointer"
+                        style={{ color: 'var(--ink-2)', background: 'var(--bg)', border: '2px solid var(--line)' }}
                       >
-                        <X size={20} aria-hidden />
+                        <X size={18} aria-hidden />
                       </button>
                     )}
                   </>

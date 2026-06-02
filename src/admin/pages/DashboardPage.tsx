@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Film, Tv, Calendar, TrendingUp, Clapperboard, Users,
-  AlertCircle, AlertTriangle, CalendarDays, Landmark,
+  AlertCircle, AlertTriangle, CalendarDays, User,
 } from 'lucide-react'
 import { getDashboard, type AdminDashboard, type AdminChallenge } from '../api'
 function wikiTypeLabel(type: string | undefined): string {
@@ -154,7 +154,7 @@ export function DashboardPage() {
                 onClick={() => navigate('/admin/wiki')}
                 className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-slate-700 rounded-lg hover:bg-slate-800 transition-colors"
               >
-                <Landmark size={14} />
+                <User size={14} />
                 Personnalités
               </button>
             </div>
@@ -169,7 +169,7 @@ export function DashboardPage() {
             options={[
               { id: 'films', label: 'Films', icon: <Film size={15} /> },
               { id: 'series', label: 'Séries', icon: <Tv size={15} /> },
-              { id: 'wiki', label: 'Personnalités', icon: <Landmark size={15} /> },
+              { id: 'wiki', label: 'Personnalités', icon: <User size={15} /> },
             ]}
           />
 
@@ -249,7 +249,7 @@ export function DashboardPage() {
             {/* ─ Colonne Personnalités ─ */}
             <div className={`space-y-4 ${activeTab !== 'wiki' ? 'hidden lg:block' : ''}`}>
               <SectionHeader
-                icon={<Landmark size={15} className="text-slate-500" />}
+                icon={<User size={15} className="text-slate-500" />}
                 label="Personnalités"
                 color="slate"
                 catalogCount={data.stats.total_wiki_persons}
@@ -466,7 +466,7 @@ function ChallengeCard({ challenge }: { challenge: AdminChallenge }) {
         <img src={media.image_url} alt={media.title} className="w-16 h-11 sm:w-20 sm:h-14 object-cover rounded-lg flex-shrink-0 border border-gray-100" />
       ) : (
         <div className="w-16 h-11 sm:w-20 sm:h-14 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-          {isWiki ? <Landmark size={20} className="text-gray-400" /> : isSeries ? <Tv size={20} className="text-gray-400" /> : <Clapperboard size={20} className="text-gray-400" />}
+          {isWiki ? <User size={20} className="text-gray-400" /> : isSeries ? <Tv size={20} className="text-gray-400" /> : <Clapperboard size={20} className="text-gray-400" />}
         </div>
       )}
       <div className="flex-1 min-w-0">
@@ -501,7 +501,7 @@ function UpcomingList({ challenges }: { challenges: AdminChallenge[] }) {
                   <img src={media.image_url} alt={media.title} className="w-9 h-6 object-cover rounded border border-gray-100 flex-shrink-0" />
                 ) : (
                   <div className="w-9 h-6 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
-                    {isWiki ? <Landmark size={11} className="text-gray-400" /> : isSeries ? <Tv size={11} className="text-gray-400" /> : <Clapperboard size={11} className="text-gray-400" />}
+                    {isWiki ? <User size={11} className="text-gray-400" /> : isSeries ? <Tv size={11} className="text-gray-400" /> : <Clapperboard size={11} className="text-gray-400" />}
                   </div>
                 )}
                 <span className="text-sm text-gray-400 w-20 sm:w-24 flex-shrink-0">{formatDateShort(ch.date)}</span>

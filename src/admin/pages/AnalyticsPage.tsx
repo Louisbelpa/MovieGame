@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from 'react'
-import { ChevronUp, ChevronDown, X } from 'lucide-react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import { ChevronUp, ChevronDown, X, Download } from 'lucide-react'
 import { AdminLayout } from '../components/AdminLayout'
 import { SegmentedToggle } from '../components/SegmentedToggle'
 import {
@@ -11,6 +11,7 @@ import {
   getHourlyDistribution,
   getAttemptsDistribution,
   getHintsDistribution,
+  getSocialStats,
   type AnalyticsOverview,
   type AnalyticsMediaFilter,
   type DailyAnalytics,
@@ -18,6 +19,7 @@ import {
   type WrongGuess,
   type ReturningPlayer,
   type HourlyData,
+  type SocialStats,
 } from '../api'
 import { FEATURES } from '@/config/features'
 
@@ -291,6 +293,17 @@ export function AnalyticsPage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(true)
   const [customApplyNonce, setCustomApplyNonce] = useState(0)
 
+  const [mainTab, setMainTab] = useState<'game' | 'users'>('game')
+
+  const [socialStats, setSocialStats] = useState<SocialStats | null>(null)
+  const [socialErr, setSocialErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    getSocialStats()
+      .then(setSocialStats)
+      .catch((e: unknown) => setSocialErr(e instanceof Error ? e.message : 'Erreur'))
+  }, [])
+
   const dateRange = useMemo(
     () => analyticsDateRange(period, customFrom, customTo),
     [period, customFrom, customTo]
@@ -348,6 +361,32 @@ export function AnalyticsPage() {
     setSort(col)
   }
 
+  const exportCsv = useCallback(() => {
+    if (challenges.length === 0) return
+    const rows = [
+      ['Date', 'Titre', 'Type', 'Année', 'Fame', 'Parties', 'Victoires %', 'Moy. tentatives', 'Moy. indices'],
+      ...challenges.map((c) => [
+        challengeDateYmd(c.challenge_date),
+        `"${c.title.replace(/"/g, '""')}"`,
+        c.media_type === 'film' ? 'Film' : c.media_type === 'series' ? 'Série' : 'Wiki',
+        String(c.year ?? ''),
+        String(c.fame_level),
+        String(c.sessions),
+        String(c.win_rate),
+        String(c.avg_attempts.toFixed(1)),
+        String(c.avg_hints.toFixed(1)),
+      ]),
+    ]
+    const csv = rows.map((r) => r.join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `analytics-${activeTab}-${dateRange.from}-${dateRange.to}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [challenges, activeTab, dateRange])
+
   const attMax = Math.max(...Object.values(attempts), 1)
   const hinMax = Math.max(...Object.values(hints), 1)
 
@@ -372,6 +411,32 @@ export function AnalyticsPage() {
     <AdminLayout>
       <div className="space-y-6">
 
+        {/* ── Onglets principaux ───────────────────────────────────────────── */}
+        <div className="flex gap-1 border-b border-gray-200 pb-0">
+          {([
+            { id: 'game',  label: '📊 Jeu' },
+            { id: 'users', label: '👥 Utilisateurs' },
+          ] as const).map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setMainTab(t.id)}
+              className={[
+                'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+                mainTab === t.id
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+              ].join(' ')}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+      </div>
+
+      {/* ── Onglet Jeu ───────────────────────────────────────────────────── */}
+      {mainTab === 'game' && <div className="space-y-6 mt-6">
         {/* ── Section 1 : Type de jeu ──────────────────────────────────────── */}
         <section>
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Type de jeu</h2>
@@ -515,13 +580,24 @@ export function AnalyticsPage() {
 
         {/* ── Section 7 : Classement défis ─────────────────────────────────── */}
         <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-gray-700">Classement des défis par difficulté</h2>
-            <p className="text-xs text-gray-500 mt-1">
-              Même <strong>période</strong> et type de jeu que ci-dessus. La colonne <strong>Date du défi</strong> est le jour planifié
-              (Paris). Tri par défaut du plus récent au plus ancien ; autres tris via les en-têtes. Sont listés les défis avec au moins
-              une partie commencée ou le défi du jour dans la fenêtre sans session encore.
-            </p>
+          <div className="px-4 py-3 border-b border-gray-100 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-gray-700">Classement des défis par difficulté</h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Même <strong>période</strong> et type de jeu que ci-dessus. La colonne <strong>Date du défi</strong> est le jour planifié
+                (Paris). Tri par défaut du plus récent au plus ancien ; autres tris via les en-têtes. Sont listés les défis avec au moins
+                une partie commencée ou le défi du jour dans la fenêtre sans session encore.
+              </p>
+            </div>
+            <button
+              onClick={exportCsv}
+              disabled={challenges.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-40 shrink-0"
+              title="Exporter en CSV"
+            >
+              <Download size={13} />
+              CSV
+            </button>
           </div>
           {challengesErr && <div className="p-4"><ErrorMsg msg={challengesErr} /></div>}
           {analyticsLoading && <Spinner />}
@@ -666,7 +742,100 @@ export function AnalyticsPage() {
           )}
         </section>
 
-      </div>
+      </div>}
+
+      {/* ── Onglet Utilisateurs ──────────────────────────────────────────── */}
+      {mainTab === 'users' && <section className="space-y-6 mt-6 bg-white rounded-xl border border-gray-200 p-5">
+        <h2 className="font-semibold text-gray-800 mb-4">Utilisateurs &amp; Social</h2>
+
+        {socialErr && <ErrorMsg msg={socialErr} />}
+        {!socialStats && !socialErr && <Spinner />}
+        {socialStats && (
+          <div className="flex flex-col gap-6">
+
+            {/* Users KPIs */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Comptes</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <KpiCard label="Total inscrits" value={socialStats.users.total.toLocaleString('fr-FR')} />
+                <KpiCard label="Nouveaux (7j)" value={`+${socialStats.users.new7d}`} />
+                <KpiCard label="Nouveaux (30j)" value={`+${socialStats.users.new30d}`} />
+                <KpiCard label="Sign in with Apple" value={socialStats.users.appleSignIn.toLocaleString('fr-FR')} />
+              </div>
+            </div>
+
+            {/* Platform breakdown */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Plateformes (push activé)</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 flex items-center gap-3">
+                  <span className="text-2xl">🍎</span>
+                  <div>
+                    <p className="text-xs text-gray-500">iOS</p>
+                    <p className="text-xl font-bold text-gray-900">{socialStats.platforms.ios.toLocaleString('fr-FR')}</p>
+                  </div>
+                </div>
+                <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 flex items-center gap-3">
+                  <span className="text-2xl">🤖</span>
+                  <div>
+                    <p className="text-xs text-gray-500">Android</p>
+                    <p className="text-xl font-bold text-gray-900">{socialStats.platforms.android.toLocaleString('fr-FR')}</p>
+                  </div>
+                </div>
+                <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 flex items-center gap-3">
+                  <span className="text-2xl">🌐</span>
+                  <div>
+                    <p className="text-xs text-gray-500">Web</p>
+                    <p className="text-xl font-bold text-gray-900">{(socialStats.platforms.web ?? 0).toLocaleString('fr-FR')}</p>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">* un user peut apparaître sur plusieurs plateformes</p>
+            </div>
+
+            {/* Achievements */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Succès débloqués</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {([
+                  { icon: '⭐', label: 'Première victoire', value: socialStats.achievements.first_win },
+                  { icon: '🎮', label: 'Habitué (10 parties)', value: socialStats.achievements.plays_10 },
+                  { icon: '🔥', label: 'Série de feu (7j)', value: socialStats.achievements.streak_7 },
+                  { icon: '👑', label: 'Invincible (30j)', value: socialStats.achievements.streak_30 },
+                  { icon: '🏆', label: 'Cinéphile (50 victoires)', value: socialStats.achievements.wins_50 },
+                  { icon: '🥇', label: 'Légende (100 victoires)', value: socialStats.achievements.wins_100 },
+                ] as const).map((a) => (
+                  <div key={a.label} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
+                    <span className="text-xl">{a.icon}</span>
+                    <div className="min-w-0">
+                      <p className="text-xs text-gray-500 truncate">{a.label}</p>
+                      <p className="text-lg font-bold text-gray-900">{a.value.toLocaleString('fr-FR')}</p>
+                    </div>
+                    {socialStats.users.total > 0 && (
+                      <span className="ml-auto text-xs text-gray-400 shrink-0">
+                        {Math.round((a.value / socialStats.users.total) * 100)}%
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Social / Friends */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Amis &amp; Social</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <KpiCard label="Amitiés actives" value={socialStats.social.acceptedFriendships.toLocaleString('fr-FR')} />
+                <KpiCard label="Invitations en attente" value={socialStats.social.pendingInvitations.toLocaleString('fr-FR')} />
+                <KpiCard label="Nouvelles amitiés (7j)" value={`+${socialStats.social.friendshipsLast7d}`} />
+                <KpiCard label="Utilisateurs avec amis" value={socialStats.social.usersWithFriends.toLocaleString('fr-FR')} />
+                <KpiCard label="Total demandes envoyées" value={socialStats.social.totalFriendships.toLocaleString('fr-FR')} />
+              </div>
+            </div>
+
+          </div>
+        )}
+      </section>}
 
       {/* Wrong guesses modal */}
       {selectedChallenge && (

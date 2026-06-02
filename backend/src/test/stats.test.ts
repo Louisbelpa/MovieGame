@@ -103,4 +103,57 @@ describe('GET /api/stats/challenge', () => {
     const res = await request(app).get('/api/stats/challenge');
     expect(res.status).toBe(400);
   });
+
+  it('returns zeroed stats for a challenge with no games', async () => {
+    const filmId = createFilm({ title: 'NoGamesFilm' });
+    const challengeId = createChallenge({ filmId, date: today() });
+
+    const res = await request(app).get(`/api/stats/challenge?challengeId=${challengeId}`);
+    expect(res.status).toBe(200);
+    expect(res.body.totalGames).toBe(0);
+    expect(res.body.totalWins).toBe(0);
+    expect(res.body.totalLosses).toBe(0);
+  });
+});
+
+// ─── Global stats accumulation ────────────────────────────────────────────────
+
+describe('GET /api/stats — accumulation across games', () => {
+  it('counts totalGames from two different sessions on the same challenge', async () => {
+    const filmTitle = `MultiGame-${Math.random().toString(36).slice(2)}`;
+    const filmId = createFilm({ title: filmTitle });
+    createChallenge({ filmId, date: today() });
+
+    // Session 1: win
+    const agent1 = request.agent(app);
+    const r1 = await agent1.get('/api/challenge/today');
+    const { challengeId } = r1.body as { challengeId: number };
+    await agent1.post('/api/challenge/guess').send({ challengeId, guess: filmTitle });
+
+    // Session 2: loss (different agent = different session)
+    const agent2 = request.agent(app);
+    await agent2.get('/api/challenge/today'); // creates second session
+    for (let i = 0; i < 5; i++) {
+      await agent2.post('/api/challenge/guess').send({ challengeId, guess: `wrong${i}` });
+    }
+
+    const res = await request(app).get('/api/stats');
+    expect(res.status).toBe(200);
+    expect(res.body.totalGames).toBeGreaterThanOrEqual(2);
+  });
+
+  it('winRate is between 0 and 100', async () => {
+    const res = await request(app).get('/api/stats');
+    expect(res.status).toBe(200);
+    expect(res.body.winRate).toBeGreaterThanOrEqual(0);
+    expect(res.body.winRate).toBeLessThanOrEqual(100);
+  });
+
+  it('returns winsByAttempt with numeric keys 1 through MAX', async () => {
+    const res = await request(app).get('/api/stats');
+    expect(res.status).toBe(200);
+    const dist = res.body.winsByAttempt as Record<string, number>;
+    expect(typeof dist).toBe('object');
+    Object.values(dist).forEach((v) => expect(typeof v).toBe('number'));
+  });
 });

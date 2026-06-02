@@ -9,6 +9,8 @@ import { activeChallengeOrdinalByDate } from '../lib/dailyChallengeOrdinal.js'
 import { normalizeCommonsPhotoUrl } from '../lib/commonsThumb.js'
 import { normalise, isGuessCorrect, expandWikiPersonAcceptedForms } from '../lib/matching.js'
 import { escapeHtml } from '../lib/utils.js'
+import { getTodayParis } from '../lib/dates.js'
+import { parseAttempts } from '../lib/session.js'
 import {
   dedupeYouthAgainstSeniorMergeEnds,
   inferClubStintEndYears,
@@ -16,6 +18,11 @@ import {
   promoteLeadingBlankYouthFromSenior,
   type ClubStint,
 } from '../lib/wikiClubYears.js'
+import {
+  getOrCreateGameSession,
+  findGameSession,
+  type GameSessionRow,
+} from './game-session.service.js'
 
 const MAX_ATTEMPTS = parseInt(process.env.WIKI_MAX_ATTEMPTS ?? '5', 10)
 const MAX_HINTS = 3
@@ -26,7 +33,7 @@ interface WikiPersonRow {
   id: number
   name: string
   name_aliases: string
-  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic'
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic' | 'actor'
   infobox_data: string
   hint_schedule: string
   photo_url: string | null
@@ -43,16 +50,7 @@ interface WikiChallengeRow {
   hint_schedule: string
 }
 
-interface SessionRow {
-  id: number
-  session_token: string
-  challenge_id: number
-  attempts: string
-  hints_revealed: number
-  outcome: 'won' | 'lost' | null
-  started_at: string
-  finished_at: string | null
-}
+type SessionRow = GameSessionRow
 
 interface AttemptEntry {
   guess: string
@@ -132,9 +130,6 @@ interface SportClubView {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getTodayParis(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
-}
 
 function hasAdjacentWikiChallenge(date: string, direction: 'prev' | 'next'): boolean {
   const todayParis = getTodayParis()
@@ -231,6 +226,9 @@ function getWikiHintKeysAllowed(personType: WikiPersonRow['person_type']): strin
   if (personType === 'entrepreneur') {
     return ['birth_year', 'nationality', 'domain', 'notable_work', 'company', 'name_initials', 'name_length']
   }
+  if (personType === 'actor') {
+    return ['birth_year', 'nationality', 'notable_films', 'occupation', 'name_initials', 'name_length']
+  }
   return ['birth_year', 'nationality', 'domain', 'notable_work', 'name_initials', 'name_length']
 }
 
@@ -244,6 +242,9 @@ function getSupplementalHintKeys(personType: WikiPersonRow['person_type']): stri
   }
   if (personType === 'entrepreneur') {
     return ['birth_year', 'nationality', 'company', 'name_initials', 'name_length']
+  }
+  if (personType === 'actor') {
+    return ['birth_year', 'nationality', 'notable_films', 'name_initials', 'name_length']
   }
   return ['birth_year', 'nationality', 'name_initials', 'name_length']
 }
@@ -313,6 +314,11 @@ function buildVisibleProfile(person: WikiPersonRow): { type: 'politician'; roles
   careerHighlights: Array<{ label: string; value: string }>
   nationalTeam: SportspersonData['national_team']
 } | {
+  type: 'actor'
+  notableFilms: string | null
+  notableFilmsParts: string[]
+  occupation: string | null
+} | {
   type: 'generic'
   domain: string | null
   notableWork: string | null
@@ -366,6 +372,15 @@ function buildVisibleProfile(person: WikiPersonRow): { type: 'politician'; roles
       sport: s.sport,
       careerHighlights: (s.career_highlights ?? []).slice(0, 6),
       nationalTeam: s.national_team,
+    }
+  }
+  if (person.person_type === 'actor') {
+    const a = data as { birth_year: number | null; nationality: string | null; notable_films: string | null; occupation: string | null }
+    return {
+      type: 'actor',
+      notableFilms: a.notable_films,
+      notableFilmsParts: a.notable_films ? a.notable_films.split(' · ').map(s => s.trim()).filter(Boolean).slice(0, 6) : [],
+      occupation: a.occupation,
     }
   }
   const g = data as GenericPersonData
@@ -431,6 +446,24 @@ function resolveHint(key: string, person: WikiPersonRow): { type: string; value:
     }
   }
 
+  if (person.person_type === 'actor') {
+    const a = data as { birth_year: number | null; nationality: string | null; notable_films: string | null; occupation: string | null }
+    switch (key) {
+      case 'birth_year':
+        return { type: 'wiki_birth_year', value: a.birth_year }
+      case 'nationality':
+        return { type: 'wiki_nationality', value: a.nationality }
+      case 'notable_films':
+        return { type: 'wiki_notable_films', value: a.notable_films }
+      case 'occupation':
+        return { type: 'wiki_occupation', value: a.occupation }
+      case 'name_initials':
+        return { type: 'wiki_name_initials', value: computeInitials(person.name) }
+      case 'name_length':
+        return { type: 'wiki_name_length', value: computeNameLength(person.name) }
+    }
+  }
+
   const g = data as GenericPersonData
   switch (key) {
     case 'birth_year':
@@ -484,23 +517,12 @@ export function getWikiChallengeById(id: number): WikiChallengeRow {
   return row
 }
 
-export function getOrCreateWikiSession(sessionToken: string, challengeId: number): SessionRow {
-  const existing = db
-    .prepare<[string, number], SessionRow>(
-      `SELECT * FROM game_sessions WHERE session_token = ? AND challenge_id = ?`
-    )
-    .get(sessionToken, challengeId)
-  if (existing) return existing
-
-  db.prepare(
-    `INSERT INTO game_sessions (session_token, challenge_id) VALUES (?, ?)`
-  ).run(sessionToken, challengeId)
-
-  return db
-    .prepare<[string, number], SessionRow>(
-      `SELECT * FROM game_sessions WHERE session_token = ? AND challenge_id = ?`
-    )
-    .get(sessionToken, challengeId)!
+export function getOrCreateWikiSession(
+  sessionToken: string,
+  challengeId: number,
+  userId?: number
+): SessionRow {
+  return getOrCreateGameSession(sessionToken, challengeId, userId)
 }
 
 function buildWikiChallengePayloadFromPerson(
@@ -510,7 +532,7 @@ function buildWikiChallengePayloadFromPerson(
 ) {
   const schedule = computeHintSchedule(person, challenge.hint_schedule)
   const hintsRevealed = Math.min(session.hints_revealed, MAX_HINTS)
-  const attempts: AttemptEntry[] = JSON.parse(session.attempts)
+  const attempts: AttemptEntry[] = parseAttempts(session.attempts)
 
   const hints = schedule
     .slice(0, hintsRevealed)
@@ -548,7 +570,8 @@ function buildWikiChallengePayloadFromPerson(
 export function buildWikiChallengePayload(challenge: WikiChallengeRow, session: SessionRow) {
   const person = db
     .prepare<[number], WikiPersonRow>(`SELECT * FROM wiki_persons WHERE id = ?`)
-    .get(challenge.wiki_person_id)!
+    .get(challenge.wiki_person_id)
+  if (!person) throw Object.assign(new Error('Wiki person not found'), { status: 500 })
   return buildWikiChallengePayloadFromPerson(person, challenge, session)
 }
 
@@ -599,6 +622,7 @@ export function buildWikiAdminPreviewFromPerson(person: WikiPersonRow, wikiPerso
     id: 0,
     session_token: '',
     challenge_id: fakeChallenge.id,
+    user_id: null,
     attempts: '[]',
     hints_revealed: MAX_HINTS,
     outcome: null,
@@ -660,15 +684,16 @@ export function buildWikiAdminPreviewFromPoolPayload(data: WikiFetchPayloadForAd
 export function processWikiGuess(
   sessionToken: string,
   challengeId: number,
-  rawGuess: string
+  rawGuess: string,
+  userId?: number
 ): { correct: boolean; outcome: 'won' | 'lost' | null; attemptsLeft: number; nextHintUnlocked: boolean } {
   return db.transaction(() => {
-    const session = getOrCreateWikiSession(sessionToken, challengeId)
+    const session = getOrCreateWikiSession(sessionToken, challengeId, userId)
     if (session.outcome !== null) {
       throw Object.assign(new Error('Game already finished'), { status: 409 })
     }
 
-    const attempts: AttemptEntry[] = JSON.parse(session.attempts)
+    const attempts: AttemptEntry[] = parseAttempts(session.attempts)
     if (attempts.length >= MAX_ATTEMPTS) {
       throw Object.assign(new Error('No attempts remaining'), { status: 409 })
     }
@@ -695,7 +720,8 @@ export function processWikiGuess(
       .prepare<[number], Pick<WikiPersonRow, 'name' | 'person_type' | 'infobox_data'>>(
         `SELECT name, person_type, infobox_data FROM wiki_persons WHERE id = ?`
       )
-      .get(challenge.wiki_person_id)!
+      .get(challenge.wiki_person_id)
+    if (!hintPerson) throw Object.assign(new Error('Wiki person not found'), { status: 500 })
     const personForHints: WikiPersonRow = {
       id: challenge.wiki_person_id,
       name: hintPerson.name,
@@ -724,39 +750,38 @@ export function processWikiGuess(
 
     db.prepare(
       `UPDATE game_sessions
-       SET attempts = ?, hints_revealed = ?, outcome = ?, finished_at = ?
-       WHERE session_token = ? AND challenge_id = ?`
+       SET attempts = ?, hints_revealed = ?, outcome = ?, finished_at = ?,
+           user_id = COALESCE(user_id, ?)
+       WHERE id = ?`
     ).run(
       JSON.stringify(attempts),
       newHintsRevealed,
       newOutcome,
       newOutcome ? new Date().toISOString() : null,
-      sessionToken,
-      challengeId
+      userId ?? null,
+      session.id
     )
 
     return { correct, outcome: newOutcome, attemptsLeft: MAX_ATTEMPTS - attempts.length, nextHintUnlocked }
   })()
 }
 
-export function getWikiResult(sessionToken: string, challengeId: number) {
-  const session = db
-    .prepare<[string, number], SessionRow>(
-      `SELECT * FROM game_sessions WHERE session_token = ? AND challenge_id = ?`
-    )
-    .get(sessionToken, challengeId)
+export function getWikiResult(sessionToken: string, challengeId: number, userId?: number) {
+  const session = findGameSession(sessionToken, challengeId, userId)
   if (!session) throw Object.assign(new Error('No session found'), { status: 404 })
   if (session.outcome === null) throw Object.assign(new Error('Game not finished yet'), { status: 403 })
 
   const challenge = db
     .prepare<[number], WikiChallengeRow>(`SELECT * FROM daily_challenges WHERE id = ?`)
-    .get(challengeId)!
+    .get(challengeId)
+  if (!challenge) throw Object.assign(new Error('Challenge not found'), { status: 404 })
 
   const person = db
     .prepare<[number], WikiPersonRow>(`SELECT * FROM wiki_persons WHERE id = ?`)
-    .get(challenge.wiki_person_id)!
+    .get(challenge.wiki_person_id)
+  if (!person) throw Object.assign(new Error('Wiki person not found'), { status: 500 })
 
-  const attempts: AttemptEntry[] = JSON.parse(session.attempts)
+  const attempts: AttemptEntry[] = parseAttempts(session.attempts)
 
   return {
     outcome: session.outcome,

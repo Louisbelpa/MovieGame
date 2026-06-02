@@ -1,116 +1,81 @@
-/**
- * layout/Header.tsx
- * Top app bar with logo, challenge number, and icon buttons.
- * Detects /wiki route and uses wikiStore for modal actions.
- */
-
-import { useRef } from 'react'
-import { HelpCircle, BarChart2, Film, CalendarDays, Tv, Home, Landmark } from 'lucide-react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { useGameStore } from '@/store/gameStore'
-import { useWikiStore } from '@/store/wikiStore'
-import { BRAND_NAME } from '@/config/features'
+import { useAuthStore } from '@/store/authStore'
+import { useAuthModal } from '@/components/modals/AuthModal'
+import { loadStats } from '@/lib/storage'
+import { FEATURES } from '@/config/features'
 
 interface HeaderProps {
   mode: 'film' | 'series' | 'wiki'
 }
 
-export function Header({ mode }: HeaderProps) {
-  const isWiki = mode === 'wiki'
+export function Header({ mode: _mode }: HeaderProps) {
+  const user = useAuthStore((s) => s.user)
+  const isLoading = useAuthStore((s) => s.isLoading)
+  const { open: openAuth } = useAuthModal()
 
-  const gameOpenModal = useGameStore((s) => s.openModal)
-  const wikiOpenModal = useWikiStore((s) => s.openModal)
-  const openModal = isWiki ? wikiOpenModal : gameOpenModal
-
-  const gameChallenge = useGameStore((s) => s.challenge)
-  const wikiChallenge = useWikiStore((s) => s.challenge)
-  const gameType = useGameStore((s) => s.gameType)
-
-  const lastNumberRef = useRef<number | null>(null)
-  const prevModeRef = useRef(mode)
-  if (prevModeRef.current !== mode) {
-    prevModeRef.current = mode
-    lastNumberRef.current = null
-  }
-  if (!isWiki && gameChallenge?.challengeNumber) lastNumberRef.current = gameChallenge.challengeNumber
-  if (isWiki && wikiChallenge?.challengeNumber) lastNumberRef.current = wikiChallenge.challengeNumber
-  const displayNumber = lastNumberRef.current
-
-  const icon = isWiki
-    ? <Landmark size={22} className="text-film-gold" aria-hidden />
-    : mode === 'series' || gameType === 'series'
-      ? <Tv size={22} className="text-film-gold" aria-hidden />
-      : <Film size={22} className="text-film-gold" aria-hidden />
+  const maxStreak = Math.max(
+    loadStats('film').currentStreak,
+    FEATURES.enableWiki   ? loadStats('wiki').currentStreak   : 0,
+    FEATURES.enableSeries ? loadStats('series').currentStreak : 0,
+  )
 
   return (
-    <header className="sticky top-0 z-30 w-full border-b border-film-border bg-film-black/90 backdrop-blur-md">
-      <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-        {/* Left: home + rules */}
-        <div className="flex items-center gap-1">
-          <a
-            href="/"
-            aria-label="Choisir le jeu"
-            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
-          >
-            <Home size={20} aria-hidden />
-          </a>
-          <button
-            onClick={() => openModal('rules')}
-            aria-label="Règles du jeu"
-            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
-          >
-            <HelpCircle size={20} aria-hidden />
-          </button>
-        </div>
+    <header className="cdy-nav">
+      {/* Logo */}
+      <a href="/" className="cdy-logo" style={{ textDecoration: 'none', color: 'var(--ink)' }}>
+        <span className="cdy-die">?</span>
+        <span>Guess<span style={{ color: 'var(--coral)' }}>Today</span></span>
+      </a>
 
-        {/* Center: logo */}
-        <div className="flex items-center gap-2">
-          <a
-            href="/"
-            aria-label={`Accueil ${BRAND_NAME}`}
-            className="inline-flex items-center gap-2 rounded-lg px-1 -mx-1 min-h-[44px] text-film-text hover:bg-film-gray/60 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
-          >
-            {icon}
-            <span className="font-title text-xl font-bold text-gradient-gold tracking-tight">
-              {BRAND_NAME}
-            </span>
-          </a>
-          {displayNumber && (
-            <div className="overflow-hidden h-5 flex items-center">
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={displayNumber}
-                  className="text-film-text-dim text-sm font-mono block"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  #{displayNumber}
-                </motion.span>
-              </AnimatePresence>
-            </div>
+      {/* Navlinks (desktop only) */}
+      <nav className="cdy-navlinks hidden lg:flex">
+        <a href="/"        className="cdy-navlink on">Jeux du jour</a>
+        <a href="/profile" className="cdy-navlink">Stats</a>
+        <a href="/friends" className="cdy-navlink">Classement</a>
+        <a href="/friends" className="cdy-navlink">Amis</a>
+      </nav>
+
+      <span className="cdy-spacer" />
+
+      {/* Right */}
+      {isLoading ? (
+        <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--line)' }} />
+      ) : user ? (
+        <>
+          {maxStreak > 0 && (
+            <span className="cdy-streak">🔥 {maxStreak}j</span>
           )}
-        </div>
-
-        {/* Right: archive + stats buttons */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => openModal('archive')}
-            aria-label="Archives"
-            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+          <a
+            href="/profile"
+            className="cdy-avatar"
+            style={{ background: 'var(--grape)', boxShadow: '0 3px 0 var(--grape-d)', textDecoration: 'none', fontSize: 14 }}
           >
-            <CalendarDays size={20} aria-hidden />
+            {user.avatarUrl ? (
+              <img src={user.avatarUrl} alt={user.displayName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+            ) : (
+              user.displayName.charAt(0).toUpperCase()
+            )}
+          </a>
+        </>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={() => openAuth('login')}
+            className="cdy-navlink"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Fredoka, sans-serif' }}
+          >
+            Se connecter
           </button>
           <button
-            onClick={() => openModal('stats')}
-            aria-label="Mes statistiques"
-            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+            type="button"
+            onClick={() => openAuth('register')}
+            className="cdy-btn cdy-btn-primary g-film"
+            style={{ padding: '10px 20px', fontSize: 14 }}
           >
-            <BarChart2 size={20} aria-hidden />
+            Créer un compte
           </button>
-        </div>
-      </div>
+        </>
+      )}
     </header>
   )
 }

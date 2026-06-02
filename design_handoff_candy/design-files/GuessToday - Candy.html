@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GuessToday — Direction Candy</title>
+<link rel="stylesheet" href="assets/ds.css" />
+<link rel="stylesheet" href="assets/directions.css" />
+<link rel="stylesheet" href="assets/candy.css" />
+<style>
+  html, body { margin: 0; height: 100%; background: #0d0d11; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="assets/design-canvas.jsx"></script>
+<script type="text/babel" src="assets/directions.jsx"></script>
+<script type="text/babel" src="assets/candy-screens.jsx"></script>
+<script type="text/babel" src="assets/candy-social.jsx"></script>
+<script type="text/babel" src="assets/candy-game.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+function App() {
+  const { DesignCanvas, DCSection, DCArtboard } = window;
+  return (
+    <DesignCanvas>
+      <DCSection id="hub" title="Hub — accueil connecté" subtitle="Le rendez-vous quotidien : 3 défis, progression, série, score du jour.">
+        <DCArtboard id="hub" label="Hub · les défis du jour" width={1440} height={1400}>
+          <CandyHub />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="landing" title="Landing — non connecté" subtitle="Concept, deck de jeux animé, comment jouer, CTA inscription.">
+        <DCArtboard id="landing" label="Landing" width={1440} height={1580}>
+          <CandyLanding />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="film" title="Écran de jeu · FilmGuess" subtitle="Page complète : header, sélecteur de défis, arène, footer. Tous les états.">
+        <DCArtboard id="film-start" label="1 · Début de partie" width={1440} height={1900}>
+          <CandyGamePage game="film" state="start" />
+        </DCArtboard>
+        <DCArtboard id="film-playing" label="2 · En cours (2 essais, 2 indices)" width={1440} height={1900}>
+          <CandyGamePage game="film" state="playing" />
+        </DCArtboard>
+        <DCArtboard id="film-won" label="3 · Victoire" width={1440} height={1900}>
+          <CandyGamePage game="film" state="won" />
+        </DCArtboard>
+        <DCArtboard id="film-lost" label="4 · Échec" width={1440} height={2010}>
+          <CandyGamePage game="film" state="lost" />
+        </DCArtboard>
+        <DCArtboard id="film-loading" label="5 · Chargement" width={1440} height={1740}>
+          <CandyGamePage game="film" state="loading" />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="serie" title="Écran de jeu · SerieGuess" subtitle="Même page, accent violet — le sélecteur permet de passer d'un défi à l'autre.">
+        <DCArtboard id="serie-playing" label="En cours" width={1440} height={1900}>
+          <CandyGamePage game="serie" state="playing" />
+        </DCArtboard>
+        <DCArtboard id="serie-won" label="Victoire" width={1440} height={1900}>
+          <CandyGamePage game="serie" state="won" />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="face" title="Écran de jeu · FaceGuess" subtitle="Variante « photo floue » + biographie + indices textuels, accent cyan.">
+        <DCArtboard id="face-playing" label="En cours" width={1440} height={2160}>
+          <CandyGamePage game="face" state="playing" />
+        </DCArtboard>
+        <DCArtboard id="face-won" label="Victoire" width={1440} height={2160}>
+          <CandyGamePage game="face" state="won" />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="guest" title="Parcours invité — « Voir le défi du jour »" subtitle="Le visiteur joue sans compte, puis tombe sur le mur d'inscription au moment de la récompense.">
+        <DCArtboard id="guest-arena" label="1 · Arène en mode découverte" width={760} height={1230}>
+          <CandyArenaGuest />
+        </DCArtboard>
+        <DCArtboard id="guest-win" label="2 · Fin de partie · mur d'inscription" width={760} height={1080}>
+          <CandyGuestWin />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="end" title="Fin de partie" subtitle="Les deux issues : la victoire qui célèbre, la défaite qui réconforte.">
+        <DCArtboard id="won" label="Victoire 🎉" width={760} height={900}>
+          <Victory k="b" />
+        </DCArtboard>
+        <DCArtboard id="lost" label="Défaite" width={760} height={900}>
+          <CandyDefeat />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="result" title="Résultat & partage" subtitle="Score, révélation de la réponse, et carte partageable sans spoiler.">
+        <DCArtboard id="result" label="Résultat de partie" width={1440} height={1480}>
+          <CandyResult />
+        </DCArtboard>
+        <DCArtboard id="share" label="Cartes de partage · un jeu vs. la journée" width={900} height={640}>
+          <CandyShareCompare />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="stats" title="Stats du jour" subtitle="Comment la communauté a joué le défi — distributions dynamiques.">
+        <DCArtboard id="stats" label="Statistiques du jour" width={1440} height={1300}>
+          <CandyStats />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="profile" title="Profil" subtitle="En-tête, stats par jeu (non câblées aux 3 jeux actuels), historique.">
+        <DCArtboard id="profile" label="Profil utilisateur" width={1440} height={1160}>
+          <CandyProfile />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="social" title="Classement & Amis" subtitle="Podium, classement amis, gestion des invitations.">
+        <DCArtboard id="leader" label="Classement amis" width={1440} height={1420}>
+          <CandyLeaderboard />
+        </DCArtboard>
+        <DCArtboard id="friends" label="Gestion des amis" width={1440} height={1240}>
+          <CandyFriends />
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+function mountWhenReady() {
+  if (window.DesignCanvas && window.CandyHub && window.CandyLanding && window.Arena && window.Victory && window.CandyDefeat && window.CandyArenaGuest && window.CandyGuestWin && window.CandyStats && window.CandyProfile && window.CandyLeaderboard && window.CandyFriends && window.CandyResult && window.CandyFaceArena && window.CandyShareCompare && window.CandyGame && window.CandyGamePage && window.CandyFooter) {
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  } else {
+    setTimeout(mountWhenReady, 30);
+  }
+}
+mountWhenReady();
+</script>
+</body>
+</html>

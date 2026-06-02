@@ -8,22 +8,19 @@ interface BadgeProps {
   className?: string
 }
 
-const variantClasses: Record<BadgeVariant, string> = {
-  gold: 'bg-film-gold/15 text-film-gold border-film-gold/30',
-  green: 'bg-film-green/15 text-film-green border-film-green/30',
-  red: 'bg-film-red/15 text-film-red border-film-red/30',
-  muted: 'bg-film-muted/20 text-film-text-dim border-film-border',
-  amber: 'bg-film-amber/15 text-film-amber border-film-amber/30',
+const variantStyles: Record<BadgeVariant, React.CSSProperties> = {
+  gold:  { background: 'var(--coral-soft)',   color: 'var(--coral-d)',   border: '1px solid var(--coral)' },
+  green: { background: 'var(--correct-soft)', color: 'var(--correct-d)', border: '1px solid var(--correct)' },
+  red:   { background: 'var(--wrong-soft)',   color: 'var(--wrong-d)',   border: '1px solid var(--wrong)' },
+  muted: { background: 'var(--bg-2)',         color: 'var(--ink-2)',     border: '1px solid var(--line)' },
+  amber: { background: '#fff5e6',             color: 'var(--flame)',     border: '1px solid #ffe2bd' },
 }
 
 export function Badge({ variant = 'muted', children, className }: BadgeProps) {
   return (
     <span
-      className={cn(
-        'inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border',
-        variantClasses[variant],
-        className
-      )}
+      className={cn('inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full', className)}
+      style={variantStyles[variant]}
     >
       {children}
     </span>

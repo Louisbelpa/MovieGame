@@ -53,6 +53,7 @@ import {
   normalizeSeriesHintScheduleJson,
 } from '../services/challenge.service.js';
 import { maybeSendPlanningAlert } from '../lib/planningAlert.js';
+import { getTodayParis } from '../lib/dates.js';
 import {
   inferSportspersonInfoboxClubYears,
   normalizeWikiPersonInfoboxForStore,
@@ -206,7 +207,7 @@ interface WikiPersonRow {
   id: number;
   name: string;
   name_aliases: string;
-  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic';
+  person_type: 'politician' | 'sportsperson' | 'artist' | 'scientist' | 'entrepreneur' | 'writer' | 'historical_figure' | 'generic' | 'actor';
   wikipedia_slug: string;
   infobox_data: string;
   hint_schedule: string;
@@ -520,10 +521,6 @@ function formatChallengesBatch(rows: ChallengeRow[]): ReturnType<typeof formatCh
   })
 }
 
-function getTodayParis(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
-}
-
 function renumberChallenges(mediaType: 'film' | 'series' | 'wiki'): void {
   const rows = db.prepare<[string], { id: number }>(
     'SELECT id FROM daily_challenges WHERE media_type = ? AND is_active = 1 ORDER BY challenge_date ASC'
@@ -581,14 +578,12 @@ adminRouter.post(
       const adminUsername = process.env.ADMIN_USERNAME ?? '';
 
       const timingSafeEqual = (a: string, b: string): boolean => {
-        const bufA = Buffer.from(a);
-        const bufB = Buffer.from(b);
-        if (bufA.length !== bufB.length) {
-          // Still run timingSafeEqual on same-length buffers to avoid leaking length
-          crypto.timingSafeEqual(bufA, bufA);
-          return false;
-        }
-        return crypto.timingSafeEqual(bufA, bufB);
+        // Hash both strings to a fixed-length digest so comparison is always
+        // constant-time regardless of input length (avoids length side-channel).
+        const key = Buffer.alloc(32);
+        const ha = crypto.createHmac('sha256', key).update(a).digest();
+        const hb = crypto.createHmac('sha256', key).update(b).digest();
+        return crypto.timingSafeEqual(ha, hb);
       };
 
       // If ADMIN_USERNAME is configured, both fields are required
@@ -880,9 +875,185 @@ adminRouter.get(
   }
 );
 
+// ─── Player accounts (users) ─────────────────────────────────────────────────
+
+function escapeLikeUserSearch(q: string): string {
+  return q.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
+// GET /api/admin/users?page=1&limit=20&q=&banned=all|1|0
+adminRouter.get(
+  '/users',
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const page = Math.max(1, parseInt((req.query.page as string | undefined) ?? '1', 10));
+      const limit = Math.min(
+        100,
+        Math.max(1, parseInt((req.query.limit as string | undefined) ?? '20', 10))
+      );
+      const offset = (page - 1) * limit;
+      const qRaw = (req.query.q as string | undefined)?.trim() ?? '';
+      const bannedParam = (req.query.banned as string | undefined)?.trim().toLowerCase() ?? 'all';
+
+      const conditions: string[] = [];
+      const filterArgs: string[] = [];
+
+      if (qRaw) {
+        const esc = escapeLikeUserSearch(qRaw);
+        conditions.push(
+          `(lower(u.email) LIKE '%' || lower(?) || '%' ESCAPE '\\' OR lower(u.display_name) LIKE '%' || lower(?) || '%' ESCAPE '\\')`
+        );
+        filterArgs.push(esc, esc);
+      }
+      if (bannedParam === '1' || bannedParam === 'true' || bannedParam === 'banned') {
+        conditions.push('u.is_banned = 1');
+      } else if (bannedParam === '0' || bannedParam === 'false' || bannedParam === 'active') {
+        conditions.push('u.is_banned = 0');
+      }
+
+      const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+      const total = (
+        db.prepare(`SELECT COUNT(*) as count FROM users u ${where}`).get(...filterArgs) as { count: number }
+      ).count;
+
+      type UserListRow = {
+        id: number;
+        email: string | null;
+        display_name: string;
+        avatar_url: string | null;
+        created_at: string;
+        is_banned: number;
+        stats_games_played: number | null;
+        stats_wins: number | null;
+        stats_streak: number | null;
+        stats_max_streak: number | null;
+        oauth_count: number;
+        active_sessions: number;
+      };
+
+      const rows = db
+        .prepare<unknown[], UserListRow>(
+          `SELECT u.id, u.email, u.display_name, u.avatar_url, u.created_at, u.is_banned,
+                  u.stats_games_played, u.stats_wins, u.stats_streak, u.stats_max_streak,
+                  (SELECT COUNT(*) FROM oauth_accounts o WHERE o.user_id = u.id) AS oauth_count,
+                  (SELECT COUNT(*) FROM user_sessions s
+                     WHERE s.user_id = u.id AND datetime(s.expires_at) > datetime('now')) AS active_sessions
+           FROM users u
+           ${where}
+           ORDER BY u.id DESC
+           LIMIT ? OFFSET ?`
+        )
+        .all(...filterArgs, limit, offset);
+
+      res.json({
+        data: rows.map((r) => ({
+          id: r.id,
+          email: r.email,
+          displayName: r.display_name,
+          avatarUrl: r.avatar_url,
+          createdAt: r.created_at,
+          isBanned: Boolean(r.is_banned),
+          statsGamesPlayed: r.stats_games_played ?? 0,
+          statsWins: r.stats_wins ?? 0,
+          statsStreak: r.stats_streak ?? 0,
+          statsMaxStreak: r.stats_max_streak ?? 0,
+          oauthCount: r.oauth_count,
+          activeSessions: r.active_sessions,
+        })),
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// PATCH /api/admin/users/:id  { "isBanned": true|false }
+adminRouter.patch(
+  '/users/:id',
+  strictAdminLimiter,
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id ?? '', 10);
+      if (!Number.isFinite(id) || id < 1) {
+        res.status(400).json({ error: 'Invalid user id' });
+        return;
+      }
+      const body = req.body as { isBanned?: unknown };
+      if (typeof body.isBanned !== 'boolean') {
+        res.status(400).json({ error: 'Field "isBanned" (boolean) is required' });
+        return;
+      }
+
+      const row = db.prepare<number, { id: number }>(`SELECT id FROM users WHERE id = ?`).get(id);
+      if (!row) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      const banned = body.isBanned ? 1 : 0;
+      db.prepare(`UPDATE users SET is_banned = ? WHERE id = ?`).run(banned, id);
+
+      if (banned) {
+        db.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).run(id);
+      }
+
+      logAuditEvent(body.isBanned ? 'user.ban' : 'user.unban', { userId: id });
+
+      const u = db
+        .prepare<number, {
+          id: number;
+          email: string | null;
+          display_name: string;
+          avatar_url: string | null;
+          created_at: string;
+          is_banned: number;
+          stats_games_played: number | null;
+          stats_wins: number | null;
+          stats_streak: number | null;
+          stats_max_streak: number | null;
+        }>(
+          `SELECT id, email, display_name, avatar_url, created_at, is_banned,
+                  stats_games_played, stats_wins, stats_streak, stats_max_streak
+           FROM users WHERE id = ?`
+        )
+        .get(id)!;
+
+      const oauthCount = (
+        db.prepare<number, { c: number }>(`SELECT COUNT(*) as c FROM oauth_accounts WHERE user_id = ?`).get(id) as {
+          c: number;
+        }
+      ).c;
+
+      res.json({
+        id: u.id,
+        email: u.email,
+        displayName: u.display_name,
+        avatarUrl: u.avatar_url,
+        createdAt: u.created_at,
+        isBanned: Boolean(u.is_banned),
+        statsGamesPlayed: u.stats_games_played ?? 0,
+        statsWins: u.stats_wins ?? 0,
+        statsStreak: u.stats_streak ?? 0,
+        statsMaxStreak: u.stats_max_streak ?? 0,
+        oauthCount,
+        activeSessions: 0,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // ─── Films CRUD ───────────────────────────────────────────────────────────────
 
-// GET /api/admin/films?page=1&limit=20
+// GET /api/admin/films?page=1&limit=20&q=title&is_active=true|false
 adminRouter.get(
   '/films',
   (req: Request, res: Response, next: NextFunction) => {
@@ -893,16 +1064,31 @@ adminRouter.get(
         Math.max(1, parseInt((req.query.limit as string | undefined) ?? '20', 10))
       );
       const offset = (page - 1) * limit;
+      const q = (req.query.q as string | undefined)?.trim() ?? '';
+      const isActiveParam = req.query.is_active as string | undefined;
+
+      const conditions: string[] = [];
+      const filterArgs: (string | number)[] = [];
+      if (q) {
+        conditions.push(`(title LIKE '%' || ? || '%' OR director LIKE '%' || ? || '%')`);
+        filterArgs.push(q, q);
+      }
+      if (isActiveParam === 'true' || isActiveParam === '1') {
+        conditions.push('is_active = 1');
+      } else if (isActiveParam === 'false' || isActiveParam === '0') {
+        conditions.push('is_active = 0');
+      }
+      const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
       const total = (
-        db.prepare(`SELECT COUNT(*) as count FROM films`).get() as { count: number }
+        db.prepare(`SELECT COUNT(*) as count FROM films ${where}`).get(...filterArgs) as { count: number }
       ).count;
 
       const rows = db
-        .prepare<[number, number], FilmRow>(
-          `SELECT * FROM films ORDER BY created_at DESC LIMIT ? OFFSET ?`
+        .prepare<unknown[], FilmRow>(
+          `SELECT * FROM films ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
         )
-        .all(limit, offset);
+        .all(...filterArgs, limit, offset);
 
       res.json({
         data: rows.map((r) => formatFilm(r, getFilmUsedDates(r.id))),
@@ -1955,6 +2141,101 @@ adminRouter.get(
   }
 );
 
+// GET /api/admin/stats/social — utilisateurs, plateformes, achievements, social
+adminRouter.get(
+  '/stats/social',
+  (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      // ── Users ──────────────────────────────────────────────────────────────
+      const { total_users } = db.prepare<[], { total_users: number }>(
+        `SELECT COUNT(*) AS total_users FROM users`
+      ).get()!;
+
+      const { new_7d } = db.prepare<[], { new_7d: number }>(
+        `SELECT COUNT(*) AS new_7d FROM users WHERE created_at >= datetime('now','-7 days')`
+      ).get()!;
+
+      const { new_30d } = db.prepare<[], { new_30d: number }>(
+        `SELECT COUNT(*) AS new_30d FROM users WHERE created_at >= datetime('now','-30 days')`
+      ).get()!;
+
+      const { apple_users } = db.prepare<[], { apple_users: number }>(
+        `SELECT COUNT(DISTINCT user_id) AS apple_users FROM oauth_accounts WHERE provider = 'apple'`
+      ).get()!;
+
+      // ── Platforms (user_platforms = tous les users connectés, pas seulement push) ──
+      const platformRows = db.prepare<[], { platform: string; count: number }>(
+        `SELECT platform, COUNT(DISTINCT user_id) AS count FROM user_platforms GROUP BY platform`
+      ).all();
+
+      const platforms: Record<string, number> = { ios: 0, android: 0, web: 0 };
+      for (const r of platformRows) platforms[r.platform] = r.count;
+
+      // ── Achievements (approximated from users stats columns) ───────────────
+      const achRow = db.prepare<[], {
+        first_win: number; plays_10: number; streak_7: number; streak_30: number;
+        wins_50: number; wins_100: number;
+      }>(`
+        SELECT
+          COUNT(CASE WHEN stats_wins >= 1   THEN 1 END) AS first_win,
+          COUNT(CASE WHEN stats_games_played >= 10 THEN 1 END) AS plays_10,
+          COUNT(CASE WHEN stats_max_streak >= 7  THEN 1 END) AS streak_7,
+          COUNT(CASE WHEN stats_max_streak >= 30 THEN 1 END) AS streak_30,
+          COUNT(CASE WHEN stats_wins >= 50  THEN 1 END) AS wins_50,
+          COUNT(CASE WHEN stats_wins >= 100 THEN 1 END) AS wins_100
+        FROM users
+      `).get()!;
+
+      // ── Social / Friends ───────────────────────────────────────────────────
+      const friendRow = db.prepare<[], {
+        total: number; accepted: number; pending: number; last_7d: number;
+      }>(`
+        SELECT
+          COUNT(*)                                        AS total,
+          COUNT(CASE WHEN status = 'accepted' THEN 1 END) AS accepted,
+          COUNT(CASE WHEN status = 'pending'  THEN 1 END) AS pending,
+          COUNT(CASE WHEN created_at >= datetime('now','-7 days') THEN 1 END) AS last_7d
+        FROM friendships
+      `).get()!;
+
+      const { users_with_friends } = db.prepare<[], { users_with_friends: number }>(`
+        SELECT COUNT(DISTINCT uid) AS users_with_friends FROM (
+          SELECT requester_id AS uid FROM friendships WHERE status = 'accepted'
+          UNION
+          SELECT addressee_id AS uid FROM friendships WHERE status = 'accepted'
+        )
+      `).get()!;
+
+      res.json({
+        users: {
+          total: total_users,
+          new7d: new_7d,
+          new30d: new_30d,
+          appleSignIn: apple_users,
+        },
+        platforms,
+        achievements: {
+          first_win:  achRow.first_win,
+          plays_10:   achRow.plays_10,
+          streak_7:   achRow.streak_7,
+          streak_30:  achRow.streak_30,
+          wins_50:    achRow.wins_50,
+          wins_100:   achRow.wins_100,
+        },
+        social: {
+          totalFriendships:    friendRow.total,
+          acceptedFriendships: friendRow.accepted,
+          pendingInvitations:  friendRow.pending,
+          friendshipsLast7d:   friendRow.last_7d,
+          usersWithFriends:    users_with_friends,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // ─── TMDB Search by title ─────────────────────────────────────────────────────
 
 // GET /api/admin/tmdb/search?q=title
@@ -2467,7 +2748,7 @@ adminRouter.get(
 
 // ─── Series CRUD ──────────────────────────────────────────────────────────────
 
-// GET /api/admin/series?page=1&limit=20
+// GET /api/admin/series?page=1&limit=20&q=title&is_active=true|false
 adminRouter.get(
   '/series',
   (req: Request, res: Response, next: NextFunction) => {
@@ -2478,16 +2759,31 @@ adminRouter.get(
         Math.max(1, parseInt((req.query.limit as string | undefined) ?? '20', 10))
       );
       const offset = (page - 1) * limit;
+      const q = (req.query.q as string | undefined)?.trim() ?? '';
+      const isActiveParam = req.query.is_active as string | undefined;
+
+      const conditions: string[] = [];
+      const filterArgs: (string | number)[] = [];
+      if (q) {
+        conditions.push(`(title LIKE '%' || ? || '%' OR creator LIKE '%' || ? || '%')`);
+        filterArgs.push(q, q);
+      }
+      if (isActiveParam === 'true' || isActiveParam === '1') {
+        conditions.push('is_active = 1');
+      } else if (isActiveParam === 'false' || isActiveParam === '0') {
+        conditions.push('is_active = 0');
+      }
+      const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
       const total = (
-        db.prepare(`SELECT COUNT(*) as count FROM series`).get() as { count: number }
+        db.prepare(`SELECT COUNT(*) as count FROM series ${where}`).get(...filterArgs) as { count: number }
       ).count;
 
       const rows = db
-        .prepare<[number, number], SeriesRow>(
-          `SELECT * FROM series ORDER BY created_at DESC LIMIT ? OFFSET ?`
+        .prepare<unknown[], SeriesRow>(
+          `SELECT * FROM series ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
         )
-        .all(limit, offset);
+        .all(...filterArgs, limit, offset);
 
       res.json({
         data: rows.map((r) => formatSeries(r, getSeriesUsedDates(r.id))),

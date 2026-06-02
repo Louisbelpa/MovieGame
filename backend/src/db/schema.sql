@@ -147,6 +147,7 @@ CREATE TABLE IF NOT EXISTS daily_challenges (
 CREATE INDEX IF NOT EXISTS idx_daily_challenges_date      ON daily_challenges (challenge_date);
 CREATE INDEX IF NOT EXISTS idx_daily_challenges_film_id   ON daily_challenges (film_id);
 -- series_id and media_type indexes created by incremental migrations after those columns are added
+CREATE INDEX IF NOT EXISTS idx_dc_date_type_active ON daily_challenges (challenge_date, media_type, is_active);
 
 -- ---------------------------------------------------------------------------
 -- game_sessions
@@ -245,6 +246,74 @@ CREATE TABLE IF NOT EXISTS active_admin_tokens (
 );
 
 CREATE INDEX IF NOT EXISTS idx_admin_tokens_hash ON active_admin_tokens (token_hash);
+
+-- ---------------------------------------------------------------------------
+-- users
+--   One row per registered player account.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS users (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  email         TEXT UNIQUE,
+  password_hash TEXT,
+  display_name  TEXT NOT NULL,
+  avatar_url    TEXT,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  is_banned     INTEGER NOT NULL DEFAULT 0,
+  stats_games_played INTEGER DEFAULT 0,
+  stats_wins         INTEGER DEFAULT 0,
+  stats_streak       INTEGER DEFAULT 0,
+  stats_max_streak   INTEGER DEFAULT 0
+);
+
+-- ---------------------------------------------------------------------------
+-- oauth_accounts
+--   Links a user to an OAuth provider identity.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS oauth_accounts (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  provider    TEXT NOT NULL,
+  provider_id TEXT NOT NULL,
+  UNIQUE(provider, provider_id)
+);
+
+-- ---------------------------------------------------------------------------
+-- user_sessions
+--   Revocable user sessions (30-day rolling).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_sessions (
+  id         TEXT PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id    ON user_sessions (user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions (expires_at);
+
+-- ---------------------------------------------------------------------------
+-- wiki_sessions
+--   Optional dedicated rows for Wiki mode (mirrors game_sessions). The live
+--   wiki API currently uses game_sessions; this table exists for parity and
+--   future use, with user_id from the start.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS wiki_sessions (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_token   TEXT NOT NULL,
+    challenge_id    INTEGER NOT NULL REFERENCES daily_challenges (id) ON DELETE CASCADE,
+    attempts        TEXT NOT NULL DEFAULT '[]',
+    hints_revealed  INTEGER NOT NULL DEFAULT 0,
+    outcome         TEXT CHECK (outcome IN ('won', 'lost')),
+    started_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    finished_at     TEXT,
+    user_id         INTEGER REFERENCES users (id) ON DELETE SET NULL,
+    UNIQUE (session_token, challenge_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wiki_sessions_token     ON wiki_sessions (session_token);
+CREATE INDEX IF NOT EXISTS idx_wiki_sessions_challenge ON wiki_sessions (challenge_id);
+CREATE INDEX IF NOT EXISTS idx_wiki_sessions_outcome     ON wiki_sessions (outcome);
+CREATE INDEX IF NOT EXISTS idx_wiki_sessions_user_id     ON wiki_sessions (user_id);
 
 -- ---------------------------------------------------------------------------
 -- Trigger: update global_stats when a session is finished.

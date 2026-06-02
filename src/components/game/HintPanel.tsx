@@ -1,11 +1,4 @@
-/**
- * game/HintPanel.tsx
- * Shows revealed hints as animated cards that appear one by one.
- * Locked hints are shown as dimmed "?" slots.
- */
-
 import { motion, AnimatePresence } from 'framer-motion'
-import { Calendar, Clapperboard, User, Users, FileText, Tag, Lock, Layers } from 'lucide-react'
 import type { HintPayload } from '@/api/client'
 
 interface HintPanelProps {
@@ -19,84 +12,55 @@ export function HintPanel({ hints, hintsAvailable, hintsRevealed }: HintPanelPro
 
   return (
     <section aria-label="Indices" className="w-full">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
+      <div className="cdym-ar-hints">
         <AnimatePresence initial={false}>
           {hints.map((hint, i) => (
             <HintCard key={hint.type} hint={hint} index={i} />
           ))}
         </AnimatePresence>
-
-        {/* Locked slots */}
         {Array.from({ length: lockedCount }).map((_, i) => (
-          <LockedSlot key={`locked-${i}`} />
+          <LockedSlot key={`locked-${i}`} index={hintsRevealed + i + 1} />
         ))}
       </div>
     </section>
   )
 }
 
-// ─── Hint card ────────────────────────────────────────────────────────────────
-
 function HintCard({ hint, index }: { hint: HintPayload; index: number }) {
-  const { icon: Icon, label, formatted } = resolveHint(hint)
-
+  const { label, formatted } = resolveHint(hint)
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.92, y: 8 }}
+      initial={{ opacity: 0, scale: 0.88, y: 14 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: index * 0.05 }}
-      className="flex items-start gap-2 sm:gap-2.5 px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-lg film-border"
+      transition={{ type: 'spring', stiffness: 320, damping: 22, delay: index * 0.04 }}
+      className="cdym-ar-hint on"
     >
-      <span className="mt-0.5 text-film-gold shrink-0" aria-hidden>
-        <Icon size={14} />
-      </span>
-      <div className="min-w-0">
-        <p className="text-xs font-semibold text-film-text-dim uppercase tracking-wider">
-          {label}
-        </p>
-        <p className="text-sm text-film-text leading-snug mt-0.5 break-words">
-          {formatted}
-        </p>
-      </div>
+      <span className="hl">{label}</span>
+      <span className="hv">{formatted}</span>
     </motion.div>
   )
 }
 
-function LockedSlot() {
+function LockedSlot({ index }: { index: number }) {
   return (
-    <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-dashed border-film-border/40 opacity-40">
-      <Lock size={14} className="text-film-text-dim shrink-0" aria-hidden />
-      <span className="text-sm text-film-text-dim">Indice verrouillé</span>
+    <div className="cdym-ar-hint" style={{ minHeight: 60, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+      <span className="hl">Indice {index}</span>
+      <span className="hv" style={{ color: 'var(--ink-3)', opacity: 0.6 }}>🔒</span>
     </div>
   )
 }
 
-// ─── Hint resolver ────────────────────────────────────────────────────────────
-
-const HINT_META: Record<
-  string,
-  { icon: typeof Calendar; label: string }
-> = {
-  year:     { icon: Calendar,     label: 'Année' },
-  director: { icon: Clapperboard, label: 'Réalisateur' },
-  genres:   { icon: Tag,          label: 'Genres' },
-  cast:     { icon: User,         label: 'Acteur principal' },
-  tagline:  { icon: FileText,     label: 'Accroche' },
-  synopsis: { icon: FileText,     label: 'Synopsis' },
-  seasons:  { icon: Layers,       label: 'Saisons' },
-  creator:  { icon: Clapperboard, label: 'Créateur' },
+const HINT_LABELS: Record<string, string> = {
+  year: 'Année', director: 'Réalisateur', genres: 'Genres',
+  cast: 'Acteur principal', tagline: 'Accroche', synopsis: 'Synopsis',
+  seasons: 'Saisons', creator: 'Créateur',
 }
 
-function resolveHint(hint: HintPayload): {
-  icon: typeof Calendar
-  label: string
-  formatted: string
-} {
-  const meta = HINT_META[hint.type] ?? { icon: Users, label: hint.type }
+function resolveHint(hint: HintPayload): { label: string; formatted: string } {
+  const label = HINT_LABELS[hint.type] ?? hint.type
   const val = hint.value
-  // For cast, show only the first actor (main actor)
   const formatted = Array.isArray(val)
     ? (hint.type === 'cast' ? val[0] ?? '' : val.join(', '))
     : String(val)
-  return { ...meta, formatted }
+  return { label, formatted }
 }

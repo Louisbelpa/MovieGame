@@ -10,49 +10,35 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   isLoading?: boolean
 }
 
-const variantClasses: Record<Variant, string> = {
-  primary:
-    'btn-mode-primary active:scale-95',
-  secondary:
-    'border border-film-border bg-film-gray text-film-text hover:border-film-gold hover:text-film-gold active:scale-95',
-  ghost:
-    'text-film-text-dim hover:text-film-text hover:bg-film-gray active:scale-95',
-  danger:
-    'border border-film-red/40 bg-film-red/10 text-film-red hover:bg-film-red/20 active:scale-95',
+const variantStyles: Record<Variant, React.CSSProperties> = {
+  primary:   { background: 'var(--mode-color, var(--coral))', color: '#fff', boxShadow: '0 5px 0 var(--mode-soft, var(--coral-soft))', border: 'none' },
+  secondary: { background: '#fff', color: 'var(--ink)', boxShadow: '0 4px 0 var(--line-2)', border: '2px solid var(--line)' },
+  ghost:     { background: 'transparent', color: 'var(--ink-2)', border: 'none', boxShadow: 'none' },
+  danger:    { background: 'var(--wrong-soft)', color: 'var(--wrong-d)', border: '2px solid var(--wrong)', boxShadow: 'none' },
 }
 
 const sizeClasses: Record<Size, string> = {
-  sm: 'px-3 py-1.5 text-sm rounded-md gap-1.5',
-  md: 'px-4 py-2.5 text-sm rounded-lg gap-2',
-  lg: 'px-6 py-3 text-base rounded-xl gap-2.5',
+  sm: 'px-3 py-1.5 text-sm rounded-[12px] gap-1.5',
+  md: 'px-4 py-2.5 text-sm rounded-[14px] gap-2',
+  lg: 'px-6 py-3 text-base rounded-[16px] gap-2.5',
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  (
-    {
-      variant = 'primary',
-      size = 'md',
-      isLoading = false,
-      className,
-      children,
-      disabled,
-      ...props
-    },
-    ref
-  ) => {
+  ({ variant = 'primary', size = 'md', isLoading = false, className, children, disabled, style, ...props }, ref) => {
     return (
       <button
         ref={ref}
         disabled={disabled || isLoading}
         aria-busy={isLoading || undefined}
         className={cn(
-          'inline-flex items-center justify-center font-body transition-all duration-150 cursor-pointer select-none',
-          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold',
+          'inline-flex items-center justify-center font-semibold transition-all duration-100 cursor-pointer select-none',
+          'focus-visible:outline-2 focus-visible:outline-offset-2',
           'disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none',
-          variantClasses[variant],
+          'active:translate-y-[3px]',
           sizeClasses[size],
           className
         )}
+        style={{ ...variantStyles[variant], ...style }}
         {...props}
       >
         {isLoading ? (
