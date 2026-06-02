@@ -46,7 +46,7 @@ interface LoseModalProps {
   unplayedModes?: Array<{ type: GameMode; path: string }>
 }
 
-export function LoseModal({ isOpen, onClose, mode, result, stats, onShare, onShareAll, onOpenStats, unplayedModes }: LoseModalProps) {
+export function LoseModal({ isOpen, onClose, mode, result, onShare, onShareAll, onOpenStats, unplayedModes }: LoseModalProps) {
   const user = useAuthStore((s) => s.user)
   const { open: openAuth } = useAuthModal()
   const accentCls = mode === 'wiki' ? 'g-face' : mode === 'series' ? 'g-serie' : 'g-film'

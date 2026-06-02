@@ -7,10 +7,6 @@ import {
   Check,
   Plus,
   X,
-  Film,
-  Tv,
-  User,
-  ChevronDown,
   ChevronLeft,
   UserPlus,
 } from 'lucide-react'
@@ -120,20 +116,6 @@ function sortRows(rows: TableRow[]): TableRow[] {
   })
 }
 
-const PERIOD_LABELS: Record<Period, string> = {
-  today: "Aujourd'hui",
-  '7d': '7 derniers jours',
-  '30d': '30 derniers jours',
-  all: 'Toujours',
-}
-
-const PERIOD_PODIUM: Record<Period, string> = {
-  today: "AUJOURD'HUI",
-  '7d': '7 JOURS',
-  '30d': '30 JOURS',
-  all: 'TOUJOURS',
-}
-
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
 function nameHue(name: string): number {
@@ -184,89 +166,6 @@ function Avatar({
     </span>
   )
 }
-
-// ─── Podium ───────────────────────────────────────────────────────────────────
-
-const PODIUM_ORDER = [1, 0, 2] // silver | gold | bronze (display order)
-const PODIUM_COLORS = [
-  { bar: 'bg-[#9aa3ad]/20 border-t border-x border-[#9aa3ad]/30', text: '#9aa3ad', h: 80 },
-  { bar: 'bg-film-gold/20 border-t border-x border-film-gold/30', text: '#d4a64a', h: 112 },
-  { bar: 'bg-[#c87533]/20 border-t border-x border-[#c87533]/30', text: '#c87533', h: 64 },
-]
-
-function PodiumChart({
-  rows,
-  period,
-}: {
-  rows: TableRow[]
-  period: Period
-}) {
-  const top3 = rows.slice(0, 3)
-
-  if (top3.length < 2) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-10 text-center">
-        <Users size={32} className="text-film-text-dim/30" />
-        <p className="text-sm text-film-text-dim">Pas encore assez de joueurs.</p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex flex-col gap-0">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-film-border/40">
-        <span className="text-[10px] font-mono font-bold tracking-widest text-film-text-dim/60 uppercase">
-          Podium · {PERIOD_PODIUM[period]}
-        </span>
-      </div>
-
-      {/* Podium bars */}
-      <div className="flex items-end justify-center gap-2 px-4 pt-8 pb-4">
-        {PODIUM_ORDER.map((rank) => {
-          const entry = top3[rank]
-          if (!entry) return <div key={rank} className="flex-1" />
-          const { bar, text, h } = PODIUM_COLORS[rank]
-          const isGold = rank === 0
-          return (
-            <div key={entry.id} className="flex-1 flex flex-col items-center gap-1.5">
-              {isGold && <span className="text-base mb-0.5">👑</span>}
-              <Avatar
-                displayName={entry.displayName}
-                avatarUrl={entry.avatarUrl}
-                size={isGold ? 44 : 36}
-                isMe={entry.isMe}
-              />
-              <span
-                className="text-xs font-semibold text-center leading-tight truncate w-full text-center"
-                style={{ color: entry.isMe ? '#d4a64a' : 'var(--color-film-text)' }}
-              >
-                {entry.isMe ? 'Toi' : entry.displayName}
-              </span>
-              <span className="text-[10px] font-semibold" style={{ color: text }}>
-                {entry.wins} ✓
-              </span>
-              <motion.div
-                className={`w-full rounded-t-lg flex items-end justify-center pb-2 ${bar}`}
-                style={{ height: h }}
-                initial={{ scaleY: 0 }}
-                animate={{ scaleY: 1 }}
-                transition={{ delay: 0.1 + rank * 0.08, duration: 0.45, ease: 'easeOut' }}
-                // transformOrigin applied via style for framer-motion
-              >
-                <span className="text-xs font-bold font-mono" style={{ color: text }}>
-                  {rank + 1}
-                </span>
-              </motion.div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ─── Table ────────────────────────────────────────────────────────────────────
 
 function TableRows({
   rows,
@@ -484,104 +383,6 @@ function CodeChip({ code }: { code: string }) {
 
 // ─── Period Dropdown ──────────────────────────────────────────────────────────
 
-function PeriodDropdown({ value, onChange }: { value: Period; onChange: (p: Period) => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 rounded-xl border border-film-border bg-film-dark hover:bg-film-dark px-3 py-1.5 text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer shrink-0"
-      >
-        <span className="text-xs text-film-text-dim/60 mr-0.5">Période :</span>
-        <span className="font-medium text-film-text">{PERIOD_LABELS[value]}</span>
-        <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-film-border bg-film-surface shadow-xl z-20 overflow-hidden"
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.15 }}
-          >
-            {(Object.entries(PERIOD_LABELS) as [Period, string][]).map(([k, label]) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => { onChange(k); setOpen(false) }}
-                className={`w-full text-left px-3.5 py-2 text-sm transition-colors cursor-pointer ${
-                  value === k ? 'text-film-gold bg-film-gold/10' : 'text-film-text-dim hover:text-film-text hover:bg-film-dark/70'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-// ─── Incoming pending banner ──────────────────────────────────────────────────
-
-function IncomingBanner({
-  incoming,
-  onAccept,
-  onDecline,
-}: {
-  incoming: PendingEntry[]
-  onAccept: (id: number) => void
-  onDecline: (id: number) => void
-}) {
-  if (incoming.length === 0) return null
-  return (
-    <div className="flex flex-col gap-2">
-      {incoming.map((p) => (
-        <div
-          key={p.id}
-          className="flex items-center gap-3 rounded-xl border border-film-border/60 bg-film-surface px-3.5 py-2.5"
-        >
-          <span className="w-7 h-7 rounded-full bg-film-border/20 border border-film-border/30 flex items-center justify-center text-xs font-bold text-film-text-dim shrink-0">
-            {p.displayName.charAt(0).toUpperCase()}
-          </span>
-          <span className="flex-1 text-sm text-film-text truncate">
-            <strong>{p.displayName}</strong> t'invite
-          </span>
-          <button
-            type="button"
-            onClick={() => onAccept(p.id)}
-            className="rounded-lg bg-film-green/20 border border-film-green/30 px-3 py-1 text-xs font-semibold text-film-green hover:bg-film-green/30 transition-colors cursor-pointer shrink-0"
-          >
-            Accepter
-          </button>
-          <button
-            type="button"
-            onClick={() => onDecline(p.id)}
-            className="text-xs text-film-text-dim/50 hover:text-film-text-dim transition-colors cursor-pointer shrink-0"
-          >
-            Ignorer
-          </button>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ─── Main page ────────────────────────────────────────────────────────────────
-
 export function FriendsPage() {
   const newDesign = useUiPrefsStore((s) => s.newDesign)
   const user = useAuthStore((s) => s.user)
@@ -589,7 +390,7 @@ export function FriendsPage() {
   const navigate = useNavigate()
 
   const [activeSection, setActiveSection] = useState<'classement' | 'amis'>('classement')
-  const [modeFilter, setModeFilter] = useState<ModeFilter>('all')
+  const [modeFilter] = useState<ModeFilter>('all')
   const [period, setPeriod] = useState<Period>('7d')
   const [showAddModal, setShowAddModal] = useState(false)
 
@@ -666,14 +467,6 @@ export function FriendsPage() {
   const pending = friendsData?.pending ?? []
   const incoming = pending.filter((p) => p.direction === 'incoming')
   const myCode = friendsData?.myCode ?? null
-
-  // Mode tabs config
-  const modeTabs: { key: ModeFilter; label: string; icon: React.ElementType; color?: string }[] = [
-    { key: 'all', label: 'Tous les modes', icon: Users },
-    { key: 'film', label: 'Films', icon: Film, color: 'var(--sg-films)' },
-    ...(FEATURES.enableSeries ? [{ key: 'series' as ModeFilter, label: 'Séries', icon: Tv, color: 'var(--sg-series)' }] : []),
-    ...(FEATURES.enableWiki ? [{ key: 'wiki' as ModeFilter, label: 'Personnalités', icon: User, color: 'var(--sg-wiki)' }] : []),
-  ]
 
   return (
     <div className="min-h-dvh flex flex-col" style={{ background: 'var(--bg)' }}>

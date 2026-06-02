@@ -1,22 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import {
   Pencil,
   Check,
   X,
   LogOut,
   Lock,
-  Users,
   Eye,
   EyeOff,
   ChevronRight,
-  ChevronLeft,
-  Settings,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { AuthModal, useAuthModal } from '@/components/modals/AuthModal'
-import type { ServerStatsMap } from '@/store/authStore'
 import { authDeleteAccount, authChangePassword, authUploadAvatar, authGetHistory } from '@/api/client'
 import { loadStats, loadHistory } from '@/lib/storage'
 import { FEATURES } from '@/config/features'
@@ -24,198 +19,7 @@ import { useUiPrefsStore } from '@/store/uiPrefsStore'
 import type { GameStats } from '@/types'
 import { Modal } from '@/components/ui/Modal'
 import { Footer } from '@/components/layout/Footer'
-
-// ─── Achievements ─────────────────────────────────────────────────────────────
-
-interface Achievement {
-  id: string
-  title: string
-  description: string
-  hint: string
-  icon: string
-  color: string
-  earned: boolean
-  progress?: { current: number; target: number }
-}
-
-function buildAchievements(serverStats: ServerStatsMap): Achievement[] {
-  const film   = serverStats.film   ?? { wins: loadStats('film').gamesWon,   gamesPlayed: loadStats('film').gamesPlayed,   maxStreak: loadStats('film').maxStreak,   distribution: Object.fromEntries(Object.entries(loadStats('film').guessDistribution).map(([k,v]) => [k, v])) }
-  const series = serverStats.series ?? { wins: loadStats('series').gamesWon, gamesPlayed: loadStats('series').gamesPlayed, maxStreak: loadStats('series').maxStreak, distribution: Object.fromEntries(Object.entries(loadStats('series').guessDistribution).map(([k,v]) => [k, v])) }
-  const wiki   = serverStats.wiki   ?? { wins: loadStats('wiki').gamesWon,   gamesPlayed: loadStats('wiki').gamesPlayed,   maxStreak: loadStats('wiki').maxStreak,   distribution: Object.fromEntries(Object.entries(loadStats('wiki').guessDistribution).map(([k,v]) => [k, v])) }
-
-  const totalWins   = film.wins + series.wins + wiki.wins
-  const totalPlayed = film.gamesPlayed + series.gamesPlayed + wiki.gamesPlayed
-  const maxStreak   = Math.max(film.maxStreak, series.maxStreak, wiki.maxStreak)
-  const firstGuess  = (film.distribution['1'] ?? 0) + (series.distribution['1'] ?? 0) + (wiki.distribution['1'] ?? 0)
-
-  return [
-    { id: 'first_win',   title: 'Première victoire',  description: 'Gagner une partie',               hint: "Trouve la réponse correcte dans n'importe quel mode.",                                                 icon: '⭐', color: '#d4a842', earned: totalWins >= 1,   progress: totalWins >= 1   ? undefined : { current: totalWins,   target: 1   } },
-    { id: 'speed_run',   title: 'Coup de maître',      description: 'Trouver du premier essai',        hint: 'Propose la bonne réponse dès le premier essai sans aucun indice.',                                     icon: '⚡', color: '#f59e0b', earned: firstGuess >= 1,  progress: firstGuess >= 1  ? undefined : { current: firstGuess,  target: 1   } },
-    { id: 'plays_10',    title: 'Habitué',             description: '10 parties jouées',               hint: 'Joue 10 parties au total, peu importe le mode ou le résultat.',                                        icon: '🎮', color: '#22c55e', earned: totalPlayed >= 10, progress: totalPlayed >= 10? undefined : { current: totalPlayed, target: 10  } },
-    { id: 'streak_7',    title: 'Série de feu',        description: '7 jours consécutifs',             hint: "Gagne une partie chaque jour pendant 7 jours d'affilée. Un seul mode suffit par jour.",               icon: '🔥', color: '#f97316', earned: maxStreak >= 7,   progress: maxStreak >= 7   ? undefined : { current: maxStreak,   target: 7   } },
-    { id: 'streak_30',   title: 'Invincible',          description: '30 jours consécutifs',            hint: 'Gagne une partie chaque jour pendant 30 jours sans interruption.',                                     icon: '👑', color: '#d4a842', earned: maxStreak >= 30,  progress: maxStreak >= 30  ? undefined : { current: maxStreak,   target: 30  } },
-    { id: 'wins_50',     title: 'Cinéphile',           description: '50 victoires au total',           hint: 'Accumule 50 victoires en tout, tous modes confondus.',                                                 icon: '🏆', color: '#d4a842', earned: totalWins >= 50,  progress: totalWins >= 50  ? undefined : { current: totalWins,   target: 50  } },
-    { id: 'wins_100',    title: 'Légende',             description: '100 victoires au total',          hint: 'Atteins 100 victoires cumulées. Une récompense réservée aux joueurs les plus assidus.',                icon: '🥇', color: '#8b6ff0', earned: totalWins >= 100, progress: totalWins >= 100 ? undefined : { current: totalWins,   target: 100 } },
-    { id: 'film_master', title: 'Maître du 7e art',    description: '50 films trouvés',                hint: 'Trouve 50 films dans le mode Films.',                                                                  icon: '🎬', color: '#d4a842', earned: film.wins >= 50,  progress: film.wins >= 50  ? undefined : { current: film.wins,   target: 50  } },
-    { id: 'wiki_master', title: 'Encyclopédiste',      description: '50 personnalités trouvées',       hint: 'Identifie 50 personnalités dans le mode Personnalités.',                                               icon: '🧠', color: '#22c55e', earned: wiki.wins >= 50,  progress: wiki.wins >= 50  ? undefined : { current: wiki.wins,   target: 50  } },
-  ]
-}
-
-function AchievementCard({ a, hinted, onToggleHint }: {
-  a: Achievement
-  hinted: string | null
-  onToggleHint: (id: string) => void
-}) {
-  if (a.earned) {
-    return (
-      <div
-        title={`${a.title} — ${a.description}`}
-        className="flex flex-col items-start justify-between p-3 rounded-xl border transition-colors flex-shrink-0
-          w-[100px] h-[100px] lg:w-auto lg:h-auto lg:aspect-square"
-        style={{ borderColor: `${a.color}30`, background: `${a.color}14` }}
-      >
-        <span className="text-2xl leading-none">{a.icon}</span>
-        <div>
-          <p className="text-[11px] font-semibold text-film-text leading-tight">{a.title}</p>
-          <p className="text-[9px] text-film-text-dim leading-tight">{a.description}</p>
-        </div>
-      </div>
-    )
-  }
-  return (
-    <button
-      type="button"
-      onClick={() => onToggleHint(a.id)}
-      className="flex-shrink-0 w-[100px] h-[100px] lg:w-auto lg:h-auto lg:aspect-square
-        bg-film-surface border border-film-border/30 rounded-xl p-3
-        flex flex-col items-start justify-between cursor-pointer hover:bg-film-dark/70 transition-colors text-left"
-    >
-      <Lock size={14} className="text-film-text-dim/20" />
-      <div className="w-full">
-        <p className="text-[11px] text-film-text-dim/40 leading-tight">{a.title}</p>
-        {a.progress && a.progress.current > 0 && (
-          <div className="mt-1 w-full">
-            <div className="h-0.5 rounded-full bg-film-gray overflow-hidden">
-              <div
-                className="h-full rounded-full bg-film-text-dim/25 transition-all"
-                style={{ width: `${Math.min(100, (a.progress.current / a.progress.target) * 100)}%` }}
-              />
-            </div>
-            <span className="text-[9px] text-film-text-dim/40 mt-0.5 block tabular-nums">
-              {a.progress.current}/{a.progress.target}
-            </span>
-          </div>
-        )}
-        {hinted === a.id && (
-          <span className="text-[10px] text-film-text-dim leading-tight mt-0.5 block">{a.hint}</span>
-        )}
-      </div>
-    </button>
-  )
-}
-
-function AchievementsSection({ serverStats }: { serverStats: ServerStatsMap }) {
-  const achievements = useMemo(() => buildAchievements(serverStats), [serverStats])
-  const earned = achievements.filter((a) => a.earned)
-  const [hinted, setHinted] = useState<string | null>(null)
-
-  function toggleHint(id: string) {
-    setHinted((prev) => (prev === id ? null : id))
-  }
-
-  return (
-    <div
-      className="rounded-2xl p-5 flex flex-col gap-4"
-      style={{ background: 'var(--color-film-surface)', border: '1px solid rgba(255,255,255,0.07)' }}
-    >
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-mono uppercase tracking-widest text-film-text-dim">SUCCÈS</p>
-        <span className="text-xs text-film-text-dim">{earned.length}/{achievements.length}</span>
-      </div>
-
-      {/* Mobile: horizontal slider / Desktop: 3-col grid */}
-      <div className="lg:hidden -mx-5 px-5">
-        <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
-          {achievements.map((a) => (
-            <AchievementCard key={a.id} a={a} hinted={hinted} onToggleHint={toggleHint} />
-          ))}
-        </div>
-      </div>
-      <div className="hidden lg:grid grid-cols-3 gap-2.5">
-        {achievements.map((a) => (
-          <AchievementCard key={a.id} a={a} hinted={hinted} onToggleHint={toggleHint} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 type TabMode = 'film' | 'series' | 'wiki' | 'total'
-
-// ─── Distribution bar chart ───────────────────────────────────────────────────
-
-function DistributionChart({
-  distribution,
-  losses,
-}: {
-  distribution: Record<string, number>
-  losses?: number
-}) {
-  const keys = (['1', '2', '3', '4', '5'] as const).filter((k) => k in distribution || true)
-  const maxVal = Math.max(1, ...keys.map((k) => distribution[k] ?? 0))
-  const maxIdx = keys.reduce(
-    (best, k, i) => ((distribution[k] ?? 0) > (distribution[keys[best]] ?? 0) ? i : best),
-    0
-  )
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      {keys.map((attemptKey, idx) => {
-        const count = distribution[attemptKey] ?? 0
-        const pct = Math.round((count / maxVal) * 100)
-        const isMax = idx === maxIdx && count > 0
-        return (
-          <div key={attemptKey} className="flex items-center gap-2 text-sm">
-            <span className="w-3 text-film-text-dim text-sm font-mono">{attemptKey}</span>
-            <div className="flex-1 h-5 bg-film-gray rounded overflow-hidden">
-              <motion.div
-                className="h-full rounded"
-                style={isMax
-                  ? { background: 'var(--mode-color, linear-gradient(180deg, #e8c06a, #d4a64a, #a07030))' }
-                  : { background: 'color-mix(in srgb, var(--mode-color, #d4a64a) 45%, transparent)' }
-                }
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.max(pct, count > 0 ? 4 : 0)}%` }}
-                transition={{ duration: 0.5, delay: (idx + 1) * 0.06, ease: 'easeOut' }}
-              />
-            </div>
-            <span className="w-4 text-film-text-dim text-sm text-right font-mono">{count}</span>
-          </div>
-        )
-      })}
-      {losses !== undefined && losses > 0 && (
-        <div className="flex items-center gap-2 text-sm">
-          <span className="w-3 text-film-red text-sm font-mono">×</span>
-          <div className="flex-1 h-5 bg-film-gray rounded overflow-hidden">
-            <motion.div
-              className="h-full rounded bg-film-red/60"
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.max(Math.round((losses / Math.max(1, maxVal)) * 100), 4)}%` }}
-              transition={{ duration: 0.5, delay: 0.36, ease: 'easeOut' }}
-            />
-          </div>
-          <span className="w-4 text-film-red text-sm text-right font-mono">{losses}</span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Stat cell (kept for possible reuse) ─────────────────────────────────────
-
-// ─── Settings Modal ───────────────────────────────────────────────────────────
 
 interface SettingsModalProps {
   onClose: () => void
@@ -440,34 +244,6 @@ function SettingsModal({ onClose, user, onSaveName, onChangePassword, onLogout, 
 }
 
 // ─── Streak calendar (60 days) ───────────────────────────────────────────────
-
-function StreakCalendarProfile({ currentStreak, gamesPlayed }: { currentStreak: number; gamesPlayed: number }) {
-  const days = 60
-  return (
-    <div>
-      <p className="text-[11px] font-mono uppercase tracking-widest text-film-text-dim/60 mb-2">Activité (60 jours)</p>
-      <div className="flex flex-wrap gap-[3px]">
-        {Array.from({ length: days }, (_, i) => {
-          const dayIndex = days - 1 - i
-          const isWon = dayIndex < currentStreak
-          const isPlayed = dayIndex < Math.min(gamesPlayed, days)
-          return (
-            <div
-              key={i}
-              title={isWon ? 'Victoire' : isPlayed ? 'Défaite' : 'Non joué'}
-              className={`aspect-square rounded-[2px] ${
-                isWon ? 'streak-day-won' : isPlayed ? 'streak-day-lost' : 'streak-day-empty'
-              }`}
-              style={{ width: 'calc((100% - 59 * 3px) / 60)' }}
-            />
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ─── #03 Auth Gate (new design) ───────────────────────────────────────────────
 
 export function AuthGateNewDesign({ context }: { context: 'profile' | 'friends' }) {
   const { open: openAuth } = useAuthModal()
@@ -695,12 +471,8 @@ export function ProfilePage() {
     ...(FEATURES.enableWiki ? (['wiki'] as const) : []),
   ]
 
-  const tabs: TabMode[] = [
-    ...enabledModes,
-    ...(enabledModes.length >= 2 ? (['total'] as TabMode[]) : []),
-  ]
 
-  const [activeTab, setActiveTab] = useState<TabMode>('film')
+  const [activeTab] = useState<TabMode>('film')
 
   const localStats: GameStats = useMemo(
     () => loadStats(activeTab === 'total' ? 'film' : activeTab),
@@ -748,7 +520,6 @@ export function ProfilePage() {
 
   // winRate computed locally in per-game rows
   void (stats.gamesPlayed > 0 ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0)
-  const losses = stats.gamesPlayed - stats.gamesWon
 
   const globalCurrentStreak = useMemo(() => {
     return Math.max(...enabledModes.map((m) => {
@@ -831,12 +602,6 @@ export function ProfilePage() {
     }
   }
 
-  const tabLabel: Record<TabMode, string> = {
-    film: 'Films',
-    series: 'Séries',
-    wiki: 'Personnalités',
-    total: 'Total',
-  }
 
   // tabActiveColor kept for future use
   void { film: 'var(--coral)', series: 'var(--grape)', wiki: 'var(--sky)', total: 'var(--ink)' }

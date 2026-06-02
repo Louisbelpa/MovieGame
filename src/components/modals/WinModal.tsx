@@ -4,7 +4,6 @@ import { useAuthStore } from '@/store/authStore'
 import { useAuthModal } from '@/components/modals/AuthModal'
 import { loadStats } from '@/lib/storage'
 import { NextGameCountdown } from '@/components/modals/NextGameCountdown'
-import { FEATURES } from '@/config/features'
 
 // Confetti — 20 particules CSS
 const CONFETTI_COLORS = ['#ff7a4d','#ffce4a','#27c08a','#ff6b81','#9b6cff','#3bb6f5','#ff9436']

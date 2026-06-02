@@ -26,29 +26,6 @@ function formatDateLong(iso: string): string {
   })
 }
 
-function useCountdown(): string {
-  const [str, setStr] = useState('')
-  useEffect(() => {
-    function update() {
-      const now = new Date()
-      const parts = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'Europe/Paris', hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false,
-      }).formatToParts(now)
-      const h = +(parts.find((p) => p.type === 'hour')?.value ?? '0')
-      const m = +(parts.find((p) => p.type === 'minute')?.value ?? '0')
-      const s = +(parts.find((p) => p.type === 'second')?.value ?? '0')
-      const total = (23 - h) * 3600 + (59 - m) * 60 + (60 - s)
-      const hh = String(Math.floor(total / 3600)).padStart(2, '0')
-      const mm = String(Math.floor((total % 3600) / 60)).padStart(2, '0')
-      const ss = String(total % 60).padStart(2, '0')
-      setStr(`${hh}:${mm}:${ss}`)
-    }
-    update()
-    const id = setInterval(update, 1000)
-    return () => clearInterval(id)
-  }, [])
-  return str
-}
 
 type TodayStatus = 'won' | 'lost' | null
 
