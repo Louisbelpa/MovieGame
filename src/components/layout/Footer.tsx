@@ -5,7 +5,6 @@
 
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { ExternalLink } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { BRAND_NAME, FEATURES } from '@/config/features'
 
@@ -206,66 +205,68 @@ export function Footer() {
   const isGamePage = location.pathname !== '/'
 
   return (
-    <footer
-      className="w-full py-4 px-4"
-      style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
-    >
-      <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-[11px] text-film-text-dim">
-        {/* Left: brand + copyright */}
-        <span style={{ color: 'rgba(236,233,226,0.35)' }}>
-          © {new Date().getFullYear()} {BRAND_NAME}
-        </span>
+    <footer className="cdy-footer">
+      <div className="cdy-foot-main">
+        {/* Colonne brand */}
+        <div className="cdy-foot-brand">
+          <a href="/" className="cdy-foot-logo" style={{ textDecoration: 'none' }}>
+            <span className="d">🎬</span>
+            <span style={{ color: 'var(--ink)' }}>Guess<span style={{ color: 'var(--coral)' }}>Today</span></span>
+          </a>
+          <p className="cdy-foot-tag">
+            Trois devinettes par jour, le même défi pour tout le monde. Garde ta série en vie et défie tes amis.
+          </p>
+          <div className="cdy-foot-social">
+            <span title="Twitter/X">✦</span>
+            <span title="Instagram">◐</span>
+            <span title="TikTok">✈</span>
+          </div>
+        </div>
 
-        {/* Center/Right: links */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setModal('faq')}
-            className="hover:text-film-text transition-colors cursor-pointer"
-          >
-            FAQ
-          </button>
-          <button
-            type="button"
-            onClick={() => setModal('privacy')}
-            className="hover:text-film-text transition-colors cursor-pointer"
-          >
-            Confidentialité
-          </button>
-          <button
-            type="button"
-            onClick={() => setModal('changelog')}
-            className="hover:text-film-text transition-colors cursor-pointer"
-          >
-            Notes de version
-          </button>
-          {isGamePage && (
-            <a
-              href="https://www.themoviedb.org"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 hover:text-film-text transition-colors"
-            >
-              <ExternalLink size={10} aria-hidden />
-              TMDB
-            </a>
-          )}
-          {FEATURES.enableWiki && isGamePage && (
-            <a
-              href="https://www.wikipedia.org"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 hover:text-film-text transition-colors"
-            >
-              <ExternalLink size={10} aria-hidden />
-              Wikipedia
-            </a>
-          )}
+        {/* Colonnes de liens */}
+        <div className="cdy-foot-cols">
+          <div className="cdy-foot-col">
+            <h5>Les jeux</h5>
+            <a href="/films">FilmGuess</a>
+            {FEATURES.enableSeries && <a href="/series">SerieGuess</a>}
+            {FEATURES.enableWiki && <a href="/wiki">FaceGuess</a>}
+            <a href="/">Défi du jour</a>
+          </div>
+          <div className="cdy-foot-col">
+            <h5>Découvrir</h5>
+            <button type="button" onClick={() => setModal('faq')}>FAQ</button>
+            <a href="/friends">Classement</a>
+            <a href="/friends">Amis</a>
+          </div>
+          <div className="cdy-foot-col">
+            <h5>GuessToday</h5>
+            <button type="button" onClick={() => setModal('privacy')}>Confidentialité</button>
+            <button type="button" onClick={() => setModal('changelog')}>Notes de version</button>
+            {isGamePage && (
+              <a href="https://www.themoviedb.org" target="_blank" rel="noopener noreferrer">
+                Données TMDB
+              </a>
+            )}
+            {FEATURES.enableWiki && isGamePage && (
+              <a href="https://www.wikipedia.org" target="_blank" rel="noopener noreferrer">
+                Données Wikipedia
+              </a>
+            )}
+          </div>
         </div>
       </div>
 
-      {modal === 'faq' && <FaqModal onClose={() => setModal(null)} />}
-      {modal === 'privacy' && <PrivacyModal onClose={() => setModal(null)} />}
+      <div className="cdy-foot-bottom">
+        <span>© {new Date().getFullYear()} {BRAND_NAME} · Fait avec 🧡 à Paris</span>
+        <span className="langs">
+          <span className="on">FR</span>
+          <span>EN</span>
+          <span>ES</span>
+        </span>
+      </div>
+
+      {modal === 'faq'       && <FaqModal       onClose={() => setModal(null)} />}
+      {modal === 'privacy'   && <PrivacyModal   onClose={() => setModal(null)} />}
       {modal === 'changelog' && <ChangelogModal onClose={() => setModal(null)} />}
     </footer>
   )

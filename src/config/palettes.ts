@@ -45,6 +45,38 @@ export interface Palette {
 
 export const PALETTES: Palette[] = [
   {
+    id: 'candy',
+    name: 'Candy',
+    num: '00',
+    vibe: 'Chaud · Ludique',
+    dark: false,
+    bg: '#fff4ea',
+    surface: '#ffffff',
+    surfaceDark: '#ffefe1',
+    surfaceGray: '#f0e3d6',
+    border: '#f0e3d6',
+    bodyGlowTop: 'transparent',
+    bodyGlowBottom: 'transparent',
+    text: '#3c3050',
+    textDim: '#9a8ca5',
+    films: '#ff7a4d',
+    filmsHover: '#ff9b7a',
+    filmsSoft: '#ffe7dd',
+    filmsRing: 'rgba(255,122,77,0.40)',
+    series: '#9b6cff',
+    seriesHover: '#b490ff',
+    seriesSoft: '#ece1ff',
+    seriesRing: 'rgba(155,108,255,0.40)',
+    wiki: '#3bb6f5',
+    wikiHover: '#6dc9f7',
+    wikiSoft: '#dcf1ff',
+    wikiRing: 'rgba(59,182,245,0.40)',
+    green: '#27c08a',
+    red: '#ff6b81',
+    goldLight: '#ffb89a',
+    goldDeep: '#d6582e',
+  },
+  {
     id: 'cinema-dore',
     name: 'Cinéma Doré',
     num: '01',
@@ -270,7 +302,7 @@ export const PALETTES: Palette[] = [
   },
 ]
 
-export const DEFAULT_PALETTE_ID = 'cinema-dore'
+export const DEFAULT_PALETTE_ID = 'candy'
 const STORAGE_KEY = 'gt_palette'
 
 export function getSavedPaletteId(): string {

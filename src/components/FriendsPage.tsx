@@ -136,11 +136,16 @@ const PERIOD_PODIUM: Record<Period, string> = {
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
+function nameHue(name: string): number {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff
+  return h % 360
+}
+
 function Avatar({
   displayName,
   avatarUrl,
   size = 32,
-  isMe = false,
 }: {
   displayName: string
   avatarUrl: string | null
@@ -148,6 +153,7 @@ function Avatar({
   isMe?: boolean
 }) {
   const initial = displayName.charAt(0).toUpperCase()
+  const hue = nameHue(displayName)
   const baseStyle = {
     width: size,
     height: size,
@@ -159,19 +165,20 @@ function Avatar({
       <img
         src={avatarUrl}
         alt={displayName}
-        className="rounded-full object-cover border border-film-gold/30 shrink-0"
+        className="rounded-full object-cover shrink-0"
         style={baseStyle}
       />
     )
   }
   return (
     <span
-      className={`rounded-full flex items-center justify-center font-bold shrink-0 ${
-        isMe
-          ? 'bg-film-gold/25 border border-film-gold/50 text-film-gold'
-          : 'bg-film-gray/60 border border-film-border/60 text-film-text-dim'
-      }`}
-      style={baseStyle}
+      className="rounded-full flex items-center justify-center font-bold shrink-0"
+      style={{
+        ...baseStyle,
+        background: `oklch(0.66 0.16 ${hue}deg)`,
+        color: '#fff',
+        boxShadow: `0 2px 0 oklch(0.52 0.16 ${hue}deg)`,
+      }}
     >
       {initial}
     </span>
@@ -274,64 +281,51 @@ function TableRows({
 
   return (
     <div className="flex flex-col">
-      {/* Header */}
-      <div className="grid gap-x-2 px-4 py-2 border-b border-film-border/40"
-        style={{ gridTemplateColumns: '1.5rem 1fr 2.5rem 2.5rem 3rem 2.5rem' }}>
-        {(['#', 'JOUEUR', 'V', '%', 'MOY.', '🔥'] as const).map((col) => (
-          <span key={col} className={`text-[10px] font-mono font-bold tracking-widest text-film-text-dim/50 uppercase ${col === 'JOUEUR' ? '' : 'text-center'}`}>
-            {col}
-          </span>
+      {/* Header — cdy-thead */}
+      <div className="cdy-thead" style={{ gridTemplateColumns: '44px 1fr 80px 70px 60px 50px', borderBottom: '2.5px solid var(--line)' }}>
+        {(['#', 'Joueur', 'Victoires', '%', 'Moy.', '🔥'] as const).map((col) => (
+          <span key={col}>{col}</span>
         ))}
       </div>
 
-      {/* Data rows */}
+      {/* Data rows — cdy-trow */}
       {rows.map((row, idx) => (
         <motion.div
           key={row.id}
-          className={`grid gap-x-2 px-4 py-2.5 items-center border-b border-film-border/20 last:border-0 ${
-            row.isMe
-              ? 'bg-film-gold/[0.07]'
-              : 'hover:bg-film-surface'
-          }`}
-          style={{ gridTemplateColumns: '1.5rem 1fr 2.5rem 2.5rem 3rem 2.5rem' }}
+          className={`cdy-trow${row.isMe ? ' me' : ''}`}
+          style={{ gridTemplateColumns: '44px 1fr 80px 70px 60px 50px' }}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.04 * idx, duration: 0.25 }}
         >
           {/* Rank */}
-          <span className={`text-xs font-bold font-mono text-center ${
-            idx === 0 ? 'text-film-gold' : idx === 1 ? 'text-[#9aa3ad]' : idx === 2 ? 'text-[#c87533]' : 'text-film-text-dim/50'
-          }`}>
-            {idx + 1}
-          </span>
+          <span className={`rk${idx < 3 ? ' top' : ''}`}>{idx + 1}</span>
 
           {/* Name */}
           <div className="flex items-center gap-2 min-w-0">
-            <Avatar displayName={row.displayName} avatarUrl={row.avatarUrl} size={26} isMe={row.isMe} />
-            <span className={`text-sm font-medium truncate ${row.isMe ? 'text-film-gold' : 'text-film-text'}`}>
-              {row.isMe ? 'toi' : row.displayName}
+            <Avatar displayName={row.displayName} avatarUrl={row.avatarUrl} size={28} isMe={row.isMe} />
+            <span style={{ fontWeight: row.isMe ? 700 : 600, fontSize: 14, color: row.isMe ? 'var(--coral-d)' : 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {row.displayName}
+              {row.isMe && <span style={{ fontSize: 11, color: 'var(--coral)', marginLeft: 5 }}>· toi</span>}
             </span>
-            {row.isMe && (
-              <span className="text-xs text-film-gold/60 shrink-0">· toi</span>
-            )}
           </div>
 
-          {/* V — wins */}
-          <span className="text-sm font-bold text-film-text text-center">{row.wins}</span>
+          {/* Wins */}
+          <span className="num" style={{ fontSize: 14, color: 'var(--ink)' }}>{row.wins}</span>
 
           {/* % */}
-          <span className="text-xs text-film-text-dim text-center">
+          <span className="num" style={{ fontSize: 13, color: 'var(--ink-2)' }}>
             {row.played > 0 ? `${row.winPct}%` : '—'}
           </span>
 
-          {/* Moy */}
-          <span className="text-xs text-film-text-dim text-center font-mono">
+          {/* Avg */}
+          <span className="num cdy-mono" style={{ fontSize: 13, color: 'var(--ink-2)' }}>
             {row.avgAttempts != null ? row.avgAttempts : '—'}
           </span>
 
           {/* Streak */}
-          <span className={`text-xs font-bold text-center ${row.streak > 0 ? 'text-amber-400' : 'text-film-text-dim/30'}`}>
-            {row.streak > 0 ? row.streak : '—'}
+          <span className="num" style={{ fontSize: 13, fontWeight: 700, color: row.streak > 0 ? 'var(--flame)' : 'var(--ink-3)' }}>
+            {row.streak > 0 ? `${row.streak}` : '—'}
           </span>
         </motion.div>
       ))}
@@ -594,6 +588,7 @@ export function FriendsPage() {
   const { open: openAuth } = useAuthModal()
   const navigate = useNavigate()
 
+  const [activeSection, setActiveSection] = useState<'classement' | 'amis'>('classement')
   const [modeFilter, setModeFilter] = useState<ModeFilter>('all')
   const [period, setPeriod] = useState<Period>('7d')
   const [showAddModal, setShowAddModal] = useState(false)
@@ -681,25 +676,25 @@ export function FriendsPage() {
   ]
 
   return (
-    <div className="min-h-dvh flex flex-col bg-film-black text-film-text">
+    <div className="min-h-dvh flex flex-col" style={{ background: 'var(--bg)' }}>
       {/* Desktop nav */}
       <TopNav />
 
       {/* Mobile header */}
       <header
         className="lg:hidden flex items-center justify-between px-4 py-3 sticky top-0 z-10"
-        style={{ background: 'rgba(11,11,26,0.92)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+        style={{ background: 'var(--panel)', borderBottom: '2.5px solid var(--line)' }}
       >
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => navigate(-1)}
             aria-label="Retour"
-            className="text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-2)', padding: 4 }}
           >
             <ChevronLeft size={22} />
           </button>
-          <h1 className="font-semibold text-film-text text-base">Amis</h1>
+          <h1 style={{ fontWeight: 700, fontSize: 17, color: 'var(--ink)' }}>Amis</h1>
         </div>
         <div className="flex items-center gap-2">
           {maxStreak > 0 && (
@@ -733,27 +728,27 @@ export function FriendsPage() {
             <AuthGateNewDesign context="friends" />
           ) : (
             <div className="flex flex-col items-center gap-5 pt-16 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-film-gold/10 border border-film-gold/25 flex items-center justify-center">
-                <Users size={28} className="text-film-gold" />
+              <div style={{ width: 64, height: 64, borderRadius: 18, background: 'var(--coral-soft)', border: '2.5px solid var(--line)', boxShadow: '0 5px 0 var(--line-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Users size={28} style={{ color: 'var(--coral)' }} />
               </div>
               <div>
-                <p className="font-semibold text-film-text text-lg">Défi entre amis</p>
-                <p className="text-film-text-dim text-sm mt-1 max-w-xs">
+                <p style={{ fontWeight: 700, fontSize: 18, color: 'var(--ink)' }}>Défi entre amis</p>
+                <p style={{ fontSize: 14, color: 'var(--ink-2)', marginTop: 6, maxWidth: 300 }}>
                   Crée un compte pour défier tes amis et comparer vos scores du jour.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => openAuth('register')}
-                className="rounded-xl px-6 py-2.5 text-sm font-semibold text-film-black transition-colors cursor-pointer"
-                style={{ background: 'var(--sg-films)' }}
+                className="cdy-btn cdy-btn-primary g-film"
+                style={{ padding: '14px 28px', fontSize: 15 }}
               >
                 Créer un compte
               </button>
               <button
                 type="button"
                 onClick={() => openAuth('login')}
-                className="text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
+                style={{ fontSize: 13, color: 'var(--ink-2)', background: 'none', border: 'none', cursor: 'pointer' }}
               >
                 Déjà un compte ? Se connecter
               </button>
@@ -763,112 +758,195 @@ export function FriendsPage() {
 
         {user && (
           <>
-            {/* Page header */}
-            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
+            {/* ── Tabs Classement / Amis (référence CandyLeaderboard + CandyFriends) ── */}
+            <div className="cdy-seg" style={{ marginBottom: 28, display: 'inline-flex' }}>
+              <span className={activeSection === 'classement' ? 'on' : ''} style={{ cursor: 'pointer' }}
+                onClick={() => setActiveSection('classement')}>
+                Classement 🏆
+              </span>
+              <span className={activeSection === 'amis' ? 'on' : ''} style={{ cursor: 'pointer' }}
+                onClick={() => setActiveSection('amis')}>
+                Amis 👥
+              </span>
+            </div>
+
+            {/* ── Section Classement (CandyLeaderboard) ── */}
+            {activeSection === 'classement' && (
               <div>
-                <h1 className="hidden lg:block text-3xl font-bold text-film-text">Amis</h1>
-                <p className="hidden lg:block text-sm text-film-text-dim mt-1">Compare tes scores et défie tes proches.</p>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {myCode && <CodeChip code={myCode} />}
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(true)}
-                  className="hidden lg:flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-film-black transition-colors cursor-pointer"
-                  style={{ background: 'var(--sg-films)' }}
-                >
-                  <Plus size={14} />
-                  Ajouter un ami
-                </button>
-              </div>
-            </div>
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24 }}>
+                  <div>
+                    <h1 className="cdy-h1b">Classement amis 🏆</h1>
+                    <p className="cdy-lead">Victoires et score moyen — moins d'essais = mieux.</p>
+                  </div>
+                  <div className="cdy-seg">
+                    <span className={period !== 'all' ? 'on' : ''} style={{ cursor: 'pointer' }}
+                      onClick={() => setPeriod('7d')}>Hebdo</span>
+                    <span className={period === 'all' ? 'on' : ''} style={{ cursor: 'pointer' }}
+                      onClick={() => setPeriod('all')}>Total</span>
+                  </div>
+                </div>
 
-            {/* Incoming pending */}
-            {incoming.length > 0 && (
-              <div className="mb-5">
-                <IncomingBanner
-                  incoming={incoming}
-                  onAccept={(id) => void handleAccept(id)}
-                  onDecline={(id) => void handleDecline(id)}
-                />
-              </div>
-            )}
-
-            {/* Filter bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-6">
-              <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
-                {modeTabs.map((tab) => {
-                  const Icon = tab.icon
-                  const active = modeFilter === tab.key
+                {/* Podium Candy (cdy-podium + cdy-pod) */}
+                {tableRows.length >= 2 && (() => {
+                  const PODIUM_DISPLAY = [1, 0, 2] // silver | gold | bronze
+                  const COLORS = [
+                    { col: 'var(--ink-2)', h: 130 },
+                    { col: 'var(--sun-d)', h: 172 },
+                    { col: '#cf8a4e',      h: 110 },
+                  ]
                   return (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      onClick={() => setModeFilter(tab.key)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-sm font-medium transition-colors cursor-pointer shrink-0 ${
-                        active
-                          ? 'bg-film-gray border-film-border text-film-text'
-                          : 'border-transparent text-film-text-dim hover:text-film-text hover:bg-film-dark/70'
-                      }`}
-                    >
-                      <Icon size={13} style={tab.color ? { color: tab.color } : undefined} />
-                      <span className="hidden sm:inline">{tab.label}</span>
-                      <span className="sm:hidden">
-                        {tab.key === 'all' ? 'Tous' : tab.key === 'wiki' ? 'Pers.' : tab.label}
-                      </span>
-                    </button>
+                    <div className="cdy-podium" style={{ marginBottom: 28 }}>
+                      {PODIUM_DISPLAY.map((rankIdx, displayIdx) => {
+                        const row = tableRows[rankIdx]
+                        if (!row) return null
+                        const { col, h } = COLORS[displayIdx]
+                        const initials = row.displayName.slice(0, 2).toUpperCase()
+                        const sz = displayIdx === 1 ? 54 : 44
+                        return (
+                          <div className="cdy-pod" key={row.id}>
+                            <span className="cdy-av" style={{ width: sz, height: sz, fontSize: sz * 0.4, background: 'var(--grape)', boxShadow: '0 4px 0 var(--grape-d)', flexShrink: 0 }}>
+                              {row.avatarUrl
+                                ? <img src={row.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                : initials}
+                            </span>
+                            <div className="pname">{row.displayName}{row.isMe && ' (toi)'}</div>
+                            <div className="pbar" style={{ height: h, background: `color-mix(in oklab, ${col} 22%, #fff)` }}>
+                              <div className="prank" style={{ color: col }}>{rankIdx + 1}</div>
+                              <div className="ppts">{row.wins}</div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
                   )
-                })}
-              </div>
-              <PeriodDropdown value={period} onChange={setPeriod} />
-            </div>
+                })()}
 
-            {/* Loading skeleton */}
-            {loading && (
-              <div className="grid lg:grid-cols-[340px_1fr] gap-5">
-                <div className="rounded-2xl border border-film-border bg-film-surface h-64 animate-pulse" />
-                <div className="rounded-2xl border border-film-border bg-film-surface h-64 animate-pulse" />
-              </div>
-            )}
-
-            {/* Content grid */}
-            {!loading && (
-              <div className="grid lg:grid-cols-[340px_1fr] gap-5 items-start">
-                {/* Podium card — only shown when there are players */}
-                {tableRows.length > 0 && (
-                  <div className="rounded-2xl border border-film-border bg-film-surface overflow-hidden">
-                    <PodiumChart rows={tableRows} period={period} />
+                {/* Table (cdy-thead + cdy-trow) */}
+                {loading ? (
+                  <div className="cdy-card h-40 animate-pulse" style={{ background: 'var(--line)' }} />
+                ) : tableRows.length === 0 ? (
+                  <div className="cdy-card" style={{ padding: 40, textAlign: 'center' }}>
+                    <p style={{ color: 'var(--ink-2)', fontSize: 15 }}>Aucun ami pour l'instant.</p>
+                    <button type="button" onClick={() => { setActiveSection('amis'); setShowAddModal(true) }}
+                      className="cdy-btn cdy-btn-primary g-film" style={{ marginTop: 16, padding: '12px 20px' }}>
+                      <Plus size={13} /> Ajouter un ami
+                    </button>
+                  </div>
+                ) : (
+                  <div className="cdy-card" style={{ padding: 0, overflow: 'hidden' }}>
+                    <TableRows rows={tableRows} pending={pending} onRelancer={handleRelancer} />
                   </div>
                 )}
+              </div>
+            )}
 
-                {/* Table card */}
-                <div className={`rounded-2xl border border-film-border bg-film-surface overflow-hidden ${tableRows.length === 0 ? 'lg:col-span-2' : ''}`}>
-                  {tableRows.length === 0 ? (
-                    <div className="flex flex-col items-center gap-3 py-12 text-center px-6">
-                      <Users size={32} className="text-film-text-dim/30" />
-                      <p className="text-sm text-film-text-dim">Aucun ami pour l'instant.</p>
-                      {myCode && (
-                        <p className="text-xs text-film-text-dim max-w-xs">
-                          Partage ton code <span className="font-mono font-bold text-film-gold">{myCode}</span> pour inviter des amis.
-                        </p>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setShowAddModal(true)}
-                        className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-film-black mt-1 cursor-pointer"
-                        style={{ background: 'var(--sg-films)' }}
-                      >
-                        <UserPlus size={13} />
-                        Ajouter un ami
-                      </button>
+            {/* ── Section Amis (CandyFriends) ── */}
+            {activeSection === 'amis' && (
+              <div>
+                <h1 className="cdy-h1b" style={{ marginBottom: 6 }}>Mes amis 👥</h1>
+                <p className="cdy-lead" style={{ marginBottom: 20 }}>Cherche par pseudo, gère tes invitations et ta liste d'amis.</p>
+
+                {/* Search bar */}
+                <div className="cdy-search" style={{ marginBottom: 28 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="2.4" strokeLinecap="round">
+                    <circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" />
+                  </svg>
+                  <span className="ph">Rechercher un pseudo…</span>
+                  <button type="button" onClick={() => setShowAddModal(true)}
+                    className="cdy-btn cdy-btn-primary g-film" style={{ padding: '10px 18px' }}>
+                    Inviter
+                  </button>
+                </div>
+
+                {/* 2-col grid: friends list + aside (invitations) */}
+                <div className="grid gap-6 grid-cols-1 lg:grid-cols-[1fr_340px]" style={{ alignItems: 'start' }}>
+                  {/* Left: friends grid */}
+                  <div>
+                    <div className="cdy-sec-head" style={{ marginTop: 0 }}>
+                      <h3>Mes amis ({friendsData?.friends.length ?? 0})</h3>
                     </div>
-                  ) : (
-                    <TableRows
-                      rows={tableRows}
-                      pending={pending}
-                      onRelancer={handleRelancer}
-                    />
-                  )}
+                    {loadingFriends ? (
+                      <div className="cdy-card h-32 animate-pulse" style={{ background: 'var(--line)' }} />
+                    ) : friendsData?.friends.length === 0 ? (
+                      <div className="cdy-card" style={{ padding: 24, color: 'var(--ink-2)', fontSize: 14 }}>
+                        Aucun ami pour l'instant. Invite des joueurs !
+                      </div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                        {friendsData?.friends.map((f) => (
+                          <div key={f.id} className="cdy-card cdy-friend">
+                            <Avatar displayName={f.displayName} avatarUrl={f.avatarUrl} size={42} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div className="fname">{f.displayName}</div>
+                              <div className="fu">@{f.displayName.toLowerCase().replace(/\s+/g, '')}</div>
+                            </div>
+                            {f.streak > 0 && (
+                              <span className="cdy-streak" style={{ fontSize: 13, padding: '6px 11px' }}>🔥 {f.streak}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right aside: invitations */}
+                  <aside style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+                    {incoming.length > 0 && (
+                      <div>
+                        <div className="cdy-sec-head" style={{ marginTop: 0 }}>
+                          <h3>Reçues ({incoming.length})</h3>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          {incoming.map((inv) => (
+                            <div key={inv.id} className="cdy-card" style={{ padding: 16 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                                <Avatar displayName={inv.displayName} avatarUrl={null} size={40} />
+                                <div>
+                                  <div className="fname" style={{ fontWeight: 700, fontSize: 14.5, color: 'var(--ink)' }}>{inv.displayName}</div>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', gap: 9 }}>
+                                <button type="button" onClick={() => void handleAccept(inv.id)}
+                                  className="cdy-btn cdy-btn-mint" style={{ flex: 1, padding: '11px 0' }}>
+                                  Accepter
+                                </button>
+                                <button type="button" onClick={() => void handleDecline(inv.id)}
+                                  className="cdy-btn cdy-btn-soft" style={{ flex: 1, padding: '11px 0' }}>
+                                  Refuser
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Envoyées */}
+                    {pending.filter(p => p.direction === 'outgoing').length > 0 && (
+                      <div>
+                        <div className="cdy-sec-head" style={{ marginTop: 0 }}>
+                          <h3>Envoyées ({pending.filter(p => p.direction === 'outgoing').length})</h3>
+                        </div>
+                        {pending.filter(p => p.direction === 'outgoing').map((inv) => (
+                          <div key={inv.id} className="cdy-card cdy-friend" style={{ marginBottom: 10 }}>
+                            <Avatar displayName={inv.displayName} avatarUrl={null} size={40} />
+                            <div style={{ flex: 1 }}>
+                              <div className="fname" style={{ fontWeight: 700, fontSize: 14.5, color: 'var(--ink)' }}>{inv.displayName}</div>
+                            </div>
+                            <span className="cdy-badge" style={{ background: '#fff1d6', color: '#b8841f' }}>En attente</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {myCode && (
+                      <div className="cdy-card" style={{ padding: 18 }}>
+                        <div style={{ fontSize: 13, color: 'var(--ink-2)', marginBottom: 10, fontWeight: 500 }}>Ton code à partager :</div>
+                        <CodeChip code={myCode} />
+                      </div>
+                    )}
+                  </aside>
                 </div>
               </div>
             )}

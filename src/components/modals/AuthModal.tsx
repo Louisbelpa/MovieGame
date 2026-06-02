@@ -41,32 +41,29 @@ export function useAuthModal() {
 // ─── Form field ───────────────────────────────────────────────────────────────
 
 function Field({
-  label,
-  id,
-  type = 'text',
-  value,
-  onChange,
-  autoComplete,
+  label, id, type = 'text', value, onChange, autoComplete,
 }: {
-  label: string
-  id: string
-  type?: string
-  value: string
-  onChange: (v: string) => void
-  autoComplete?: string
+  label: string; id: string; type?: string; value: string
+  onChange: (v: string) => void; autoComplete?: string
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm text-film-text-dim font-medium">
+      <label htmlFor={id} style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-2)' }}>
         {label}
       </label>
       <input
-        id={id}
-        type={type}
-        value={value}
+        id={id} type={type} value={value}
         onChange={(e) => onChange(e.target.value)}
         autoComplete={autoComplete}
-        className="w-full rounded-lg border border-film-border bg-film-gray px-3 py-2.5 text-sm text-film-text placeholder:text-film-text-dim/60 focus:outline-none focus:border-film-gold focus:ring-1 focus:ring-film-gold transition-colors"
+        style={{
+          width: '100%', borderRadius: 14, border: '2.5px solid var(--line)',
+          background: 'var(--bg)', padding: '12px 14px', fontSize: 15,
+          color: 'var(--ink)', outline: 'none', fontFamily: 'Fredoka, sans-serif',
+          boxShadow: '0 3px 0 var(--line-2)',
+          transition: 'border-color .15s',
+        }}
+        onFocus={(e) => { e.target.style.borderColor = 'var(--coral)' }}
+        onBlur={(e)  => { e.target.style.borderColor = 'var(--line)' }}
       />
     </div>
   )
@@ -96,28 +93,32 @@ function LoginForm({ onSuccess, onSwitch, onForgot }: { onSuccess: () => void; o
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <Field label="Adresse e-mail" id="login-email" type="email" value={email} onChange={setEmail} autoComplete="email" />
-      <Field label="Mot de passe" id="login-password" type="password" value={password} onChange={setPassword} autoComplete="current-password" />
+    <form onSubmit={handleSubmit}>
+      <div className="cdym-field">
+        <label htmlFor="login-email">E-mail</label>
+        <input id="login-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="ton@email.com" />
+      </div>
+      <div className="cdym-field">
+        <label htmlFor="login-password">Mot de passe</label>
+        <input id="login-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder="••••••••" />
+      </div>
 
       {error && (
-        <p role="alert" className="text-sm text-film-red bg-film-red/10 border border-film-red/30 rounded-lg px-3 py-2">
+        <p role="alert" style={{ fontSize: 13, color: 'var(--wrong-d)', background: 'var(--wrong-soft)', border: '1.5px solid var(--wrong)', borderRadius: 12, padding: '10px 14px', marginBottom: 12 }}>
           {error}
         </p>
       )}
 
-      <Button type="submit" size="lg" isLoading={isLoading} className="w-full mt-1">
-        Se connecter
-      </Button>
+      <button type="submit" disabled={isLoading} className="cdy-btn cdy-btn-primary" style={{ width: '100%', padding: '15px', marginTop: 4 }}>
+        {isLoading ? '…' : 'Se connecter'}
+      </button>
 
-      <div className="flex flex-col gap-3 text-sm text-film-text-dim">
-        <span>
-          Pas de compte ?{' '}
-          <button type="button" onClick={onSwitch} className="text-film-gold hover:underline cursor-pointer">
-            Créer un compte
-          </button>
-        </span>
-        <button type="button" onClick={onForgot} className="text-film-text-dim hover:text-film-text cursor-pointer text-left">
+      <div className="cdym-auth-foot">
+        Pas de compte ?{' '}
+        <b onClick={onSwitch}>Créer un compte</b>
+      </div>
+      <div style={{ textAlign: 'center', marginTop: 8 }}>
+        <button type="button" onClick={onForgot} style={{ color: 'var(--ink-3)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, fontFamily: 'Fredoka, sans-serif' }}>
           Mot de passe oublié ?
         </button>
       </div>
@@ -161,27 +162,40 @@ function RegisterForm({ onSuccess, onSwitch }: { onSuccess: () => void; onSwitch
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <Field label="Pseudo" id="reg-name" value={displayName} onChange={setDisplayName} autoComplete="nickname" />
-      <Field label="Adresse e-mail" id="reg-email" type="email" value={email} onChange={setEmail} autoComplete="email" />
-      <Field label="Mot de passe" id="reg-password" type="password" value={password} onChange={setPassword} autoComplete="new-password" />
-      <Field label="Confirmer le mot de passe" id="reg-confirm" type="password" value={confirm} onChange={setConfirm} autoComplete="new-password" />
+    <form onSubmit={handleSubmit}>
+      <div className="cdym-field">
+        <label htmlFor="reg-name">Pseudo</label>
+        <input id="reg-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoComplete="nickname" placeholder="marius" />
+      </div>
+      <div className="cdym-field">
+        <label htmlFor="reg-email">E-mail</label>
+        <input id="reg-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="marius@email.com" />
+      </div>
+      <div className="cdym-field">
+        <label htmlFor="reg-password">Mot de passe</label>
+        <input id="reg-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" placeholder="8 caractères minimum" />
+      </div>
+      <div className="cdym-field">
+        <label htmlFor="reg-confirm">Confirmer</label>
+        <input id="reg-confirm" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" placeholder="••••••••" />
+      </div>
 
       {error && (
-        <p role="alert" className="text-sm text-film-red bg-film-red/10 border border-film-red/30 rounded-lg px-3 py-2">
+        <p role="alert" style={{ fontSize: 13, color: 'var(--wrong-d)', background: 'var(--wrong-soft)', border: '1.5px solid var(--wrong)', borderRadius: 12, padding: '10px 14px', marginBottom: 12 }}>
           {error}
         </p>
       )}
 
-      <Button type="submit" size="lg" isLoading={isLoading} className="w-full mt-1">
-        Créer mon compte
-      </Button>
+      <button type="submit" disabled={isLoading} className="cdy-btn cdy-btn-primary" style={{ width: '100%', padding: '15px', marginTop: 4 }}>
+        {isLoading ? '…' : 'Créer mon compte'}
+      </button>
 
-      <p className="text-center text-sm text-film-text-dim">
+      <div className="cdym-auth-foot">
         Déjà un compte ?{' '}
-        <button type="button" onClick={onSwitch} className="text-film-gold hover:underline cursor-pointer">
-          Se connecter
-        </button>
+        <b onClick={onSwitch}>Se connecter</b>
+      </div>
+      <p className="cdym-auth-legal">
+        En continuant, tu acceptes les Conditions d'utilisation et la Politique de confidentialité.
       </p>
     </form>
   )
@@ -210,12 +224,12 @@ function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
   if (sent) {
     return (
       <div className="flex flex-col gap-4">
-        <div className="rounded-lg bg-film-green/10 border border-film-green/30 px-4 py-3 text-sm text-film-green">
+        <div style={{ background: 'var(--correct-soft)', border: '1.5px solid var(--correct)', borderRadius: 14, padding: '14px 16px', fontSize: 14, color: 'var(--correct-d)' }}>
           Si un compte existe pour <strong>{email}</strong>, tu vas recevoir un e-mail dans quelques minutes.
         </div>
-        <Button variant="secondary" size="lg" className="w-full" onClick={onBack}>
+        <button type="button" onClick={onBack} className="cdy-btn cdy-btn-soft" style={{ width: '100%', justifyContent: 'center' }}>
           Retour à la connexion
-        </Button>
+        </button>
       </div>
     )
   }
@@ -343,7 +357,8 @@ function AppleSignInButton({ onSuccess }: { onSuccess: () => void }) {
     <button
       type="button"
       onClick={() => void handleAppleSignIn()}
-      className="w-full flex items-center justify-center gap-2 rounded-lg border border-film-border bg-white/5 px-4 py-2.5 text-sm font-medium text-film-text hover:bg-white/10 transition-colors cursor-pointer"
+      className="w-full flex items-center justify-center gap-2 cursor-pointer"
+      style={{ background: '#1a1a1a', color: '#fff', borderRadius: 14, padding: '13px 18px', fontSize: 14, fontWeight: 600, border: 'none', boxShadow: '0 5px 0 #000', fontFamily: 'Fredoka, sans-serif', transition: 'transform .08s', }}
     >
       <svg
         viewBox="0 0 24 24"
@@ -432,61 +447,51 @@ export function AuthModal() {
 
   return (
     <Modal isOpen={isOpen} onClose={close} ariaLabel={ariaLabel}>
-      {tab !== 'forgot' && (
-        <div className="flex mb-6 border-b border-film-border">
-          <button
-            type="button"
-            onClick={() => setTab('login')}
-            className={`flex-1 pb-3 text-sm font-medium transition-colors cursor-pointer ${
-              tab === 'login'
-                ? 'text-film-gold border-b-2 border-film-gold -mb-px'
-                : 'text-film-text-dim hover:text-film-text'
-            }`}
-          >
-            Connexion
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('register')}
-            className={`flex-1 pb-3 text-sm font-medium transition-colors cursor-pointer ${
-              tab === 'register'
-                ? 'text-film-gold border-b-2 border-film-gold -mb-px'
-                : 'text-film-text-dim hover:text-film-text'
-            }`}
-          >
-            Créer un compte
-          </button>
-        </div>
-      )}
+      <div className="cdym-auth g-film" style={{ padding: 0 }}>
 
-      {tab === 'forgot' && (
-        <h2 className="text-base font-semibold text-film-text mb-5">Mot de passe oublié</h2>
-      )}
+        {/* Logo */}
+        <span className="cdym-auth-logo">
+          <span className="d">?</span>
+          Guess<span style={{ color: 'var(--coral)' }}>Today</span>
+        </span>
 
-      {tab === 'login' ? (
-        <LoginForm onSuccess={handleSuccess} onSwitch={() => setTab('register')} onForgot={() => setTab('forgot')} />
-      ) : tab === 'register' ? (
-        <RegisterForm onSuccess={handleSuccess} onSwitch={() => setTab('login')} />
-      ) : (
-        <ForgotPasswordForm onBack={() => setTab('login')} />
-      )}
+        {tab === 'forgot' ? (
+          /* ── Mot de passe oublié ── */
+          <>
+            <h1 className="cdym-auth-h">Mot de passe oublié</h1>
+            <p className="cdym-auth-sub">On t'envoie un lien pour réinitialiser.</p>
+            <ForgotPasswordForm onBack={() => setTab('login')} />
+          </>
+        ) : (
+          <>
+            {/* Title + sub */}
+            <h1 className="cdym-auth-h">
+              {tab === 'register' ? 'Crée ton compte' : 'Bon retour !'}
+            </h1>
+            <p className="cdym-auth-sub">
+              {tab === 'register'
+                ? 'Garde ta série, tes stats et défie tes amis.'
+                : 'Connecte-toi pour reprendre ta série.'}
+            </p>
 
-      {tab !== 'forgot' && (
-        <>
-          <div className="flex items-center gap-3 mt-5 mb-3">
-            <div className="flex-1 h-px bg-film-border" />
-            <span className="text-xs text-film-text-dim">ou</span>
-            <div className="flex-1 h-px bg-film-border" />
-          </div>
-          <div className="flex flex-col gap-2">
-            {GOOGLE_CLIENT_ID && <GoogleSignInButton onSuccess={handleSuccess} />}
-            <AppleSignInButton onSuccess={handleSuccess} />
-            <Button variant="secondary" size="lg" className="w-full" onClick={close}>
-              Continuer sans compte
-            </Button>
-          </div>
-        </>
-      )}
+            {/* Social buttons ABOVE form */}
+            <div className="cdym-social">
+              <AppleSignInButton onSuccess={handleSuccess} />
+              {GOOGLE_CLIENT_ID && <GoogleSignInButton onSuccess={handleSuccess} />}
+            </div>
+
+            {/* Divider */}
+            <div className="cdym-divider">ou avec un e-mail</div>
+
+            {/* Form */}
+            {tab === 'login' ? (
+              <LoginForm onSuccess={handleSuccess} onSwitch={() => setTab('register')} onForgot={() => setTab('forgot')} />
+            ) : (
+              <RegisterForm onSuccess={handleSuccess} onSwitch={() => setTab('login')} />
+            )}
+          </>
+        )}
+      </div>
     </Modal>
   )
 }

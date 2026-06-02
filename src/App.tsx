@@ -137,12 +137,12 @@ function GameLayout({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
   }, [mode, gameOpenModal, wikiOpenModal])
 
   return (
-    <div className="app min-h-dvh flex flex-col bg-film-black text-film-text" data-mode={mode}>
+    <div style={{ background: 'var(--bg)', minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
       <Header mode={mode} />
-      <main id="main-content" className="flex-1">
+      <main style={{ flex: 1 }}>
         <GamePage mode={mode} />
       </main>
-      <Footer />
+      <div className="hidden lg:block"><Footer /></div>
       <GameModals mode={mode} />
     </div>
   )

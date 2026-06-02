@@ -1,17 +1,23 @@
-import { Share2, XCircle, BarChart2, ExternalLink, Film, Tv, User, UserCircle, Users } from 'lucide-react'
+import { Share2, BarChart2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
-import { Badge } from '@/components/ui/Badge'
 import { useAuthStore } from '@/store/authStore'
 import { useAuthModal } from '@/components/modals/AuthModal'
 import { NextGameCountdown } from '@/components/modals/NextGameCountdown'
 
 type GameMode = 'film' | 'series' | 'wiki'
 
-const MODE_META: Record<GameMode, { label: string; icon: React.ElementType }> = {
-  film: { label: 'Cinéma', icon: Film },
-  series: { label: 'Séries', icon: Tv },
-  wiki: { label: 'Personnalités', icon: User },
+function GlyphC({ game, size = 18 }: { game: string; size?: number }) {
+  const s = { fill: 'none', stroke: 'currentColor', strokeWidth: 2.2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
+  if (game === 'film')  return <svg width={size} height={size} viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5" {...s} /><path d="M3 9h18M3 15h18M8 4v16M16 4v16" {...s} /></svg>
+  if (game === 'serie') return <svg width={size} height={size} viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2.5" {...s} /><path d="M8 3l4 4 4-4" {...s} /></svg>
+  if (game === 'face')  return <svg width={size} height={size} viewBox="0 0 24 24"><circle cx="12" cy="9" r="4" {...s} /><path d="M5 20c0-3.8 3.1-6.2 7-6.2s7 2.4 7 6.2" {...s} /></svg>
+  return null
+}
+
+function modeGlyph(m: GameMode) {
+  if (m === 'series') return 'serie'
+  if (m === 'wiki')   return 'face'
+  return 'film'
 }
 
 interface LoseModalProps {
@@ -40,166 +46,119 @@ interface LoseModalProps {
   unplayedModes?: Array<{ type: GameMode; path: string }>
 }
 
-function getPersonTypeLabel(personType?: string): string {
-  switch (personType) {
-    case 'sportsperson': return 'Sportif·ve'
-    case 'artist': return 'Artiste'
-    case 'scientist': return 'Scientifique'
-    case 'entrepreneur': return 'Entrepreneur·e'
-    case 'writer': return 'Ecrivain·e'
-    case 'historical_figure': return 'Personnalité historique'
-    case 'generic': return 'Personnalité'
-    default: return 'Politicien·ne'
-  }
-}
-
 export function LoseModal({ isOpen, onClose, mode, result, stats, onShare, onShareAll, onOpenStats, unplayedModes }: LoseModalProps) {
-  const isWiki = mode === 'wiki'
-  const modalTitleId = 'modal-title'
-  const modalDescId = 'modal-desc-lose'
   const user = useAuthStore((s) => s.user)
   const { open: openAuth } = useAuthModal()
-  const tmdbUrl = !isWiki && result.tmdbId
-    ? `https://www.themoviedb.org/${mode === 'series' ? 'tv' : 'movie'}/${result.tmdbId}`
-    : null
-  const learnMoreUrl = isWiki ? result.wikipediaUrl : tmdbUrl
-  const personTypeLabel = getPersonTypeLabel(result.personType)
+  const accentCls = mode === 'wiki' ? 'g-face' : mode === 'series' ? 'g-serie' : 'g-film'
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      headerContent={
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-film-red/10 border border-film-red/30 flex items-center justify-center">
-            <XCircle size={16} className="text-film-red" />
-          </div>
-          <span id={modalTitleId} className="font-title text-xl font-bold text-film-red">Raté...</span>
-        </div>
-      }
-      ariaLabelledBy={modalTitleId}
-      ariaDescribedBy={modalDescId}
-    >
-      <div className="flex flex-col items-center gap-4 text-center" style={{ background: 'linear-gradient(180deg, rgba(230,57,70,0.08) 0%, transparent 40%)' }}>
-        <p id={modalDescId} className="sr-only">Résumé de défaite et actions de partage.</p>
+    <Modal isOpen={isOpen} onClose={onClose} className={accentCls}>
+      <div className="cdym-result">
 
-        <div className="w-full film-border rounded-xl overflow-hidden">
-          {result.photoUrl && (
-            isWiki ? (
-              <div className="flex h-48 w-full items-center justify-center bg-film-gray">
-                <img src={result.photoUrl} alt={result.name} className="max-h-full max-w-full object-contain" referrerPolicy="no-referrer" />
-              </div>
-            ) : (
-              <img src={result.photoUrl} alt={result.name} className="w-full aspect-video object-cover" />
-            )
-          )}
-          <div className="p-3 text-left">
-            <div className="flex items-start justify-between gap-2">
-              <p className="font-title text-2xl sm:text-3xl font-black text-film-text leading-tight">{result.name}</p>
-              {learnMoreUrl && (
-                <a href={learnMoreUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 text-film-text-dim hover:text-film-text transition-colors mt-0.5">
-                  <ExternalLink size={14} />
-                </a>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {isWiki ? (
-                <Badge variant="gold">{personTypeLabel}</Badge>
-              ) : (
-                <>
-                  {result.year && <Badge variant="muted">{result.year}</Badge>}
-                  {result.director && <Badge variant="muted">{result.director}</Badge>}
-                  {result.genres?.slice(0, 2).map((genre) => (
-                    <Badge key={genre} variant="amber">{genre}</Badge>
-                  ))}
-                </>
-              )}
-            </div>
-            {result.extract && (
-              <p className="text-sm text-film-text-dim mt-2 line-clamp-3 text-left">{result.extract}</p>
+        {/* 1. Tag statut */}
+        <span className="cdym-res-tag lose">PERDU POUR AUJOURD'HUI</span>
+
+        {/* 2. Emoji défaite */}
+        <div style={{ fontSize: 52, lineHeight: 1 }}>🫥</div>
+
+        {/* 3. Réponse */}
+        <div className="cdym-res-answer">
+          <span className="cdym-res-poster">
+            {result.photoUrl && (
+              <img
+                src={result.photoUrl}
+                alt={result.name}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                referrerPolicy="no-referrer"
+              />
             )}
-            <p className="text-xs text-film-text-dim mt-2">
-              {stats.attemptsUsed}/{stats.maxAttempts} essais · {stats.hintsRevealed} indice{stats.hintsRevealed !== 1 ? 's' : ''} utilisé{stats.hintsRevealed !== 1 ? 's' : ''}
-            </p>
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="l">La réponse était</div>
+            <div className="t">{result.name}</div>
+            {result.year && (
+              <div className="cdy-mono" style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{result.year}</div>
+            )}
           </div>
         </div>
 
-        <div className="flex gap-2 w-full">
-          {onOpenStats && (
-            <Button variant="secondary" size="md" onClick={onOpenStats} className="flex-1">
-              <BarChart2 size={15} />
-              Stats
-            </Button>
-          )}
-          <Button variant="primary" size="md" onClick={onShare} className="flex-1">
-            <Share2 size={15} />
-            Partager
-          </Button>
+        {/* 4. Série remise à zéro */}
+        <div className="cdy-mono" style={{ fontSize: 12.5, color: 'var(--ink-2)', fontWeight: 600 }}>
+          Série remise à zéro · 🔥 0 jour
         </div>
 
-        {onShareAll && (
-          <Button variant="secondary" size="md" onClick={onShareAll} className="w-full">
-            <Share2 size={15} />
-            Partager les 3 jeux 🎬📺🏛️
-          </Button>
-        )}
+        {/* 5. Message consolation */}
+        <p style={{ margin: 0, fontSize: 15, color: 'var(--ink-2)', fontWeight: 500, textAlign: 'center' }}>
+          Pas de panique — un nouveau défi t'attend demain.
+        </p>
 
-        {unplayedModes && unplayedModes.length > 0 && (
-          <div className="w-full">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="flex-1 h-px bg-film-border" />
-              <p className="text-xs text-film-text-dim shrink-0">Jouer aussi aujourd'hui</p>
-              <div className="flex-1 h-px bg-film-border" />
-            </div>
-            <div className="flex gap-2">
-              {unplayedModes.map(({ type, path }) => {
-                const { label, icon: Icon } = MODE_META[type]
-                return (
-                  <a key={type} href={path} className="flex-1">
-                    <Button variant="secondary" size="md" className="w-full">
-                      <Icon size={14} />
-                      {label}
-                    </Button>
-                  </a>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {user && (
-          <a href="/friends" className="w-full">
-            <Button variant="secondary" size="md" className="w-full">
-              <Users size={15} />
-              Voir les scores de mes amis
-            </Button>
-          </a>
-        )}
-
+        {/* 6. Mur d'inscription (non connecté) */}
         {!user && (
-          <div className="w-full rounded-xl border border-film-border bg-film-dark p-3 flex items-center gap-3">
-            <div className="shrink-0 w-8 h-8 rounded-full bg-film-gray flex items-center justify-center">
-              <UserCircle size={15} className="text-film-text-dim" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-film-text">Protège ta progression</p>
-              <p className="text-xs text-film-text-dim">Un compte gratuit sauvegarde tes stats et ta série.</p>
-            </div>
+          <div style={{ width: '100%', borderRadius: 16, padding: '14px', background: 'var(--bg-2)', border: '2.5px solid var(--line)', boxShadow: '0 4px 0 var(--line-2)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>Protège ta progression</div>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-2)', fontWeight: 400 }}>
+              Un compte gratuit sauvegarde tes stats et ta série.
+            </p>
             <button
               type="button"
               onClick={() => { onClose(); openAuth('register') }}
-              className="shrink-0 text-xs font-semibold text-film-gold hover:underline cursor-pointer whitespace-nowrap"
+              className="cdy-btn cdy-btn-soft"
+              style={{ width: '100%' }}
             >
               Créer un compte
             </button>
           </div>
         )}
 
-        <p className="text-xs text-film-text-dim">
+        {/* 7. Partager quand même */}
+        <button type="button" onClick={onShare} className="cdy-btn cdy-btn-primary" style={{ width: '100%', padding: '15px' }}>
+          <Share2 size={16} />
+          Partager quand même
+        </button>
+
+        {/* 8. Stats + Accueil */}
+        <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+          {onOpenStats && (
+            <button type="button" onClick={onOpenStats} className="cdy-btn cdy-btn-soft" style={{ flex: 1 }}>
+              <BarChart2 size={15} />
+              Stats du jour
+            </button>
+          )}
+          <a href="/" className="cdy-btn cdy-btn-soft" style={{ flex: 1, textDecoration: 'none' }}>
+            Accueil
+          </a>
+        </div>
+
+        {/* 9. Défis non joués */}
+        {unplayedModes && unplayedModes.length > 0 && (
+          <div style={{ width: '100%' }}>
+            <div className="cdy-mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-2)', marginBottom: 8, textAlign: 'center' }}>
+              ✨ +{unplayedModes.length} défis t'attendent aujourd'hui
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {unplayedModes.map(({ type, path }) => (
+                <a key={type} href={path} className="cdy-btn cdy-btn-soft" style={{ flex: 1, textDecoration: 'none', padding: '10px 12px' }}>
+                  <GlyphC game={modeGlyph(type)} size={16} />
+                  {type === 'wiki' ? 'FaceGuess' : type === 'series' ? 'SerieGuess' : 'FilmGuess'}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 10. Partager les 3 */}
+        {onShareAll && (
+          <button type="button" onClick={onShareAll} className="cdy-btn cdy-btn-soft" style={{ width: '100%', fontSize: 13.5 }}>
+            <Share2 size={14} />
+            Partager les 3 jeux
+          </button>
+        )}
+
+        {/* 11. Countdown */}
+        <div className="cdy-mono" style={{ fontSize: 11, color: 'var(--ink-2)', fontWeight: 600 }}>
           Prochain défi dans <NextGameCountdown />
-        </p>
+        </div>
       </div>
     </Modal>
   )
 }
-

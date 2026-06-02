@@ -12,19 +12,18 @@ import {
   EyeOff,
   ChevronRight,
   ChevronLeft,
-  Camera,
   Settings,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { AuthModal, useAuthModal } from '@/components/modals/AuthModal'
 import type { ServerStatsMap } from '@/store/authStore'
-import { authDeleteAccount, authChangePassword, authUploadAvatar } from '@/api/client'
-import { loadStats } from '@/lib/storage'
+import { authDeleteAccount, authChangePassword, authUploadAvatar, authGetHistory } from '@/api/client'
+import { loadStats, loadHistory } from '@/lib/storage'
 import { FEATURES } from '@/config/features'
 import { useUiPrefsStore } from '@/store/uiPrefsStore'
 import type { GameStats } from '@/types'
-import { ApertureIcon } from '@/components/ui/ApertureIcon'
 import { Modal } from '@/components/ui/Modal'
+import { Footer } from '@/components/layout/Footer'
 
 // ─── Achievements ─────────────────────────────────────────────────────────────
 
@@ -214,23 +213,7 @@ function DistributionChart({
   )
 }
 
-// ─── Stat cell ────────────────────────────────────────────────────────────────
-
-function StatCell({ value, label }: { value: string | number; label: string }) {
-  return (
-    <div className="flex flex-col items-center gap-0.5 py-3">
-      <span
-        className="font-title font-bold text-gradient-gold"
-        style={{ fontSize: '32px', lineHeight: 1 }}
-      >
-        {value}
-      </span>
-      <span className="text-[10px] font-mono uppercase tracking-widest text-film-text-dim mt-1 text-center leading-tight">
-        {label}
-      </span>
-    </div>
-  )
-}
+// ─── Stat cell (kept for possible reuse) ─────────────────────────────────────
 
 // ─── Settings Modal ───────────────────────────────────────────────────────────
 
@@ -651,6 +634,8 @@ export function AuthGateNewDesign({ context }: { context: 'profile' | 'friends' 
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+type HistEntry = { cls: string; name: string; date: string; rawDate: string; won: boolean }
+
 export function ProfilePage() {
   const navigate = useNavigate()
   const newDesign = useUiPrefsStore((s) => s.newDesign)
@@ -666,11 +651,43 @@ export function ProfilePage() {
   }, [user, isLoading, navigate])
 
   const [avatarLoading, setAvatarLoading] = useState(false)
-  const [avatarError, setAvatarError] = useState<string | null>(null)
+  const [_avatarError, setAvatarError] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [histEntries, setHistEntries] = useState<HistEntry[]>([])
+
+  useEffect(() => {
+    const MODES = [
+      { key: 'film' as const,   cls: 'g-film',  name: 'FilmGuess'  },
+      { key: 'series' as const, cls: 'g-serie', name: 'SerieGuess', skip: !FEATURES.enableSeries },
+      { key: 'wiki' as const,   cls: 'g-face',  name: 'FaceGuess',  skip: !FEATURES.enableWiki  },
+    ]
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
+    const yest  = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date(Date.now() - 86400000))
+    const all: HistEntry[] = []
+    async function run() {
+      for (const m of MODES) {
+        if (m.skip) continue
+        let hist: Record<string, 'won' | 'lost'> = {}
+        if (user) {
+          try { hist = (await authGetHistory(m.key)).history } catch { hist = loadHistory(m.key) as Record<string, 'won' | 'lost'> }
+        } else {
+          hist = loadHistory(m.key) as Record<string, 'won' | 'lost'>
+        }
+        for (const [rawDate, outcome] of Object.entries(hist)) {
+          const d = new Date(rawDate + 'T12:00:00Z')
+          const label = rawDate === today ? "Aujourd'hui" : rawDate === yest ? 'Hier'
+            : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+          all.push({ cls: m.cls, name: m.name, date: label, rawDate, won: outcome === 'won' })
+        }
+      }
+      all.sort((a, b) => b.rawDate.localeCompare(a.rawDate))
+      setHistEntries(all.slice(0, 10))
+    }
+    void run()
+  }, [user])
 
   const enabledModes: Array<'film' | 'series' | 'wiki'> = [
     'film',
@@ -729,7 +746,8 @@ export function ProfilePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, sv, localStats, serverStats])
 
-  const winRate = stats.gamesPlayed > 0 ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0
+  // winRate computed locally in per-game rows
+  void (stats.gamesPlayed > 0 ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) : 0)
   const losses = stats.gamesPlayed - stats.gamesWon
 
   const globalCurrentStreak = useMemo(() => {
@@ -740,30 +758,22 @@ export function ProfilePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverStats])
 
-  const globalMaxStreak = useMemo(() => {
-    return Math.max(...enabledModes.map((m) => {
-      const svM = serverStats[m]
-      return svM?.maxStreak ?? loadStats(m).maxStreak
-    }))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serverStats])
+  // globalMaxStreak unused in this layout
+  void useMemo(() => Math.max(...enabledModes.map((m) => serverStats[m]?.maxStreak ?? loadStats(m).maxStreak)), [serverStats])
 
   if (isLoading) return (
-    <div className="min-h-screen bg-film-black flex items-center justify-center">
-      <div className="w-6 h-6 rounded-full border-2 border-film-gold border-t-transparent animate-spin" />
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="spinner spinner--lg" />
     </div>
   )
 
   if (!user) {
-    if (newDesign) {
-      return (
-        <div className="min-h-screen bg-film-black text-film-text">
-          <AuthModal />
-          <AuthGateNewDesign context="profile" />
-        </div>
-      )
-    }
-    return null
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+        <AuthModal />
+        <AuthGateNewDesign context="profile" />
+      </div>
+    )
   }
 
   const initial = user.displayName.charAt(0).toUpperCase()
@@ -828,233 +838,177 @@ export function ProfilePage() {
     total: 'Total',
   }
 
-  const tabActiveColor: Record<TabMode, string> = {
-    film:   'var(--sg-films)',
-    series: 'var(--sg-series)',
-    wiki:   'var(--sg-wiki)',
-    total:  'var(--color-film-text)',
-  }
+  // tabActiveColor kept for future use
+  void { film: 'var(--coral)', series: 'var(--grape)', wiki: 'var(--sky)', total: 'var(--ink)' }
+
+  // ── Per-mode stats for cdy-grow rows ──────────────────────────────────────
+  const perGameModes = [
+    { key: 'film' as const, cls: 'g-film', name: 'FilmGuess', glyph: 'film', enabled: true },
+    { key: 'series' as const, cls: 'g-serie', name: 'SerieGuess', glyph: 'serie', enabled: FEATURES.enableSeries },
+    { key: 'wiki' as const, cls: 'g-face', name: 'FaceGuess', glyph: 'face', enabled: FEATURES.enableWiki },
+  ].filter(m => m.enabled)
+
+  // Global totals
+  const totalPlayed = enabledModes.reduce((s, m) => s + (serverStats[m]?.gamesPlayed ?? loadStats(m).gamesPlayed), 0)
+  const totalWins   = enabledModes.reduce((s, m) => s + (serverStats[m]?.wins ?? loadStats(m).gamesWon), 0)
+  const totalPct    = totalPlayed > 0 ? Math.round((totalWins / totalPlayed) * 100) : 0
 
   return (
-    <div className="min-h-screen bg-film-black text-film-text">
-      {/* Header */}
-      <header
-        className="sticky top-0 z-30 w-full h-14"
-        style={{ background: 'rgba(11,11,26,0.92)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}
-      >
-        {/* Desktop */}
-        <div className="hidden lg:flex items-center justify-between h-full px-6 max-w-5xl mx-auto">
-          <a href="/" className="flex items-center gap-2">
-            <ApertureIcon size={28} />
-            <span className="font-title font-bold text-film-text">GuessToday</span>
-          </a>
-          <div className="flex items-center gap-3">
-            {user.avatarUrl ? (
-              <img
-                src={user.avatarUrl}
-                alt={user.displayName}
-                className="w-8 h-8 rounded-full object-cover border border-film-gold/40"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-film-gold/20 border border-film-gold/40 flex items-center justify-center text-sm font-bold text-film-gold">
-                {initial}
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(true)}
-              aria-label="Réglages"
-              className="text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
-            >
-              <Settings size={18} />
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile */}
-        <div className="lg:hidden flex items-center h-full px-4 gap-3">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            aria-label="Retour"
-            className="text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
-          >
-            <ChevronLeft size={22} />
-          </button>
-          <span className="font-title font-semibold text-film-text">Profil</span>
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(true)}
-            aria-label="Réglages"
-            className="ml-auto text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
-          >
-            <Settings size={18} />
-          </button>
-        </div>
+    <div style={{ background: 'var(--bg)' }}>
+      {/* ── Header Candy ── */}
+      <header className="cdy-nav">
+        <a href="/" className="cdy-logo" style={{ textDecoration: 'none', color: 'var(--ink)' }}>
+          <span className="cdy-die">?</span>
+          <span>Guess<span style={{ color: 'var(--coral)' }}>Today</span></span>
+        </a>
+        <nav className="cdy-navlinks hidden lg:flex">
+          <a href="/"        className="cdy-navlink">Jeux du jour</a>
+          <a href="/profile" className="cdy-navlink on">Stats</a>
+          <a href="/friends" className="cdy-navlink">Classement</a>
+          <a href="/friends" className="cdy-navlink">Amis</a>
+        </nav>
+        <span className="cdy-spacer" />
+        {globalCurrentStreak > 0 && (
+          <span className="cdy-streak">🔥 {globalCurrentStreak}j</span>
+        )}
+        <button
+          type="button"
+          onClick={() => setSettingsOpen(true)}
+          className="cdy-avatar"
+          style={{ background: 'var(--grape)', boxShadow: '0 4px 0 var(--grape-d)', border: 'none', cursor: 'pointer', fontSize: 14, color: '#fff' }}
+          aria-label="Réglages"
+        >
+          {initial}
+        </button>
       </header>
 
-      {/*
-        Mobile order  : identity(1) → streak(2) → stats(3) → achievements(4) → friends(5)
-        Desktop layout: col-1 = identity+streak+achievements+friends  |  col-2 = stats (spans all rows)
-      */}
-      <div className="max-w-5xl mx-auto py-8 px-4 lg:px-10
-        flex flex-col gap-6
-        lg:grid lg:grid-cols-[1fr_1.2fr] lg:grid-rows-[auto_auto_auto_auto] lg:gap-x-9 lg:gap-y-6">
+      {/* ── CandyProfile layout ── */}
+      <div className="cdy-page">
 
-        {/* ── Identity hero — order 1 mobile, col 1 row 1 desktop ── */}
-        <div
-          className="order-1 lg:col-start-1 lg:row-start-1 rounded-2xl p-6 flex flex-col gap-4"
-          style={{ background: 'var(--color-film-surface)', border: '1px solid rgba(255,255,255,0.07)' }}
-        >
-          <div className="flex items-center gap-4">
-            <div className="flex flex-col items-center gap-1 flex-shrink-0">
-              <label className="relative group cursor-pointer" title="Changer la photo de profil">
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="sr-only"
-                  onChange={handleAvatarUpload}
-                  disabled={avatarLoading}
-                />
-                {user.avatarUrl ? (
-                  <img
-                    src={user.avatarUrl}
-                    alt={user.displayName}
-                    className="w-[76px] h-[76px] rounded-full object-cover border border-film-gold/40"
-                  />
-                ) : (
-                  <div className="w-[76px] h-[76px] rounded-full bg-film-gold/20 border border-film-gold/40 flex items-center justify-center text-2xl font-bold text-film-gold">
-                    {initial}
-                  </div>
-                )}
-                <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  {avatarLoading ? (
-                    <div className="w-4 h-4 rounded-full border-2 border-film-gold border-t-transparent animate-spin" />
-                  ) : (
-                    <Camera size={16} className="text-white" />
-                  )}
-                </div>
-              </label>
-              {avatarError && (
-                <p className="text-[10px] text-film-red text-center max-w-[80px] leading-tight">{avatarError}</p>
-              )}
-            </div>
+        {/* ── Profile header card (cdy-card) ── */}
+        <div className="cdy-card" style={{ display: 'flex', alignItems: 'center', gap: 22, padding: 28, flexWrap: 'wrap' }}>
+          {/* Avatar (cliquable pour upload) */}
+          <label className="relative" style={{ cursor: 'pointer', flexShrink: 0 }} title="Changer la photo de profil">
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+              onChange={handleAvatarUpload} disabled={avatarLoading} />
+            {user.avatarUrl ? (
+              <img src={user.avatarUrl} alt={user.displayName}
+                style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid #fff', boxShadow: '0 4px 0 var(--line-2)' }} />
+            ) : (
+              <span className="cdy-av"
+                style={{ width: 80, height: 80, fontSize: 28, background: 'var(--grape)', boxShadow: '0 4px 0 var(--grape-d)' }}>
+                {initial}
+              </span>
+            )}
+            {avatarLoading && (
+              <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div className="spinner spinner--sm" />
+              </div>
+            )}
+          </label>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-film-text truncate">{user.displayName}</span>
-                <button
-                  type="button"
-                  onClick={() => setSettingsOpen(true)}
-                  aria-label="Modifier le pseudo"
-                  className="text-film-text-dim hover:text-film-text cursor-pointer flex-shrink-0"
-                >
-                  <Pencil size={14} />
-                </button>
-              </div>
-              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                <span className="text-sm text-film-text-dim truncate">{user.email ?? '—'}</span>
-              </div>
+          {/* Name + pseudo */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <h1 style={{ margin: 0, fontWeight: 700, fontSize: 28, color: 'var(--ink)', lineHeight: 1 }}>
+                {user.displayName}
+              </h1>
+              <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Modifier le profil"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', padding: 2 }}>
+                <Pencil size={14} />
+              </button>
             </div>
+            <div className="cdy-mono" style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 5 }}>
+              {user.email ?? '—'}
+            </div>
+          </div>
+
+          {/* Global stats inline */}
+          <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="cdy-mstat"><b>{totalPlayed}</b><span>parties</span></div>
+            <div className="cdy-mstat"><b style={{ color: 'var(--mint)' }}>{totalWins}</b><span>victoires</span></div>
+            <div className="cdy-mstat"><b>{totalPct}%</b><span>réussite</span></div>
+            {globalCurrentStreak > 0 && (
+              <span className="cdy-streak" style={{ fontSize: 15, padding: '9px 16px' }}>
+                🔥 {globalCurrentStreak} jours
+              </span>
+            )}
           </div>
         </div>
 
-        {/* ── Streak banner — order 2 mobile, col 1 row 2 desktop ── */}
-        <div
-          className="order-2 lg:col-start-1 lg:row-start-2 rounded-2xl border border-amber-400/20 p-5"
-          style={{ background: 'linear-gradient(135deg, rgba(212,120,30,0.15) 0%, rgba(212,166,74,0.10) 100%)' }}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-mono uppercase text-amber-400/70 mb-1">Série en cours</p>
-              <div className="flex items-end gap-2">
-                <span className="text-2xl">🔥</span>
-                <span className="font-title font-bold text-gradient-gold" style={{ fontSize: '36px', lineHeight: 1 }}>
-                  {globalCurrentStreak}
-                </span>
-                <span className="text-sm text-film-text-dim mb-1">jours</span>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] font-mono uppercase text-film-text-dim/50 mb-1">RECORD</p>
-              <div className="flex items-end gap-1 justify-end">
-                <span className="text-xl font-bold text-film-gold">{globalMaxStreak}</span>
-                <span className="text-sm text-film-text-dim mb-0.5">j</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* ── 2-col grid: stats par jeu + distribution ── */}
+        <div className="grid gap-6 mt-3 grid-cols-1 lg:grid-cols-[1fr_360px]">
 
-        {/* ── Stats column — order 3 mobile, col 2 rows 1-4 desktop ── */}
-        <div className="order-3 lg:col-start-2 lg:row-start-1 lg:row-end-5 flex flex-col gap-5">
-
-          {/* Mode tabs */}
-          <div className="flex gap-4 border-b border-film-border/30 mb-5">
-            {tabs.map((t) => {
-              const isActive = activeTab === t
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setActiveTab(t)}
-                  className={`pb-2.5 text-sm font-medium transition-colors cursor-pointer border-b-2 -mb-px ${
-                    isActive
-                      ? ''
-                      : 'text-film-text-dim border-transparent hover:text-film-text'
-                  }`}
-                  style={isActive ? { color: tabActiveColor[t], borderColor: tabActiveColor[t] } : undefined}
-                >
-                  {tabLabel[t]}
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Stats 4-col */}
-          <div className="grid grid-cols-4 gap-2 mb-5">
-            <StatCell value={stats.gamesPlayed} label="JOUÉS" />
-            <StatCell value={`${winRate}%`} label="VICTOIRES" />
-            <StatCell value={stats.currentStreak} label="SÉRIE" />
-            <StatCell value={stats.maxStreak} label="MAX" />
-          </div>
-
-          {/* Distribution */}
+          {/* Colonne gauche : stats par jeu (cdy-grow) */}
           <div>
-            <p className="text-[11px] font-mono uppercase tracking-widest text-film-text-dim/60 mb-3">
-              TENTATIVES
-            </p>
-            <DistributionChart distribution={stats.guessDistributionStr} losses={losses > 0 ? losses : undefined} />
+            <div className="cdy-sec-head"><h3>Stats par jeu</h3></div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {perGameModes.map(({ key, cls, name }) => {
+                const sv = serverStats[key]
+                const loc = loadStats(key)
+                const played = sv?.gamesPlayed ?? loc.gamesPlayed
+                const won    = sv?.wins ?? loc.gamesWon
+                const streak = sv?.currentStreak ?? loc.currentStreak
+                const pct    = played > 0 ? Math.round((won / played) * 100) : 0
+                return (
+                  <div key={key} className={`cdy-card cdy-grow ${cls}`}>
+                    <span className="gg">
+                      {key === 'film'   && <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9h18M3 15h18M8 4v16M16 4v16"/></svg>}
+                      {key === 'series' && <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8 3l4 4 4-4"/></svg>}
+                      {key === 'wiki'   && <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="9" r="4"/><path d="M5 20c0-3.8 3.1-6.2 7-6.2s7 2.4 7 6.2"/></svg>}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="gname">{name}</div>
+                      <div className="gsub">{played} partie{played !== 1 ? 's' : ''} · {won} victoire{won !== 1 ? 's' : ''}</div>
+                    </div>
+                    <div className="gwin">
+                      <div className="gwin-track">
+                        <div className="gwin-fill" style={{ width: `${pct}%` }} />
+                      </div>
+                      <div className="gwin-pct">{pct}% de victoire</div>
+                    </div>
+                    <div className={`gstreak${streak > 0 ? '' : ' off'}`}>
+                      <b>{streak > 0 ? `🔥${streak}` : '–'}</b>
+                      <span>série</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
           </div>
 
-          {/* Streak calendar */}
-          <StreakCalendarProfile
-            currentStreak={stats.currentStreak}
-            gamesPlayed={stats.gamesPlayed}
-          />
+          {/* Colonne droite : historique (référence CandyProfile) */}
+          <aside>
+            <div className="cdy-sec-head"><h3>Historique</h3></div>
+            <div className="cdy-card" style={{ padding: 6 }}>
+              {histEntries.length === 0 ? (
+                <div style={{ padding: '18px 16px', color: 'var(--ink-3)', fontSize: 14, fontWeight: 500 }}>
+                  Aucune partie jouée pour l'instant.
+                </div>
+              ) : histEntries.map((h, i) => (
+                <div key={i} className={`cdy-hrow ${h.cls}`}>
+                  <span className="hg">
+                    {h.cls === 'g-film' && <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9h18M3 15h18M8 4v16M16 4v16"/></svg>}
+                    {h.cls === 'g-serie' && <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8 3l4 4 4-4"/></svg>}
+                    {h.cls === 'g-face' && <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="9" r="4"/><path d="M5 20c0-3.8 3.1-6.2 7-6.2s7 2.4 7 6.2"/></svg>}
+                  </span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14.5 }}>{h.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 500 }}>{h.date}</div>
+                  </div>
+                  <span className={`cdy-hres ${h.won ? 'win' : 'lose'}`}>
+                    {h.won ? 'Gagné' : 'X/5'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </aside>
         </div>
-
-        {/* ── Achievements — order 4 mobile, col 1 row 3 desktop ── */}
-        <div className="order-4 lg:col-start-1 lg:row-start-3">
-          <AchievementsSection serverStats={serverStats} />
-        </div>
-
-        {/* ── Friends link — order 5 mobile, col 1 row 4 desktop ── */}
-        <a
-          href="/friends"
-          className="order-5 lg:col-start-1 lg:row-start-4 group rounded-2xl p-5 flex items-center gap-4 transition-colors"
-          style={{ background: 'var(--color-film-surface)', border: '1px solid rgba(255,255,255,0.07)' }}
-        >
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--color-film-dark)' }}>
-            <Users size={18} className="text-film-text-dim group-hover:text-film-text transition-colors" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-film-text">Scores de mes amis</p>
-            <p className="text-sm text-film-text-dim mt-0.5">Compare tes résultats avec tes amis</p>
-          </div>
-          <ChevronRight size={16} className="text-film-text-dim/40 group-hover:text-film-text-dim transition-colors shrink-0" />
-        </a>
 
       </div>
+
+      <Footer />
 
       {settingsOpen && (
         <SettingsModal
