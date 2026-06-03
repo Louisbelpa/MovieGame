@@ -20,14 +20,21 @@ function CAvatar({ name, size = 40, hue = 270 }) {
 }
 
 /* ----------------------- STATS DU JOUR ----------------------- */
-function CandyStats() {
+function CandyStats({ guest = false }) {
   const dist = [['1', 30, '6%', 'coral'], ['2', 55, '18%', 'coral'], ['3', 100, '28%', 'mint', true],
     ['4', 70, '20%', 'coral'], ['5', 38, '10%', 'coral'], ['X', 62, '18%', 'wrong']];
   const byHint = [['0', 100, '41%'], ['1', 72, '29%'], ['2', 46, '18%'], ['3', 30, '12%']];
   return (
     <div className="cdy g-film" style={{ width: 1440 }}>
-      <CandyNav active="stats" />
+      <CandyNav active="stats" connected={!guest} />
       <div className="cdy-page">
+        {guest && (
+          <div className="cdy-guest-strip">
+            <span className="e">👋</span>
+            <div><div className="t">Tu consultes les stats publiques du jour</div><div className="s">Crée un compte pour suivre <strong>tes</strong> stats, ta série et ton historique.</div></div>
+            <button className="cdy-btn cdy-btn-primary g-film b">Créer un compte</button>
+          </div>
+        )}
         <span className="cdy-badge" style={{ marginBottom: 14 }}>FilmGuess · #142</span>
         <h1 className="cdy-h1b">Les stats du jour 📊</h1>
         <p className="cdy-lead">Comment toute la communauté a joué le défi d'aujourd'hui.</p>
@@ -467,4 +474,97 @@ function CandyShareCompare() {
   );
 }
 
-Object.assign(window, { CandyStats, CandyProfile, CandyLeaderboard, CandyFriends, CandyResult, CandyFaceArena, CandyDailyShareCard, CandyShareSingle, CandyShareCompare, CAvatar });
+/* ----------------------- MUR D'INSCRIPTION (pages perso en invité) ----------------------- */
+const LOCKED_CFG = {
+  classement: { active: 'classement', icon: '🏆', title: 'Le classement, c\'est entre amis', body: 'Crée un compte pour rejoindre le classement, suivre ton rang et défier tes amis chaque jour.', perks: ['🏆 Ton rang', '📈 Évolution', '👥 Tes amis'], bg: () => <CandyLeaderboard /> },
+  profil: { active: 'profil', icon: '👤', title: 'Ton profil t\'attend', body: 'Crée un compte pour sauvegarder ta série, tes stats par jeu et tout ton historique de parties.', perks: ['🔥 Ta série', '📊 Tes stats', '🕑 Historique'], bg: () => <CandyProfile /> },
+  amis: { active: 'amis', icon: '👥', title: 'Joue avec tes amis', body: 'Crée un compte pour ajouter des amis, comparer vos scores et vous défier sur le défi du jour.', perks: ['➕ Ajouter des amis', '⚔️ Défis', '📊 Comparaison'], bg: () => <CandyFriends /> },
+};
+function CandyLockedPage({ page = 'profil' }) {
+  const cfg = LOCKED_CFG[page];
+  return (
+    <div className="cdy g-film" style={{ width: 1440 }}>
+      <CandyNav active={cfg.active} connected={false} />
+      <div className="cdy-locked">
+        <div className="cdy-locked-bg" aria-hidden="true">{cfg.bg()}</div>
+        <div className="cdy-locked-scrim">
+          <div className="cdy-locked-card">
+            <div className="lk">{cfg.icon}</div>
+            <h2>{cfg.title}</h2>
+            <p>{cfg.body}</p>
+            <div className="cdy-locked-perks">{cfg.perks.map((p) => <span className="cdy-locked-perk" key={p}>{p}</span>)}</div>
+            <div className="cdy-locked-cta">
+              <button className="cdy-btn cdy-btn-lg cdy-btn-primary" style={{ width: 300 }}>Créer un compte gratuit</button>
+              <span className="cdy-locked-ghost">J'ai déjà un compte · Se connecter</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { CandyStats, CandyProfile, CandyLeaderboard, CandyFriends, CandyResult, CandyFaceArena, CandyDailyShareCard, CandyShareSingle, CandyShareCompare, CAvatar, CandyLockedPage, CandyProfileEdit });
+
+/* ----------------------- ÉDITION DE PROFIL (desktop) ----------------------- */
+const EDIT_HUES = [300, 30, 200, 150, 90, 260, 340, 50];
+function CandyProfileEdit() {
+  return (
+    <div className="cdy g-film" style={{ width: 1440 }}>
+      <CandyNav active="profil" />
+      <div className="cdy-page">
+        <div className="cdy-edit">
+          <h1 className="cdy-h1b" style={{ marginBottom: 4 }}>Modifier mon profil</h1>
+          <p className="cdy-lead" style={{ marginBottom: 28 }}>Ton pseudo et ton avatar sont visibles par tes amis et dans le classement.</p>
+
+          <div className="cdy-edit-card">
+            <h3>Avatar</h3>
+            <p className="ch">Choisis une couleur — tes initiales s'affichent dessus.</p>
+            <div className="cdy-edit-avatar">
+              <span className="cdy-edit-av" style={{ background: 'oklch(0.66 0.16 300)', boxShadow: '0 6px 0 oklch(0.5 0.15 300)' }}>LM</span>
+              <div className="cdy-edit-hues">
+                {EDIT_HUES.map((h, i) => (
+                  <span key={h} className={`cdy-edit-hue${i === 0 ? ' on' : ''}`} style={{ background: `oklch(0.66 0.16 ${h})` }} />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="cdy-edit-card">
+            <h3>Informations</h3>
+            <p className="ch">Modifie ce que voient les autres joueurs.</p>
+            <div className="cdy-field-row">
+              <div className="cdy-fld"><label>Nom affiché</label><div className="inp">Léa Martin</div></div>
+              <div className="cdy-fld"><label>Pseudo</label><div className="inp">@leamartin</div><div className="hint">guesstoday.app/@leamartin</div></div>
+            </div>
+            <div className="cdy-fld"><label>E-mail</label><div className="inp">lea.martin@email.com</div></div>
+            <div className="cdy-fld"><label>Bio (optionnel)</label><div className="inp area">Accro à FilmGuess depuis le jour 1. 🎬</div></div>
+          </div>
+
+          <div className="cdy-edit-card">
+            <h3>Préférences</h3>
+            <p className="ch">Notifications et confidentialité.</p>
+            <div className="cdy-toggle-row"><div><div className="tt">Rappel quotidien</div><div className="ts">Une notif quand les défis du jour sont prêts.</div></div><span className="cdy-toggle on" /></div>
+            <div className="cdy-toggle-row"><div><div className="tt">Apparaître dans le classement amis</div><div className="ts">Tes amis voient ton score et ta série.</div></div><span className="cdy-toggle on" /></div>
+            <div className="cdy-toggle-row"><div><div className="tt">Profil public</div><div className="ts">N'importe qui avec le lien peut voir tes stats.</div></div><span className="cdy-toggle" /></div>
+          </div>
+
+          <div className="cdy-edit-card" style={{ display: 'flex', alignItems: 'center' }}>
+            <div className="cdy-edit-danger">
+              <div><div className="dt">Supprimer mon compte</div><div className="ds">Action définitive — séries, stats et historique perdus.</div></div>
+            </div>
+            <button className="cdy-btn cdy-btn-danger" style={{ marginLeft: 'auto' }}>Supprimer</button>
+          </div>
+
+          <div className="cdy-edit-actions">
+            <button className="cdy-btn cdy-btn-lg cdy-btn-primary" style={{ flex: 1 }}>Enregistrer les modifications</button>
+            <button className="cdy-btn cdy-btn-lg cdy-btn-soft">Annuler</button>
+          </div>
+        </div>
+      </div>
+      <CandyFooter />
+    </div>
+  );
+}
+
+Object.assign(window, { CandyProfileEdit });

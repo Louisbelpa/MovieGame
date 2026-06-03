@@ -35,7 +35,7 @@ function buildAttempts(cfg, state) {
   return { rows: [], hints: 0 };
 }
 
-function CandyGame({ game = 'film', state = 'start' }) {
+function CandyGame({ game = 'film', state = 'start', dayNum = 142, dateLabel = '28 mai 2026', isToday = true }) {
   const cfg = GAME_CFG[game];
   const { rows, hints: hintsRevealed } = buildAttempts(cfg, state);
   const used = rows.filter((r) => r.k !== 'empty').length;
@@ -50,9 +50,22 @@ function CandyGame({ game = 'film', state = 'start' }) {
         <div className="cdy-ar-top">
           <div className="cdy-ar-game">
             <span className="cdy-ar-icon"><GlyphG game={cfg.glyph} size={26} /></span>
-            <div><div className="cdy-ar-name">{cfg.name}</div><div className="cdy-ar-day">Défi #142 · 28 mai</div></div>
+            <div><div className="cdy-ar-name">{cfg.name}</div><div className="cdy-ar-day">{cfg.label}</div></div>
           </div>
           <span className="cdy-ar-badge">{cfg.label}</span>
+        </div>
+
+        {/* date navigator — accès aux jours précédents */}
+        <div className="cdy-datenav">
+          <span className="cdy-datenav-arrow" title="Jour précédent">‹</span>
+          <div className="cdy-datenav-center">
+            <div className="cdy-datenav-date"><span className="cal">📅</span>{dateLabel}</div>
+            <div className="cdy-datenav-sub">Défi #{dayNum} · appuie pour l'archive</div>
+          </div>
+          {isToday
+            ? <span className="cdy-datenav-today">Aujourd'hui</span>
+            : <span className="cdy-datenav-replay">Ancien défi</span>}
+          <span className={`cdy-datenav-arrow${isToday ? ' disabled' : ''}`} title="Jour suivant">›</span>
         </div>
 
         {/* tries slots */}
@@ -207,3 +220,76 @@ function CandyGamePage({ game = 'film', state = 'playing' }) {
 }
 
 Object.assign(window, { CandySwitch, CandyGamePage });
+
+/* ---------------- archive (calendrier des défis passés) ---------------- */
+function CandyArchive({ today = 28, monthDays = 31, firstDow = 4, month = 'Mai 2026' }) {
+  // résultats déterministes par jour : 3 jeux (film/serie/face) → win|lose|none
+  const dayResult = (d) => {
+    const r = (n) => { const x = Math.sin((d + 1) * (n + 3) * 12.9898) * 43758.5453; return x - Math.floor(x); };
+    return [0, 1, 2].map((g) => {
+      if (d > today) return 'none';
+      const v = r(g);
+      if (d === today && g > 0) return 'none';       // aujourd'hui : seul FilmGuess joué
+      return v < 0.62 ? 'win' : v < 0.82 ? 'lose' : 'none';
+    });
+  };
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= monthDays; d++) cells.push(d);
+
+  return (
+    <div className="cdy-archive">
+      <div className="cdy-archive-head">
+        <span className="ic">📅</span>
+        <div>
+          <h3>Archive des défis</h3>
+          <p>Rejoue les défis que tu as manqués — chaque jour reste accessible.</p>
+        </div>
+        <span className="cdy-archive-x">✕</span>
+      </div>
+      <div className="cdy-archive-body">
+        <div className="cdy-archive-month">
+          <button title="Mois précédent">‹</button>
+          <span className="m">{month}</span>
+          <button className="disabled" title="Mois suivant">›</button>
+        </div>
+        <div className="cdy-cal-dow">{['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => <span key={i}>{d}</span>)}</div>
+        <div className="cdy-cal-grid">
+          {cells.map((d, i) => {
+            if (d === null) return <div key={i} className="cdy-cal-day empty" />;
+            const res = dayResult(d);
+            const isToday = d === today;
+            const isFuture = d > today;
+            const full = !isFuture && res.every((r) => r !== 'none');
+            const cls = ['cdy-cal-day', isToday ? 'today' : '', isFuture ? 'future' : '', full ? 'full' : ''].filter(Boolean).join(' ');
+            return (
+              <div key={i} className={cls}>
+                <span className="dn">{d}</span>
+                {!isFuture && <span className="dots">{res.map((r, j) => <i key={j} className={r} />)}</span>}
+              </div>
+            );
+          })}
+        </div>
+        <div className="cdy-archive-legend">
+          <span><i className="win" /> Trouvé</span>
+          <span><i className="lose" /> Manqué</span>
+          <span><i className="none" /> Non joué</span>
+          <span style={{ color: 'var(--ink-3)' }}>· 3 pastilles = les 3 jeux du jour</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CandyArchiveScreen({ game = 'film' }) {
+  return (
+    <div className={`cdy g-${game}`} style={{ position: 'relative', width: 760, minHeight: 900 }}>
+      <div style={{ filter: 'blur(2px)', opacity: 0.55, pointerEvents: 'none' }}>
+        <CandyGame game={game} state="start" />
+      </div>
+      <div className="cdy-archive-scrim"><CandyArchive /></div>
+    </div>
+  );
+}
+
+Object.assign(window, { CandyArchive, CandyArchiveScreen });

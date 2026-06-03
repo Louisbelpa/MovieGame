@@ -104,7 +104,7 @@ export function CalendarPage() {
   const [dropError, setDropError] = useState<string | null>(null)
 
   const [todayISO, setTodayISO] = useState(getTodayISO)
-  const [showPast, setShowPast] = useState(false)
+  const [showPast, setShowPast] = useState(true)
 
   // Reset todayISO at Paris midnight
   useEffect(() => {

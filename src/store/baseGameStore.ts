@@ -19,6 +19,7 @@ interface BaseChallengePayloadLike {
   imageUrl?: string | null
   photoUrl?: string | null
   profile?: unknown
+  extract?: string | null
   hints?: unknown[]
   maxAttempts?: number
   isPastChallenge?: boolean

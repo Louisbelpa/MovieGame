@@ -92,7 +92,7 @@ function mRows(cfg, state) {
   if (state === 'lost') return [{ k: 'wrong', t: w[0] }, { k: 'wrong', t: w[1] }, { k: 'skip', t: 'passé' }, { k: 'wrong', t: w[2] }, { k: 'wrong', t: w[3] }];
   return [];
 }
-function MobileGameBody({ game = 'film', state = 'playing' }) {
+function MobileGameBody({ game = 'film', state = 'playing', dayNum = 142, dateLabel = '28 mai 2026', isToday = true }) {
   const cfg = CFG_M[game];
   const rows = mRows(cfg, state);
   const used = rows.length;
@@ -115,6 +115,15 @@ function MobileGameBody({ game = 'film', state = 'playing' }) {
               </div>
             );
           })}
+        </div>
+        <div className="cdym-datenav">
+          <span className="arrow">‹</span>
+          <div className="center">
+            <div className="d">📅 {dateLabel}</div>
+            <div className="s">Défi #{dayNum} · appuie pour l'archive</div>
+          </div>
+          {isToday ? <span className="tag">Auj.</span> : <span className="tag old">Ancien</span>}
+          <span className={`arrow${isToday ? ' disabled' : ''}`}>›</span>
         </div>
         <div className="cdym-arena">
           <div className="cdym-ar-slots">
@@ -153,11 +162,11 @@ function MobileGameBody({ game = 'film', state = 'playing' }) {
   );
 }
 
-function MobileGame({ game = 'film', state = 'playing' }) {
+function MobileGame({ game = 'film', state = 'playing', dayNum = 142, dateLabel = '28 mai 2026', isToday = true }) {
   return (
     <div className={`cdym g-${game}`}>
       <MHeader />
-      <div className="cdym-scroll"><MobileGameBody game={game} state={state} /></div>
+      <div className="cdym-scroll"><MobileGameBody game={game} state={state} dayNum={dayNum} dateLabel={dateLabel} isToday={isToday} /></div>
       <MTabBar active="jeux" />
     </div>
   );

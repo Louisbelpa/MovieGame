@@ -2,6 +2,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useAuthModal } from '@/components/modals/AuthModal'
 import { loadStats } from '@/lib/storage'
 import { FEATURES } from '@/config/features'
+import { avatarBg, avatarShadow, parseAvatarHue } from '@/lib/utils'
 
 interface HeaderProps {
   mode: 'film' | 'series' | 'wiki'
@@ -30,13 +31,13 @@ export function Header({ mode: _mode }: HeaderProps) {
       <nav className="cdy-navlinks hidden lg:flex">
         <a href="/"        className="cdy-navlink on">Jeux du jour</a>
         <a href="/profile" className="cdy-navlink">Stats</a>
-        <a href="/friends" className="cdy-navlink">Classement</a>
-        <a href="/friends" className="cdy-navlink">Amis</a>
+        <a href="/classement" className="cdy-navlink">Classement</a>
+        <a href="/friends"    className="cdy-navlink">Amis</a>
       </nav>
 
       <span className="cdy-spacer" />
 
-      {/* Right */}
+      {/* Right — authenticated: streak + avatar; non-auth desktop: Se connecter + S'inscrire; non-auth mobile: hidden (auth via page CTAs) */}
       {isLoading ? (
         <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--line)' }} />
       ) : user ? (
@@ -47,9 +48,9 @@ export function Header({ mode: _mode }: HeaderProps) {
           <a
             href="/profile"
             className="cdy-avatar"
-            style={{ background: 'var(--grape)', boxShadow: '0 3px 0 var(--grape-d)', textDecoration: 'none', fontSize: 14 }}
+            style={{ background: avatarBg(user.avatarUrl), boxShadow: avatarShadow(user.avatarUrl), textDecoration: 'none', fontSize: 14 }}
           >
-            {user.avatarUrl ? (
+            {user.avatarUrl && !parseAvatarHue(user.avatarUrl) ? (
               <img src={user.avatarUrl} alt={user.displayName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
             ) : (
               user.displayName.charAt(0).toUpperCase()
@@ -58,22 +59,36 @@ export function Header({ mode: _mode }: HeaderProps) {
         </>
       ) : (
         <>
-          <button
-            type="button"
-            onClick={() => openAuth('login')}
-            className="cdy-navlink"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Fredoka, sans-serif' }}
-          >
-            Se connecter
-          </button>
-          <button
-            type="button"
-            onClick={() => openAuth('register')}
-            className="cdy-btn cdy-btn-primary g-film"
-            style={{ padding: '10px 20px', fontSize: 14 }}
-          >
-            Créer un compte
-          </button>
+          {/* Mobile: compact primary CTA */}
+          <div className="lg:hidden">
+            <button
+              type="button"
+              onClick={() => openAuth('register')}
+              className="cdy-btn cdy-btn-primary g-film"
+              style={{ padding: '9px 14px', fontSize: 13.5 }}
+            >
+              Créer un compte
+            </button>
+          </div>
+          {/* Desktop: Se connecter + Créer un compte */}
+          <div className="cdy-nav-auth hidden lg:flex" style={{ gap: 8, alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => openAuth('login')}
+              className="cdy-navlink"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Fredoka, sans-serif' }}
+            >
+              Se connecter
+            </button>
+            <button
+              type="button"
+              onClick={() => openAuth('register')}
+              className="cdy-btn cdy-btn-primary g-film"
+              style={{ padding: '10px 20px', fontSize: 14 }}
+            >
+              Créer un compte
+            </button>
+          </div>
         </>
       )}
     </header>

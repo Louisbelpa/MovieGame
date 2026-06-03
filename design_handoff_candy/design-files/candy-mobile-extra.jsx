@@ -128,13 +128,20 @@ function MobileHubBehind() {
 }
 
 /* ------------------------------- STATS -------------------------------- */
-function MobileStats() {
+function MobileStats({ guest = false }) {
   const dist = [['1', 6, 'var(--coral)'], ['2', 18, 'var(--coral)'], ['3', 28, 'var(--mint)'], ['4', 20, 'var(--coral)'], ['5', 10, 'var(--coral)'], ['X', 18, 'var(--wrong)']];
   const max = 28;
   return (
     <div className="cdym g-film">
       <MHeaderE />
       <div className="cdym-scroll">
+        {guest && (
+          <div className="cdym-guest-strip">
+            <span className="e">👋</span>
+            <div style={{ flex: 1, minWidth: 0 }}><div className="t">Stats publiques du jour</div><div className="s">Crée un compte pour suivre tes stats.</div></div>
+            <button className="cdym-btn cdym-btn-primary" style={{ padding: '9px 13px', fontSize: 13 }}>Compte</button>
+          </div>
+        )}
         <div className="cdym-ph"><h1>Stats du jour 📊</h1><div className="sub">FilmGuess · #142</div></div>
         <div className="cdym-stat-grid">
           <div className="cdym-stat-t"><div className="v" style={{ color: 'var(--mint)' }}>72%</div><div className="l">taux de victoire</div></div>
@@ -232,7 +239,125 @@ function MobileFriends() {
   );
 }
 
-Object.assign(window, { MobileOnboarding, MobileAuth, MobileLanding, MobileMenu, MobileStats, MobileResult, MobileFriends, MobileGuestArena, MobileGuestWin });
+Object.assign(window, { MobileOnboarding, MobileAuth, MobileLanding, MobileMenu, MobileStats, MobileResult, MobileFriends, MobileGuestArena, MobileGuestWin, MobileLocked });
+
+/* ----- mur d'inscription mobile (pages perso en invité) ----- */
+const MLOCK = {
+  classement: { active: 'classement', icon: '🏆', title: 'Classement entre amis', body: 'Crée un compte pour rejoindre le classement et défier tes amis.', perks: ['🏆 Ton rang', '👥 Tes amis'] },
+  profil: { active: 'profil', icon: '👤', title: 'Ton profil t\'attend', body: 'Crée un compte pour sauvegarder ta série, tes stats et ton historique.', perks: ['🔥 Ta série', '📊 Tes stats'] },
+  amis: { active: 'profil', icon: '👥', title: 'Joue avec tes amis', body: 'Crée un compte pour ajouter des amis et comparer vos scores.', perks: ['➕ Ajouter', '⚔️ Défis'] },
+};
+function MobileLocked({ page = 'profil' }) {
+  const cfg = MLOCK[page];
+  return (
+    <div className="cdym g-film">
+      <MHeaderE />
+      <div className="cdym-locked">
+        <div className="lk">{cfg.icon}</div>
+        <h2>{cfg.title}</h2>
+        <p>{cfg.body}</p>
+        <div className="cdym-locked-perks">{cfg.perks.map((p) => <span className="cdym-locked-perk" key={p}>{p}</span>)}</div>
+        <button className="cdym-btn cdym-btn-primary cdym-btn-block" style={{ padding: '15px' }}>Créer un compte gratuit</button>
+        <span className="cdym-locked-ghost">J'ai déjà un compte · Se connecter</span>
+      </div>
+      <MTabBarE active={cfg.active} />
+    </div>
+  );
+}
+
+Object.assign(window, { MobileLocked });
+
+/* --------------------- ARCHIVE mobile (calendrier des défis) --------------------- */
+function MobileArchive({ today = 28, monthDays = 31, firstDow = 4, month = 'Mai 2026' }) {
+  const dayResult = (d) => {
+    const r = (n) => { const x = Math.sin((d + 1) * (n + 3) * 12.9898) * 43758.5453; return x - Math.floor(x); };
+    return [0, 1, 2].map((g) => {
+      if (d > today) return 'none';
+      if (d === today && g > 0) return 'none';
+      const v = r(g);
+      return v < 0.62 ? 'win' : v < 0.82 ? 'lose' : 'none';
+    });
+  };
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= monthDays; d++) cells.push(d);
+  return (
+    <div className="cdym g-film">
+      <MHeaderE />
+      <div className="cdym-scroll">
+        <div className="cdym-arch-head">
+          <h1>Archive des défis 📅</h1>
+          <div className="sub">Rejoue les défis que tu as manqués — chaque jour reste accessible.</div>
+        </div>
+        <div className="cdym-arch-month">
+          <button>‹</button>
+          <span className="m">{month}</span>
+          <button className="disabled">›</button>
+        </div>
+        <div className="cdym-cal-dow">{['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => <span key={i}>{d}</span>)}</div>
+        <div className="cdym-cal-grid">
+          {cells.map((d, i) => {
+            if (d === null) return <div key={i} className="cdym-cal-day empty" />;
+            const res = dayResult(d);
+            const isToday = d === today; const isFuture = d > today;
+            const full = !isFuture && res.every((r) => r !== 'none');
+            const cls = ['cdym-cal-day', isToday ? 'today' : '', isFuture ? 'future' : '', full ? 'full' : ''].filter(Boolean).join(' ');
+            return (
+              <div key={i} className={cls}>
+                <span className="dn">{d}</span>
+                {!isFuture && <span className="dots">{res.map((r, j) => <i key={j} className={r} />)}</span>}
+              </div>
+            );
+          })}
+        </div>
+        <div className="cdym-arch-legend">
+          <span><i className="win" /> Trouvé</span>
+          <span><i className="lose" /> Manqué</span>
+          <span><i className="none" /> Non joué</span>
+        </div>
+        <div style={{ height: 16 }} />
+      </div>
+      <MTabBarE active="jeux" />
+    </div>
+  );
+}
+
+Object.assign(window, { MobileArchive });
+
+/* --------------------- ÉDITION DE PROFIL (mobile) --------------------- */
+const MEDIT_HUES = [300, 30, 200, 150, 90, 260];
+function MobileProfileEdit() {
+  return (
+    <div className="cdym g-film">
+      <div className="cdym-lhead">
+        <span className="cdym-logo" style={{ fontSize: 17 }}><span className="d">‹</span>Modifier le profil</span>
+      </div>
+      <div className="cdym-scroll">
+        <div className="cdym-edit">
+          <div className="cdym-edit-av-row">
+            <span className="cdym-edit-av" style={{ background: 'oklch(0.66 0.16 300)', boxShadow: '0 5px 0 oklch(0.5 0.15 300)' }}>LM</span>
+            <div className="cdym-edit-hues">
+              {MEDIT_HUES.map((h, i) => <span key={h} className={`cdym-edit-hue${i === 0 ? ' on' : ''}`} style={{ background: `oklch(0.66 0.16 ${h})` }} />)}
+            </div>
+          </div>
+          <div className="cdym-sec-t" style={{ paddingLeft: 0 }}>Informations</div>
+          <div className="cdym-fld"><label>Nom affiché</label><div className="inp">Léa Martin</div></div>
+          <div className="cdym-fld"><label>Pseudo</label><div className="inp">@leamartin</div></div>
+          <div className="cdym-fld"><label>E-mail</label><div className="inp">lea.martin@email.com</div></div>
+          <div className="cdym-fld"><label>Bio (optionnel)</label><div className="inp ph">Ajoute une bio…</div></div>
+          <div className="cdym-sec-t" style={{ paddingLeft: 0 }}>Préférences</div>
+          <div className="cdym-toggle-row"><div style={{ flex: 1, minWidth: 0 }}><div className="tt">Rappel quotidien</div><div className="ts">Notif quand les défis sont prêts.</div></div><span className="cdym-toggle on" /></div>
+          <div className="cdym-toggle-row"><div style={{ flex: 1, minWidth: 0 }}><div className="tt">Visible au classement</div><div className="ts">Tes amis voient ton score.</div></div><span className="cdym-toggle on" /></div>
+          <button className="cdym-btn cdym-btn-primary cdym-btn-block" style={{ padding: '15px', marginTop: 6 }}>Enregistrer</button>
+          <span className="cdym-locked-ghost" style={{ color: 'var(--wrong-d)' }}>Supprimer mon compte</span>
+        </div>
+      </div>
+      <MTabBarE active="profil" />
+    </div>
+  );
+}
+
+Object.assign(window, { MobileProfileEdit });
 
 /* --------------------- GUEST : arène découverte --------------------- */
 function MobileGuestArena() {
@@ -247,6 +372,7 @@ function MobileGuestArena() {
         <div><div className="t">Tu joues en invité</div><div className="s">Crée un compte pour garder ta série et tes stats.</div></div>
       </div>
       <div className="cdym-scroll"><MobileGameBodyE game="film" state="playing" /></div>
+      <MTabBarE active="jeux" />
     </div>
   );
 }

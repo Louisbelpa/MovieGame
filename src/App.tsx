@@ -161,6 +161,7 @@ export default function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/stats" element={<StatsPage />} />
             <Route path="/friends" element={<FriendsPage />} />
+            <Route path="/classement" element={<FriendsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/" element={<Navigate to="/films" replace />} />
             <Route path="*" element={<NotFound />} />

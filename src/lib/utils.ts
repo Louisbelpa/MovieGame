@@ -8,6 +8,26 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Parse a `color:HUE` avatarUrl → oklch hue number.
+ * Returns null for real image URLs or null input.
+ */
+export function parseAvatarHue(avatarUrl: string | null | undefined): number | null {
+  if (!avatarUrl?.startsWith('color:')) return null
+  const h = parseInt(avatarUrl.slice(6), 10)
+  return isNaN(h) ? null : h
+}
+
+/** CSS background for an avatar: hue-based or fallback grape */
+export function avatarBg(avatarUrl: string | null | undefined): string {
+  const hue = parseAvatarHue(avatarUrl)
+  return hue !== null ? `oklch(0.66 0.16 ${hue})` : 'var(--grape)'
+}
+export function avatarShadow(avatarUrl: string | null | undefined): string {
+  const hue = parseAvatarHue(avatarUrl)
+  return hue !== null ? `0 4px 0 oklch(0.5 0.15 ${hue})` : '0 4px 0 var(--grape-d)'
+}
+
 /** Returns today's date as YYYY-MM-DD (UTC) */
 export function getTodayId(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())

@@ -556,6 +556,7 @@ function buildWikiChallengePayloadFromPerson(
     personType: person.person_type,
     photoUrl: wikiPhotoDisplayUrl(person.photo_url),
     profile: buildVisibleProfile(person),
+    extract: person.extract,
     isGameOver: session.outcome !== null,
     hintsAvailable: schedule.length,
     hintsRevealed,

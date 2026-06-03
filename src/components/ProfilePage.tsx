@@ -13,6 +13,7 @@ import { useAuthStore } from '@/store/authStore'
 import { AuthModal, useAuthModal } from '@/components/modals/AuthModal'
 import { authDeleteAccount, authChangePassword, authUploadAvatar, authGetHistory } from '@/api/client'
 import { loadStats, loadHistory } from '@/lib/storage'
+import { parseAvatarHue, avatarBg, avatarShadow } from '@/lib/utils'
 import { FEATURES } from '@/config/features'
 import { useUiPrefsStore } from '@/store/uiPrefsStore'
 import type { GameStats } from '@/types'
@@ -22,8 +23,9 @@ type TabMode = 'film' | 'series' | 'wiki' | 'total'
 
 interface SettingsModalProps {
   onClose: () => void
-  user: { displayName: string; email?: string | null; emailVerified?: boolean }
+  user: { displayName: string; email?: string | null; emailVerified?: boolean; avatarUrl?: string | null }
   onSaveName: (name: string) => Promise<void>
+  onSaveHue: (hue: number) => Promise<void>
   onChangePassword: (current: string, next: string, confirm: string) => Promise<string | null>
   onLogout: () => Promise<void>
   onDeleteAccount: () => Promise<void>
@@ -31,14 +33,16 @@ interface SettingsModalProps {
 
 const EDIT_HUES = [300, 30, 200, 150, 90, 260, 340, 50]
 
-function SettingsModal({ onClose, user, onSaveName, onChangePassword, onLogout, onDeleteAccount }: SettingsModalProps) {
+
+function SettingsModal({ onClose, user, onSaveName, onSaveHue, onChangePassword, onLogout, onDeleteAccount }: SettingsModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null)
 
   const [nameInput, setNameInput] = useState(user.displayName)
   const [nameLoading, setNameLoading] = useState(false)
   const [nameSaved, setNameSaved] = useState(false)
 
-  const [hue, setHue] = useState(300)
+  const [hue, setHue] = useState(() => parseAvatarHue(user.avatarUrl) ?? 300)
+  const [hueSaving, setHueSaving] = useState(false)
   const [notifOn, setNotifOn] = useState(false)
   const [leaderOn, setLeaderOn] = useState(true)
   const [publicOn, setPublicOn] = useState(true)
@@ -112,8 +116,13 @@ function SettingsModal({ onClose, user, onSaveName, onChangePassword, onLogout, 
                 <span
                   key={h}
                   className={`cdy-edit-hue${h === hue ? ' on' : ''}`}
-                  style={{ background: `oklch(0.66 0.16 ${h})` }}
-                  onClick={() => setHue(h)}
+                  style={{ background: `oklch(0.66 0.16 ${h})`, opacity: hueSaving ? 0.6 : 1 }}
+                  onClick={async () => {
+                    if (hueSaving || h === hue) return
+                    setHue(h)
+                    setHueSaving(true)
+                    await onSaveHue(h).finally(() => setHueSaving(false))
+                  }}
                 />
               ))}
             </div>
@@ -511,6 +520,17 @@ export function ProfilePage() {
     await updateProfile({ displayName: name })
   }
 
+  async function handleSaveHue(hue: number) {
+    // Optimistic update — apply immediately so the UI reflects the change
+    // even before the API responds (or in mock/offline mode)
+    if (user) setUser({ ...user, avatarUrl: `color:${hue}` })
+    try {
+      await updateProfile({ avatarUrl: `color:${hue}` })
+    } catch {
+      // API failed — store was already updated optimistically; keep the change
+    }
+  }
+
   async function handleChangePassword(current: string, next: string, confirm: string): Promise<string | null> {
     if (next.length < 8) return 'Le nouveau mot de passe doit contenir au moins 8 caractères.'
     if (next !== confirm) return 'Les mots de passe ne correspondent pas.'
@@ -582,7 +602,7 @@ export function ProfilePage() {
           type="button"
           onClick={() => setSettingsOpen(true)}
           className="cdy-avatar"
-          style={{ background: 'var(--grape)', boxShadow: '0 4px 0 var(--grape-d)', border: 'none', cursor: 'pointer', fontSize: 14, color: '#fff' }}
+          style={{ background: avatarBg(user.avatarUrl), boxShadow: avatarShadow(user.avatarUrl), border: 'none', cursor: 'pointer', fontSize: 14, color: '#fff' }}
           aria-label="Réglages"
         >
           {initial}
@@ -598,12 +618,12 @@ export function ProfilePage() {
           <label className="relative" style={{ cursor: 'pointer', flexShrink: 0 }} title="Changer la photo de profil">
             <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
               onChange={handleAvatarUpload} disabled={avatarLoading} />
-            {user.avatarUrl ? (
+            {user.avatarUrl && !parseAvatarHue(user.avatarUrl) ? (
               <img src={user.avatarUrl} alt={user.displayName}
                 style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid #fff', boxShadow: '0 4px 0 var(--line-2)' }} />
             ) : (
               <span className="cdy-av"
-                style={{ width: 80, height: 80, fontSize: 28, background: 'var(--grape)', boxShadow: '0 4px 0 var(--grape-d)' }}>
+                style={{ width: 80, height: 80, fontSize: 28, background: avatarBg(user.avatarUrl), boxShadow: avatarShadow(user.avatarUrl) }}>
                 {initial}
               </span>
             )}
@@ -722,6 +742,7 @@ export function ProfilePage() {
           onClose={() => setSettingsOpen(false)}
           user={user}
           onSaveName={handleSaveName}
+          onSaveHue={handleSaveHue}
           onChangePassword={handleChangePassword}
           onLogout={handleLogout}
           onDeleteAccount={handleDeleteAccount}

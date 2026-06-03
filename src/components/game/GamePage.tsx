@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Film, Tv, User, Share2, BarChart2, CheckCircle2 } from 'lucide-react'
+import { Film, Tv, User, Share2, BarChart2, CheckCircle2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { GuessInput } from './GuessInput'
 import { HintPanel } from './HintPanel'
@@ -42,6 +42,7 @@ type SharedChallenge = {
 type WikiChallengeExtras = {
   profile: unknown
   personType?: WikiChallengePayload['personType']
+  extract?: string | null
   wikipediaUrl?: string | null
 }
 
@@ -104,11 +105,17 @@ function modeGlyph(m: string) {
 
 function GameSwitcher({ currentMode }: { currentMode: 'film' | 'series' | 'wiki' }) {
   const today = getTodayParis()
+  const activeTabRef = useRef<HTMLElement | null>(null)
   const modes = [
     { key: 'film' as const,   path: '/films',  name: 'FilmGuess',  enabled: true },
     { key: 'series' as const, path: '/series', name: 'SerieGuess', enabled: FEATURES.enableSeries },
     { key: 'wiki' as const,   path: '/wiki',   name: 'FaceGuess',  enabled: FEATURES.enableWiki },
   ].filter(m => m.enabled)
+
+  // Scroll active tab into view on mobile (horizontal scroll)
+  useEffect(() => {
+    activeTabRef.current?.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'center' })
+  }, [currentMode])
 
   return (
     <div className="cdy-switch">
@@ -137,6 +144,7 @@ function GameSwitcher({ currentMode }: { currentMode: 'film' | 'series' | 'wiki'
           return (
             <Tag
               key={key}
+              ref={isCur ? (el: HTMLElement | null) => { activeTabRef.current = el } : undefined}
               {...(href ? { href } : {})}
               className={`cdy-switch-tab ${cls} ${st}${isCur ? ' active' : ''}`}
               style={{ textDecoration: 'none' }}
@@ -369,34 +377,27 @@ export function GamePage({ mode }: GamePageProps) {
   if (!challenge || status === 'not_found' || error) {
     return (
       <div className={accentClass(mode)} style={{ background: 'var(--bg)' }}>
-        <GameSwitcher currentMode={mode} />
-        <div className="cdym-arena" style={{ paddingTop: 32 }}>
-          {/* Date nav */}
-          <div className="flex items-center justify-center gap-2">
-            {showPrevNav && (
-              <button type="button" onClick={() => void navigateDate('prev')} disabled={isLoading}
-                className="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
-                style={{ background: '#fff', border: '2px solid var(--line)', boxShadow: '0 3px 0 var(--line-2)', color: 'var(--ink-2)' }}>
-                <ChevronLeft size={18} />
-              </button>
-            )}
-            <span className="cdy-mono text-sm font-bold" style={{ color: 'var(--ink-2)' }}>
-              {isToday ? "Aujourd'hui" : formatDateFr(currentDate)}
-            </span>
-            {showNextNav && (
-              <button type="button" onClick={() => void navigateDate('next')} disabled={isLoading}
-                className="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
-                style={{ background: '#fff', border: '2px solid var(--line)', boxShadow: '0 3px 0 var(--line-2)', color: 'var(--ink-2)' }}>
-                <ChevronRight size={18} />
-              </button>
-            )}
-          </div>
-          <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
-            <p className="text-4xl">🗓️</p>
-            <p className="font-bold text-lg" style={{ color: 'var(--ink)' }}>
-              {isWiki ? 'Aucun défi Personnalités pour cette date.' : 'Aucun défi pour cette date.'}
-            </p>
-            <p className="text-sm" style={{ color: 'var(--ink-2)' }}>Utilise les flèches pour naviguer vers une date avec un défi.</p>
+        <div className="lg:cdy-gamepage">
+          <GameSwitcher currentMode={mode} />
+          <div className="lg:cdy-gamestage">
+            <div className="cdym-arena">
+              <div className="cdym-datenav">
+                <button type="button" onClick={() => void navigateDate('prev')} disabled={isLoading || !showPrevNav} className={`arrow${!showPrevNav ? ' disabled' : ''}`}>‹</button>
+                <div className="center" onClick={() => openModal('archive')} style={{ cursor: 'pointer' }}>
+                  <div className="d"><span>📅</span>{isToday ? "Aujourd'hui" : formatDateFr(currentDate)}</div>
+                  <div className="s">Archive des défis</div>
+                </div>
+                {isToday ? <span className="tag">Auj.</span> : <span className="tag old" onClick={() => void loadDate(todayParis)} style={{ cursor: 'pointer' }}>Aujourd'hui</span>}
+                <button type="button" onClick={() => void navigateDate('next')} disabled={isLoading || !showNextNav} className={`arrow${!showNextNav ? ' disabled' : ''}`}>›</button>
+              </div>
+              <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+                <p className="text-4xl">🗓️</p>
+                <p className="font-bold text-lg" style={{ color: 'var(--ink)' }}>
+                  {isWiki ? 'Aucun défi Personnalités pour cette date.' : 'Aucun défi pour cette date.'}
+                </p>
+                <p className="text-sm" style={{ color: 'var(--ink-2)' }}>Utilise les flèches pour naviguer vers une date avec un défi.</p>
+              </div>
+            </div>
           </div>
         </div>
         <TabBar activeTab="games" />
@@ -413,6 +414,7 @@ export function GamePage({ mode }: GamePageProps) {
     ? (challenge.profile as WikiVisibleProfile)
     : { type: 'generic', domain: null, notableWork: null, notableWorkParts: [], era: null, company: null, highlights: [] }
   const wikiPersonType = isWikiChallenge(challenge) ? challenge.personType : undefined
+  const wikiExtract    = isWikiChallenge(challenge) ? challenge.extract : null
 
   const answerLabelPending = (status === 'won' || status === 'lost') && !resultDetails?.name && !resultLoadError
   const modalResultName = resultDetails?.name
@@ -447,10 +449,12 @@ export function GamePage({ mode }: GamePageProps) {
   return (
     <div className={gCls} data-mode={dataModeAttr} style={{ background: 'var(--bg)', minHeight: '100dvh' }}>
 
-      {/* ── Game switcher ── */}
+      {/* ── Game switcher + arena wrapper (desktop: cdy-gamepage) ── */}
+      <div className="lg:cdy-gamepage">
       <GameSwitcher currentMode={mode} />
 
       {/* ── Arena ── */}
+      <div className="lg:cdy-gamestage">
       <div className="cdym-arena">
 
         {/* 0. Arena header: icon + name + badge */}
@@ -474,7 +478,38 @@ export function GamePage({ mode }: GamePageProps) {
           </span>
         </div>
 
-        {/* 1. Attempt slots */}
+        {/* 1. Date navigator — before slots (Candy spec: ar-top → datenav → slots → media) */}
+        <div className="cdym-datenav">
+          <button
+            type="button"
+            onClick={() => void navigateDate('prev')}
+            disabled={isLoading || !showPrevNav}
+            className={`arrow${(!showPrevNav || isLoading) ? ' disabled' : ''}`}
+            aria-label="Jour précédent"
+          >‹</button>
+          <div className="center" onClick={() => openModal('archive')} style={{ cursor: 'pointer' }}>
+            <div className="d">
+              <span>📅</span>
+              {isToday ? "Aujourd'hui" : formatDateFr(currentDate)}
+            </div>
+            <div className="s">
+              {challenge.challengeNumber ? `Défi #${challenge.challengeNumber} · ` : ''}Archive
+            </div>
+          </div>
+          {isToday
+            ? <span className="tag">Auj.</span>
+            : <span className="tag old" onClick={() => void loadDate(todayParis)} style={{ cursor: 'pointer' }}>Aujourd'hui</span>
+          }
+          <button
+            type="button"
+            onClick={() => void navigateDate('next')}
+            disabled={isLoading || !showNextNav}
+            className={`arrow${(!showNextNav || isLoading) ? ' disabled' : ''}`}
+            aria-label="Jour suivant"
+          >›</button>
+        </div>
+
+        {/* 2. Attempt slots */}
         <div className="cdym-ar-slots">
           {Array.from({ length: maxAttempts }).map((_, i) => {
             const g = guesses[i]
@@ -489,8 +524,8 @@ export function GamePage({ mode }: GamePageProps) {
           })}
         </div>
 
-        {/* 2. Media */}
-        <div className={`cdym-ar-media${isWiki ? ' square' : ''}`} style={{ position: 'relative' }}>
+        {/* 3. Media */}
+        <div className={`cdym-ar-media${isWiki ? ' square' : ''}`}>
           {!isWiki ? (
             <MovieImage
               imageUrl={challenge.photoUrl ?? null}
@@ -514,38 +549,17 @@ export function GamePage({ mode }: GamePageProps) {
               )}
             </div>
           )}
-
-          {/* Date nav overlay */}
-          <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between pointer-events-none">
-            <div className="flex items-center gap-1 pointer-events-auto" style={{ background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(8px)', borderRadius: 999, border: '1.5px solid var(--line)', boxShadow: '0 2px 0 var(--line-2)', padding: '4px 8px 4px 4px' }}>
-              {showPrevNav ? (
-                <button type="button" onClick={() => void navigateDate('prev')} disabled={isLoading} className="w-7 h-7 rounded-full flex items-center justify-center transition-colors" style={{ color: 'var(--ink-2)' }}>
-                  <ChevronLeft size={14} />
-                </button>
-              ) : <span className="w-7" />}
-              <button
-                type="button"
-                onClick={isToday ? undefined : () => void loadDate(todayParis)}
-                className={`cdy-mono text-[11px] font-bold px-1 ${isToday ? 'cursor-default' : 'cursor-pointer'}`}
-                style={{ color: isToday ? 'var(--coral)' : 'var(--ink-2)' }}
-              >
-                {isToday ? "Aujourd'hui" : formatDateFr(currentDate)}
-              </button>
-              {showNextNav ? (
-                <button type="button" onClick={() => void navigateDate('next')} disabled={isLoading} className="w-7 h-7 rounded-full flex items-center justify-center transition-colors" style={{ color: 'var(--ink-2)' }}>
-                  <ChevronRight size={14} />
-                </button>
-              ) : <span className="w-7" />}
-            </div>
-            {challenge.challengeNumber && (
-              <div className="pointer-events-auto" style={{ background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(8px)', borderRadius: 999, border: '1.5px solid var(--line)', boxShadow: '0 2px 0 var(--line-2)', padding: '5px 10px' }}>
-                <span className="cdy-mono text-[11px] font-bold" style={{ color: 'var(--ink-2)' }}>#{challenge.challengeNumber}</span>
-              </div>
-            )}
-          </div>
         </div>
 
-        {/* 3. Wiki biography */}
+        {/* 2b. FaceGuess biography extract (ar-bio) */}
+        {isWiki && wikiExtract && (
+          <div className="cdym-ar-bio">
+            <div className="bl">Extrait biographique (vague)</div>
+            <p>« {wikiExtract} »</p>
+          </div>
+        )}
+
+        {/* 3. Wiki hint panel (profile-based hints) */}
         {isWiki && (
           <WikiHintPanel
             profile={wikiProfile}
@@ -692,6 +706,8 @@ export function GamePage({ mode }: GamePageProps) {
         </div>
 
       </div>{/* /cdym-arena */}
+      </div>{/* /lg:cdy-gamestage */}
+      </div>{/* /lg:cdy-gamepage */}
 
       {/* ── Bottom tab bar (mobile) ── */}
       <TabBar activeTab="games" />

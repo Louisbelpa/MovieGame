@@ -17,6 +17,7 @@ export const useWikiStore = createBaseGameStore(
       personType: payload.personType,
       photoUrl: payload.photoUrl,
       profile: payload.profile,
+      extract: payload.extract,
       hintsAvailable: payload.hintsAvailable,
       hintsRevealed: payload.hintsRevealed,
       hints: payload.hints,

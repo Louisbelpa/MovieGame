@@ -131,8 +131,8 @@ function CandyHub() {
                 <div className="cdy-gc-glyph"><GlyphC game={g.game} /></div>
                 <div className="cdy-gc-name">{g.name}</div>
                 <div className="cdy-gc-label">{g.label}</div>
+                <span className="cdy-gc-chip">{g.status === 'done' ? '✓ Terminé' : '5 essais · 3 indices'}</span>
               </div>
-              <div className={`cdy-gc-img${g.status === 'todo' ? ' locked' : ''}`}>{g.status === 'done' ? 'AFFICHE DU JOUR' : ''}</div>
               <div className="cdy-gc-body">
                 {g.status === 'done' ? (
                   <React.Fragment>
@@ -143,7 +143,7 @@ function CandyHub() {
                   </React.Fragment>
                 ) : (
                   <React.Fragment>
-                    <div className="cdy-gc-status todo"><span className="tk">·</span> Pas encore joué</div>
+                    <div className="cdy-gc-status todo"><span className="tk">·</span> Pas encore joué aujourd'hui</div>
                     <button className="cdy-btn cdy-btn-primary" style={{ width: '100%' }}>Jouer maintenant →</button>
                   </React.Fragment>
                 )}
@@ -194,8 +194,8 @@ function CandyDefeat() {
 /* --------------------- GUEST : arène mode découverte --------------------- */
 function CandyArenaGuest() {
   return (
-    <div className="cdy" style={{ width: 760 }}>
-      <div className="cdy-guestbar">
+    <div className="cdy g-film" style={{ width: 760 }}>
+      <div className="cdy-guestbar" style={{ margin: '18px 18px 0' }}>
         <span className="gb-emoji">👋</span>
         <div>
           <div className="gb-title">Tu joues en invité</div>
@@ -203,7 +203,7 @@ function CandyArenaGuest() {
         </div>
         <button className="cdy-btn cdy-btn-primary g-film gb-btn">Créer un compte</button>
       </div>
-      <Arena k="b" />
+      <CandyGame game="film" state="playing" />
     </div>
   );
 }
@@ -271,7 +271,11 @@ function CandyFooter() {
         <div className="cdy-foot-brand">
           <span className="cdy-foot-logo"><span className="d">?</span><span>Guess<span style={{ color: 'var(--coral)' }}>Today</span></span></span>
           <p className="cdy-foot-tag">Trois devinettes par jour, le même défi pour tout le monde. Garde ta série en vie et défie tes amis.</p>
-          <div className="cdy-foot-social"><span>✦</span><span>◐</span><span>✈</span><span>✎</span></div>
+          <div className="cdy-foot-social">
+            <a aria-label="Instagram"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" /></svg></a>
+            <a aria-label="TikTok"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 3c.3 2 1.6 3.6 3.5 3.9v2.4c-1.3.1-2.5-.3-3.5-1v5.6a5.4 5.4 0 1 1-5.4-5.4c.2 0 .4 0 .6.05v2.5a2.9 2.9 0 1 0 2 2.75V3h2.8z" /></svg></a>
+            <a aria-label="X"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h3l-6.6 7.6L22 22h-6.3l-4.9-6.4L5 22H2l7-8.1L2 2h6.4l4.5 5.9L18 2zm-1.1 18h1.7L7.2 3.8H5.4L16.9 20z" /></svg></a>
+          </div>
         </div>
         <div className="cdy-foot-cols">
           {cols.map(([h, links]) => (

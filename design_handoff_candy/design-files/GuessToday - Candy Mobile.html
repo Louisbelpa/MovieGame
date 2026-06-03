@@ -79,6 +79,9 @@ function App() {
       <DCSection id="guest" title="Parcours invité" subtitle="Jouer sans compte, puis mur d'inscription au pic d'émotion — zéro friction à l'entrée, conversion à la victoire.">
         <DCArtboard id="guest-arena" label="1 · Arène en mode découverte" width={402} height={850}><MobileWebFrame><MobileGuestArena /></MobileWebFrame></DCArtboard>
         <DCArtboard id="guest-win" label="2 · Fin + mur d'inscription" width={402} height={850}><MobileWebFrame><MobileGuestWin /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="guest-stats" label="3 · Stats · accessible (publiques)" width={402} height={850}><MobileWebFrame><MobileStats guest={true} /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="guest-locked-lead" label="4 · Classement · mur" width={402} height={850}><MobileWebFrame><MobileLocked page="classement" /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="guest-locked-prof" label="5 · Profil · mur" width={402} height={850}><MobileWebFrame><MobileLocked page="profil" /></MobileWebFrame></DCArtboard>
       </DCSection>
 
       <DCSection id="web" title="Site mobile (responsive)" subtitle="Le site GuessToday dans un navigateur mobile : header compact, contenu en colonne, tab bar basse.">
@@ -92,6 +95,13 @@ function App() {
         <DCArtboard id="web-prof" label="Profil" width={402} height={850}><MobileWebFrame><MobileProfile /></MobileWebFrame></DCArtboard>
         <DCArtboard id="web-lead" label="Classement" width={402} height={850}><MobileWebFrame><MobileLeaderboard /></MobileWebFrame></DCArtboard>
         <DCArtboard id="web-friends" label="Amis" width={402} height={850}><MobileWebFrame><MobileFriends /></MobileWebFrame></DCArtboard>
+      </DCSection>
+
+      <DCSection id="archive" title="Jours précédents · Archive" subtitle="Le navigateur de date dans l'arène + le calendrier des défis passés (à la Wordle), avec rejeu d'un ancien défi.">
+        <DCArtboard id="arch-cal" label="Archive · calendrier" width={402} height={850}><MobileWebFrame><MobileArchive /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="arch-replay" label="Rejouer un ancien défi (21 mai)" width={402} height={850}><MobileWebFrame><MobileGame game="face" state="playing" dayNum={135} dateLabel="21 mai 2026" isToday={false} /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="arch-ios" label="Archive · iOS" width={402} height={874}><IOSWrap><MobileArchive /></IOSWrap></DCArtboard>
+        <DCArtboard id="arch-and" label="Archive · Android" width={412} height={892}><AndroidWrap><MobileArchive /></AndroidWrap></DCArtboard>
       </DCSection>
 
       <DCSection id="ios" title="Application iOS" subtitle="Écrans clés dans le châssis iOS (dynamic island, home indicator).">
@@ -120,7 +130,7 @@ function App() {
 }
 
 function mountWhenReady() {
-  if (window.DesignCanvas && window.MobileHub && window.MobileGame && window.MobileProfile && window.MobileLeaderboard && window.IOSDevice && window.AndroidDevice && window.GAME_CFG && window.MobileOnboarding && window.MobileAuth && window.MobileLanding && window.MobileMenu && window.MobileStats && window.MobileResult && window.MobileFriends && window.CandyDailyShareCard && window.MobileGuestArena && window.MobileGuestWin) {
+  if (window.DesignCanvas && window.MobileHub && window.MobileGame && window.MobileProfile && window.MobileLeaderboard && window.IOSDevice && window.AndroidDevice && window.GAME_CFG && window.MobileOnboarding && window.MobileAuth && window.MobileLanding && window.MobileMenu && window.MobileStats && window.MobileResult && window.MobileFriends && window.CandyDailyShareCard && window.MobileGuestArena && window.MobileGuestWin && window.MobileLocked && window.MobileArchive) {
     ReactDOM.createRoot(document.getElementById('root')).render(<App />);
   } else { setTimeout(mountWhenReady, 30); }
 }

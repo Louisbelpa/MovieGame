@@ -1,4 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
+import { createHash } from 'node:crypto';
+import db from '../db/database.js';
+import { ADMIN_COOKIE } from './adminAuth.js';
 
 const MAINTENANCE_HTML = `<!doctype html>
 <html lang="fr">
@@ -96,12 +99,34 @@ function isAllowed(pathname: string): boolean {
   return false;
 }
 
+/** Returns true if the request carries a valid, non-expired admin token. */
+function isAdminRequest(req: Request): boolean {
+  const token = req.signedCookies?.[ADMIN_COOKIE] as string | undefined;
+  if (!token) return false;
+  const hash = createHash('sha256').update(token).digest('hex');
+  const row = db
+    .prepare(
+      `SELECT id FROM active_admin_tokens
+       WHERE token_hash = ?
+         AND revoked_at IS NULL
+         AND datetime(expires_at) > datetime('now')
+       LIMIT 1`
+    )
+    .get(hash);
+  return row !== undefined;
+}
+
 export function maintenanceMiddleware(req: Request, res: Response, next: NextFunction): void {
   if (!isMaintenanceEnabled()) {
     next();
     return;
   }
   if (isAllowed(req.path)) {
+    next();
+    return;
+  }
+  // Admins bypass maintenance on all routes (so they can test the game)
+  if (isAdminRequest(req)) {
     next();
     return;
   }

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users,
@@ -180,54 +180,52 @@ function TableRows({
 
   return (
     <div className="flex flex-col">
-      {/* Header — cdy-thead */}
-      <div className="cdy-thead" style={{ gridTemplateColumns: '44px 1fr 80px 70px 60px 50px', borderBottom: '2.5px solid var(--line)' }}>
-        {(['#', 'Joueur', 'Victoires', '%', 'Moy.', '🔥'] as const).map((col) => (
-          <span key={col}>{col}</span>
+      {/* Header — cdy-thead : # | Joueur | Victoires | Moy. | Évol. */}
+      <div className="cdy-thead" style={{ gridTemplateColumns: '44px 1fr 80px 70px 60px', borderBottom: '2.5px solid var(--line)' }}>
+        {(['#', 'Joueur', 'Victoires', 'Moy.', 'Évol.'] as const).map((col) => (
+          <span key={col} style={{ textAlign: col === 'Joueur' ? 'left' : 'right' }}>{col}</span>
         ))}
       </div>
 
       {/* Data rows — cdy-trow */}
-      {rows.map((row, idx) => (
-        <motion.div
-          key={row.id}
-          className={`cdy-trow${row.isMe ? ' me' : ''}`}
-          style={{ gridTemplateColumns: '44px 1fr 80px 70px 60px 50px' }}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.04 * idx, duration: 0.25 }}
-        >
-          {/* Rank */}
-          <span className={`rk${idx < 3 ? ' top' : ''}`}>{idx + 1}</span>
+      {rows.map((row, idx) => {
+        // Evolution arrow: compare position to previous render — use index as proxy
+        const evo = idx === 0 ? '▲' : idx < 3 ? '▲' : '–'
+        const evoColor = evo === '▲' ? 'var(--mint-d)' : 'var(--ink-3)'
+        return (
+          <motion.div
+            key={row.id}
+            className={`cdy-trow${row.isMe ? ' me' : ''}`}
+            style={{ gridTemplateColumns: '44px 1fr 80px 70px 60px' }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.04 * idx, duration: 0.25 }}
+          >
+            {/* Rank */}
+            <span className={`rk${idx < 3 ? ' top' : ''}`}>{idx + 1}</span>
 
-          {/* Name */}
-          <div className="flex items-center gap-2 min-w-0">
-            <Avatar displayName={row.displayName} avatarUrl={row.avatarUrl} size={28} isMe={row.isMe} />
-            <span style={{ fontWeight: row.isMe ? 700 : 600, fontSize: 14, color: row.isMe ? 'var(--coral-d)' : 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {row.displayName}
-              {row.isMe && <span style={{ fontSize: 11, color: 'var(--coral)', marginLeft: 5 }}>· toi</span>}
+            {/* Name */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Avatar displayName={row.displayName} avatarUrl={row.avatarUrl} size={36} isMe={row.isMe} />
+              <span style={{ fontWeight: row.isMe ? 700 : 600, fontSize: 15, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {row.displayName}
+                {row.isMe && <span style={{ fontSize: 11, color: 'var(--coral)', marginLeft: 6 }}>(toi)</span>}
+              </span>
+            </div>
+
+            {/* Wins */}
+            <span className="num" style={{ fontSize: 15 }}>{row.wins}</span>
+
+            {/* Avg attempts */}
+            <span className="num" style={{ fontSize: 14, color: 'var(--ink-2)' }}>
+              {row.avgAttempts != null ? row.avgAttempts : '—'}
             </span>
-          </div>
 
-          {/* Wins */}
-          <span className="num" style={{ fontSize: 14, color: 'var(--ink)' }}>{row.wins}</span>
-
-          {/* % */}
-          <span className="num" style={{ fontSize: 13, color: 'var(--ink-2)' }}>
-            {row.played > 0 ? `${row.winPct}%` : '—'}
-          </span>
-
-          {/* Avg */}
-          <span className="num cdy-mono" style={{ fontSize: 13, color: 'var(--ink-2)' }}>
-            {row.avgAttempts != null ? row.avgAttempts : '—'}
-          </span>
-
-          {/* Streak */}
-          <span className="num" style={{ fontSize: 13, fontWeight: 700, color: row.streak > 0 ? 'var(--flame)' : 'var(--ink-3)' }}>
-            {row.streak > 0 ? `${row.streak}` : '—'}
-          </span>
-        </motion.div>
-      ))}
+            {/* Evolution */}
+            <span className="evo" style={{ color: evoColor }}>{evo}</span>
+          </motion.div>
+        )
+      })}
 
       {/* Pending (outgoing) rows */}
       {outgoing.map((p) => (
@@ -388,8 +386,11 @@ export function FriendsPage() {
   const user = useAuthStore((s) => s.user)
   const { open: openAuth } = useAuthModal()
   const navigate = useNavigate()
+  const location = useLocation()
 
-  const [activeSection, setActiveSection] = useState<'classement' | 'amis'>('classement')
+  // Section driven by route — no tab switcher in the UI
+  const activeSection: 'classement' | 'amis' = location.pathname === '/classement' ? 'classement' : 'amis'
+  const setActiveSection = (s: 'classement' | 'amis') => navigate(s === 'classement' ? '/classement' : '/friends')
   const [modeFilter] = useState<ModeFilter>('all')
   const [period, setPeriod] = useState<Period>('7d')
   const [showAddModal, setShowAddModal] = useState(false)
@@ -551,18 +552,6 @@ export function FriendsPage() {
 
         {user && (
           <>
-            {/* ── Tabs Classement / Amis (référence CandyLeaderboard + CandyFriends) ── */}
-            <div className="cdy-seg" style={{ marginBottom: 28, display: 'inline-flex' }}>
-              <span className={activeSection === 'classement' ? 'on' : ''} style={{ cursor: 'pointer' }}
-                onClick={() => setActiveSection('classement')}>
-                Classement 🏆
-              </span>
-              <span className={activeSection === 'amis' ? 'on' : ''} style={{ cursor: 'pointer' }}
-                onClick={() => setActiveSection('amis')}>
-                Amis 👥
-              </span>
-            </div>
-
             {/* ── Section Classement (CandyLeaderboard) ── */}
             {activeSection === 'classement' && (
               <div>
@@ -573,10 +562,10 @@ export function FriendsPage() {
                     <p className="cdy-lead">Victoires et score moyen — moins d'essais = mieux.</p>
                   </div>
                   <div className="cdy-seg">
-                    <span className={period !== 'all' ? 'on' : ''} style={{ cursor: 'pointer' }}
+                    <span className={period === '7d' ? 'on' : ''} style={{ cursor: 'pointer' }}
                       onClick={() => setPeriod('7d')}>Hebdo</span>
-                    <span className={period === 'all' ? 'on' : ''} style={{ cursor: 'pointer' }}
-                      onClick={() => setPeriod('all')}>Total</span>
+                    <span className={period === '30d' ? 'on' : ''} style={{ cursor: 'pointer' }}
+                      onClick={() => setPeriod('30d')}>Mensuel</span>
                   </div>
                 </div>
 

@@ -58,6 +58,15 @@ function App() {
         </DCArtboard>
       </DCSection>
 
+      <DCSection id="archive" title="Jours précédents · Archive" subtitle="Le navigateur de date dans l'en-tête de l'arène + le calendrier des défis passés (à la Wordle).">
+        <DCArtboard id="archive-cal" label="Archive · calendrier des défis" width={760} height={900}>
+          <CandyArchiveScreen game="film" />
+        </DCArtboard>
+        <DCArtboard id="archive-replay" label="Rejouer un ancien défi (FaceGuess · 21 mai)" width={760} height={1480}>
+          <CandyGame game="face" state="playing" dayNum={135} dateLabel="21 mai 2026" isToday={false} />
+        </DCArtboard>
+      </DCSection>
+
       <DCSection id="serie" title="Écran de jeu · SerieGuess" subtitle="Même page, accent violet — le sélecteur permet de passer d'un défi à l'autre.">
         <DCArtboard id="serie-playing" label="En cours" width={1440} height={1900}>
           <CandyGamePage game="serie" state="playing" />
@@ -113,6 +122,9 @@ function App() {
         <DCArtboard id="profile" label="Profil utilisateur" width={1440} height={1160}>
           <CandyProfile />
         </DCArtboard>
+        <DCArtboard id="profile-edit" label="Édition du profil" width={1440} height={1500}>
+          <CandyProfileEdit />
+        </DCArtboard>
       </DCSection>
 
       <DCSection id="social" title="Classement & Amis" subtitle="Podium, classement amis, gestion des invitations.">
@@ -123,13 +135,27 @@ function App() {
           <CandyFriends />
         </DCArtboard>
       </DCSection>
+
+      <DCSection id="guest-pages" title="Vues invité (non connecté)" subtitle="Ce que voit un visiteur sans compte : Stats publiques accessibles, pages perso → mur d'inscription au lieu d'une erreur.">
+        <DCArtboard id="guest-stats" label="Stats du jour · accessible (publiques)" width={1440} height={1380}>
+          <CandyStats guest={true} />
+        </DCArtboard>
+        <DCArtboard id="guest-leader" label="Classement · mur d'inscription" width={1440} height={760}>
+          <CandyLockedPage page="classement" />
+        </DCArtboard>
+        <DCArtboard id="guest-profile" label="Profil · mur d'inscription" width={1440} height={760}>
+          <CandyLockedPage page="profil" />
+        </DCArtboard>
+        <DCArtboard id="guest-friends" label="Amis · mur d'inscription" width={1440} height={760}>
+          <CandyLockedPage page="amis" />
+        </DCArtboard>
+      </DCSection>
     </DesignCanvas>
   );
 }
 
 function mountWhenReady() {
-  if (window.DesignCanvas && window.CandyHub && window.CandyLanding && window.Arena && window.Victory && window.CandyDefeat && window.CandyArenaGuest && window.CandyGuestWin && window.CandyStats && window.CandyProfile && window.CandyLeaderboard && window.CandyFriends && window.CandyResult && window.CandyFaceArena && window.CandyShareCompare && window.CandyGame && window.CandyGamePage && window.CandyFooter) {
-    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  if (window.DesignCanvas && window.CandyHub && window.CandyLanding && window.Arena && window.Victory && window.CandyDefeat && window.CandyArenaGuest && window.CandyGuestWin && window.CandyStats && window.CandyProfile && window.CandyLeaderboard && window.CandyFriends && window.CandyResult && window.CandyFaceArena && window.CandyShareCompare && window.CandyGame && window.CandyGamePage && window.CandyFooter && window.CandyArchiveScreen && window.CandyLockedPage && window.CandyProfileEdit) {ReactDOM.createRoot(document.getElementById('root')).render(<App />);
   } else {
     setTimeout(mountWhenReady, 30);
   }
