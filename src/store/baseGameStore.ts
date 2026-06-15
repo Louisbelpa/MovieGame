@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { addToHistory, loadStats, saveStats } from '@/lib/storage'
+import { addToHistory, loadStats, saveStats, saveGameState } from '@/lib/storage'
 import { updateStats } from '@/lib/utils'
 import { authChallengeResult } from '@/api/client'
 import { useAuthStore } from '@/store/authStore'
@@ -291,6 +291,20 @@ export function createBaseGameStore<
           }))
           const updated = updateStats(prev, { guesses: mappedGuesses, status: outcome }, challengeDate)
           saveStats(updated, type)
+          // Persiste l'état complet pour que la carte « Ma journée » (loadGameState) retrouve
+          // les guesses des autres jeux joués aujourd'hui.
+          saveGameState({
+            challengeId: challengeDate,
+            guesses: payload.challenge.attempts.map((a) => ({
+              value: a.guess,
+              status: a.correct ? 'correct' as const : a.guess === '' ? 'skipped' as const : 'wrong' as const,
+              timestamp: Date.now(),
+            })),
+            hintsUnlocked: get().hintsRevealed,
+            status: outcome,
+            blurIndex: 0,
+            completedAt: Date.now(),
+          }, type)
           if (useAuthStore.getState().user) {
             void authChallengeResult(
               payload.challenge.challengeId,

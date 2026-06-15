@@ -20,7 +20,8 @@ import { useGameStore, getTodayParis } from '@/store/gameStore'
 import { useWikiStore } from '@/store/wikiStore'
 import { loadHistory, loadGameState } from '@/lib/storage'
 
-import { buildShareText, buildAllShareText, type AllShareGame } from '@/lib/utils'
+import { buildShareText, buildAllShareText, collectDayShareGames, type AllShareGame } from '@/lib/utils'
+import { nativeShare } from '@/lib/share'
 import { FEATURES } from '@/config/features'
 
 interface GamePageProps {
@@ -60,19 +61,16 @@ function isWikiChallenge(challenge: SharedChallenge): challenge is SharedChallen
   return 'profile' in challenge
 }
 
-async function shareResult(
+/** Construit le texte de partage d'un défi (sans effet de bord — copie/partage gérés par l'appelant). */
+function buildResultText(
   shareMode: 'film' | 'series' | 'wiki',
   challengeId: string,
   guesses: Array<{ status: 'correct' | 'wrong' | 'skipped' }>,
   maxAttempts: number,
   challengeNumber?: number,
-) {
+): string {
   const won = guesses.some((g) => g.status === 'correct')
-  const text = buildShareText(challengeId, guesses as GuessEntry[], won, maxAttempts, challengeNumber, shareMode)
-  if (navigator.share) {
-    try { await navigator.share({ text }); return } catch { /* fall through */ }
-  }
-  await navigator.clipboard.writeText(text)
+  return buildShareText(challengeId, guesses as GuessEntry[], won, maxAttempts, challengeNumber, shareMode)
 }
 
 // ── Game switcher ─────────────────────────────────────────────────────────────
@@ -385,16 +383,16 @@ export function GamePage({ mode }: GamePageProps) {
   ]
   const unplayedModes = allModes.filter(m => m.enabled && m.type !== mode && !loadHistory(m.type)[today])
 
-  const buildOnShareAll = unplayedModes.length === 0 ? () => {
-    const games: AllShareGame[] = allModes.filter(m => m.enabled).flatMap((m) => {
-      if (m.type === mode) return [{ mode: m.type, guesses: guessesForTracker, won: status === 'won', maxAttempts }]
-      const state = loadGameState(m.type)
-      if (!state) return []
-      return [{ mode: m.type, guesses: state.guesses, won: state.status === 'won', maxAttempts: 5 }]
-    })
-    const text = buildAllShareText(today, games)
-    if (navigator.share) void navigator.share({ text }); else void navigator.clipboard.writeText(text)
-  } : undefined
+  const enabledShareModes = allModes.filter((m) => m.enabled).map((m) => m.type)
+  const currentShareGame: AllShareGame = {
+    mode,
+    guesses: guessesForTracker as GuessEntry[],
+    won: status === 'won',
+    maxAttempts,
+  }
+  const buildDayText = () => buildAllShareText(today, collectDayShareGames(currentShareGame, { enabledModes: enabledShareModes }))
+  const handleShareAll = () => { void nativeShare(buildDayText()) }
+  const singleShareText = buildResultText(mode, challenge.date ?? getTodayParis(), guessesForTracker, maxAttempts, challenge.challengeNumber)
 
   // ── Render ────────────────────────────────────────────────────────────────
   const gCls = accentClass(mode)
@@ -638,7 +636,7 @@ export function GamePage({ mode }: GamePageProps) {
             <>
               <button
                 type="button"
-                onClick={() => void shareResult(mode, challenge.date ?? getTodayParis(), guessesForTracker, maxAttempts, challenge.challengeNumber)}
+                onClick={() => void nativeShare(singleShareText)}
                 className="cdy-btn cdy-btn-primary"
                 style={{ flex: 1 }}
               >
@@ -654,10 +652,10 @@ export function GamePage({ mode }: GamePageProps) {
                 <BarChart2 size={15} />
                 Stats
               </button>
-              {buildOnShareAll && (
+              {unplayedModes.length === 0 && (
                 <button
                   type="button"
-                  onClick={buildOnShareAll}
+                  onClick={handleShareAll}
                   className="cdy-btn cdy-btn-soft"
                 >
                   <CheckCircle2 size={15} />
@@ -692,8 +690,9 @@ export function GamePage({ mode }: GamePageProps) {
             tmdbId: resultDetails?.tmdbId ?? null,
           }}
           stats={{ attemptsUsed: guesses.length, maxAttempts, hintsRevealed }}
-          onShare={() => void shareResult(mode, challenge.date ?? getTodayParis(), guessesForTracker, maxAttempts, challenge.challengeNumber)}
-          onShareAll={buildOnShareAll}
+          singleShareText={singleShareText}
+          currentShareGame={currentShareGame}
+          enabledShareModes={enabledShareModes}
           onOpenStats={() => openModal('stats')}
           unplayedModes={unplayedModes}
         />
@@ -713,8 +712,8 @@ export function GamePage({ mode }: GamePageProps) {
             wikipediaUrl: resultDetails?.wikipediaUrl ?? (isWikiChallenge(challenge) ? challenge.wikipediaUrl ?? null : null),
           }}
           stats={{ attemptsUsed: guesses.length, maxAttempts, hintsRevealed }}
-          onShare={() => void shareResult(mode, challenge.date ?? getTodayParis(), guessesForTracker, maxAttempts, challenge.challengeNumber)}
-          onShareAll={buildOnShareAll}
+          onShare={() => void nativeShare(singleShareText)}
+          onShareAll={handleShareAll}
           onOpenStats={() => openModal('stats')}
           unplayedModes={unplayedModes}
         />

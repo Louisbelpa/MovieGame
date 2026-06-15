@@ -847,6 +847,8 @@
 }
 .cdy-summary .sm-score { font-weight: 700; font-size: 48px; line-height: .9; color: var(--coral); }
 .cdy-summary .sm-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-2); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.cdy-summary-actions { margin-left: auto; display: flex; gap: 14px; align-items: center; }
+.cdy-summary-hint { margin: 0; font-size: 13px; color: var(--ink-2); font-weight: 500; }
 
 /* ── Leaderboard / classement ───────────────────────────────────── */
 .cdy-podium { display: flex; align-items: flex-end; justify-content: center; gap: 18px; }
@@ -1494,7 +1496,10 @@
   .cdy-prog .dd-sub { display: block; font-size: 12px; white-space: nowrap; }
   /* cdy-games behaves like cdym-games on mobile */
   .cdy-games { display: flex !important; flex-direction: column; padding: 16px; gap: 15px; margin-top: 0; }
-  .cdy-summary { flex-direction: column; gap: 14px; padding: 20px; margin: 4px 16px 16px; }
+  .cdy-summary { flex-direction: column; align-items: stretch; gap: 16px; padding: 20px; margin: 4px 16px 16px; text-align: center; }
+  .cdy-summary-actions { margin-left: 0; flex-direction: column; align-items: stretch; width: 100%; gap: 10px; }
+  .cdy-summary-hint { text-align: center; line-height: 1.35; }
+  .cdy-summary-share { width: 100%; }
   .cdy-summary .sm-score { font-size: 36px; }
   .cdy-how { padding: 16px 16px 32px; }
   .cdy-how-grid { grid-template-columns: 1fr; gap: 12px; }
@@ -1564,7 +1569,10 @@
   .cdy-prog { flex-direction: column-reverse; align-items: flex-end; gap: 4px; margin-left: auto; flex-shrink: 0; }
   .cdy-prog .dd-sub { display: block; font-size: 12px; white-space: nowrap; }
   .cdy-games { display: flex !important; flex-direction: column; padding: 16px; gap: 15px; margin-top: 0; }
-  .cdy-summary { flex-direction: column; gap: 12px; padding: 18px; margin: 4px 16px 16px; }
+  .cdy-summary { flex-direction: column; align-items: stretch; gap: 16px; padding: 18px; margin: 4px 16px 16px; text-align: center; }
+  .cdy-summary-actions { margin-left: 0; flex-direction: column; align-items: stretch; width: 100%; gap: 10px; }
+  .cdy-summary-hint { text-align: center; line-height: 1.35; }
+  .cdy-summary-share { width: 100%; }
   .cdy-summary .sm-score { font-size: 36px; }
   /* Landing */
   .cdy-hero { grid-template-columns: 1fr !important; padding: 28px 16px 20px; }
@@ -1707,6 +1715,8 @@
 .cdy-cal-day { aspect-ratio:1/1; border-radius:10px; background:#fff; border:2px solid var(--line); box-shadow:0 3px 0 var(--line-2); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; cursor:pointer; }
 .cdy-cal-day.empty { background:transparent; border-color:transparent; box-shadow:none; cursor:default; }
 .cdy-cal-day.future { opacity:.35; cursor:default; }
+.cdy-cal-day.nodifi { opacity:.4; background:var(--bg-2); border-color:transparent; box-shadow:none; cursor:default; }
+.cdy-cal-day.nodifi .dn { color:var(--ink-3); }
 .cdy-cal-day.today { border-color:var(--acc); background:var(--acc-soft); box-shadow:0 3px 0 color-mix(in oklab, var(--acc) 30%, #fff); }
 .cdy-cal-day.full { background:var(--correct-soft); border-color:#bce6cf; }
 .cdy-cal-day .dn { font-weight:700; font-size:12px; color:var(--ink); }
@@ -1833,6 +1843,8 @@
 .cdym-cal-day { aspect-ratio:1/1; border-radius:11px; background:#fff; border:2px solid var(--line); box-shadow:0 3px 0 var(--line-2); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; cursor:pointer; }
 .cdym-cal-day.empty { background:transparent; border-color:transparent; box-shadow:none; cursor:default; }
 .cdym-cal-day.future { opacity:.35; cursor:default; }
+.cdym-cal-day.nodifi { opacity:.4; background:var(--bg-2); border-color:transparent; box-shadow:none; cursor:default; }
+.cdym-cal-day.nodifi .dn { color:var(--ink-3); }
 .cdym-cal-day.today { border-color:var(--acc); background:var(--acc-soft); }
 .cdym-cal-day.full { background:var(--correct-soft); border-color:#bce6cf; }
 .cdym-cal-day .dn { font-weight:700; font-size:13px; color:var(--ink); }

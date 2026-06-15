@@ -1,12 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Share2, BarChart2, Flame, Copy, Check } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { useAuthStore } from '@/store/authStore'
 import { useAuthModal } from '@/components/modals/AuthModal'
+import { authGetTodayResults, type TodayResultsPayload } from '@/api/client'
 import { loadStats, loadGameState } from '@/lib/storage'
 import { NextGameCountdown } from '@/components/modals/NextGameCountdown'
 import { getTodayParis } from '@/store/gameStore'
+import { copyText, nativeShare, canNativeShare } from '@/lib/share'
+import { buildAllShareText, collectDayShareGames, type AllShareGame, type ShareGameMode } from '@/lib/utils'
 
 /** "2026-06-14" → "14 juin 2026" (format français). */
 function formatDateFr(dateStr: string): string {
@@ -90,13 +93,26 @@ function DailyShareCard({ currentMode, currentWon, currentAttempts }: {
 }) {
   const today = getTodayParis()
   const streak = loadStats(currentMode).currentStreak
+  const user = useAuthStore((s) => s.user)
+  const [serverResults, setServerResults] = useState<TodayResultsPayload | null>(null)
+
+  // Connecté : récupère les résultats du jour côté serveur (fiable multi-appareils).
+  useEffect(() => {
+    if (user) authGetTodayResults().then(setServerResults).catch(() => {})
+  }, [user])
+
   const list: Array<{ mode: ShareGameMode; won: boolean | null; attempts: number }> = (
     ['film', 'series', 'wiki'] as ShareGameMode[]
   ).map((m) => {
     if (m === currentMode) return { mode: m, won: currentWon, attempts: currentAttempts }
     const s = loadGameState(m)
-    if (!s) return { mode: m, won: null, attempts: 0 }
-    return { mode: m, won: s.status === 'won', attempts: s.guesses.length }
+    if (s && s.challengeId === today && (s.status === 'won' || s.status === 'lost')) {
+      return { mode: m, won: s.status === 'won', attempts: s.guesses.length }
+    }
+    // Fallback serveur (joué sur un autre appareil / state local absent)
+    const sv = serverResults?.results[m]
+    if (sv) return { mode: m, won: sv.won, attempts: sv.attempts.length }
+    return { mode: m, won: null, attempts: 0 }
   })
   const solved = list.filter((r) => r.won === true).length
 
@@ -193,13 +209,14 @@ interface WinModalProps {
     maxAttempts: number
     hintsRevealed: number
   }
-  onShare: () => void
-  onShareAll?: () => void
+  singleShareText: string
+  currentShareGame: AllShareGame
+  enabledShareModes?: ShareGameMode[]
   onOpenStats?: () => void
   unplayedModes?: Array<{ type: GameMode; path: string }>
 }
 
-export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShareAll, onOpenStats, unplayedModes }: WinModalProps) {
+export function WinModal({ isOpen, onClose, mode, result, stats, singleShareText, currentShareGame, enabledShareModes, onOpenStats, unplayedModes }: WinModalProps) {
   const user      = useAuthStore((s) => s.user)
   const { open: openAuth } = useAuthModal()
   const statsKey  = mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : 'film'
@@ -207,11 +224,32 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShar
   const accentCls = mode === 'wiki' ? 'g-face' : mode === 'series' ? 'g-serie' : 'g-film'
   const [shareTab, setShareTab] = useState<'one' | 'day'>('day')
   const [copied, setCopied] = useState(false)
+  const [serverResults, setServerResults] = useState<TodayResultsPayload | null>(null)
 
-  function handleCopy() {
-    onShare()
+  useEffect(() => {
+    if (!isOpen || !user) return
+    authGetTodayResults().then(setServerResults).catch(() => {})
+  }, [isOpen, user])
+
+  useEffect(() => {
+    setCopied(false)
+  }, [shareTab])
+
+  function textForTab(tab: 'one' | 'day') {
+    if (tab === 'one') return singleShareText
+    const games = collectDayShareGames(currentShareGame, { serverResults, enabledModes: enabledShareModes })
+    return games.length > 0 ? buildAllShareText(getTodayParis(), games) : singleShareText
+  }
+
+  async function handleCopy() {
+    const ok = await copyText(textForTab(shareTab))
+    if (!ok) return
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  function handleNativeShare() {
+    void nativeShare(textForTab(shareTab))
   }
 
   return (
@@ -278,10 +316,11 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShar
               <button type="button" onClick={handleCopy} className="cdy-btn cdy-btn-primary" style={{ width: '100%' }}>
                 {copied ? <><Check size={15} /> Copié !</> : <><Copy size={15} /> Copier la carte</>}
               </button>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button type="button" onClick={onShare} className="cdy-btn cdy-btn-soft" style={{ flex: 1 }}><Share2 size={14} /> Partager</button>
-                {onShareAll && <button type="button" onClick={onShareAll} className="cdy-btn cdy-btn-soft" style={{ flex: 1 }}>Ma journée</button>}
-              </div>
+              {canNativeShare() && (
+                <button type="button" onClick={handleNativeShare} className="cdy-btn cdy-btn-soft" style={{ width: '100%' }}>
+                  <Share2 size={14} /> Partager
+                </button>
+              )}
             </div>
           </div>
         </aside>
@@ -357,23 +396,41 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShar
           </div>
         )}
 
-        {/* 6. Carte « Ma journée » (visuel) */}
-        <div className="cdy-mono" style={{ fontSize: 11, color: 'var(--ink-2)', alignSelf: 'flex-start', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em' }}>
-          Ta carte « Ma journée »
+        {/* 6. Partage */}
+        <div style={{ width: '100%' }}>
+          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Partage ton score</div>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--ink-2)', fontWeight: 500 }}>Aucune réponse révélée — sans spoiler.</p>
+          <div className="cdy-seg" style={{ display: 'flex', marginBottom: 16, width: '100%' }}>
+            <span style={{ flex: 1, textAlign: 'center' }} className={shareTab === 'one' ? 'on' : ''} onClick={() => setShareTab('one')}>Ce jeu</span>
+            <span style={{ flex: 1, textAlign: 'center' }} className={shareTab === 'day' ? 'on' : ''} onClick={() => setShareTab('day')}>Ma journée</span>
+          </div>
+          {shareTab === 'one' ? (
+            <SingleGameShareCard
+              mode={statsKey as ShareGameMode}
+              won={true}
+              attempts={stats.attemptsUsed}
+              maxAttempts={stats.maxAttempts}
+            />
+          ) : (
+            <DailyShareCard
+              currentMode={statsKey as ShareGameMode}
+              currentWon={true}
+              currentAttempts={stats.attemptsUsed}
+            />
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
+            <button type="button" onClick={handleCopy} className="cdy-btn cdy-btn-primary" style={{ width: '100%', padding: '15px' }}>
+              {copied ? <><Check size={15} /> Copié !</> : <><Copy size={15} /> Copier la carte</>}
+            </button>
+            {canNativeShare() && (
+              <button type="button" onClick={handleNativeShare} className="cdy-btn cdy-btn-soft" style={{ width: '100%', padding: '15px' }}>
+                <Share2 size={16} /> Partager
+              </button>
+            )}
+          </div>
         </div>
-        <DailyShareCard
-          currentMode={statsKey as ShareGameMode}
-          currentWon={true}
-          currentAttempts={stats.attemptsUsed}
-        />
 
-        {/* 7. Partager ma journée */}
-        <button type="button" onClick={onShareAll ?? onShare} className="cdy-btn cdy-btn-primary" style={{ width: '100%', padding: '15px' }}>
-          <Share2 size={16} />
-          Partager ma journée
-        </button>
-
-        {/* 8. Stats + Accueil */}
+        {/* 7. Stats + Accueil */}
         <div style={{ display: 'flex', gap: 10, width: '100%' }}>
           {onOpenStats && (
             <button type="button" onClick={onOpenStats} className="cdy-btn cdy-btn-soft" style={{ flex: 1 }}>

@@ -1,0 +1,124 @@
+/* ===========================================================================
+   GuessToday — Design System tokens
+   Dark mode premium · noir profond neutre · accents vifs harmonisés (oklch)
+   =========================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  /* ---- Surfaces (neutral deep black, tiny cool tint) ---- */
+  --gt-bg:        oklch(0.158 0.006 270);
+  --gt-bg-2:      oklch(0.185 0.007 270);
+  --gt-surface:   oklch(0.213 0.008 270);
+  --gt-surface-2: oklch(0.252 0.009 270);
+  --gt-surface-3: oklch(0.300 0.010 270);
+  --gt-line:      oklch(0.330 0.010 270);
+  --gt-line-2:    oklch(0.420 0.012 270);
+
+  /* ---- Text ---- */
+  --gt-text:   oklch(0.975 0.003 270);
+  --gt-text-2: oklch(0.760 0.008 270);
+  --gt-text-3: oklch(0.580 0.008 270);
+  --gt-text-4: oklch(0.460 0.008 270);
+
+  /* ---- Game accents — fixed L=0.78, C≈0.155, hue varies (harmonised) ----
+     Each game owns a hue. New games slot in by adding a hue at same L/C. */
+  --gt-film:     oklch(0.820 0.150 85);   /* doré / amber  — FilmGuess  */
+  --gt-serie:    oklch(0.680 0.190 305);  /* violet        — SerieGuess */
+  --gt-face:     oklch(0.790 0.130 210);  /* cyan          — FaceGuess  */
+  --gt-game-4:   oklch(0.800 0.165 150);  /* vert/lime     — démo extensibilité */
+  --gt-game-5:   oklch(0.720 0.180 25);   /* corail        — réserve futur */
+  --gt-game-6:   oklch(0.770 0.130 265);  /* indigo        — réserve futur */
+
+  /* tinted fills (12%) for each accent, computed via color-mix */
+  --gt-film-dim:  color-mix(in oklab, var(--gt-film)  16%, transparent);
+  --gt-serie-dim: color-mix(in oklab, var(--gt-serie) 16%, transparent);
+  --gt-face-dim:  color-mix(in oklab, var(--gt-face)  16%, transparent);
+  --gt-game-4-dim:color-mix(in oklab, var(--gt-game-4) 16%, transparent);
+
+  /* ---- Semantic ---- */
+  --gt-correct: oklch(0.800 0.165 150);   /* succès — vert */
+  --gt-wrong:   oklch(0.660 0.205 25);    /* échec — rouge */
+  --gt-warn:    oklch(0.820 0.150 85);    /* alerte — amber */
+  --gt-correct-dim: color-mix(in oklab, var(--gt-correct) 18%, transparent);
+  --gt-wrong-dim:   color-mix(in oklab, var(--gt-wrong) 18%, transparent);
+
+  /* default brand accent (logo / generic CTA) */
+  --gt-brand: oklch(0.800 0.165 150);
+
+  /* ---- Radii ---- */
+  --gt-r-sm: 8px;
+  --gt-r-md: 14px;
+  --gt-r-lg: 20px;
+  --gt-r-xl: 28px;
+  --gt-r-pill: 999px;
+
+  /* ---- Spacing scale ---- */
+  --gt-s1: 4px;  --gt-s2: 8px;  --gt-s3: 12px; --gt-s4: 16px;
+  --gt-s5: 24px; --gt-s6: 32px; --gt-s7: 48px; --gt-s8: 64px;
+
+  /* ---- Shadows / glow ---- */
+  --gt-shadow:    0 2px 8px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.35);
+  --gt-shadow-sm: 0 1px 3px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.25);
+
+  /* ---- Type ---- */
+  --gt-sans: 'Space Grotesk', system-ui, sans-serif;
+  --gt-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* a per-game accent context: set --acc on any subtree to recolor accents */
+.gt-film  { --acc: var(--gt-film);   --acc-dim: var(--gt-film-dim); }
+.gt-serie { --acc: var(--gt-serie);  --acc-dim: var(--gt-serie-dim); }
+.gt-face  { --acc: var(--gt-face);   --acc-dim: var(--gt-face-dim); }
+.gt-game-4{ --acc: var(--gt-game-4); --acc-dim: var(--gt-game-4-dim); }
+
+* { box-sizing: border-box; }
+
+.gt-root {
+  font-family: var(--gt-sans);
+  background: var(--gt-bg);
+  color: var(--gt-text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.gt-mono { font-family: var(--gt-mono); font-variant-numeric: tabular-nums; }
+
+/* striped image placeholder used wherever real art will be dropped in */
+.gt-ph {
+  background-color: var(--gt-surface);
+  background-image: repeating-linear-gradient(
+    45deg,
+    color-mix(in oklab, var(--gt-line) 60%, transparent) 0 2px,
+    transparent 2px 11px);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gt-text-4);
+  font-family: var(--gt-mono); font-size: 12px; letter-spacing: .04em;
+  text-align: center;
+}
+
+/* ---- shared animations ---- */
+@keyframes gt-shake {
+  0%,100% { transform: translateX(0); }
+  15% { transform: translateX(-9px); }
+  30% { transform: translateX(8px); }
+  45% { transform: translateX(-6px); }
+  60% { transform: translateX(5px); }
+  75% { transform: translateX(-3px); }
+}
+@keyframes gt-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+@keyframes gt-flip-in {
+  0% { transform: rotateX(-90deg); opacity: 0; }
+  100% { transform: rotateX(0); opacity: 1; }
+}
+@keyframes gt-rise {
+  0% { transform: translateY(8px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@keyframes gt-spin { to { transform: rotate(360deg); } }
+@keyframes gt-pulse { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
+
+.gt-shake { animation: gt-shake .5s cubic-bezier(.36,.07,.19,.97); }
+.gt-pop   { animation: gt-pop .4s ease; }

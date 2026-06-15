@@ -29,6 +29,7 @@ import { sendPasswordResetEmail } from '../lib/email.js';
 import { registerPushToken } from '../services/push-notification.service.js';
 import { getUploadsAbsDir } from '../config/uploads.js';
 import { linkAnonymousGameSessionsToUser } from '../services/game-session.service.js';
+import { getTodayResultsForUser } from '../services/challenge.service.js';
 import { getTodayParis } from '../lib/dates.js';
 
 export const authRouter = Router();
@@ -206,6 +207,11 @@ authRouter.get('/me', userAuth, (req: Request, res: Response): void => {
     return;
   }
   res.json({ user: req.user });
+});
+
+/** GET /api/auth/today — résultats du jour par mode (grille complète) pour le compte */
+authRouter.get('/today', userAuth, requireUser, (req: Request, res: Response): void => {
+  res.json(getTodayResultsForUser(req.user!.id));
 });
 
 /** PUT /api/auth/profile */

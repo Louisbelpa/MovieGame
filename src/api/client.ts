@@ -240,6 +240,20 @@ export function authUpdateProfile(data: { displayName?: string; avatarUrl?: stri
   })
 }
 
+export interface TodayResultPayload {
+  won: boolean
+  attempts: { guess: string; correct: boolean }[]
+}
+export interface TodayResultsPayload {
+  date: string
+  results: { film: TodayResultPayload | null; series: TodayResultPayload | null; wiki: TodayResultPayload | null }
+}
+
+/** GET /api/auth/today — résultats du jour par mode (grille complète) depuis le compte serveur */
+export function authGetTodayResults(): Promise<TodayResultsPayload> {
+  return request<TodayResultsPayload>('/api/auth/today')
+}
+
 export interface PreferencesPayload {
   notifDaily: boolean
   leaderboardPublic: boolean

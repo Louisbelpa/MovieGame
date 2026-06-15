@@ -2,6 +2,7 @@ import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import type { GameStats, GuessEntry } from '@/types'
 import { BRAND_NAME, PUBLIC_SITE_URL } from '@/config/features'
+import { loadGameState } from '@/lib/storage'
 
 /** Merge Tailwind classes safely */
 export function cn(...inputs: ClassValue[]) {
@@ -124,6 +125,66 @@ export function buildAllShareText(date: string, games: AllShareGame[]): string {
     return `${SHARE_CORRECT_EMOJI[g.mode]} ${shareLabelForMode(g.mode)} — ${score} ${grid}`
   })
   return `${BRAND_NAME} — ${dateFr}\n\n${lines.join('\n')}\n\n${base}`
+}
+
+export interface TodayResultLike {
+  won: boolean
+  attempts: unknown[]
+}
+
+export interface TodayResultsLike {
+  results: {
+    film: TodayResultLike | null
+    series: TodayResultLike | null
+    wiki: TodayResultLike | null
+  }
+}
+
+function guessesFromServerResult(won: boolean, attemptCount: number): GuessEntry[] {
+  const n = won ? Math.min(5, Math.max(1, attemptCount)) : 5
+  return Array.from({ length: n }, (_, i) => ({
+    value: '',
+    status: won && i === n - 1 ? 'correct' : 'wrong',
+    timestamp: 0,
+  }))
+}
+
+/** Agrège les jeux joués aujourd'hui pour la carte « Ma journée » (local + serveur). */
+export function collectDayShareGames(
+  current: AllShareGame,
+  options?: {
+    serverResults?: TodayResultsLike | null
+    enabledModes?: ShareGameMode[]
+  },
+): AllShareGame[] {
+  const today = getTodayId()
+  const modes = options?.enabledModes ?? (['film', 'series', 'wiki'] as ShareGameMode[])
+
+  return modes.flatMap((m) => {
+    if (m === current.mode) return [current]
+
+    const state = loadGameState(m)
+    if (state && state.challengeId === today && (state.status === 'won' || state.status === 'lost')) {
+      return [{
+        mode: m,
+        guesses: state.guesses,
+        won: state.status === 'won',
+        maxAttempts: state.maxAttempts ?? 5,
+      }]
+    }
+
+    const sv = options?.serverResults?.results[m]
+    if (sv) {
+      return [{
+        mode: m,
+        guesses: guessesFromServerResult(sv.won, sv.attempts.length),
+        won: sv.won,
+        maxAttempts: 5,
+      }]
+    }
+
+    return []
+  })
 }
 
 /** Default empty stats */

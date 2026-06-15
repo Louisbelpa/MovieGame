@@ -807,3 +807,44 @@ export function getLandingStats(): { challengeDays: number; playersPerDay: numbe
     playersPerDay: avgRow?.avg ? Math.round(avgRow.avg) : 0,
   };
 }
+
+/**
+ * Résultats du jour (par mode) pour un utilisateur connecté, avec la grille complète.
+ * Source serveur fiable pour reconstruire la carte « Ma journée » sur n'importe quel
+ * appareil (web autre navigateur, app iOS…), indépendamment du localStorage.
+ */
+export function getTodayResultsForUser(userId: number): {
+  date: string;
+  results: Record<'film' | 'series' | 'wiki', { won: boolean; attempts: { guess: string; correct: boolean }[] } | null>;
+} {
+  const today = getTodayParis();
+  const results: Record<'film' | 'series' | 'wiki', { won: boolean; attempts: { guess: string; correct: boolean }[] } | null> = {
+    film: null, series: null, wiki: null,
+  };
+
+  const challenges = db
+    .prepare<[string], { id: number; media_type: 'film' | 'series' | 'wiki' }>(
+      `SELECT id, media_type FROM daily_challenges WHERE challenge_date = ? AND is_active = 1`
+    )
+    .all(today);
+
+  for (const ch of challenges) {
+    if (ch.media_type !== 'film' && ch.media_type !== 'series' && ch.media_type !== 'wiki') continue;
+    // Nom de table en dur (pas d'entrée utilisateur) — pas d'injection.
+    const table = ch.media_type === 'wiki' ? 'wiki_sessions' : 'game_sessions';
+    const row = db
+      .prepare<[number, number], { attempts: string; outcome: string | null }>(
+        `SELECT attempts, outcome FROM ${table} WHERE user_id = ? AND challenge_id = ? AND outcome IS NOT NULL`
+      )
+      .get(userId, ch.id);
+    if (row?.outcome) {
+      const attempts: AttemptEntry[] = parseAttempts(row.attempts);
+      results[ch.media_type] = {
+        won: row.outcome === 'won',
+        attempts: attempts.map((a) => ({ guess: a.guess, correct: a.correct })),
+      };
+    }
+  }
+
+  return { date: today, results };
+}

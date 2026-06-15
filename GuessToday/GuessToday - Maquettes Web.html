@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GuessToday — Maquettes Web</title>
+<link rel="stylesheet" href="assets/ds.css" />
+<style>
+  html, body { margin: 0; height: 100%; background: #0d0d11; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="assets/design-canvas.jsx"></script>
+<script type="text/babel" src="assets/gt-primitives.jsx"></script>
+<script type="text/babel" src="assets/gt-components.jsx"></script>
+<script type="text/babel" src="assets/gt-share-combined.jsx"></script>
+<script type="text/babel" src="assets/gt-shell.jsx"></script>
+<script type="text/babel" src="assets/screens-ds.jsx"></script>
+<script type="text/babel" src="assets/screens-hub.jsx"></script>
+<script type="text/babel" src="assets/screens-game.jsx"></script>
+<script type="text/babel" src="assets/screens-social.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+function App() {
+  const { DesignCanvas, DCSection, DCArtboard } = window;
+  return (
+    <DesignCanvas>
+      <DCSection id="ds" title="Design System" subtitle="Tokens, logo, couleurs, type, composants — tous nommés GuessToday">
+        <DCArtboard id="ds" label="GuessToday DS v1.0" width={1440} height={1760}>
+          <DSView />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="hub" title="Hub principal (connecté)" subtitle="Grille auto-fit — fonctionne avec 3, 4, 6, 8 jeux">
+        <DCArtboard id="hub3" label="Hub · 3 jeux du jour" width={1440} height={1120}>
+          <HubView />
+        </DCArtboard>
+        <DCArtboard id="hub4" label="Preview extensibilité · 4e jeu ajouté" width={1440} height={1120}>
+          <HubExtendedView />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="landing" title="Landing page (non connecté)" subtitle="Concept, défis du jour, CTA inscription">
+        <DCArtboard id="landing" label="Landing" width={1440} height={1540}>
+          <LandingView />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="film" title="Écran de jeu · FilmGuess" subtitle="Template générique — image nette, autocomplétion, indices progressifs">
+        <DCArtboard id="f1" label="1 · Début de partie" width={1440} height={1180}>
+          <FilmStart />
+        </DCArtboard>
+        <DCArtboard id="f2" label="2 · Après 2 essais (2 indices)" width={1440} height={1180}>
+          <FilmPlaying />
+        </DCArtboard>
+        <DCArtboard id="f3" label="3 · Victoire" width={1440} height={1180}>
+          <FilmWon />
+        </DCArtboard>
+        <DCArtboard id="f4" label="4 · Échec" width={1440} height={1180}>
+          <FilmLost />
+        </DCArtboard>
+        <DCArtboard id="f5" label="5 · Chargement" width={1440} height={1180}>
+          <FilmLoading />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="face" title="Écran de jeu · FaceGuess" subtitle="Image floue constante + biographie partielle + indices textuels">
+        <DCArtboard id="face1" label="En cours · photo floue, 2 indices" width={1440} height={1180}>
+          <FacePlaying />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="result" title="Résultat & partage" subtitle="Score, révélation, carte partageable sans spoiler">
+        <DCArtboard id="result" label="Résultat de partie · partage de la journée" width={1440} height={1120}>
+          <ResultView />
+        </DCArtboard>
+        <DCArtboard id="share" label="Cartes de partage · ce jeu vs. journée combinée" width={900} height={620}>
+          <ShareCompareView />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="social" title="Stats · Profil · Classement · Amis" subtitle="Stats par jeu dynamiques, non câblées aux 3 jeux actuels">
+        <DCArtboard id="stats" label="Statistiques du jour" width={1440} height={920}>
+          <StatsView />
+        </DCArtboard>
+        <DCArtboard id="profile" label="Profil utilisateur" width={1440} height={1080}>
+          <ProfileView />
+        </DCArtboard>
+        <DCArtboard id="leader" label="Leaderboard amis" width={1440} height={1180}>
+          <LeaderboardView />
+        </DCArtboard>
+        <DCArtboard id="friends" label="Gestion des amis" width={1440} height={1080}>
+          <FriendsView />
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+function mountWhenReady() {
+  if (window.DesignCanvas && window.DSView && window.HubView && window.FilmStart && window.ResultView && window.ShareCompareView) {
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  } else {
+    setTimeout(mountWhenReady, 30);
+  }
+}
+mountWhenReady();
+</script>
+</body>
+</html>

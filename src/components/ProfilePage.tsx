@@ -44,7 +44,6 @@ function SettingsModal({ onClose, user, onSaveName, onSaveHue, onChangePassword,
 
   const [hue, setHue] = useState(() => parseAvatarHue(user.avatarUrl) ?? 300)
   const [hueSaving, setHueSaving] = useState(false)
-  const [notifOn, setNotifOn] = useState(false)
   const [leaderOn, setLeaderOn] = useState(true)
   const [publicOn, setPublicOn] = useState(true)
 
@@ -54,7 +53,6 @@ function SettingsModal({ onClose, user, onSaveName, onSaveHue, onChangePassword,
     authGetPreferences()
       .then((p) => {
         if (cancelled) return
-        setNotifOn(p.notifDaily)
         setLeaderOn(p.leaderboardPublic)
         setPublicOn(p.profilePublic)
       })
@@ -195,13 +193,6 @@ function SettingsModal({ onClose, user, onSaveName, onSaveHue, onChangePassword,
         <div className="cdy-edit-card">
           <h3>Préférences</h3>
           <div className="cdy-toggle-row" style={{ borderTop: 0 }}>
-            <div style={{ flex: 1 }}>
-              <div className="tt">Rappel quotidien</div>
-              <div className="ts">Notif à minuit pour le nouveau défi</div>
-            </div>
-            <div className={`cdy-toggle${notifOn ? ' on' : ''}`} onClick={() => togglePref('notifDaily', notifOn, setNotifOn)} />
-          </div>
-          <div className="cdy-toggle-row">
             <div style={{ flex: 1 }}>
               <div className="tt">Classement public</div>
               <div className="ts">Ton score apparaît dans le classement global</div>
@@ -611,10 +602,10 @@ export function ProfilePage() {
           <span>Guess<span style={{ color: 'var(--coral)' }}>Today</span></span>
         </Link>
         <nav className="cdy-navlinks hidden lg:flex">
-          <Link to="/"        className="cdy-navlink">Jeux du jour</Link>
-          <Link to="/profile" className="cdy-navlink on">Stats</Link>
-          <Link to="/friends" className="cdy-navlink">Classement</Link>
-          <Link to="/friends" className="cdy-navlink">Amis</Link>
+          <Link to="/"           className="cdy-navlink">Jeux du jour</Link>
+          <Link to="/stats"      className="cdy-navlink">Stats</Link>
+          <Link to="/classement" className="cdy-navlink">Classement</Link>
+          <Link to="/friends"    className="cdy-navlink">Amis</Link>
         </nav>
         <span className="cdy-spacer" />
         {globalCurrentStreak > 0 && (

@@ -241,7 +241,7 @@ export function Footer() {
           <div className="cdy-foot-col">
             <h5>Découvrir</h5>
             <button type="button" onClick={() => setModal('faq')}>FAQ</button>
-            <Link to="/friends">Classement</Link>
+            <Link to="/classement">Classement</Link>
             <Link to="/friends">Amis</Link>
           </div>
           <div className="cdy-foot-col">

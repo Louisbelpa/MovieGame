@@ -7,6 +7,7 @@ import { FEATURES, IOS_APP_STORE_URL } from '@/config/features'
 import { useAuthStore } from '@/store/authStore'
 import { loadStats, loadHistory, loadGameState, setHistoryEntry } from '@/lib/storage'
 import { buildAllShareText, type AllShareGame, avatarBg, avatarShadow, parseAvatarHue } from '@/lib/utils'
+import { nativeShare } from '@/lib/share'
 import type { GuessEntry } from '@/types'
 import { fetchChallenge, fetchLandingStats, type LandingStatsPayload } from '@/api/client'
 import { fetchWikiChallenge } from '@/api/wikiClient'
@@ -70,10 +71,10 @@ function HomeNav() {
       {/* Navlinks (connecté, desktop only) */}
       {!isLoading && user && (
         <nav className="cdy-navlinks hidden lg:flex">
-          <Link to="/"         className="cdy-navlink on">Jeux du jour</Link>
-          <Link to="/profile"  className="cdy-navlink">Stats</Link>
-          <Link to="/friends"  className="cdy-navlink">Classement</Link>
-          <Link to="/friends"  className="cdy-navlink">Amis</Link>
+          <Link to="/"           className="cdy-navlink on">Jeux du jour</Link>
+          <Link to="/stats"      className="cdy-navlink">Stats</Link>
+          <Link to="/classement" className="cdy-navlink">Classement</Link>
+          <Link to="/friends"    className="cdy-navlink">Amis</Link>
         </nav>
       )}
 
@@ -429,24 +430,31 @@ function CandyHub({ user, today, filmStatus, seriesStatus, wikiStatus, attemptsU
 
       {/* Score du jour récap */}
       <div className="cdy-summary">
-        <div>
+        <div className="cdy-summary-score">
           <div className="sm-label cdy-mono">TON SCORE DU JOUR</div>
           <div className="sm-score">
             {score}
             <span style={{ fontSize: 26, color: 'var(--ink-3)', fontWeight: 400 }}> / {totalCount} jeux</span>
           </div>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 14, alignItems: 'center' }}>
+        <div className="cdy-summary-actions">
           {doneCount < totalCount && (
-            <span className="cdy-mono" style={{ fontSize: 13, color: 'var(--ink-2)' }}>
+            <p className="cdy-summary-hint cdy-mono">
               Termine les {totalCount} pour partager ta journée
-            </span>
+            </p>
           )}
           <button
             type="button"
             onClick={onShareDay}
-            className="cdy-btn"
-            style={{ background: 'var(--mint)', color: '#fff', boxShadow: '0 6px 0 var(--mint-d)', padding: '14px 24px', fontSize: 15 }}
+            disabled={doneCount < totalCount}
+            className="cdy-btn cdy-summary-share"
+            style={{
+              background: 'var(--mint)', color: '#fff',
+              boxShadow: doneCount < totalCount ? 'none' : '0 6px 0 var(--mint-d)',
+              padding: '14px 24px', fontSize: 15,
+              opacity: doneCount < totalCount ? 0.45 : 1,
+              cursor: doneCount < totalCount ? 'not-allowed' : 'pointer',
+            }}
           >
             {shareCopied ? '✓ Copié !' : 'Partager ma journée'}
           </button>
@@ -566,7 +574,7 @@ export function HomePage() {
     } catch {}
   }, [])
 
-  function handleShareDay() {
+  async function handleShareDay() {
     const order = [
       { type: 'film' as const,   enabled: true,                 status: filmStatus,   attempts: attemptsUsed.film },
       { type: 'series' as const, enabled: FEATURES.enableSeries, status: seriesStatus, attempts: attemptsUsed.series },
@@ -574,7 +582,7 @@ export function HomePage() {
     ]
     const games: AllShareGame[] = order.filter((m) => m.enabled).flatMap((m) => {
       const local = loadGameState(m.type)
-      if (local && (local.status === 'won' || local.status === 'lost')) {
+      if (local && local.challengeId === today && (local.status === 'won' || local.status === 'lost')) {
         return [{ mode: m.type, guesses: local.guesses, won: local.status === 'won', maxAttempts: 5 }]
       }
       // Connecté sans état local (joué ailleurs) : reconstruit une grille depuis le statut serveur.
@@ -592,11 +600,10 @@ export function HomePage() {
     })
     if (games.length === 0) return
     const text = buildAllShareText(today, games)
-    const flash = () => { setShareCopied(true); setTimeout(() => setShareCopied(false), 2000) }
-    if (navigator.share) {
-      void navigator.share({ text }).then(flash).catch(() => {})
-    } else {
-      navigator.clipboard?.writeText(text).then(flash).catch(() => {})
+    const result = await nativeShare(text)
+    if (result === 'copied') {
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2000)
     }
   }
 

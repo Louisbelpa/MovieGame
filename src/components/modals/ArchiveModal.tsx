@@ -198,11 +198,13 @@ export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps
           const day    = parseInt(date.slice(8), 10)
           const isActive = date === activeDate
           const isFuture = date > today
+          const hasChallenge = s !== 'none'
           const cls = [
             'cdym-cal-day',
-            isFuture       ? 'future' : '',
-            s === 'won'    ? 'full'   : '',
-            isActive && !isFuture ? 'today' : '',
+            isFuture                  ? 'future' : '',
+            !isFuture && !hasChallenge ? 'nodifi' : '',
+            s === 'won'               ? 'full'   : '',
+            isActive && !isFuture && hasChallenge ? 'today' : '',
           ].filter(Boolean).join(' ')
 
           return (
@@ -210,13 +212,17 @@ export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps
               key={date}
               type="button"
               onClick={() => handleDay(date)}
-              disabled={s === 'none' || isFuture}
-              aria-label={isFuture ? `${date} – futur` : s !== 'none' ? `Défi du ${date}` : date}
+              disabled={!hasChallenge || isFuture}
+              aria-label={
+                isFuture ? `${date} – futur`
+                  : hasChallenge ? `Défi du ${date}`
+                  : `${date} – pas de défi`
+              }
               className={cls}
-              style={{ cursor: s === 'none' || isFuture ? 'default' : 'pointer', border: 'none', padding: 0, fontFamily: 'inherit', background: 'none' }}
+              style={{ cursor: !hasChallenge || isFuture ? 'default' : 'pointer', border: 'none', padding: 0, fontFamily: 'inherit', background: 'none' }}
             >
               <span className="dn">{day}</span>
-              {!isFuture && s !== 'none' && (
+              {!isFuture && hasChallenge && (
                 <span className="dots">
                   <i className={s === 'won' ? 'win' : s === 'lost' ? 'lose' : 'none'} />
                 </span>

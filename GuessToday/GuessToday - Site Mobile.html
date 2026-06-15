@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GuessToday — Site Mobile (responsive web)</title>
+<link rel="stylesheet" href="assets/ds.css" />
+<style>
+  html, body { margin: 0; height: 100%; background: #0d0d11; }
+  .mw-wrap { padding: 20px; display: flex; align-items: flex-start; justify-content: center; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="assets/design-canvas.jsx"></script>
+<script type="text/babel" src="assets/gt-primitives.jsx"></script>
+<script type="text/babel" src="assets/gt-components.jsx"></script>
+<script type="text/babel" src="assets/gt-shell.jsx"></script>
+<script type="text/babel" src="assets/gt-share-combined.jsx"></script>
+<script type="text/babel" src="assets/web-mobile-shell.jsx"></script>
+<script type="text/babel" src="assets/web-mobile-a.jsx"></script>
+<script type="text/babel" src="assets/web-mobile-b.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+function App() {
+  const { DesignCanvas, DCSection, DCArtboard } = window;
+  // browser frame is 390 wide; wrap adds 20px padding each side → 430. Height varies per screen.
+  const B = (id, label, child, h) => (
+    <DCArtboard id={id} label={label} width={430} height={h}>
+      <div className="mw-wrap">{child}</div>
+    </DCArtboard>
+  );
+  return (
+    <DesignCanvas>
+      <DCSection id="land" title="Landing (non connecté)" subtitle="Site GuessToday à 390px — nav hamburger, partage web (≠ app native). Hero, défis du jour, CTA">
+        {B('land', 'Landing mobile', <MWLanding />, 1780)}
+      </DCSection>
+
+      <DCSection id="hub" title="Hub + menu" subtitle="Défis du jour empilés, progression, mini-classement, drawer">
+        {B('hub', 'Hub connecté', <MWHub />, 1560)}
+        {B('menu', 'Menu (drawer ouvert)', <MWMenu />, 770)}
+      </DCSection>
+
+      <DCSection id="game" title="Écrans de jeu" subtitle="Image, autocomplétion, indices — adaptés au mobile web">
+        {B('film1', 'FilmGuess · début', <MWFilmStart />, 1245)}
+        {B('film2', 'FilmGuess · 2 essais, 2 indices', <MWFilmPlaying />, 1245)}
+        {B('face', 'FaceGuess · floue + bio', <MWFace />, 1500)}
+      </DCSection>
+
+      <DCSection id="result" title="Résultat + partage web" subtitle="Sélecteur « Ce jeu / Ma journée » + carte combinée multi-jeux">
+        {B('result', 'Résultat + partage', <MWResult />, 1160)}
+      </DCSection>
+
+      <DCSection id="social" title="Stats · Profil · Classement · Amis" subtitle="Toutes les pages en responsive mobile">
+        {B('stats', 'Stats du jour', <MWStats />, 990)}
+        {B('profile', 'Profil', <MWProfile />, 820)}
+        {B('leader', 'Classement amis', <MWLeaderboard />, 920)}
+        {B('friends', 'Amis', <MWFriends />, 870)}
+      </DCSection>
+
+      <DCSection id="tutorial" title="Tutoriel · Comment jouer" subtitle="Sheet remonte du bas au 1er lancement (ou via le bouton ? de l'arène) — 3 étapes visuelles, bouton « C'est parti ! »">
+        {B('tuto-film', 'FilmGuess · tutoriel', <MWTutorialScreen game="film" />, 900)}
+        {B('tuto-face', 'FaceGuess · tutoriel', <MWTutorialScreen game="face" />, 900)}
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+// intro note removed
+
+function mountWhenReady() {
+  if (window.DesignCanvas && window.MWLanding && window.MWHub && window.MWResult && window.MWFriends && window.MWTutorialScreen && window.GTDailyShareCard) {
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  } else {
+    setTimeout(mountWhenReady, 30);
+  }
+}
+mountWhenReady();
+</script>
+</body>
+</html>

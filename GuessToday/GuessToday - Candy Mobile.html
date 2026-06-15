@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GuessToday — Candy Mobile</title>
+<link rel="stylesheet" href="assets/ds.css" />
+<link rel="stylesheet" href="assets/candy.css" />
+<link rel="stylesheet" href="assets/candy-mobile.css" />
+<style>
+  html, body { margin: 0; height: 100%; background: #0d0d11; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="assets/design-canvas.jsx"></script>
+<script type="text/babel" src="assets/directions.jsx"></script>
+<script type="text/babel" src="assets/candy-screens.jsx"></script>
+<script type="text/babel" src="assets/candy-social.jsx"></script>
+<script type="text/babel" src="assets/candy-game.jsx"></script>
+<script type="text/babel" src="assets/ios-frame.jsx"></script>
+<script type="text/babel" src="assets/android-frame.jsx"></script>
+<script type="text/babel" src="assets/candy-mobile.jsx"></script>
+<script type="text/babel" src="assets/candy-mobile-extra.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+function MobileWebFrame({ children }) {
+  return (
+    <div style={{ width: 402, height: 850, borderRadius: 22, overflow: 'hidden', background: '#fff',
+      boxShadow: '0 30px 70px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', fontFamily: 'Fredoka, sans-serif' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#fff4ea', borderBottom: '2px solid #f0e3d6' }}>
+        <span style={{ display: 'flex', gap: 6 }}>
+          <span style={{ width: 11, height: 11, borderRadius: 99, background: '#ff7a4d' }} />
+          <span style={{ width: 11, height: 11, borderRadius: 99, background: '#ffce4a' }} />
+          <span style={{ width: 11, height: 11, borderRadius: 99, background: '#27c08a' }} />
+        </span>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 7, background: '#fff', borderRadius: 999, padding: '7px 14px', border: '2px solid #f0e3d6', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: '#9a8ca5' }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#27c08a" strokeWidth="2.5"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" /></svg>
+          guesstoday.app
+        </div>
+      </div>
+      <div style={{ flex: 1, overflow: 'hidden' }}>{children}</div>
+    </div>
+  );
+}
+
+function IOSWrap({ children }) {
+  return (
+    <IOSDevice>
+      <div style={{ height: '100%', paddingTop: 54, paddingBottom: 24, display: 'flex', flexDirection: 'column' }}>
+        {children}
+      </div>
+    </IOSDevice>
+  );
+}
+function AndroidWrap({ children }) {
+  return <AndroidDevice><div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>{children}</div></AndroidDevice>;
+}
+
+function App() {
+  const { DesignCanvas, DCSection, DCArtboard } = window;
+  return (
+    <DesignCanvas>
+      <DCSection id="onb" title="Onboarding" subtitle="3 slides de première ouverture — présentation des jeux, du principe, du social.">
+        <DCArtboard id="onb1" label="1 · Un défi par jour" width={402} height={850}><MobileWebFrame><MobileOnboarding slide={0} /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="onb2" label="2 · 5 essais, 3 indices" width={402} height={850}><MobileWebFrame><MobileOnboarding slide={1} /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="onb3" label="3 · Joue avec tes amis" width={402} height={850}><MobileWebFrame><MobileOnboarding slide={2} /></MobileWebFrame></DCArtboard>
+      </DCSection>
+
+      <DCSection id="auth" title="Connexion / Inscription" subtitle="Compte e-mail + Apple & Google. C'est la cible des boutons « Créer un compte » présents partout.">
+        <DCArtboard id="signup" label="Inscription" width={402} height={850}><MobileWebFrame><MobileAuth mode="signup" /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="login" label="Connexion" width={402} height={850}><MobileWebFrame><MobileAuth mode="login" /></MobileWebFrame></DCArtboard>
+      </DCSection>
+
+      <DCSection id="guest" title="Parcours invité" subtitle="Jouer sans compte, puis mur d'inscription au pic d'émotion — zéro friction à l'entrée, conversion à la victoire.">
+        <DCArtboard id="guest-arena" label="1 · Arène en mode découverte" width={402} height={850}><MobileWebFrame><MobileGuestArena /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="guest-win" label="2 · Fin + mur d'inscription" width={402} height={850}><MobileWebFrame><MobileGuestWin /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="guest-stats" label="3 · Stats · accessible (publiques)" width={402} height={850}><MobileWebFrame><MobileStats guest={true} /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="guest-locked-lead" label="4 · Classement · mur" width={402} height={850}><MobileWebFrame><MobileLocked page="classement" /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="guest-locked-prof" label="5 · Profil · mur" width={402} height={850}><MobileWebFrame><MobileLocked page="profil" /></MobileWebFrame></DCArtboard>
+      </DCSection>
+
+      <DCSection id="web" title="Site mobile (responsive)" subtitle="Le site GuessToday dans un navigateur mobile : header compact, contenu en colonne, tab bar basse.">
+        <DCArtboard id="web-land" label="Landing" width={402} height={850}><MobileWebFrame><MobileLanding /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="web-menu" label="Menu (drawer)" width={402} height={850}><MobileWebFrame><MobileMenu /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="web-hub" label="Hub" width={402} height={850}><MobileWebFrame><MobileHub /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="web-game" label="Jeu · en cours" width={402} height={850}><MobileWebFrame><MobileGame game="film" state="playing" /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="web-won" label="Jeu · victoire" width={402} height={850}><MobileWebFrame><MobileGame game="film" state="won" /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="web-tuto" label="Jeu · Comment jouer (overlay)" width={402} height={850}><MobileWebFrame><MobileTutorialScreen game="film" /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="web-result" label="Résultat + partage" width={402} height={850}><MobileWebFrame><MobileResult /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="web-stats" label="Stats du jour" width={402} height={850}><MobileWebFrame><MobileStats /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="web-prof" label="Profil" width={402} height={850}><MobileWebFrame><MobileProfile /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="web-lead" label="Classement" width={402} height={850}><MobileWebFrame><MobileLeaderboard /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="web-friends" label="Amis" width={402} height={850}><MobileWebFrame><MobileFriends /></MobileWebFrame></DCArtboard>
+      </DCSection>
+
+      <DCSection id="archive" title="Jours précédents · Archive" subtitle="Le navigateur de date dans l'arène + le calendrier des défis passés (à la Wordle), avec rejeu d'un ancien défi.">
+        <DCArtboard id="arch-cal" label="Archive · calendrier" width={402} height={850}><MobileWebFrame><MobileArchive /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="arch-replay" label="Rejouer un ancien défi (21 mai)" width={402} height={850}><MobileWebFrame><MobileGame game="face" state="playing" dayNum={135} dateLabel="21 mai 2026" isToday={false} /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="arch-ios" label="Archive · iOS" width={402} height={874}><IOSWrap><MobileArchive /></IOSWrap></DCArtboard>
+        <DCArtboard id="arch-and" label="Archive · Android" width={412} height={892}><AndroidWrap><MobileArchive /></AndroidWrap></DCArtboard>
+      </DCSection>
+
+      <DCSection id="tuto" title="Tutoriel · Comment jouer" subtitle="Sheet remontant du bas au 1er lancement ou via le bouton ? — jeu flouté en fond, 3 étapes, « C'est parti ! ».">
+        <DCArtboard id="tuto-web-film" label="Web · FilmGuess" width={402} height={850}><MobileWebFrame><MobileTutorialScreen game="film" /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="tuto-web-face" label="Web · FaceGuess" width={402} height={850}><MobileWebFrame><MobileTutorialScreen game="face" /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="tuto-web-serie" label="Web · SerieGuess" width={402} height={850}><MobileWebFrame><MobileTutorialScreen game="serie" /></MobileWebFrame></DCArtboard>
+        <DCArtboard id="tuto-ios" label="iOS · FilmGuess" width={402} height={874}><IOSWrap><MobileTutorialScreen game="film" /></IOSWrap></DCArtboard>
+        <DCArtboard id="tuto-and" label="Android · FaceGuess" width={412} height={892}><AndroidWrap><MobileTutorialScreen game="face" /></AndroidWrap></DCArtboard>
+      </DCSection>
+
+      <DCSection id="ios" title="Application iOS" subtitle="Écrans clés dans le châssis iOS (dynamic island, home indicator).">
+        <DCArtboard id="ios-onb" label="Onboarding" width={402} height={874}><IOSWrap><MobileOnboarding slide={0} /></IOSWrap></DCArtboard>
+        <DCArtboard id="ios-auth" label="Inscription" width={402} height={874}><IOSWrap><MobileAuth mode="signup" /></IOSWrap></DCArtboard>
+        <DCArtboard id="ios-hub" label="Hub" width={402} height={874}><IOSWrap><MobileHub /></IOSWrap></DCArtboard>
+        <DCArtboard id="ios-game" label="FilmGuess · en cours" width={402} height={874}><IOSWrap><MobileGame game="film" state="playing" /></IOSWrap></DCArtboard>
+        <DCArtboard id="ios-face" label="FaceGuess · photo floue" width={402} height={874}><IOSWrap><MobileGame game="face" state="playing" /></IOSWrap></DCArtboard>
+        <DCArtboard id="ios-tuto" label="FilmGuess · Comment jouer" width={402} height={874}><IOSWrap><MobileTutorialScreen game="film" /></IOSWrap></DCArtboard>
+        <DCArtboard id="ios-result" label="Résultat + partage" width={402} height={874}><IOSWrap><MobileResult /></IOSWrap></DCArtboard>
+        <DCArtboard id="ios-prof" label="Profil" width={402} height={874}><IOSWrap><MobileProfile /></IOSWrap></DCArtboard>
+        <DCArtboard id="ios-lead" label="Classement" width={402} height={874}><IOSWrap><MobileLeaderboard /></IOSWrap></DCArtboard>
+      </DCSection>
+
+      <DCSection id="android" title="Application Android" subtitle="Écrans clés dans le châssis Android (Material 3, barre de gestes).">
+        <DCArtboard id="and-onb" label="Onboarding" width={412} height={892}><AndroidWrap><MobileOnboarding slide={2} /></AndroidWrap></DCArtboard>
+        <DCArtboard id="and-auth" label="Connexion" width={412} height={892}><AndroidWrap><MobileAuth mode="login" /></AndroidWrap></DCArtboard>
+        <DCArtboard id="and-hub" label="Hub" width={412} height={892}><AndroidWrap><MobileHub /></AndroidWrap></DCArtboard>
+        <DCArtboard id="and-game" label="FilmGuess · en cours" width={412} height={892}><AndroidWrap><MobileGame game="film" state="playing" /></AndroidWrap></DCArtboard>
+        <DCArtboard id="and-serie" label="SerieGuess · victoire" width={412} height={892}><AndroidWrap><MobileGame game="serie" state="won" /></AndroidWrap></DCArtboard>
+        <DCArtboard id="and-tuto" label="FaceGuess · Comment jouer" width={412} height={892}><AndroidWrap><MobileTutorialScreen game="face" /></AndroidWrap></DCArtboard>
+        <DCArtboard id="and-stats" label="Stats du jour" width={412} height={892}><AndroidWrap><MobileStats /></AndroidWrap></DCArtboard>
+        <DCArtboard id="and-prof" label="Profil" width={412} height={892}><AndroidWrap><MobileProfile /></AndroidWrap></DCArtboard>
+        <DCArtboard id="and-friends" label="Amis" width={412} height={892}><AndroidWrap><MobileFriends /></AndroidWrap></DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+function mountWhenReady() {
+  if (window.DesignCanvas && window.MobileHub && window.MobileGame && window.MobileProfile && window.MobileLeaderboard && window.IOSDevice && window.AndroidDevice && window.GAME_CFG && window.MobileOnboarding && window.MobileAuth && window.MobileLanding && window.MobileMenu && window.MobileStats && window.MobileResult && window.MobileFriends && window.CandyDailyShareCard && window.MobileGuestArena && window.MobileGuestWin && window.MobileLocked && window.MobileArchive && window.MobileProfileEdit && window.MobileTutorial && window.MobileTutorialScreen) {
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  } else { setTimeout(mountWhenReady, 30); }
+}
+mountWhenReady();
+</script>
+</body>
+</html>
