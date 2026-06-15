@@ -179,7 +179,12 @@ export async function sendDailyChallengeNotification(
   body  = 'Le défi du jour est prêt. Saurez-vous trouver ?',
 ): Promise<void> {
   const tokens = db
-    .prepare<[], PushTokenRow>(`SELECT user_id, token, platform FROM push_tokens`)
+    .prepare<[], PushTokenRow>(
+      `SELECT pt.user_id, pt.token, pt.platform
+       FROM push_tokens pt
+       JOIN users u ON u.id = pt.user_id
+       WHERE u.notif_daily = 1`
+    )
     .all();
 
   if (tokens.length === 0) return;

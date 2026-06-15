@@ -378,6 +378,14 @@ const incremental: { name: string; sql: string }[] = [
     name: 'create_users_idx_friend_code',
     sql: `CREATE INDEX IF NOT EXISTS idx_users_friend_code ON users (friend_code)`,
   },
+  {
+    name: 'add_wiki_persons_parse_quality_score',
+    sql: `ALTER TABLE wiki_persons ADD COLUMN parse_quality_score INTEGER`,
+  },
+  {
+    name: 'add_wiki_persons_parse_warnings',
+    sql: `ALTER TABLE wiki_persons ADD COLUMN parse_warnings TEXT`,
+  },
 ]
 
 // Multi-statement migrations that need db.exec() rather than db.prepare().run()
@@ -715,6 +723,10 @@ const postMultiStatementIncremental: { name: string; sql: string }[] = [
     name: 'add_idx_dc_date_type_active',
     sql: `CREATE INDEX IF NOT EXISTS idx_dc_date_type_active ON daily_challenges (challenge_date, media_type, is_active)`,
   },
+  // Préférences utilisateur (toggles de l'écran profil)
+  { name: 'add_notif_daily_to_users',        sql: `ALTER TABLE users ADD COLUMN notif_daily INTEGER NOT NULL DEFAULT 0` },
+  { name: 'add_leaderboard_public_to_users', sql: `ALTER TABLE users ADD COLUMN leaderboard_public INTEGER NOT NULL DEFAULT 1` },
+  { name: 'add_profile_public_to_users',     sql: `ALTER TABLE users ADD COLUMN profile_public INTEGER NOT NULL DEFAULT 1` },
 ]
 
 for (const { name, sql } of postMultiStatementIncremental) {

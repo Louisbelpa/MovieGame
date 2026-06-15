@@ -242,6 +242,44 @@ authRouter.put('/profile', userAuth, requireUser, (req: Request, res: Response):
   res.json({ user: formatUser(updated) });
 });
 
+// ─── Préférences (toggles écran profil) ──────────────────────────────────────
+
+interface PrefsRow { notif_daily: number; leaderboard_public: number; profile_public: number }
+
+function formatPrefs(row: PrefsRow) {
+  return {
+    notifDaily: row.notif_daily === 1,
+    leaderboardPublic: row.leaderboard_public === 1,
+    profilePublic: row.profile_public === 1,
+  };
+}
+
+const PREFS_SQL = `SELECT notif_daily, leaderboard_public, profile_public FROM users WHERE id = ?`;
+
+/** GET /api/auth/preferences */
+authRouter.get('/preferences', userAuth, requireUser, (req: Request, res: Response): void => {
+  const row = db.prepare<number, PrefsRow>(PREFS_SQL).get(req.user!.id)!;
+  res.json(formatPrefs(row));
+});
+
+/** PATCH /api/auth/preferences — { notifDaily?, leaderboardPublic?, profilePublic? } */
+authRouter.patch('/preferences', userAuth, requireUser, (req: Request, res: Response): void => {
+  const { notifDaily, leaderboardPublic, profilePublic } = req.body as {
+    notifDaily?: unknown; leaderboardPublic?: unknown; profilePublic?: unknown;
+  };
+  const userId = req.user!.id;
+  // Noms de colonnes en dur (pas d'entrée utilisateur) — pas d'injection.
+  const set = (col: 'notif_daily' | 'leaderboard_public' | 'profile_public', val: unknown) => {
+    if (typeof val === 'boolean') db.prepare(`UPDATE users SET ${col} = ? WHERE id = ?`).run(val ? 1 : 0, userId);
+  };
+  set('notif_daily', notifDaily);
+  set('leaderboard_public', leaderboardPublic);
+  set('profile_public', profilePublic);
+
+  const row = db.prepare<number, PrefsRow>(PREFS_SQL).get(userId)!;
+  res.json(formatPrefs(row));
+});
+
 /** POST /api/auth/avatar — multipart image upload */
 const avatarUpload = multer({
   storage: multer.diskStorage({

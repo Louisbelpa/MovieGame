@@ -770,3 +770,40 @@ export function searchSeries(query: string, limit = 10, excludeChallengeId?: num
   const filtered = rows.filter((r) => !excludeIds.has(r.id));
   return filtered.slice(0, limit).map((r) => ({ title: r.title, year: r.year }));
 }
+
+/**
+ * Stats publiques pour la landing (homepage non connectée) :
+ * - challengeDays : nombre de jours de défis actifs (distincts)
+ * - playersPerDay : moyenne de joueurs distincts par jour sur les 30 derniers jours
+ *                   (un « joueur » = un session_token, anonyme ou connecté)
+ */
+export function getLandingStats(): { challengeDays: number; playersPerDay: number } {
+  const challengeDays = (
+    db
+      .prepare<[], { n: number }>(
+        `SELECT COUNT(DISTINCT challenge_date) AS n FROM daily_challenges WHERE is_active = 1`
+      )
+      .get() ?? { n: 0 }
+  ).n;
+
+  const avgRow = db
+    .prepare<[], { avg: number | null }>(
+      `SELECT AVG(daily) AS avg FROM (
+         SELECT dc.challenge_date AS d, COUNT(DISTINCT s.session_token) AS daily
+         FROM (
+           SELECT session_token, challenge_id FROM game_sessions
+           UNION ALL
+           SELECT session_token, challenge_id FROM wiki_sessions
+         ) s
+         JOIN daily_challenges dc ON dc.id = s.challenge_id
+         WHERE dc.is_active = 1 AND dc.challenge_date >= date('now', '-30 days')
+         GROUP BY dc.challenge_date
+       )`
+    )
+    .get();
+
+  return {
+    challengeDays,
+    playersPerDay: avgRow?.avg ? Math.round(avgRow.avg) : 0,
+  };
+}

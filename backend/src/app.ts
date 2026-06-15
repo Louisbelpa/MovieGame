@@ -58,6 +58,16 @@ export function createApp(): express.Application {
     .filter((o): o is string => Boolean(o));
   const allowedOriginsSet = new Set(allowedOrigins)
 
+  const isDevLocalOrigin = (origin: string): boolean => {
+    if (process.env.NODE_ENV !== 'development') return false
+    try {
+      const { hostname } = new URL(origin)
+      return hostname === 'localhost' || hostname === '127.0.0.1'
+    } catch {
+      return false
+    }
+  }
+
   app.set('trust proxy', 1);
   app.use(requestIdMiddleware);
   app.use(pinoHttp({
@@ -96,6 +106,25 @@ export function createApp(): express.Application {
   }
   app.use(cookieParser(cookieSecret ?? 'dev_secret'));
 
+  // Apple App Site Association — Universal Links.
+  // Doit être joignable sans auth ni redirection, en application/json, même en maintenance.
+  const appleAppSiteAssociation = {
+    applinks: {
+      apps: [],
+      details: [
+        {
+          appID: 'Z5JH565RAL.fr.guesstoday.app',
+          paths: ['/reset-password', '/reset-password*'],
+        },
+      ],
+    },
+  };
+  const serveAASA = (_req: express.Request, res: express.Response): void => {
+    res.type('application/json').json(appleAppSiteAssociation);
+  };
+  app.get('/.well-known/apple-app-site-association', serveAASA);
+  app.get('/apple-app-site-association', serveAASA);
+
   // Maintenance mode — laisse passer /health, /assets, /uploads, /admin (SPA) et /api/admin
   app.use(maintenanceMiddleware);
 
@@ -118,7 +147,7 @@ export function createApp(): express.Application {
       if (!origin) { callback(null, true); return }
       if (allowedOriginsSet.size === 0) { callback(null, true); return }
       const normalized = toOrigin(origin)
-      if (normalized && allowedOriginsSet.has(normalized)) {
+      if (normalized && (allowedOriginsSet.has(normalized) || isDevLocalOrigin(normalized))) {
         callback(null, true)
         return
       }

@@ -14,6 +14,7 @@
 
 import 'dotenv/config';
 import db from '../src/db/database.js';
+import { pickBestBackdrop, type TmdbBackdrop } from '../src/lib/tmdb-images.js';
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const TMDB_API_BASE = 'https://api.themoviedb.org/3';
@@ -25,23 +26,19 @@ if (!TMDB_API_KEY) {
 }
 
 interface TmdbImagesResponse {
-  backdrops: Array<{ file_path: string; vote_average: number; width: number }>;
+  backdrops: TmdbBackdrop[];
 }
 
 async function fetchBestBackdrop(tmdbId: number): Promise<string | null> {
-  const url = `${TMDB_API_BASE}/movie/${tmdbId}/images?api_key=${TMDB_API_KEY}`;
+  const url = `${TMDB_API_BASE}/movie/${tmdbId}/images?api_key=${TMDB_API_KEY}&include_image_language=null`;
   const res = await fetch(url);
   if (!res.ok) {
     console.warn(`  TMDB ${tmdbId}: HTTP ${res.status}`);
     return null;
   }
   const data = (await res.json()) as TmdbImagesResponse;
-
-  if (!data.backdrops || data.backdrops.length === 0) return null;
-
-  // Pick the highest-rated backdrop (most visually interesting scene)
-  const best = data.backdrops.sort((a, b) => b.vote_average - a.vote_average)[0];
-  return best.file_path;
+  // Préfère un backdrop paysage sans texte ; déterministe pour un script batch.
+  return pickBestBackdrop(data.backdrops, false);
 }
 
 async function main() {

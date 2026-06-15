@@ -9,6 +9,8 @@ interface WikiRow {
 
 const LIMIT = Math.max(0, parseInt(process.env.BACKFILL_LIMIT ?? '0', 10) || 0)
 const SLEEP_MS = Math.max(300, parseInt(process.env.BACKFILL_SLEEP_MS ?? '1200', 10) || 1200)
+// Préserve l'ordre des indices personnalisé en admin (BACKFILL_KEEP_HINTS=1 ou --keep-hints).
+const KEEP_HINTS = process.env.BACKFILL_KEEP_HINTS === '1' || process.argv.includes('--keep-hints')
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -26,7 +28,7 @@ async function main() {
     ? db.prepare<[number], WikiRow>(`SELECT id, wikipedia_slug, name FROM wiki_persons ORDER BY id ASC LIMIT ?`).all(LIMIT)
     : db.prepare<[], WikiRow>(`SELECT id, wikipedia_slug, name FROM wiki_persons ORDER BY id ASC`).all())
 
-  console.log(`Backfill wiki_persons: ${rows.length} fiche(s), pause=${SLEEP_MS}ms`)
+  console.log(`Backfill wiki_persons: ${rows.length} fiche(s), pause=${SLEEP_MS}ms${KEEP_HINTS ? ', hints préservés' : ''}`)
 
   let ok = 0
   let failed = 0
@@ -35,28 +37,29 @@ async function main() {
   for (const row of rows) {
     try {
       const data = await fetchWikipediaData(row.wikipedia_slug, 'fr')
-      db.prepare(`
-        UPDATE wiki_persons
-        SET
-          name = ?,
-          person_type = ?,
-          infobox_data = ?,
-          hint_schedule = ?,
-          photo_url = ?,
-          extract = ?,
-          wikipedia_url = ?,
-          updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-        WHERE id = ?
-      `).run(
-        data.name,
-        data.person_type,
-        JSON.stringify(data.infobox_data),
-        JSON.stringify(data.hint_schedule),
-        data.photo_url,
-        data.extract,
-        data.wikipedia_url,
-        row.id
-      )
+      const score = typeof data.parse_quality_score === 'number' ? Math.round(data.parse_quality_score) : null
+      const warnings = Array.isArray(data.parse_warnings) ? JSON.stringify(data.parse_warnings) : null
+      if (KEEP_HINTS) {
+        db.prepare(`
+          UPDATE wiki_persons
+          SET name = ?, person_type = ?, infobox_data = ?, photo_url = ?, extract = ?, wikipedia_url = ?,
+              parse_quality_score = ?, parse_warnings = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+          WHERE id = ?
+        `).run(
+          data.name, data.person_type, JSON.stringify(data.infobox_data),
+          data.photo_url, data.extract, data.wikipedia_url, score, warnings, row.id
+        )
+      } else {
+        db.prepare(`
+          UPDATE wiki_persons
+          SET name = ?, person_type = ?, infobox_data = ?, hint_schedule = ?, photo_url = ?, extract = ?, wikipedia_url = ?,
+              parse_quality_score = ?, parse_warnings = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+          WHERE id = ?
+        `).run(
+          data.name, data.person_type, JSON.stringify(data.infobox_data), JSON.stringify(data.hint_schedule),
+          data.photo_url, data.extract, data.wikipedia_url, score, warnings, row.id
+        )
+      }
 
       ok += 1
       console.log(`[OK] #${row.id} ${row.wikipedia_slug} -> ${data.person_type} (score ${data.parse_quality_score})`)

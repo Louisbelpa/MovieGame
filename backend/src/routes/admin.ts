@@ -36,6 +36,7 @@ import { fileTypeFromBuffer } from 'file-type';
 import { ensureUploadsDir, getUploadsAbsDir } from '../config/uploads.js';
 import db from '../db/database.js';
 import { normalizeCommonsPhotoUrl } from '../lib/commonsThumb.js';
+import { pickBestBackdrop, type TmdbBackdrop } from '../lib/tmdb-images.js';
 import { adminAuth, computeAdminToken, ADMIN_COOKIE } from '../middleware/adminAuth.js';
 import { adminLimiter, loginLimiter } from '../middleware/rateLimiter.js';
 import { logAuditEvent } from '../middleware/auditLog.js';
@@ -216,6 +217,8 @@ interface WikiPersonRow {
   wikipedia_url: string | null;
   difficulty: number;
   is_active: number;
+  parse_quality_score: number | null;
+  parse_warnings: string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -390,6 +393,14 @@ function formatWikiPerson(row: WikiPersonRow, usedDates?: string[]) {
     wikipedia_url: row.wikipedia_url,
     difficulty: row.difficulty,
     is_active: row.is_active === 1,
+    parse_quality_score: row.parse_quality_score,
+    parse_warnings: (() => {
+      if (!row.parse_warnings) return [] as string[]
+      try {
+        const arr = JSON.parse(row.parse_warnings) as unknown
+        return Array.isArray(arr) ? arr.filter((w): w is string => typeof w === 'string') : []
+      } catch { return [] as string[] }
+    })(),
     used_dates: usedDates ?? [],
   };
 }
@@ -1767,6 +1778,113 @@ adminRouter.post(
   }
 );
 
+// POST /api/admin/challenges/auto-schedule — remplit automatiquement les jours vides avec des fiches inutilisées
+adminRouter.post('/challenges/auto-schedule', strictAdminLimiter, (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const body = (req.body ?? {}) as { mediaType?: unknown; startDate?: unknown; days?: unknown; minScore?: unknown };
+    const mediaType = body.mediaType === 'film' || body.mediaType === 'series' || body.mediaType === 'wiki'
+      ? body.mediaType : null;
+    if (!mediaType) { res.status(400).json({ error: 'mediaType doit être film, series ou wiki.' }); return; }
+    const startDate = typeof body.startDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.startDate)
+      ? body.startDate : getTodayParis();
+    const daysRaw = parseInt(String(body.days ?? '30'), 10);
+    const days = Math.max(1, Math.min(400, Number.isFinite(daysRaw) ? daysRaw : 30));
+    const minScoreRaw = parseInt(String(body.minScore ?? ''), 10);
+    const minScore = Number.isFinite(minScoreRaw) ? Math.max(0, Math.min(100, minScoreRaw)) : null;
+
+    const addDaysIso = (iso: string, n: number): string => {
+      const d = new Date(`${iso}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + n);
+      return d.toISOString().slice(0, 10);
+    };
+
+    // Jours vides (aucun défi actif de ce media_type) dans la fenêtre
+    const filledRows = db.prepare<[string, string, string], { challenge_date: string }>(
+      `SELECT challenge_date FROM daily_challenges
+       WHERE media_type = ? AND is_active = 1 AND challenge_date BETWEEN ? AND ?`
+    ).all(mediaType, startDate, addDaysIso(startDate, days - 1));
+    const filled = new Set(filledRows.map((r) => r.challenge_date));
+    const emptyDates: string[] = [];
+    for (let i = 0; i < days; i++) {
+      const date = addDaysIso(startDate, i);
+      if (!filled.has(date)) emptyDates.push(date);
+    }
+    if (emptyDates.length === 0) { res.json({ ok: true, scheduled: 0, emptyDays: 0, remainingPool: 0 }); return; }
+
+    // Fiches inutilisées (pas déjà dans un défi actif), triées par pertinence
+    let pool: { id: number; hint_schedule: string }[];
+    if (mediaType === 'wiki') {
+      pool = db.prepare<[number | null, number | null], { id: number; hint_schedule: string }>(
+        `SELECT wp.id, wp.hint_schedule FROM wiki_persons wp
+         WHERE wp.is_active = 1
+           AND NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.wiki_person_id = wp.id AND dc.is_active = 1)
+           AND (? IS NULL OR COALESCE(wp.parse_quality_score, 0) >= ?)
+         ORDER BY COALESCE(wp.parse_quality_score, 0) DESC, wp.created_at ASC`
+      ).all(minScore, minScore);
+    } else if (mediaType === 'film') {
+      pool = db.prepare<[], { id: number; hint_schedule: string }>(
+        `SELECT f.id, f.hint_schedule FROM films f
+         WHERE f.is_active = 1
+           AND NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.film_id = f.id AND dc.is_active = 1)
+         ORDER BY f.fame_level DESC, f.created_at ASC`
+      ).all();
+    } else {
+      pool = db.prepare<[], { id: number; hint_schedule: string }>(
+        `SELECT s.id, s.hint_schedule FROM series s
+         WHERE s.is_active = 1
+           AND NOT EXISTS (SELECT 1 FROM daily_challenges dc WHERE dc.series_id = s.id AND dc.is_active = 1)
+         ORDER BY s.fame_level DESC, s.created_at ASC`
+      ).all();
+    }
+    if (pool.length === 0) { res.json({ ok: true, scheduled: 0, emptyDays: emptyDates.length, remainingPool: 0, note: 'Aucune fiche disponible à planifier.' }); return; }
+
+    const maxNumRow = db.prepare<[string], { max_num: number }>(
+      `SELECT COALESCE(MAX(challenge_number), 0) AS max_num FROM daily_challenges WHERE media_type = ? AND is_active = 1`
+    ).get(mediaType)!;
+    let nextNum = maxNumRow.max_num;
+
+    const insert = db.prepare(
+      `INSERT INTO daily_challenges (challenge_date, media_type, film_id, series_id, wiki_person_id, challenge_number, hint_schedule)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    );
+    const delSoft = db.prepare(`DELETE FROM daily_challenges WHERE challenge_date = ? AND media_type = ? AND is_active = 0`);
+
+    const count = Math.min(emptyDates.length, pool.length);
+    const scheduledDates: string[] = [];
+    const tx = db.transaction(() => {
+      for (let i = 0; i < count; i++) {
+        const date = emptyDates[i];
+        const entity = pool[i];
+        delSoft.run(date, mediaType);
+        nextNum += 1;
+        const hintSchedule = mediaType === 'film'
+          ? normalizeFilmHintScheduleJson(JSON.parse(entity.hint_schedule))
+          : mediaType === 'series'
+            ? normalizeSeriesHintScheduleJson(JSON.parse(entity.hint_schedule))
+            : entity.hint_schedule;
+        insert.run(
+          date, mediaType,
+          mediaType === 'film' ? entity.id : null,
+          mediaType === 'series' ? entity.id : null,
+          mediaType === 'wiki' ? entity.id : null,
+          nextNum, hintSchedule,
+        );
+        scheduledDates.push(date);
+      }
+    });
+    tx();
+    renumberChallenges(mediaType);
+    logAuditEvent('challenge.auto_schedule', { mediaType, startDate, days, scheduled: scheduledDates.length });
+    res.json({
+      ok: true,
+      scheduled: scheduledDates.length,
+      emptyDays: emptyDates.length,
+      remainingPool: pool.length - count,
+      scheduledDates,
+    });
+  } catch (err) { next(err); }
+});
+
 // PUT /api/admin/challenges/:id
 adminRouter.put(
   '/challenges/:id',
@@ -1998,6 +2116,8 @@ interface TmdbImageEntry {
   width: number;
   height: number;
   vote_average: number;
+  aspect_ratio?: number;
+  iso_639_1?: string | null;
 }
 
 interface TmdbImagesResponse {
@@ -2330,21 +2450,14 @@ adminRouter.get(
         crew: { job: string; name: string }[];
         cast: { name: string }[];
       };
-      const images = (await imagesRes.json()) as {
-        backdrops: { file_path: string; vote_average: number }[];
-      };
+      const images = (await imagesRes.json()) as { backdrops: TmdbBackdrop[] };
 
       const director = credits.crew?.find((c) => c.job === 'Director')?.name ?? '';
       const cast = (credits.cast ?? []).slice(0, 5).map((c) => c.name);
       const genres = (details.genres ?? []).map((g) => g.name);
 
-      const bestBackdrop = (images.backdrops ?? [])
-        .sort((a, b) => b.vote_average - a.vote_average)[0];
-      const imageUrl = bestBackdrop
-        ? `https://image.tmdb.org/t/p/w1280${bestBackdrop.file_path}`
-        : details.backdrop_path
-        ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}`
-        : '';
+      const bestPath = pickBestBackdrop(images.backdrops) ?? details.backdrop_path;
+      const imageUrl = bestPath ? `https://image.tmdb.org/t/p/w1280${bestPath}` : '';
 
       const titleAliases: string[] = [];
       if (details.original_title && details.original_title !== details.title) {
@@ -2426,22 +2539,15 @@ adminRouter.get(
         crew: { job: string; name: string }[];
         cast: { name: string }[];
       };
-      const images = (await imagesRes.json()) as {
-        backdrops: { file_path: string; vote_average: number }[];
-      };
+      const images = (await imagesRes.json()) as { backdrops: TmdbBackdrop[] };
 
       const director = credits.crew?.find((c) => c.job === 'Director')?.name ?? '';
       const cast = (credits.cast ?? []).slice(0, 5).map((c) => c.name);
       const genres = (details.genres ?? []).map((g) => g.name);
 
       // Best backdrop or fallback to TMDB backdrop_path
-      const bestBackdrop = (images.backdrops ?? [])
-        .sort((a, b) => b.vote_average - a.vote_average)[0];
-      const imageUrl = bestBackdrop
-        ? `https://image.tmdb.org/t/p/w1280${bestBackdrop.file_path}`
-        : details.backdrop_path
-        ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}`
-        : '';
+      const bestPath = pickBestBackdrop(images.backdrops) ?? details.backdrop_path;
+      const imageUrl = bestPath ? `https://image.tmdb.org/t/p/w1280${bestPath}` : '';
 
       const titleAliases: string[] = [];
       if (details.original_title && details.original_title !== details.title) {
@@ -2522,9 +2628,7 @@ adminRouter.get(
       const credits = (await creditsRes.json()) as {
         cast: { name: string; order: number }[];
       };
-      const images = (await imagesRes.json()) as {
-        backdrops: { file_path: string; vote_average: number }[];
-      };
+      const images = (await imagesRes.json()) as { backdrops: TmdbBackdrop[] };
 
       const cast = (credits.cast ?? [])
         .sort((a, b) => a.order - b.order)
@@ -2532,13 +2636,8 @@ adminRouter.get(
         .map((c) => c.name);
       const genres = (details.genres ?? []).map((g) => g.name);
 
-      const bestBackdrop = (images.backdrops ?? [])
-        .sort((a, b) => b.vote_average - a.vote_average)[0];
-      const imageUrl = bestBackdrop
-        ? `https://image.tmdb.org/t/p/w1280${bestBackdrop.file_path}`
-        : details.backdrop_path
-        ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}`
-        : '';
+      const bestPath = pickBestBackdrop(images.backdrops) ?? details.backdrop_path;
+      const imageUrl = bestPath ? `https://image.tmdb.org/t/p/w1280${bestPath}` : '';
 
       const titleAliases: string[] = [];
       if (details.original_name && details.original_name !== details.name) {
@@ -3738,22 +3837,15 @@ adminRouter.get(
       const credits = (await creditsRes.json()) as {
         cast: { name: string }[];
       };
-      const images = (await imagesRes.json()) as {
-        backdrops: { file_path: string; vote_average: number }[];
-      };
+      const images = (await imagesRes.json()) as { backdrops: TmdbBackdrop[] };
 
       const creator = (details.created_by ?? []).map((c) => c.name).join(', ');
       const cast = (credits.cast ?? []).slice(0, 5).map((c) => c.name);
       const genres = (details.genres ?? []).map((g) => g.name);
       const network = (details.networks ?? [])[0]?.name ?? '';
 
-      const bestBackdrop = (images.backdrops ?? [])
-        .sort((a, b) => b.vote_average - a.vote_average)[0];
-      const imageUrl = bestBackdrop
-        ? `https://image.tmdb.org/t/p/w1280${bestBackdrop.file_path}`
-        : details.backdrop_path
-        ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}`
-        : '';
+      const bestPath = pickBestBackdrop(images.backdrops) ?? details.backdrop_path;
+      const imageUrl = bestPath ? `https://image.tmdb.org/t/p/w1280${bestPath}` : '';
 
       const titleAliases: string[] = [];
       if (details.original_name && details.original_name !== details.name) {
@@ -3908,6 +4000,7 @@ adminRouter.post('/wiki-persons', strictAdminLimiter, (req: Request, res: Respon
       name, name_aliases = '[]', person_type = 'politician',
       wikipedia_slug, infobox_data = '{}', hint_schedule = '[]',
       photo_url, extract, wikipedia_url, difficulty = 3,
+      parse_quality_score, parse_warnings,
     } = req.body as Record<string, unknown>
 
     if (!name || !wikipedia_slug) {
@@ -3917,10 +4010,14 @@ adminRouter.post('/wiki-persons', strictAdminLimiter, (req: Request, res: Respon
     const safeAliases = typeof name_aliases === 'string' ? name_aliases : JSON.stringify(name_aliases)
     const safeInfobox = normalizeWikiPersonInfoboxForStore(String(person_type), infobox_data)
     const safeHintSchedule = normalizeWikiHintSchedule(hint_schedule, person_type)
+    const qualityScore = typeof parse_quality_score === 'number' ? Math.round(parse_quality_score) : null
+    const warningsJson = Array.isArray(parse_warnings)
+      ? JSON.stringify(parse_warnings.filter((w): w is string => typeof w === 'string'))
+      : null
 
     const result = db.prepare(`
-      INSERT INTO wiki_persons (name, name_aliases, person_type, wikipedia_slug, infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO wiki_persons (name, name_aliases, person_type, wikipedia_slug, infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty, parse_quality_score, parse_warnings)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       String(name),
       safeAliases,
@@ -3933,7 +4030,9 @@ adminRouter.post('/wiki-persons', strictAdminLimiter, (req: Request, res: Respon
         : null,
       typeof extract === 'string' && extract.trim() ? extract : null,
       typeof wikipedia_url === 'string' && wikipedia_url.trim() ? wikipedia_url : null,
-      typeof difficulty === 'number' ? difficulty : parseInt(String(difficulty ?? 3), 10) || 3
+      typeof difficulty === 'number' ? difficulty : parseInt(String(difficulty ?? 3), 10) || 3,
+      qualityScore,
+      warningsJson,
     )
 
     logAuditEvent('wiki_person_created', { id: result.lastInsertRowid, name })
@@ -4130,17 +4229,83 @@ adminRouter.get('/wiki-prefetch-pool/:id/game-preview', strictAdminLimiter, (req
   }
 })
 
+interface WikiPoolImportRow {
+  payload_json: string | null
+  resolved_slug: string | null
+  source_slug: string
+}
+type WikiPoolImportResult =
+  | { status: 'created'; id: number; name: string; slug: string }
+  | { status: 'duplicate'; existingId: number; slug: string }
+  | { status: 'error'; message: string }
+
+/** Crée une fiche `wiki_persons` depuis une entrée prefetch ready. Réutilisé par l'import unitaire et l'import en masse. */
+function importWikiPersonFromPoolRow(row: WikiPoolImportRow, fromPoolId?: number): WikiPoolImportResult {
+  if (!row.payload_json?.trim()) return { status: 'error', message: 'Pool entry has no ready payload.' }
+  let parsed: WikiFetchPayloadForAdminPreview & { resolved_slug?: string; canonical_wikipedia_slug?: string }
+  try {
+    parsed = JSON.parse(row.payload_json) as typeof parsed
+  } catch {
+    return { status: 'error', message: 'Invalid payload JSON in pool entry.' }
+  }
+  if (!parsed.name || typeof parsed.person_type !== 'string') {
+    return { status: 'error', message: 'Payload missing name or person_type.' }
+  }
+  const wikipediaSlug =
+    (row.resolved_slug && row.resolved_slug.trim())
+    || (typeof parsed.resolved_slug === 'string' && parsed.resolved_slug.trim())
+    || (typeof parsed.canonical_wikipedia_slug === 'string' && parsed.canonical_wikipedia_slug.trim())
+    || row.source_slug.trim()
+  if (!wikipediaSlug) return { status: 'error', message: 'Could not determine wikipedia_slug.' }
+  const dup = db.prepare<[string], { id: number }>(`SELECT id FROM wiki_persons WHERE wikipedia_slug = ?`).get(wikipediaSlug)
+  if (dup) return { status: 'duplicate', existingId: dup.id, slug: wikipediaSlug }
+  const infoboxMerged = parseInfoboxRecord(parsed.infobox_data)
+  if (typeof parsed.parse_quality_score === 'number') infoboxMerged.parse_quality_score = parsed.parse_quality_score
+  if (Array.isArray(parsed.parse_warnings)) {
+    infoboxMerged.parse_warnings = parsed.parse_warnings.filter((w): w is string => typeof w === 'string')
+  }
+  const safeInfobox = normalizeWikiPersonInfoboxForStore(String(parsed.person_type), infoboxMerged)
+  const safeHintSchedule = normalizeWikiHintSchedule(parsed.hint_schedule, parsed.person_type)
+  let diff = typeof parsed.suggested_difficulty === 'number' ? parsed.suggested_difficulty : 3
+  diff = Math.min(5, Math.max(1, diff))
+  let photoUrl: string | null = null
+  if (typeof parsed.photo_url === 'string' && parsed.photo_url.trim()) {
+    const p = parsed.photo_url.trim()
+    photoUrl = p.startsWith('//') ? `https:${p}` : p
+  }
+  const extract = typeof parsed.extract === 'string' && parsed.extract.trim() ? parsed.extract : null
+  const wikiUrl = typeof parsed.wikipedia_url === 'string' && parsed.wikipedia_url.trim() ? parsed.wikipedia_url : null
+  const qualityScore = typeof parsed.parse_quality_score === 'number' ? Math.round(parsed.parse_quality_score) : null
+  const warningsJson = Array.isArray(parsed.parse_warnings)
+    ? JSON.stringify(parsed.parse_warnings.filter((w): w is string => typeof w === 'string'))
+    : null
+  const result = db.prepare(`
+    INSERT INTO wiki_persons (name, name_aliases, person_type, wikipedia_slug, infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty, parse_quality_score, parse_warnings)
+    VALUES (?, '[]', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    String(parsed.name).trim(),
+    String(parsed.person_type),
+    wikipediaSlug,
+    safeInfobox,
+    safeHintSchedule,
+    photoUrl,
+    extract,
+    wikiUrl,
+    diff,
+    qualityScore,
+    warningsJson,
+  )
+  const newId = Number(result.lastInsertRowid)
+  logAuditEvent('wiki_person_created', { id: newId, name: parsed.name, from_prefetch_pool: fromPoolId ?? null })
+  return { status: 'created', id: newId, name: String(parsed.name).trim(), slug: wikipediaSlug }
+}
+
 // POST /api/admin/wiki-prefetch-pool/:id/import-wiki-person — créer une fiche `wiki_persons` à partir du JSON ready
 adminRouter.post('/wiki-prefetch-pool/:id/import-wiki-person', strictAdminLimiter, (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id, 10)
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid pool entry id.' }); return }
-    const row = db.prepare<[number], {
-      status: string
-      payload_json: string | null
-      resolved_slug: string | null
-      source_slug: string
-    }>(
+    const row = db.prepare<[number], { status: string } & WikiPoolImportRow>(
       `SELECT status, payload_json, resolved_slug, source_slug FROM wiki_prefetch_pool WHERE id = ?`
     ).get(id)
     if (!row) { res.status(404).json({ error: 'Pool entry not found.' }); return }
@@ -4148,69 +4313,81 @@ adminRouter.post('/wiki-prefetch-pool/:id/import-wiki-person', strictAdminLimite
       res.status(400).json({ error: 'Pool entry has no ready payload.' })
       return
     }
-    let parsed: WikiFetchPayloadForAdminPreview & { resolved_slug?: string; canonical_wikipedia_slug?: string }
-    try {
-      parsed = JSON.parse(row.payload_json) as typeof parsed
-    } catch {
-      res.status(500).json({ error: 'Invalid payload JSON in pool entry.' })
-      return
-    }
-    if (!parsed.name || typeof parsed.person_type !== 'string') {
-      res.status(400).json({ error: 'Payload missing name or person_type.' })
-      return
-    }
-    const wikipediaSlug =
-      (row.resolved_slug && row.resolved_slug.trim())
-      || (typeof parsed.resolved_slug === 'string' && parsed.resolved_slug.trim())
-      || (typeof parsed.canonical_wikipedia_slug === 'string' && parsed.canonical_wikipedia_slug.trim())
-      || row.source_slug.trim()
-    if (!wikipediaSlug) {
-      res.status(400).json({ error: 'Could not determine wikipedia_slug.' })
-      return
-    }
-    const dup = db.prepare<[string], { id: number }>(`SELECT id FROM wiki_persons WHERE wikipedia_slug = ?`).get(wikipediaSlug)
-    if (dup) {
+    const outcome = importWikiPersonFromPoolRow(row, id)
+    if (outcome.status === 'duplicate') {
       res.status(409).json({
-        error: `Une fiche existe déjà pour le slug « ${wikipediaSlug} ».`,
-        existingWikiPersonId: dup.id,
+        error: `Une fiche existe déjà pour le slug « ${outcome.slug} ».`,
+        existingWikiPersonId: outcome.existingId,
       })
       return
     }
-    const infoboxMerged = parseInfoboxRecord(parsed.infobox_data)
-    if (typeof parsed.parse_quality_score === 'number') {
-      infoboxMerged.parse_quality_score = parsed.parse_quality_score
+    if (outcome.status === 'error') {
+      res.status(400).json({ error: outcome.message })
+      return
     }
-    if (Array.isArray(parsed.parse_warnings)) {
-      infoboxMerged.parse_warnings = parsed.parse_warnings.filter((w): w is string => typeof w === 'string')
+    res.status(201).json({ id: outcome.id })
+  } catch (err) { next(err) }
+})
+
+// POST /api/admin/wiki-prefetch-pool/import-batch — importe en masse les entrées ready (option minScore, category, limit)
+adminRouter.post('/wiki-prefetch-pool/import-batch', strictAdminLimiter, (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const body = (req.body ?? {}) as { lang?: unknown; minFame?: unknown; minScore?: unknown; category?: unknown; limit?: unknown }
+    const lang = sanitizeLang(body.lang)
+    const minFame = sanitizeMinFame(body.minFame)
+    const minScoreRaw = parseInt(String(body.minScore ?? ''), 10)
+    const minScore = Number.isFinite(minScoreRaw) ? Math.max(0, Math.min(100, minScoreRaw)) : null
+    const category = isWikiCategory(body.category) ? body.category : null
+    const limitRaw = parseInt(String(body.limit ?? '100'), 10)
+    const limit = Math.max(1, Math.min(500, Number.isFinite(limitRaw) ? limitRaw : 100))
+    const now = Date.now()
+    const slugExpr = wikiPrefetchPoolEffectiveSlugSql('p')
+
+    const rows = db.prepare<[string, number, number], WikiPoolImportRow & { id: number }>(
+      `SELECT p.id, p.payload_json, p.resolved_slug, p.source_slug
+       FROM wiki_prefetch_pool p
+       WHERE p.lang = ? AND p.min_fame = ? AND p.status = 'ready' AND p.expires_at > ?
+         AND NOT EXISTS (SELECT 1 FROM wiki_persons wp WHERE wp.wikipedia_slug = (${slugExpr}))
+       ORDER BY p.updated_at ASC`
+    ).all(lang, minFame, now)
+
+    let created = 0, skipped = 0, failed = 0
+    const createdIds: number[] = []
+    for (const row of rows) {
+      if (created >= limit) break
+      let payloadScore: number | null = null
+      let payloadType: string | null = null
+      try {
+        const p = row.payload_json ? JSON.parse(row.payload_json) as Record<string, unknown> : {}
+        payloadScore = typeof p.parse_quality_score === 'number' ? p.parse_quality_score : null
+        payloadType = typeof p.person_type === 'string' ? p.person_type : null
+      } catch { /* ignore */ }
+      if (minScore != null && (payloadScore == null || payloadScore < minScore)) { skipped += 1; continue }
+      if (category && payloadType !== category) { skipped += 1; continue }
+      const outcome = importWikiPersonFromPoolRow(row, row.id)
+      if (outcome.status === 'created') { created += 1; createdIds.push(outcome.id) }
+      else if (outcome.status === 'duplicate') skipped += 1
+      else failed += 1
     }
-    const safeInfobox = normalizeWikiPersonInfoboxForStore(String(parsed.person_type), infoboxMerged)
-    const safeHintSchedule = normalizeWikiHintSchedule(parsed.hint_schedule, parsed.person_type)
-    let diff = typeof parsed.suggested_difficulty === 'number' ? parsed.suggested_difficulty : 3
-    diff = Math.min(5, Math.max(1, diff))
-    let photoUrl: string | null = null
-    if (typeof parsed.photo_url === 'string' && parsed.photo_url.trim()) {
-      const p = parsed.photo_url.trim()
-      photoUrl = p.startsWith('//') ? `https:${p}` : p
+    res.json({ ok: true, created, skipped, failed, createdIds })
+  } catch (err) { next(err) }
+})
+
+// DELETE /api/admin/wiki-prefetch-pool — vide entièrement le pool de préchargement.
+// Ne touche PAS aux fiches `wiki_persons`. Efface aussi le cache SPARQL pour forcer une
+// régénération fraîche (utile après un changement de parser). Le worker reremplit ensuite.
+adminRouter.delete('/wiki-prefetch-pool', strictAdminLimiter, (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const clearCache = (req.query.clearCache ?? 'true') !== 'false'
+    const poolCount = (db.prepare(`SELECT COUNT(*) AS n FROM wiki_prefetch_pool`).get() as { n: number }).n
+    db.prepare(`DELETE FROM wiki_prefetch_pool`).run()
+    let cacheCount = 0
+    if (clearCache) {
+      cacheCount = (db.prepare(`SELECT COUNT(*) AS n FROM sparql_cache`).get() as { n: number }).n
+      db.prepare(`DELETE FROM sparql_cache`).run()
     }
-    const extract = typeof parsed.extract === 'string' && parsed.extract.trim() ? parsed.extract : null
-    const wikiUrl = typeof parsed.wikipedia_url === 'string' && parsed.wikipedia_url.trim() ? parsed.wikipedia_url : null
-    const result = db.prepare(`
-      INSERT INTO wiki_persons (name, name_aliases, person_type, wikipedia_slug, infobox_data, hint_schedule, photo_url, extract, wikipedia_url, difficulty)
-      VALUES (?, '[]', ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      String(parsed.name).trim(),
-      String(parsed.person_type),
-      wikipediaSlug,
-      safeInfobox,
-      safeHintSchedule,
-      photoUrl,
-      extract,
-      wikiUrl,
-      diff,
-    )
-    const newId = Number(result.lastInsertRowid)
-    logAuditEvent('wiki_person_created', { id: newId, name: parsed.name, from_prefetch_pool: id })
-    res.status(201).json({ id: newId })
+    logAuditEvent('wiki_prefetch_pool_cleared', { poolDeleted: poolCount, cacheDeleted: cacheCount })
+    res.json({ ok: true, poolDeleted: poolCount, cacheDeleted: cacheCount })
   } catch (err) { next(err) }
 })
 
@@ -4326,18 +4503,37 @@ const PREFETCH_SPARQL_LIMIT = process.env.WIKI_PREFETCH_SPARQL_LIMIT?.trim()
   ? clampInt(parseInt(process.env.WIKI_PREFETCH_SPARQL_LIMIT, 10), 50, 800)
   : clampInt(Math.max(100, PREFETCH_TARGET_READY), 100, 800)
 
-async function fetchSparqlSlugs(lang: string, minFame: number): Promise<string[]> {
-  const cacheKey = `${lang}:${minFame}:lim${PREFETCH_SPARQL_LIMIT}`
+// Catégories de métier → classe Wikidata (occupation P106, élargie aux sous-classes
+// via P279*). Permet un tirage ciblé garantissant le person_type du jeu.
+const WIKI_CATEGORY_QIDS: Record<string, string> = {
+  politician: 'Q82955',      // homme/femme politique
+  sportsperson: 'Q2066131',  // sportif
+  actor: 'Q33999',           // acteur
+  artist: 'Q639669',         // musicien
+  scientist: 'Q901',         // scientifique
+  writer: 'Q36180',          // écrivain
+  entrepreneur: 'Q131524',   // entrepreneur
+}
+
+export function isWikiCategory(raw: unknown): raw is keyof typeof WIKI_CATEGORY_QIDS {
+  return typeof raw === 'string' && raw in WIKI_CATEGORY_QIDS
+}
+
+async function fetchSparqlSlugs(lang: string, minFame: number, category?: string): Promise<string[]> {
+  const qid = category && isWikiCategory(category) ? WIKI_CATEGORY_QIDS[category] : null
+  const cacheKey = `${lang}:${minFame}:lim${PREFETCH_SPARQL_LIMIT}:${qid ?? 'all'}`
   const cached = db.prepare<[string], { slugs_json: string; expires_at: number }>(
     `SELECT slugs_json, expires_at FROM sparql_cache WHERE key = ?`
   ).get(cacheKey)
   if (cached && Date.now() < cached.expires_at) return JSON.parse(cached.slugs_json) as string[]
 
+  const occupationClause = qid ? `?person wdt:P106/wdt:P279* wd:${qid} .` : ''
   const sparql = `
     SELECT ?title WHERE {
       ?person wdt:P31 wd:Q5 ;
               wdt:P569 ?birthDate ;
               wikibase:sitelinks ?n .
+      ${occupationClause}
       FILTER(YEAR(?birthDate) >= 1900 && ?n >= ${minFame})
       ?art schema:about ?person ;
            schema:isPartOf <https://${lang}.wikipedia.org/> ;
@@ -4555,9 +4751,10 @@ adminRouter.get('/wiki-persons/random', async (req: Request, res: Response, next
   try {
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'fr'
     const minFame = Math.max(5, Math.min(100, parseInt(String(req.query.minFame ?? '30'), 10) || 30))
-    const slugs = await fetchSparqlSlugs(lang, minFame)
+    const category = isWikiCategory(req.query.category) ? req.query.category : undefined
+    const slugs = await fetchSparqlSlugs(lang, minFame, category)
     if (slugs.length === 0) {
-      res.status(404).json({ error: 'Aucun résultat Wikidata. Essaie de réduire minFame.' })
+      res.status(404).json({ error: 'Aucun résultat Wikidata. Essaie de réduire minFame ou la catégorie.' })
       return
     }
     // Shuffle before sending
@@ -4569,6 +4766,115 @@ adminRouter.get('/wiki-persons/random', async (req: Request, res: Response, next
   } catch (err) {
     next(err)
   }
+})
+
+// ─── Génération de masse ciblée par métier ───────────────────────────────────
+
+const generateWorkers = new Set<string>()
+
+/** Traite en arrière-plan une liste de slugs : fetch Wikipédia + écriture pool (ready/failed). Détaché (non attendu). */
+async function processQueuedSlugs(lang: string, minFame: number, slugs: string[]): Promise<void> {
+  const key = `${lang}:${minFame}`
+  if (generateWorkers.has(key)) return
+  generateWorkers.add(key)
+  try {
+    const { fetchWikipediaData } = await import('../lib/wikipedia.js')
+    const withTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+      let timer: NodeJS.Timeout | null = null
+      try {
+        return await Promise.race([
+          promise,
+          new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Timeout prefetch')), ms) }),
+        ])
+      } finally {
+        if (timer) clearTimeout(timer)
+      }
+    }
+    for (const slug of slugs) {
+      try {
+        const data = await withTimeout(fetchWikipediaData(slug, lang), PREFETCH_FETCH_TIMEOUT_MS)
+        db.prepare<[string, string, number, string, number, string], void>(
+          `UPDATE wiki_prefetch_pool
+           SET status = 'ready', resolved_slug = ?, payload_json = ?, error_message = NULL, expires_at = ?,
+               updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+           WHERE lang = ? AND min_fame = ? AND source_slug = ?`
+        ).run(data.canonical_wikipedia_slug ?? slug, JSON.stringify(data), Date.now() + PREFETCH_READY_TTL_MS, lang, minFame, slug)
+      } catch (err) {
+        const message = err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300)
+        db.prepare<[string, number, string, number, string], void>(
+          `UPDATE wiki_prefetch_pool
+           SET status = 'failed', payload_json = NULL, error_message = ?, expires_at = ?,
+               updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+           WHERE lang = ? AND min_fame = ? AND source_slug = ?`
+        ).run(message, Date.now() + PREFETCH_FAILED_TTL_MS, lang, minFame, slug)
+      }
+    }
+  } finally {
+    generateWorkers.delete(key)
+  }
+}
+
+// POST /api/admin/wiki-prefetch/generate — remplit le pool par catégories de métier (Wikidata ciblé)
+adminRouter.post('/wiki-prefetch/generate', strictAdminLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const body = (req.body ?? {}) as { lang?: unknown; minFame?: unknown; categories?: unknown; countPerCategory?: unknown }
+    const lang = sanitizeLang(body.lang)
+    const minFame = sanitizeMinFame(body.minFame)
+    const categories = Array.isArray(body.categories)
+      ? body.categories.filter((c): c is string => isWikiCategory(c))
+      : []
+    if (categories.length === 0) {
+      res.status(400).json({ error: 'Aucune catégorie valide. Catégories: politician, sportsperson, actor, artist, scientist, writer, entrepreneur.' })
+      return
+    }
+    const cpcRaw = parseInt(String(body.countPerCategory ?? '15'), 10)
+    const countPerCategory = Math.max(1, Math.min(100, Number.isFinite(cpcRaw) ? cpcRaw : 15))
+    const now = Date.now()
+
+    // slugs déjà en cours / prêts ou déjà importés → à éviter
+    const busy = new Set(
+      db.prepare<[string, number, number], { source_slug: string }>(
+        `SELECT source_slug FROM wiki_prefetch_pool WHERE lang = ? AND min_fame = ? AND status IN ('processing','ready') AND expires_at > ?`
+      ).all(lang, minFame, now).map((r) => r.source_slug)
+    )
+
+    const selected: string[] = []
+    const perCategory: Record<string, number> = {}
+    for (const category of categories) {
+      const slugs = await fetchSparqlSlugs(lang, minFame, category)
+      for (let i = slugs.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[slugs[i], slugs[j]] = [slugs[j], slugs[i]]
+      }
+      let taken = 0
+      for (const slug of slugs) {
+        if (taken >= countPerCategory) break
+        if (busy.has(slug)) continue
+        const exists = db.prepare<[string], { id: number }>(`SELECT id FROM wiki_persons WHERE wikipedia_slug = ?`).get(slug)
+        if (exists) continue
+        busy.add(slug)
+        selected.push(slug)
+        taken += 1
+      }
+      perCategory[category] = taken
+    }
+
+    if (selected.length === 0) {
+      res.status(404).json({ error: 'Rien à générer (déjà en pool ou importé). Essaie une autre catégorie ou minFame.' })
+      return
+    }
+
+    // Insère des entrées 'processing' immédiatement (visibles dans le pool), puis fetch en arrière-plan
+    const insert = db.prepare<[string, number, string, number], void>(
+      `INSERT OR REPLACE INTO wiki_prefetch_pool (lang, min_fame, source_slug, status, expires_at, updated_at)
+       VALUES (?, ?, ?, 'processing', ?, strftime('%Y-%m-%dT%H:%M:%SZ','now'))`
+    )
+    for (const slug of selected) insert.run(lang, minFame, slug, now + PREFETCH_FAILED_TTL_MS)
+
+    void processQueuedSlugs(lang, minFame, selected)
+    logAuditEvent('wiki_prefetch_generate', { lang, minFame, categories, queued: selected.length })
+    res.json({ ok: true, queued: selected.length, perCategory, lang, minFame })
+  } catch (err) { next(err) }
 })
 
 // GET /api/admin/wiki-persons/random-prefetched?lang=fr&minFame=30
@@ -4668,6 +4974,8 @@ adminRouter.get('/wiki-persons/prefetch-pool', (req: Request, res: Response, nex
     const lang = sanitizeLang(req.query.lang)
     const minFame = sanitizeMinFame(req.query.minFame)
     const filterMode = sanitizePrefetchPoolHasWikiPerson(req.query.hasWikiPerson)
+    const minScoreRaw = parseInt(String(req.query.minScore ?? ''), 10)
+    const minScore = Number.isFinite(minScoreRaw) ? Math.max(0, Math.min(100, minScoreRaw)) : null
     const pageRaw = parseInt(String(req.query.page ?? '1'), 10)
     const page = Math.max(1, Number.isFinite(pageRaw) ? pageRaw : 1)
     const pageSizeRaw = parseInt(String(req.query.pageSize ?? '25'), 10)
@@ -4680,6 +4988,10 @@ adminRouter.get('/wiki-persons/prefetch-pool', (req: Request, res: Response, nex
       filterClause = ` AND EXISTS (SELECT 1 FROM wiki_persons wp WHERE wp.wikipedia_slug = (${slugExpr}))`
     } else if (filterMode === 'no') {
       filterClause = ` AND NOT EXISTS (SELECT 1 FROM wiki_persons wp WHERE wp.wikipedia_slug = (${slugExpr}))`
+    }
+    if (minScore != null) {
+      // n'affecte que les fiches prêtes (payload présent) ; exclut les scores manquants
+      filterClause += ` AND CAST(json_extract(p.payload_json, '$.parse_quality_score') AS INTEGER) >= ${minScore}`
     }
 
     const stats = readWikiPrefetchStats(lang, minFame)
@@ -4730,6 +5042,13 @@ adminRouter.get('/wiki-persons/prefetch-pool', (req: Request, res: Response, nex
         }
       }
       const wikiPersonId = row.wiki_person_id != null ? Number(row.wiki_person_id) : null
+      const score = payload && typeof payload.parse_quality_score === 'number'
+        ? Math.round(payload.parse_quality_score as number)
+        : null
+      const warnings = payload && Array.isArray(payload.parse_warnings)
+        ? (payload.parse_warnings as unknown[]).filter((w): w is string => typeof w === 'string')
+        : []
+      const personType = payload && typeof payload.person_type === 'string' ? payload.person_type : null
       return {
         id: row.id,
         source_slug: row.source_slug,
@@ -4739,6 +5058,9 @@ adminRouter.get('/wiki-persons/prefetch-pool', (req: Request, res: Response, nex
         expires_at: row.expires_at,
         updated_at: row.updated_at,
         payload,
+        parse_quality_score: score,
+        parse_warnings: warnings,
+        person_type: personType,
         has_wiki_person: wikiPersonId != null && wikiPersonId > 0,
         wiki_person_id: wikiPersonId,
       }
@@ -4747,6 +5069,7 @@ adminRouter.get('/wiki-persons/prefetch-pool', (req: Request, res: Response, nex
     res.json({
       lang,
       minFame,
+      minScore,
       stats,
       page: pageClamped,
       pageSize,

@@ -81,6 +81,8 @@ CREATE TABLE IF NOT EXISTS wiki_persons (
   wikipedia_url   TEXT,
   difficulty      INTEGER NOT NULL DEFAULT 3 CHECK (difficulty BETWEEN 1 AND 5),
   is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+  parse_quality_score INTEGER,
+  parse_warnings  TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );

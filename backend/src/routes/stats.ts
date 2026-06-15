@@ -8,7 +8,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
-import { getGlobalStats, getCommunityStatsForChallengeId } from '../services/challenge.service.js';
+import { getGlobalStats, getCommunityStatsForChallengeId, getLandingStats } from '../services/challenge.service.js';
 
 export const statsRouter = Router();
 
@@ -39,6 +39,18 @@ statsRouter.get(
   (_req: Request, res: Response, next: NextFunction) => {
     try {
       res.json(getGlobalStats());
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+statsRouter.get(
+  '/landing',
+  statsLimiter,
+  (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(getLandingStats());
     } catch (err) {
       next(err);
     }

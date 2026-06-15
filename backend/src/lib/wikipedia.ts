@@ -119,6 +119,16 @@ interface WikidataFallback {
   languages: string[]
   fields_of_work: string[]
   p39_roles: WikidataP39Role[]
+  /** P641 — sport pratiqué (label résolu). */
+  sport: string | null
+  /** P413 — poste / position de jeu (label résolu). */
+  position: string | null
+  /** P54 — clubs/équipes (carrière), avec années + stats via qualifiers. */
+  clubs: WikiClub[]
+  /** Sélection nationale déduite des P54 « équipe nationale ». */
+  national_team: { name: string; caps: number | null; goals: number | null } | null
+  /** P166 — distinctions / palmarès (labels résolus), pour sports individuels & autres. */
+  awards: string[]
   photo_url: string | null
   sitelinks_count: number
 }
@@ -132,7 +142,7 @@ const wikiCache = new LRUCache<string, WikiFetchResult>({
 })
 const WIKI_MIN_INTERVAL = 800 // serialized Wikipedia calls (~75 req/min max)
 const WIKIDATA_MIN_INTERVAL = 200 // serialized Wikidata calls (~300 req/min max)
-const OPTIONAL_ENRICH_TIMEOUT_MS = 8_000
+const OPTIONAL_ENRICH_TIMEOUT_MS = 20_000 // grosses entités Wikidata (ex. Messi/Mbappé) dépassent 8s
 
 type ThrottleState = {
   queue: Array<{
@@ -258,12 +268,21 @@ async function throttledFetch(url: string, init?: RequestInit): Promise<Response
 }
 
 /** Wikidata calls — serialized throttle to avoid burst rate-limiting. */
-async function wikidataFetch(url: string): Promise<Response> {
+async function wikidataFetch(url: string, init: RequestInit = {}): Promise<Response> {
   return runThrottled(
     wikidataThrottle,
     WIKIDATA_MIN_INTERVAL,
-    () => fetchWithRetry(url, {}, 2)
+    () => fetchWithRetry(url, init, 2)
   )
+}
+
+// Requêtes SPARQL (chemins de propriété P279*) : plus lentes que l'API entités → timeout dédié.
+const SPARQL_TIMEOUT_MS = 15_000
+function sparqlFetch(url: string): Promise<Response> {
+  return wikidataFetch(url, {
+    signal: AbortSignal.timeout(SPARQL_TIMEOUT_MS),
+    headers: { Accept: 'application/sparql-results+json' },
+  })
 }
 
 /** Strip wikilinks: [[Target|Label]] → Label, [[Target]] → Target */
@@ -557,14 +576,14 @@ function detectPersonTypeFromSummary(description: string | undefined): WikiPerso
   const d = (description ?? '').toLowerCase()
   if (!d) return null
   if (/(activiste|militant|militante|écologiste|ecologiste|climate activist|environmental activist|human rights activist)/.test(d)) return 'generic'
-  if (/(footballeu[rs]e?|joueu[rs]e?|athlète|sportif|sportive|tennis|basket|rugby|cycliste|nageuse?|handballeu[rs]e?|volleyballer|boxeu[rs]e?)/.test(d)) return 'sportsperson'
-  if (/(acteu[rs]|actrice|réalisateu[rs]e?|comédien|comédienne|filmmaker)/.test(d)) return 'actor'
-  if (/(chanteu[rs]e?|artiste|musicien|musicienne|rappeu[rs]e?|compositeu[rs]e?)/.test(d)) return 'artist'
-  if (/(scientifique|physicien|chimiste|mathématicien|biologiste|astronome|informaticien|ingénieur)/.test(d)) return 'scientist'
-  if (/(entrepreneur|homme d'affaires|femme d'affaires|businessman|businesswoman|investisseur|chef d'entreprise|dirigeant)/.test(d)) return 'entrepreneur'
-  if (/(écrivain|écrivaine|romancier|romancière|poète|poétesse|auteur|auteure|dramaturge|journaliste)/.test(d)) return 'writer'
-  if (/(empereur|impératrice|roi|reine|monarque|personnalité historique|duc|duchesse|prince|princesse|sultan|pape|pharaon)/.test(d)) return 'historical_figure'
-  if (/(homme politique|femme politique|président|présidente|premier ministre|ministre|député|sénateur|maire|gouverneur|chancelier)/.test(d)) return 'politician'
+  if (/(footballeu[rs]e?|joueu[rs]e?|athlète|sportif|sportive|tennis|basket|rugby|cycliste|nageuse?|handballeu[rs]e?|volleyballer|boxeu[rs]e?|footballer|football player|basketball|baseball|athlete|cyclist|swimmer|racing driver|formula one|gymnast|skier|skater|rower|wrestler|sprinter)/.test(d)) return 'sportsperson'
+  if (/(acteu[rs]|actrice|réalisateu[rs]e?|comédien|comédienne|filmmaker|\bactor\b|actress|film director|screen actor)/.test(d)) return 'actor'
+  if (/(chanteu[rs]e?|artiste|musicien|musicienne|rappeu[rs]e?|compositeu[rs]e?|singer|rapper|musician|composer|songwriter|guitarist|pianist|\bdj\b|record producer)/.test(d)) return 'artist'
+  if (/(scientifique|physicien|chimiste|mathématicien|biologiste|astronome|informaticien|ingénieur|scientist|physicist|chemist|mathematician|biologist|astronomer|researcher|engineer|computer scientist|economist|psychologist)/.test(d)) return 'scientist'
+  if (/(entrepreneur|homme d'affaires|femme d'affaires|businessman|businesswoman|investisseur|chef d'entreprise|dirigeant|business magnate|\bceo\b|co-founder|\bfounder\b|investor|industrialist)/.test(d)) return 'entrepreneur'
+  if (/(écrivain|écrivaine|romancier|romancière|poète|poétesse|auteur|auteure|dramaturge|journaliste|\bwriter\b|novelist|\bauthor\b|\bpoet\b|playwright|screenwriter|journalist|essayist)/.test(d)) return 'writer'
+  if (/(empereur|impératrice|roi|reine|monarque|personnalité historique|duc|duchesse|prince|princesse|sultan|pape|pharaon|\bemperor\b|\bempress\b|\bking\b|\bqueen\b|\bmonarch\b|\bpope\b|\bpharaoh\b|\bduke\b|\bduchess\b|nobleman|noblewoman)/.test(d)) return 'historical_figure'
+  if (/(homme politique|femme politique|président|présidente|premier ministre|ministre|député|sénateur|maire|gouverneur|chancelier|politician|\bpresident\b|prime minister|minister|senator|congressman|congresswoman|governor|chancellor|statesman|diplomat)/.test(d)) return 'politician'
   return null
 }
 
@@ -1014,7 +1033,11 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
       goals: ntGoals ? parseInt(stripLinks(ntGoals).replace(/[^\d]/g, '').trim(), 10) || null : null,
     }
   }
-  const national_team = findNationalTeam()
+  // Rejette les noms de sélection invalides (ex. « 2017 » issu d'un mauvais découpage infobox).
+  const national_team_raw = findNationalTeam()
+  const national_team = national_team_raw && /[a-zà-ÿ]{3,}/i.test(national_team_raw.name) && !/[{}]/.test(national_team_raw.name)
+    ? national_team_raw
+    : null
 
   const birthYear = extractYear(readInfoboxField(fields, ['birth_date', 'date de naissance', 'naissance']))
 
@@ -1027,18 +1050,27 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
   ).trim()
   const isTennisProfile = /tennis/i.test(sport)
 
+  // Tokens de templates wikitext qui parasitent les noms de clubs quand le découpage
+  // ligne-à-ligne casse un template multi-lignes ({{nobr|1=…}}, {{Abréviation discrète|…}}).
+  const TEMPLATE_JUNK_RE = /^(nobr|abr[ée]viation discr[èe]te|0|trois colonnes|deux colonnes|date|nowrap|formatnum|unité|unite|lien|ill)\b/i
   const normalizeClubNames = (arr: WikiClub[]) =>
     arr
       .map((club) => ({
         ...club,
         name: normalizeValue(
           club.name
+            // résidus de templates : {{tmpl|1=  /  fragments ouvrants/fermants non équilibrés
+            .replace(/\{\{[^}]*$/g, '')
+            .replace(/^[^{]*\}\}/g, '')
+            .replace(/[{}]/g, '')
+            .replace(/\|\s*\d+\s*=\s*/g, ' ')
             .replace(/^[|:•\s]+/, '')
             .replace(/\bFichier:[^|,\n]+/gi, '')
             .replace(/\s{2,}/g, ' ')
         ) ?? '',
       }))
-      .filter((club) => club.name.length > 1)
+      // rejette les fragments de template et les noms trop courts / purement numériques
+      .filter((club) => club.name.length > 1 && !TEMPLATE_JUNK_RE.test(club.name) && !/^\d+$/.test(club.name))
 
   const cleanedClubs = normalizeClubNames(dedupedClubs)
   const cleanedYouth = normalizeClubNames(dedupedYouth)
@@ -1330,7 +1362,8 @@ async function fetchWikidataFallback(entityId: string, lang: string): Promise<Wi
 
   const occupationIds = readEntityIds('P106')
   const nationalityIds = readEntityIds('P27')
-  const employerIds = readEntityIds('P108').slice(0, 12)
+  // P108 (employeur) + P1037 (dirige) + P1830 (propriétaire de) → entreprises liées (entrepreneurs).
+  const employerIds = [...new Set([...readEntityIds('P108'), ...readEntityIds('P1037'), ...readEntityIds('P1830')])].slice(0, 14)
   const partyIds = readEntityIds('P102').slice(0, 6)
   /** Plusieurs P800 (albums, titres…) pour hydrater highlights artistes. */
   const notableWorkIds = readEntityIds('P800').slice(0, 14)
@@ -1374,6 +1407,41 @@ async function fetchWikidataFallback(entityId: string, lang: string): Promise<Wi
 
   const p39Claims = readP39Claims()
 
+  /** P54 — équipes de sport, avec qualifiers années (P580/P582) + stats (P1350 matchs, P1351 buts). */
+  const readP54Clubs = (): Array<{ teamId: string; start_year: number | null; end_year: number | null; appearances: number | null; goals: number | null }> => {
+    const raw = claims['P54'] as Array<{
+      mainsnak?: { datavalue?: { value?: { id?: string } } }
+      qualifiers?: Record<string, unknown[]>
+    }> | undefined
+    if (!raw || !Array.isArray(raw)) return []
+    const qualifierInt = (quals: Record<string, unknown[]> | undefined, prop: string): number | null => {
+      const snak = quals?.[prop]?.[0] as { datavalue?: { value?: { amount?: string } | string } } | undefined
+      const val = snak?.datavalue?.value
+      const amount = typeof val === 'object' && val ? (val as { amount?: string }).amount : (val as string | undefined)
+      if (amount == null) return null
+      const n = parseInt(String(amount).replace('+', ''), 10)
+      return Number.isFinite(n) ? n : null
+    }
+    const out: Array<{ teamId: string; start_year: number | null; end_year: number | null; appearances: number | null; goals: number | null }> = []
+    for (const c of raw) {
+      const teamId = c.mainsnak?.datavalue?.value?.id
+      if (!teamId) continue
+      out.push({
+        teamId,
+        start_year: qualifierTimeYear(c.qualifiers, 'P580'),
+        end_year: qualifierTimeYear(c.qualifiers, 'P582'),
+        appearances: qualifierInt(c.qualifiers, 'P1350'),
+        goals: qualifierInt(c.qualifiers, 'P1351'),
+      })
+    }
+    return out.slice(0, 25)
+  }
+  const p54Claims = readP54Clubs()
+  const sportIds = readEntityIds('P641').slice(0, 3)
+  const positionIds = readEntityIds('P413').slice(0, 3)
+  const awardIds = readEntityIds('P166').slice(0, 12)
+  const p54TeamIds = p54Claims.map((c) => c.teamId)
+
   /** Orgs liées au mandat (P39) — ex. PDG + P2389 → LVMH ; souvent absent alors que P108 (employer) est vide. */
   const readPositionHeldOrganizationIds = (): string[] => {
     const raw = claims['P39'] as Array<{ qualifiers?: Record<string, unknown[]> }> | undefined
@@ -1401,6 +1469,7 @@ async function fetchWikidataFallback(entityId: string, lang: string): Promise<Wi
     ...occupationIds, ...nationalityIds, ...notableWorkIds,
     ...languageIds, ...fieldIds, ...p39PositionIds, ...employerIds, ...positionHeldOrgIds,
     ...partyIds, ...recordLabelIds, ...memberOfIds,
+    ...sportIds, ...positionIds, ...awardIds, ...p54TeamIds,
   ]
   const uniqueIds = [...new Set(allIds)]
 
@@ -1440,6 +1509,30 @@ async function fetchWikidataFallback(entityId: string, lang: string): Promise<Wi
     }))
     .filter((r) => r.title.length > 0)
 
+  // ── Sport (P641/P413/P54/P166) ──────────────────────────────────────────────
+  const sportLabel = normalizeValue(resolve(sportIds)[0] ?? null)
+  const positionLabel = normalizeValue(resolve(positionIds)[0] ?? null)
+  const awardLabels = [...new Set(resolve(awardIds))].filter(Boolean)
+  const p54Resolved = p54Claims
+    .map((c) => ({ name: labelsMap[c.teamId] ?? '', start_year: c.start_year, end_year: c.end_year, appearances: c.appearances, goals: c.goals }))
+    .filter((c) => c.name.length > 0)
+  // dédup par nom normalisé (les QID distincts au même nom sont rares ; on garde l'entrée la plus complète)
+  const seenClub = new Map<string, WikiClub>()
+  for (const c of p54Resolved) {
+    const key = c.name.toLowerCase()
+    const prev = seenClub.get(key)
+    if (!prev || (c.appearances != null && prev.appearances == null)) seenClub.set(key, c)
+  }
+  const allWdClubs = [...seenClub.values()]
+  const wdNationalTeams = allWdClubs.filter((c) => isNationalTeamName(c.name))
+  const wdClubs = allWdClubs.filter((c) => !isNationalTeamName(c.name))
+  const wdNationalTeam = wdNationalTeams.length > 0
+    ? (() => {
+        const best = wdNationalTeams.reduce((a, b) => ((b.appearances ?? 0) > (a.appearances ?? 0) ? b : a))
+        return { name: best.name, caps: best.appearances, goals: best.goals }
+      })()
+    : null
+
   return {
     birth_year: birthYear,
     nationality: normalizeValue(nationalityLabels[0] ?? null),
@@ -1454,8 +1547,85 @@ async function fetchWikidataFallback(entityId: string, lang: string): Promise<Wi
     languages: languageLabels,
     fields_of_work: fieldLabels,
     p39_roles,
+    sport: sportLabel,
+    position: positionLabel,
+    clubs: wdClubs,
+    national_team: wdNationalTeam,
+    awards: awardLabels,
     photo_url: photoUrl,
     sitelinks_count,
+  }
+}
+
+/**
+ * Filmographie d'un acteur via SPARQL : œuvres dont il est membre de la distribution (P161),
+ * classées par notoriété (sitelinks) → les rôles emblématiques d'abord. Distingue films / séries.
+ */
+async function fetchWikidataFilmography(entityId: string, lang: string): Promise<{ films: string[]; series: string[] }> {
+  const sparql = `
+    SELECT ?workLabel ?sl ?cat WHERE {
+      { ?work wdt:P161 wd:${entityId} ; wikibase:sitelinks ?sl . ?work wdt:P31/wdt:P279* wd:Q11424 . BIND("film" AS ?cat) }
+      UNION
+      { ?work wdt:P161 wd:${entityId} ; wikibase:sitelinks ?sl . ?work wdt:P31/wdt:P279* wd:Q5398426 . BIND("series" AS ?cat) }
+      SERVICE wikibase:label { bd:serviceParam wikibase:language "${lang},en". }
+    } ORDER BY DESC(?sl) LIMIT 18`
+  const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(sparql)}&format=json`
+  try {
+    const res = await sparqlFetch(url)
+    if (!res.ok) return { films: [], series: [] }
+    const json = await safeJson<{ results?: { bindings?: Array<{ workLabel?: { value?: string }; cat?: { value?: string } }> } }>(res)
+    const films: string[] = []
+    const series: string[] = []
+    const seen = new Set<string>()
+    for (const b of json?.results?.bindings ?? []) {
+      const label = normalizeValue(b.workLabel?.value ?? null)
+      if (!label) continue
+      // ignore les QID non résolus (label = identifiant brut type "Q12345")
+      if (/^Q\d+$/.test(label)) continue
+      const key = label.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      if (b.cat?.value === 'series') series.push(label)
+      else films.push(label)
+    }
+    return { films, series }
+  } catch {
+    return { films: [], series: [] }
+  }
+}
+
+/**
+ * Discographie d'un artiste via SPARQL : albums dont la personne est l'interprète (P175),
+ * classés par notoriété (sitelinks) → les albums emblématiques d'abord. (Q482994 = album.)
+ */
+async function fetchWikidataDiscography(entityId: string, lang: string): Promise<string[]> {
+  // P31 direct sur les types d'album courants (VALUES) plutôt qu'un chemin transitif P279* :
+  // pour un artiste prolifique (ex. Beyoncé) le P279* prend 8–15s, le VALUES < 2s.
+  // Q482994 album · Q208569 studio album · Q209939 live album · Q20671381 album solo
+  const sparql = `
+    SELECT ?albumLabel ?sl WHERE {
+      VALUES ?type { wd:Q482994 wd:Q208569 wd:Q209939 wd:Q20671381 }
+      ?album wdt:P175 wd:${entityId} ; wdt:P31 ?type ; wikibase:sitelinks ?sl .
+      SERVICE wikibase:label { bd:serviceParam wikibase:language "${lang},en". }
+    } ORDER BY DESC(?sl) LIMIT 12`
+  const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(sparql)}&format=json`
+  try {
+    const res = await sparqlFetch(url)
+    if (!res.ok) return []
+    const json = await safeJson<{ results?: { bindings?: Array<{ albumLabel?: { value?: string } }> } }>(res)
+    const albums: string[] = []
+    const seen = new Set<string>()
+    for (const b of json?.results?.bindings ?? []) {
+      const label = normalizeValue(b.albumLabel?.value ?? null)
+      if (!label || /^Q\d+$/.test(label)) continue
+      const key = label.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      albums.push(label)
+    }
+    return albums
+  } catch {
+    return []
   }
 }
 
@@ -1477,17 +1647,69 @@ function inferTypeFromWikidataOccupations(occupations: string[]): WikiPersonType
   const lower = occupations.map((o) => o.toLowerCase())
   // historical_figure d'abord: empereur/monarque l'emporte sur tout (même si l'individu
   // est aussi rangé comme "militant" ou "personnalité politique" dans Wikidata).
+  // Override absolu : monarque / figure historique l'emporte sur tout.
   if (lower.some((o) => /(\bmonarch\b|\bmonarque\b|\bempereur\b|\bimp[ée]ratrice\b|\bemperor\b|\broi\b|\bking\b|\breine\b|\bqueen\b|\bnobility\b|\bdynasty\b|\bsultan\b|\bpope\b|\bpape\b|\bpharaoh\b|\bduke\b|\bduchess\b|\bsouverain\b)/.test(o))) return 'historical_figure'
+
+  // Beaucoup de célébrités cumulent des occupations Wikidata secondaires (un acteur tagué
+  // « compositeur », un chanteur tagué « acteur », un entrepreneur avec un cameo…). Une simple
+  // priorité au premier match se trompe (Tom Hanks → artist). On COMPTE les occupations par
+  // catégorie et on retient la dominante — l'identité réelle de la personne.
+  const CATEGORY_PATTERNS: Array<[WikiPersonType, RegExp]> = [
+    ['sportsperson', /(football|athl[èé]te|athletics|\btennis\b|basket|\bsport|joueu|\bplayer\b|coureu|nageu|rugby|cyclist|cyclis|swimmer|boxe|boxer|golfe|golfer|pilote (automobile|de course)|racing driver|formula one|race car|motorsport|skie|skater|patineu|rower|rameu|gymnast|wrestler|catcheu|handball|volley|hockey)/],
+    ['artist', /(singer|chanteu|musicien|musician|rappeu|rapper|composit|composer|auteur-composit|songwriter|guitarist|guitariste|pianist|pianiste|\bdj\b|disc jockey|danseu|dancer)/],
+    ['entrepreneur', /(entrepreneu|\bbusiness|monde des affaires|investisseu|investor|industriel|chef d'entreprise|magnate|\bceo\b|fondateu|founder|financ)/],
+    ['scientist', /(scientif|physicien|chimiste|chemist|math[ée]matic|mathematician|biolog|astronom|chercheu|researcher|ing[ée]nieu|engineer|economist|[ée]conomiste|psycholog)/],
+    ['writer', /(\b[ée]crivain|writer|\bauteu|author|poète|poet|romancier|novelist|nouvelliste|dramaturge|playwright|journalist|scénariste|screenwriter|essayist)/],
+    ['politician', /(politici|personnalité politique|\bpolitique\b|ministre|minister|président|president|député|deputy|sénateu|senator|maire|\bmayor\b|gouverneu|governor|chancel|diplomat|statesman)/],
+    ['actor', /(acteu|actrice|\bactor\b|actress|com[ée]dien|comedian|humoriste|réalisateu|filmmaker|film director|metteur en scène)/],
+  ]
+  let best: WikiPersonType | null = null
+  let bestCount = 0
+  for (const [type, re] of CATEGORY_PATTERNS) {
+    const count = lower.filter((o) => re.test(o)).length
+    if (count > bestCount) { bestCount = count; best = type }
+  }
+  if (best) return best
+  // En dernier recours : militant/activiste sans autre profession forte → generic.
   if (lower.some((o) => /(activist|activisme|militant|militante|environmentalist|écologiste|ecologiste|human rights)/.test(o))) return 'generic'
-  if (lower.some((o) => /(football|athl|tennis|basket|sport|joueur|player|coureur|nageur|rugby|cyclist|swimmer|boxer|golfer)/.test(o))) return 'sportsperson'
-  if (lower.some((o) => /(actor|actrice|acteur|actress|filmmaker|réalisateur|director|comedian|comédien)/.test(o))) return 'actor'
-  if (lower.some((o) => /(singer|artist|artiste|musician|musicien|rappeur|composer)/.test(o))) return 'artist'
-  if (lower.some((o) =>
-    /(scientist|scientifique|physicien|chimiste|mathématicien|mathematician|biologiste|astronomer|researcher|ingénieur|ingenieur|engineer)/.test(o))) return 'scientist'
-  if (lower.some((o) => /(entrepreneur|business|investor|industriel|chef d'entreprise)/.test(o))) return 'entrepreneur'
-  if (lower.some((o) => /(writer|écrivain|author|auteur|poet|poète|romancier|journalist)/.test(o))) return 'writer'
-  if (lower.some((o) => /(politician|politique|ministre|président|député|sénateur|mayor|governor|chancellor)/.test(o))) return 'politician'
   return null
+}
+
+/** Valeur wikitext « propre » : sans résidu de template/markup ni énumération de dates parasite. */
+function looksCleanField(value: string | null | undefined): boolean {
+  if (!value) return false
+  const v = value.trim()
+  if (v.length < 2) return false
+  // résidus de templates / markup ou dates/parenthèses multiples (nationalités à rallonge)
+  if (/[{}[\]]|''|--|\bd-\b|^[A-Z]{2,3}-d\b/.test(v)) return false
+  if ((v.match(/\(/g) ?? []).length >= 2) return false
+  if (/\d{4}/.test(v) && /[,;]/.test(v)) return false // « Allemande, (1879-1896)… »
+  return true
+}
+/** Préfère le wikitext seulement s'il est propre ; sinon Wikidata (souvent plus fiable). */
+function preferCleanWikitext(wikitext: string | null | undefined, wikidata: string | null | undefined): string | null {
+  const wt = normalizeValue(wikitext ?? null)
+  if (wt && looksCleanField(wt)) return wt
+  const wd = normalizeValue(wikidata ?? null)
+  if (wd) return wd
+  // Dernier recours (Wikidata indisponible) : retirer les résidus de templates drapeau,
+  // ex. « ESP-d Espagnole » → « Espagnole ».
+  if (wt) return normalizeValue(wt.replace(/\b[A-Z]{2,3}-[a-z]\b/g, '').replace(/\s{2,}/g, ' ').trim()) ?? wt
+  return null
+}
+/** Année de naissance : Wikidata P569 fait autorité ; le wikitext est un fallback. */
+function preferWikidataYear(wikitextYear: number | null | undefined, wikidataYear: number | null | undefined): number | null {
+  return wikidataYear ?? wikitextYear ?? null
+}
+/** Nom d'équipe/club valide (lettres, pas de template ni purement numérique). */
+function looksValidTeamName(name: string | null | undefined): boolean {
+  if (!name) return false
+  return /[a-zà-ÿ]{3,}/i.test(name) && !/[{}]/.test(name)
+}
+/** Nom d'une sélection nationale (vs club) — partagé entre Wikidata et la fusion wikitext. */
+const NATIONAL_TEAM_NAME_RE = /(\bnational(e|es)?\b|\bsélection\b|\bselection\b|équipe (nationale|de\b|d['’])|\bcoupe davis\b|\bfed cup\b|\bbillie jean king cup\b|olympic team|national team)/i
+function isNationalTeamName(name: string | null | undefined): boolean {
+  return !!name && NATIONAL_TEAM_NAME_RE.test(name)
 }
 
 function applyWikidataFallback(
@@ -1522,24 +1744,42 @@ function applyWikidataFallback(
       infobox: {
         roles,
         party: partyMerged,
-        birth_year: p.birth_year ?? fallback.birth_year,
-        nationality: normalizeValue(p.nationality ?? fallback.nationality),
+        birth_year: preferWikidataYear(p.birth_year, fallback.birth_year),
+        nationality: preferCleanWikitext(p.nationality, fallback.nationality),
       },
     }
   }
   if (resolvedType === 'sportsperson') {
     const s = infobox as Partial<WikiSportspersonData>
+    // Clubs wikitext : on retire résidus de templates ET sélections nationales (comptées à part),
+    // pour comparer équitablement avec la liste Wikidata (déjà sans sélections).
+    const wikitextClean = (s.clubs ?? []).filter((c) => looksValidTeamName(c.name) && !isNationalTeamName(c.name))
+    // On garde la source la plus FOURNIE : Wikidata seulement si strictement plus de clubs
+    // (évite qu'une liste Wikidata éparse écrase un wikitext riche) ; sinon wikitext s'il existe.
+    const clubs = fallback.clubs.length > wikitextClean.length
+      ? fallback.clubs
+      : (wikitextClean.length > 0 ? wikitextClean : fallback.clubs)
+    // Palmarès : fusion highlights wikitext + distinctions Wikidata (P166), dédup, cap.
+    const highlights: Array<{ label: string; value: string }> = [...(s.career_highlights ?? [])]
+    for (const award of fallback.awards.slice(0, 8)) {
+      const v = normalizeValue(award)
+      if (!v) continue
+      if (highlights.some((h) => h.value.toLowerCase() === v.toLowerCase())) continue
+      highlights.push({ label: 'Distinction', value: v })
+    }
+    // Sélection nationale : Wikidata (équipe senior, fiable) prioritaire ; wikitext seulement si valide.
+    const wikitextNT = s.national_team && looksValidTeamName(s.national_team.name) ? s.national_team : null
     return {
       personType: resolvedType,
       infobox: {
-        sport: normalizeValue(s.sport ?? null),
-        position: normalizeValue(s.position ?? null),
-        clubs: s.clubs ?? [],
+        sport: preferCleanWikitext(s.sport, fallback.sport),
+        position: preferCleanWikitext(s.position, fallback.position),
+        clubs,
         clubs_youth: s.clubs_youth,
-        career_highlights: s.career_highlights ?? [],
-        national_team: s.national_team ?? null,
-        birth_year: s.birth_year ?? fallback.birth_year,
-        nationality: normalizeValue(s.nationality ?? fallback.nationality),
+        career_highlights: highlights.slice(0, 10),
+        national_team: fallback.national_team ?? wikitextNT,
+        birth_year: preferWikidataYear(s.birth_year, fallback.birth_year),
+        nationality: preferCleanWikitext(s.nationality, fallback.nationality),
       },
     }
   }
@@ -1558,19 +1798,18 @@ function applyWikidataFallback(
     return {
       personType: resolvedType,
       infobox: {
-        birth_year: a.birth_year ?? fallback.birth_year,
-        nationality: normalizeValue(a.nationality ?? fallback.nationality),
+        birth_year: preferWikidataYear(a.birth_year, fallback.birth_year),
+        nationality: preferCleanWikitext(a.nationality, fallback.nationality),
         notable_films,
         occupation,
       } satisfies WikiActorData,
     }
   }
   const g = infobox as Partial<WikiGenericData>
-  const isActorResolved = resolvedType === 'artist' && fallback.occupations.some((o) =>
-    /(actor|acteur|actrice|actress|réalisateur|director|filmmaker|comedian|comédien|comédienne)/.test(o.toLowerCase())
-  )
+  // Le type est désormais décidé par comptage d'occupations : « artist » = musicien dominant
+  // (même s'il a joué dans un film). Le domaine suit donc toujours « Musique ».
   const fallbackDomain = (() => {
-    if (resolvedType === 'artist') return isActorResolved ? 'Cinéma' : 'Musique'
+    if (resolvedType === 'artist') return 'Musique'
     if (resolvedType === 'scientist') return 'Science'
     if (resolvedType === 'entrepreneur') return 'Entrepreneuriat'
     if (resolvedType === 'writer') return 'Littérature'
@@ -1629,30 +1868,17 @@ function applyWikidataFallback(
 
   if (resolvedType === 'artist') {
     const rows: Array<{ label: string; value: string }> = [...existingHighlights]
-    if (isActorResolved) {
-      for (const value of fallback.notable_work_labels.slice(0, 9)) {
-        const v = normalizeValue(value)
-        if (!v) continue
-        rows.push({ label: 'Film / série', value: v })
-      }
-    } else {
-      if (fallback.member_of_labels.length > 0) {
-        rows.push({
-          label: 'Membre de',
-          value: fallback.member_of_labels.slice(0, 6).join(' · '),
-        })
-      }
-      if (fallback.record_label_labels.length > 0) {
-        rows.push({
-          label: 'Label(s)',
-          value: fallback.record_label_labels.slice(0, 6).join(' · '),
-        })
-      }
-      for (const value of fallback.notable_work_labels.slice(1, 9)) {
-        const v = normalizeValue(value)
-        if (!v) continue
-        rows.push({ label: 'Album / titre', value: v })
-      }
+    if (fallback.member_of_labels.length > 0) {
+      rows.push({ label: 'Membre de', value: fallback.member_of_labels.slice(0, 6).join(' · ') })
+    }
+    if (fallback.record_label_labels.length > 0) {
+      rows.push({ label: 'Label(s)', value: fallback.record_label_labels.slice(0, 6).join(' · ') })
+    }
+    // Œuvres P800 en repli (la discographie SPARQL, plus complète, est ajoutée dans le pipeline).
+    for (const value of fallback.notable_work_labels.slice(1, 9)) {
+      const v = normalizeValue(value)
+      if (!v) continue
+      rows.push({ label: 'Album / titre', value: v })
     }
     highlightsOut = rows.slice(0, HIGHLIGHT_CAP)
     if (highlightsOut.length === 0) highlightsOut = undefined
@@ -1666,8 +1892,8 @@ function applyWikidataFallback(
       domain: domainMerged,
       notable_work: notableMerged,
       era: normalizeValue(g.era ?? fallback.era),
-      birth_year: g.birth_year ?? fallback.birth_year,
-      nationality: normalizeValue(g.nationality ?? fallback.nationality),
+      birth_year: preferWikidataYear(g.birth_year, fallback.birth_year),
+      nationality: preferCleanWikitext(g.nationality, fallback.nationality),
       company: companyMerged,
       ...(highlightsOut ? { highlights: highlightsOut } : {}),
     },
@@ -1997,9 +2223,6 @@ export async function fetchWikipediaData(
 
   const wikidataType = wikidata ? inferTypeFromWikidataOccupations(wikidata.occupations) : null
   let personType = wikidataType ?? detectPersonTypeFromSummary(summaryDescription) ?? detectPersonType(wikitext)
-  const isActorOccupation = (wikidata?.occupations ?? []).some((o) =>
-    /(actor|acteur|actrice|actress|réalisateur|director|filmmaker|comedian|comédien|comédienne)/.test(o.toLowerCase())
-  )
   let infobox_data: WikiInfoboxData = personType === 'politician'
     ? parsePoliticianData(wikitext)
     : personType === 'sportsperson'
@@ -2007,7 +2230,7 @@ export async function fetchWikipediaData(
       : personType === 'actor'
         ? parseActorData(wikitext)
         : personType === 'artist'
-          ? parseGenericData(wikitext, isActorOccupation ? 'Cinéma' : 'Musique')
+          ? parseGenericData(wikitext, 'Musique')
           : personType === 'scientist'
           ? parseGenericData(wikitext, 'Science')
           : personType === 'entrepreneur'
@@ -2025,6 +2248,43 @@ export async function fetchWikipediaData(
     resolved.infobox,
     inferBirthYearFromExtract(summaryExtract)
   )
+
+  // 3b. Acteurs : filmographie classée par notoriété (SPARQL P161 inverse).
+  if (personType === 'actor' && resolvedEntityId) {
+    const filmo = await withSoftTimeout(
+      fetchWikidataFilmography(resolvedEntityId, lang),
+      OPTIONAL_ENRICH_TIMEOUT_MS,
+      { films: [], series: [] },
+    )
+    const top = [...filmo.films.slice(0, 5), ...filmo.series.slice(0, 2)]
+    if (top.length > 0) {
+      const a = infobox_data as WikiActorData
+      infobox_data = { ...a, notable_films: normalizeValue(top.join(' · ')) }
+    }
+  }
+
+  // 3c. Artistes musicaux : discographie classée par notoriété (SPARQL P175 interprète).
+  if (personType === 'artist' && resolvedEntityId) {
+    const albums = await withSoftTimeout(
+      fetchWikidataDiscography(resolvedEntityId, lang),
+      OPTIONAL_ENRICH_TIMEOUT_MS,
+      [] as string[],
+    )
+    if (albums.length > 0) {
+      const g = infobox_data as WikiGenericData
+      const topAlbums = albums.slice(0, 6)
+      const albumRows = topAlbums.map((a) => ({ label: 'Album', value: a }))
+      // On conserve les repères non-album (groupe, label) et on remplace les anciens albums P800.
+      const keep = (g.highlights ?? []).filter((h) => !/^album/i.test(h.label))
+      infobox_data = {
+        ...g,
+        domain: g.domain && g.domain !== 'Société' ? g.domain : 'Musique',
+        notable_work: normalizeValue(topAlbums.join(' · ')),
+        highlights: [...albumRows, ...keep].slice(0, 10),
+      }
+    }
+  }
+
   if (personType === 'historical_figure') {
     const g = infobox_data as WikiGenericData
     if (!g.era) {

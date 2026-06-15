@@ -174,62 +174,39 @@ friendsRouter.delete('/:userId', AUTH, userAuth, requireUser, (req: Request, res
 });
 
 /** GET /api/friends/leaderboard */
-friendsRouter.get('/leaderboard', apiLimiter, userAuth, requireUser, (req: Request, res: Response): void => {
-  const me = req.user!.id;
+interface LbUser { id: number; display_name: string; avatar_url: string | null; stats_max_streak: number; isMe: boolean }
 
-  interface FriendRow { id: number; display_name: string; avatar_url: string | null; stats_max_streak: number; }
+/** Construit le classement (mêmes entrées riches) pour une liste d'utilisateurs donnée. */
+function buildLeaderboard(users: LbUser[]) {
+  interface WinsRow { user_id: number; media_type: string; wins: number; played: number; avg_attempts: number }
+  interface WonDateRow { user_id: number; challenge_date: string }
 
-  const accepted = db
-    .prepare<[number, number, number], FriendRow>(
-      `SELECT u.id, u.display_name, u.avatar_url, u.stats_max_streak
-       FROM friendships f
-       JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
-       WHERE (f.requester_id = ? OR f.addressee_id = ?) AND f.status = 'accepted'`
-    )
-    .all(me, me, me);
+  const userIds = users.map((u) => u.id);
+  if (userIds.length === 0) return [];
+  const ph = userIds.map(() => '?').join(',');
 
-  const meRow = db
-    .prepare<number, FriendRow>(`SELECT id, display_name, avatar_url, stats_max_streak FROM users WHERE id = ?`)
-    .get(me)!;
+  const winsData = db.prepare(
+    `SELECT ucr.user_id, dc.media_type,
+            COUNT(*) as played,
+            SUM(CASE WHEN ucr.won = 1 THEN 1 ELSE 0 END) as wins,
+            ROUND(AVG(ucr.attempts_used), 1) as avg_attempts
+     FROM user_challenge_results ucr
+     JOIN daily_challenges dc ON dc.id = ucr.challenge_id
+     WHERE ucr.user_id IN (${ph}) AND dc.is_active = 1
+     GROUP BY ucr.user_id, dc.media_type`
+  ).all(...userIds) as WinsRow[];
 
-  const allUsers: (FriendRow & { isMe: boolean })[] = [
-    { ...meRow, isMe: true },
-    ...accepted.map((f) => ({ ...f, isMe: false })),
-  ];
-
-  interface WinsRow { user_id: number; media_type: string; wins: number; played: number; avg_attempts: number; }
-  interface WonDateRow { user_id: number; challenge_date: string; }
-
-  const userIds = allUsers.map((u) => u.id);
-  const winsData = userIds.length > 0
-    ? (db.prepare(
-        `SELECT ucr.user_id, dc.media_type,
-                COUNT(*) as played,
-                SUM(CASE WHEN ucr.won = 1 THEN 1 ELSE 0 END) as wins,
-                ROUND(AVG(ucr.attempts_used), 1) as avg_attempts
-         FROM user_challenge_results ucr
-         JOIN daily_challenges dc ON dc.id = ucr.challenge_id
-         WHERE ucr.user_id IN (${userIds.map(() => '?').join(',')})
-           AND dc.is_active = 1
-         GROUP BY ucr.user_id, dc.media_type`
-      ).all(...userIds) as WinsRow[])
-    : [];
-
-  // Compute current streak dynamically from user_challenge_results
   const todayParis = getTodayParis();
   const yd = new Date(); yd.setDate(yd.getDate() - 1);
   const yesterdayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(yd);
 
-  const wonDatesData = userIds.length > 0
-    ? (db.prepare(
-        `SELECT ucr.user_id, dc.challenge_date
-         FROM user_challenge_results ucr
-         JOIN daily_challenges dc ON dc.id = ucr.challenge_id
-         WHERE ucr.user_id IN (${userIds.map(() => '?').join(',')})
-           AND ucr.won = 1 AND dc.is_active = 1
-         ORDER BY ucr.user_id, dc.challenge_date DESC`
-      ).all(...userIds) as WonDateRow[])
-    : [];
+  const wonDatesData = db.prepare(
+    `SELECT ucr.user_id, dc.challenge_date
+     FROM user_challenge_results ucr
+     JOIN daily_challenges dc ON dc.id = ucr.challenge_id
+     WHERE ucr.user_id IN (${ph}) AND ucr.won = 1 AND dc.is_active = 1
+     ORDER BY ucr.user_id, dc.challenge_date DESC`
+  ).all(...userIds) as WonDateRow[];
 
   function computeCurrentStreak(userId: number): number {
     const dates = [...new Set(wonDatesData.filter((r) => r.user_id === userId).map((r) => r.challenge_date))].sort().reverse();
@@ -242,7 +219,7 @@ friendsRouter.get('/leaderboard', apiLimiter, userAuth, requireUser, (req: Reque
     return streak;
   }
 
-  const entries = allUsers.map((u) => {
+  const entries = users.map((u) => {
     const rows = winsData.filter((r) => r.user_id === u.id);
     const filmWins   = rows.find((r) => r.media_type === 'film')?.wins ?? 0;
     const seriesWins = rows.find((r) => r.media_type === 'series')?.wins ?? 0;
@@ -261,23 +238,61 @@ friendsRouter.get('/leaderboard', apiLimiter, userAuth, requireUser, (req: Reque
       totalWins,
       totalPlayed,
       winRate: totalPlayed > 0 ? Math.round((totalWins / totalPlayed) * 100) / 100 : 0,
-      filmWins,
-      seriesWins,
-      wikiWins,
-      filmPlayed,
-      seriesPlayed,
-      wikiPlayed,
+      filmWins, seriesWins, wikiWins,
+      filmPlayed, seriesPlayed, wikiPlayed,
       avgAttempts: totalPlayed > 0 ? Math.round((totalAttempts / totalPlayed) * 10) / 10 : null,
       currentStreak: computeCurrentStreak(u.id),
       maxStreak: u.stats_max_streak ?? 0,
     };
   });
 
-  // Sort by totalWins desc, then winRate desc
   entries.sort((a, b) => b.totalWins - a.totalWins || b.winRate - a.winRate);
-  const leaderboard = entries.map((e, i) => ({ ...e, rank: i + 1 }));
+  return entries.map((e, i) => ({ ...e, rank: i + 1 }));
+}
 
-  res.json({ leaderboard });
+/** GET /api/friends/leaderboard — classement de mes amis (+ moi) */
+friendsRouter.get('/leaderboard', apiLimiter, userAuth, requireUser, (req: Request, res: Response): void => {
+  const me = req.user!.id;
+  interface FriendRow { id: number; display_name: string; avatar_url: string | null; stats_max_streak: number; }
+
+  const accepted = db
+    .prepare<[number, number, number], FriendRow>(
+      `SELECT u.id, u.display_name, u.avatar_url, u.stats_max_streak
+       FROM friendships f
+       JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
+       WHERE (f.requester_id = ? OR f.addressee_id = ?) AND f.status = 'accepted'
+         AND u.leaderboard_public = 1`
+    )
+    .all(me, me, me);
+
+  const meRow = db
+    .prepare<number, FriendRow>(`SELECT id, display_name, avatar_url, stats_max_streak FROM users WHERE id = ?`)
+    .get(me)!;
+
+  const users: LbUser[] = [{ ...meRow, isMe: true }, ...accepted.map((f) => ({ ...f, isMe: false }))];
+  res.json({ leaderboard: buildLeaderboard(users) });
+});
+
+/** GET /api/friends/leaderboard/global — classement mondial (top joueurs publics, viewer optionnel) */
+friendsRouter.get('/leaderboard/global', apiLimiter, userAuth, (req: Request, res: Response): void => {
+  const me = req.user?.id ?? -1;
+  interface TopRow { id: number; display_name: string; avatar_url: string | null; stats_max_streak: number }
+
+  const top = db
+    .prepare<[], TopRow>(
+      `SELECT u.id, u.display_name, u.avatar_url, u.stats_max_streak
+       FROM users u
+       JOIN user_challenge_results ucr ON ucr.user_id = u.id
+       JOIN daily_challenges dc ON dc.id = ucr.challenge_id
+       WHERE u.leaderboard_public = 1 AND u.is_banned = 0 AND dc.is_active = 1
+       GROUP BY u.id
+       ORDER BY SUM(CASE WHEN ucr.won = 1 THEN 1 ELSE 0 END) DESC
+       LIMIT 100`
+    )
+    .all();
+
+  const users: LbUser[] = top.map((u) => ({ ...u, isMe: u.id === me }));
+  res.json({ leaderboard: buildLeaderboard(users) });
 });
 
 /** GET /api/friends */
@@ -319,6 +334,7 @@ friendsRouter.get('/', apiLimiter, userAuth, requireUser, (req: Request, res: Re
     display_name: string;
     avatar_url: string | null;
     stats_streak: number;
+    profile_public: number;
     friendship_id: number;
     requester_id: number;
     addressee_id: number;
@@ -327,7 +343,7 @@ friendsRouter.get('/', apiLimiter, userAuth, requireUser, (req: Request, res: Re
 
   const allFriendships = db
     .prepare<[number, number, number], FriendRow>(
-      `SELECT u.id, u.display_name, u.avatar_url, u.stats_streak,
+      `SELECT u.id, u.display_name, u.avatar_url, u.stats_streak, u.profile_public,
               f.id as friendship_id, f.requester_id, f.addressee_id, f.status
        FROM friendships f
        JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
@@ -338,19 +354,20 @@ friendsRouter.get('/', apiLimiter, userAuth, requireUser, (req: Request, res: Re
   const accepted = allFriendships.filter((f) => f.status === 'accepted');
   const pending = allFriendships.filter((f) => f.status === 'pending');
 
-  const allUserIds = [me, ...accepted.map((f) => f.id)];
+  // profile_public = 0 → les résultats de cet ami ne sont pas exposés (il reste listé, sans score)
+  const resultUserIds = [me, ...accepted.filter((f) => f.profile_public === 1).map((f) => f.id)];
 
   const allParams = [
-    ...allUserIds,
+    ...resultUserIds,
     ...todayChallenges.map((c) => c.id),
   ];
-  const results = allUserIds.length > 0
+  const results = todayChallenges.length > 0
     ? (db
         .prepare(
           `SELECT user_id, challenge_id, attempts_used, won, completed_at
            FROM user_challenge_results
-           WHERE user_id IN (${allUserIds.map(() => '?').join(',')})
-             AND challenge_id IN (${todayChallenges.length > 0 ? todayChallenges.map(() => '?').join(',') : 'NULL'})`
+           WHERE user_id IN (${resultUserIds.map(() => '?').join(',')})
+             AND challenge_id IN (${todayChallenges.map(() => '?').join(',')})`
         )
         .all(...allParams) as ResultRow[])
     : [];

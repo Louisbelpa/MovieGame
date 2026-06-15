@@ -146,8 +146,11 @@ CREATE TABLE IF NOT EXISTS daily_challenges (
 
 CREATE INDEX IF NOT EXISTS idx_daily_challenges_date      ON daily_challenges (challenge_date);
 CREATE INDEX IF NOT EXISTS idx_daily_challenges_film_id   ON daily_challenges (film_id);
--- series_id and media_type indexes created by incremental migrations after those columns are added
-CREATE INDEX IF NOT EXISTS idx_dc_date_type_active ON daily_challenges (challenge_date, media_type, is_active);
+-- series_id, media_type and is_active columns are added by incremental migrations.
+-- Their indexes — incl. the composite idx_dc_date_type_active — are therefore created
+-- by migrate.ts AFTER those columns exist (cf. add_idx_dc_date_type_active). Do NOT
+-- reference is_active here: on a fresh DB schema.sql runs before any migration, so an
+-- index on a not-yet-existing column aborts db.exec(schema) and truncates the schema.
 
 -- ---------------------------------------------------------------------------
 -- game_sessions
