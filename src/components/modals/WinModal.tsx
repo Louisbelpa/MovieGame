@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Share2, BarChart2, Flame, Copy, Check } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { useAuthStore } from '@/store/authStore'
@@ -6,6 +7,12 @@ import { useAuthModal } from '@/components/modals/AuthModal'
 import { loadStats, loadGameState } from '@/lib/storage'
 import { NextGameCountdown } from '@/components/modals/NextGameCountdown'
 import { getTodayParis } from '@/store/gameStore'
+
+/** "2026-06-14" → "14 juin 2026" (format français). */
+function formatDateFr(dateStr: string): string {
+  const d = new Date(`${dateStr}T12:00:00Z`)
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+}
 
 // ── Carte de partage "Ma journée" ────────────────────────────────────────────
 
@@ -57,7 +64,7 @@ function SingleGameShareCard({ mode, won, attempts, maxAttempts }: {
       <div className="cdy-share-body">
         <div className="cdy-share-head">
           <span className="cdy-share-logo"><span className="d">?</span>GuessToday</span>
-          <span className="cdy-mono" style={{ fontSize: 12, color: 'var(--ink-2)' }}>{today}</span>
+          <span className="cdy-mono" style={{ fontSize: 12, color: 'var(--ink-2)' }}>{formatDateFr(today)}</span>
         </div>
         <div className={g.cls}>
           <div className="cdy-share-title">{g.name}</div>
@@ -101,7 +108,7 @@ function DailyShareCard({ currentMode, currentWon, currentAttempts }: {
       <div className="cdy-share-body">
         <div className="cdy-share-head">
           <span className="cdy-share-logo"><span className="d">?</span>GuessToday</span>
-          <span className="cdy-mono" style={{ fontSize: 12, color: 'var(--ink-2)' }}>{today}</span>
+          <span className="cdy-mono" style={{ fontSize: 12, color: 'var(--ink-2)' }}>{formatDateFr(today)}</span>
         </div>
         <div>
           <div className="cdy-share-title">Ma journée 🎯</div>
@@ -208,7 +215,7 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShar
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} className={accentCls}>
+    <Modal isOpen={isOpen} onClose={onClose} className={`${accentCls} lg:max-w-4xl`}>
       {/* Desktop: 2-col layout (result + aside partage) */}
       <div className="hidden lg:grid" style={{ gridTemplateColumns: '1fr 380px', gap: 32, alignItems: 'start' }}>
 
@@ -240,7 +247,7 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShar
             {onOpenStats && (
               <button type="button" onClick={onOpenStats} className="cdy-btn cdy-btn-soft">Stats du jour →</button>
             )}
-            <a href="/" className="cdy-btn cdy-btn-soft" style={{ textDecoration: 'none' }}>Retour à l'accueil</a>
+            <Link to="/" className="cdy-btn cdy-btn-soft" style={{ textDecoration: 'none' }}>Retour à l'accueil</Link>
           </div>
         </div>
 
@@ -374,9 +381,9 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShar
               Stats du jour
             </button>
           )}
-          <a href="/" className="cdy-btn cdy-btn-soft" style={{ flex: 1, textDecoration: 'none' }}>
+          <Link to="/" className="cdy-btn cdy-btn-soft" style={{ flex: 1, textDecoration: 'none' }}>
             Accueil
-          </a>
+          </Link>
         </div>
 
         {/* 9. Défis non joués (teaser) */}
@@ -387,10 +394,10 @@ export function WinModal({ isOpen, onClose, mode, result, stats, onShare, onShar
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               {unplayedModes.map(({ type, path }) => (
-                <a key={type} href={path} className="cdy-btn cdy-btn-soft" style={{ flex: 1, textDecoration: 'none', padding: '10px 12px' }}>
+                <Link key={type} to={path} className="cdy-btn cdy-btn-soft" style={{ flex: 1, textDecoration: 'none', padding: '10px 12px' }}>
                   <GlyphC game={modeGlyph(type)} size={16} />
                   {type === 'wiki' ? 'FaceGuess' : type === 'series' ? 'SerieGuess' : 'FilmGuess'}
-                </a>
+                </Link>
               ))}
             </div>
           </div>

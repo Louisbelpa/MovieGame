@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Film, Tv, User, Share2, BarChart2, CheckCircle2 } from 'lucide-react'
+import { Film, Tv, User, Share2, BarChart2, CheckCircle2, HelpCircle } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { GuessInput } from './GuessInput'
 import { HintPanel } from './HintPanel'
@@ -7,6 +7,7 @@ import { MovieImage } from './MovieImage'
 import { WikiChallengeImage } from '@/components/wiki/WikiChallengeImage'
 import { WikiHintPanel } from '@/components/wiki/WikiHintPanel'
 import { WikiGuessInput } from '@/components/wiki/WikiGuessInput'
+import { MobileTabBar } from '@/components/layout/MobileTabBar'
 import { Spinner } from '@/components/ui/Spinner'
 import { WinModal } from '@/components/modals/WinModal'
 import { LoseModal } from '@/components/modals/LoseModal'
@@ -18,7 +19,7 @@ import type { GuessEntry } from '@/types'
 import { useGameStore, getTodayParis } from '@/store/gameStore'
 import { useWikiStore } from '@/store/wikiStore'
 import { loadHistory, loadGameState } from '@/lib/storage'
-import { Sounds } from '@/lib/sounds'
+
 import { buildShareText, buildAllShareText, type AllShareGame } from '@/lib/utils'
 import { FEATURES } from '@/config/features'
 
@@ -121,7 +122,7 @@ function GameSwitcher({ currentMode }: { currentMode: 'film' | 'series' | 'wiki'
     <div className="cdy-switch">
       {/* Header label (desktop) */}
       <div className="cdy-switch-head hidden sm:block">
-        Les défis du jour · change de jeu quand tu veux
+        Un nouveau défi chaque jour · choisis ton jeu
       </div>
 
       {/* Tabs */}
@@ -160,47 +161,6 @@ function GameSwitcher({ currentMode }: { currentMode: 'film' | 'series' | 'wiki'
         })}
       </div>
     </div>
-  )
-}
-
-// ── Bottom tab bar (mobile) ───────────────────────────────────────────────────
-
-function TabBar({ activeTab }: { activeTab: 'games' | 'stats' | 'friends' | 'profile' }) {
-  return (
-    <nav className="cdym-tabs fixed bottom-0 left-0 right-0 z-30 lg:hidden">
-      <a href="/films" className={`cdym-tab ${activeTab === 'games' ? 'on' : ''}`}>
-        <span className="ic">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="6" width="20" height="14" rx="3" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M9 12h6M12 9v6" />
-          </svg>
-        </span>
-        <span className="lb">Jeux</span>
-      </a>
-      <a href="/stats" className={`cdym-tab ${activeTab === 'stats' ? 'on' : ''}`}>
-        <span className="ic">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="12" width="4" height="9" rx="1" /><rect x="10" y="7" width="4" height="14" rx="1" /><rect x="17" y="3" width="4" height="18" rx="1" />
-          </svg>
-        </span>
-        <span className="lb">Stats</span>
-      </a>
-      <a href="/friends" className={`cdym-tab ${activeTab === 'friends' ? 'on' : ''}`}>
-        <span className="ic">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-          </svg>
-        </span>
-        <span className="lb">Classement</span>
-      </a>
-      <a href="/profile" className={`cdym-tab ${activeTab === 'profile' ? 'on' : ''}`}>
-        <span className="ic">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="8" r="4" /><path d="M5 20c0-3.5 3-5.5 7-5.5s7 2 7 5.5" />
-          </svg>
-        </span>
-        <span className="lb">Profil</span>
-      </a>
-    </nav>
   )
 }
 
@@ -299,23 +259,16 @@ export function GamePage({ mode }: GamePageProps) {
     const prev = previousStatusRef.current
     previousStatusRef.current = status
     if (prev === 'playing' && (status === 'won' || status === 'lost')) {
-      if (status === 'won') Sounds.win()
-      else Sounds.lose()
       openModal(status === 'won' ? 'win' : 'lose')
     }
   }, [challenge, status, mode, openModal])
 
   useEffect(() => {
-    if (hintsRevealed > prevHintsRevealedRef.current && prevHintsRevealedRef.current > 0) Sounds.hint()
     prevHintsRevealedRef.current = hintsRevealed
   }, [hintsRevealed])
 
   useEffect(() => {
     const count = guesses.length
-    if (count > prevGuessCountRef.current && count > 0 && status === 'playing') {
-      const last = guesses[count - 1]
-      if (last) { if (last.correct) Sounds.correct(); else Sounds.wrong() }
-    }
     prevGuessCountRef.current = count
   }, [guesses, status])
 
@@ -400,7 +353,7 @@ export function GamePage({ mode }: GamePageProps) {
             </div>
           </div>
         </div>
-        <TabBar activeTab="games" />
+        <MobileTabBar activeTab="games" />
       </div>
     )
   }
@@ -473,9 +426,25 @@ export function GamePage({ mode }: GamePageProps) {
               </div>
             </div>
           </div>
-          <span className="cdym-ar-badge">
-            {mode === 'wiki' ? 'Personnalités' : mode === 'series' ? 'Séries' : 'Films'}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => openModal('rules')}
+              aria-label="Comment jouer"
+              title="Comment jouer"
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                border: '1px solid var(--line)', background: 'var(--panel)',
+                color: 'var(--ink-2)', cursor: 'pointer', padding: 0,
+              }}
+            >
+              <HelpCircle size={17} />
+            </button>
+            <span className="cdym-ar-badge">
+              {mode === 'wiki' ? 'Personnalités' : mode === 'series' ? 'Séries' : 'Films'}
+            </span>
+          </div>
         </div>
 
         {/* 1. Date navigator — before slots (Candy spec: ar-top → datenav → slots → media) */}
@@ -710,7 +679,7 @@ export function GamePage({ mode }: GamePageProps) {
       </div>{/* /lg:cdy-gamepage */}
 
       {/* ── Bottom tab bar (mobile) ── */}
-      <TabBar activeTab="games" />
+      <MobileTabBar activeTab="games" />
 
       {/* ── Modals ── */}
       {status === 'won' && (

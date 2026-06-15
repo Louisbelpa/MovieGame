@@ -1,5 +1,5 @@
 import { request, BASE_URL } from './client'
-import type { AdminWikiPerson, WikiPersonPayload, WikipediaFetchPayload, WikiPrefetchPoolHasWikiFilter, WikiPrefetchPoolResponse, WikiPersonDraftPreviewBody } from './types'
+import type { AdminWikiPerson, WikiPersonPayload, WikipediaFetchPayload, WikiPrefetchPoolHasWikiFilter, WikiPrefetchPoolResponse, WikiPersonDraftPreviewBody, WikiCategory } from './types'
 import type { WikiChallengePayload } from './client'
 
 function parseJsonArray(value: unknown): string[] {
@@ -58,6 +58,8 @@ function mapWikiPerson(raw: Record<string, unknown>): AdminWikiPerson {
     difficulty: Number(raw.difficulty ?? 3),
     is_active: Number(raw.is_active ?? 1) === 1,
     used_dates: parseUsedDates(raw.used_dates),
+    parse_quality_score: typeof raw.parse_quality_score === 'number' ? raw.parse_quality_score : null,
+    parse_warnings: parseJsonArray(raw.parse_warnings),
   }
 }
 
@@ -145,6 +147,7 @@ export async function getWikiPrefetchPool(params: {
   page?: number
   pageSize?: number
   hasWikiPerson?: WikiPrefetchPoolHasWikiFilter
+  minScore?: number | null
 }): Promise<WikiPrefetchPoolResponse> {
   const q = new URLSearchParams()
   q.set('lang', params.lang ?? 'fr')
@@ -152,7 +155,34 @@ export async function getWikiPrefetchPool(params: {
   q.set('page', String(params.page ?? 1))
   q.set('pageSize', String(params.pageSize ?? 25))
   q.set('hasWikiPerson', params.hasWikiPerson ?? 'all')
+  if (params.minScore != null) q.set('minScore', String(params.minScore))
   return request<WikiPrefetchPoolResponse>(`/api/admin/wiki-persons/prefetch-pool?${q.toString()}`)
+}
+
+// Génère un lot ciblé par métier dans le pool (fetch en arrière-plan).
+export async function generateWikiPrefetchBatch(body: {
+  categories: WikiCategory[]
+  countPerCategory?: number
+  minFame?: number
+  lang?: string
+}): Promise<{ ok: boolean; queued: number; perCategory: Record<string, number>; lang: string; minFame: number }> {
+  return request('/api/admin/wiki-prefetch/generate', { method: 'POST', body: JSON.stringify(body) })
+}
+
+// Importe en masse les fiches prêtes du pool (option qualité / catégorie).
+export async function importWikiPrefetchBatch(body: {
+  lang?: string
+  minFame?: number
+  minScore?: number | null
+  category?: WikiCategory | null
+  limit?: number
+}): Promise<{ ok: boolean; created: number; skipped: number; failed: number; createdIds: number[] }> {
+  return request('/api/admin/wiki-prefetch-pool/import-batch', { method: 'POST', body: JSON.stringify(body) })
+}
+
+// Vide tout le pool de préchargement (et le cache SPARQL). N'affecte pas les fiches Personnalités.
+export async function clearWikiPrefetchPool(): Promise<{ ok: boolean; poolDeleted: number; cacheDeleted: number }> {
+  return request('/api/admin/wiki-prefetch-pool', { method: 'DELETE' })
 }
 
 export async function addWikiPrefetchPoolEntry(body: {

@@ -1,6 +1,6 @@
 /**
  * modals/RulesModal.tsx
- * Onboarding premier démarrage — structure MobileOnboarding (3 slides Candy)
+ * Tutoriel « Comment jouer » — 3 slides de règles, spécifiques au jeu courant.
  */
 
 import { useState } from 'react'
@@ -19,29 +19,36 @@ function GlyphC({ game, size = 84 }: { game: string; size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" />
 }
 
-const SLIDES = [
-  {
-    g: 'film',
-    glyph: 'film',
-    cls: 'g-film',
-    title: 'Un défi par jour',
-    body: 'Trois jeux de devinettes, renouvelés chaque jour à minuit. Tout le monde joue le même défi.',
-  },
-  {
-    g: 'serie',
-    glyph: 'serie',
-    cls: 'g-serie',
-    title: '5 essais, 3 indices',
-    body: 'Devine le titre ou la personnalité. Bloqué ? Un indice se dévoile à chaque essai raté.',
-  },
-  {
-    g: 'face',
-    glyph: 'face',
-    cls: 'g-face',
-    title: 'Joue avec tes amis',
-    body: 'Compare tes scores, grimpe au classement et partage ta journée en une seule carte.',
-  },
-]
+type RulesSlide = { glyph: string; cls: string; title: string; body: string }
+
+/** Règles « Comment jouer » spécifiques au jeu courant. */
+function slidesFor(mode: RulesMode): RulesSlide[] {
+  const noun  = mode === 'wiki' ? 'une personnalité' : mode === 'series' ? 'une série' : 'un film'
+  const glyph = mode === 'wiki' ? 'face' : mode === 'series' ? 'serie' : 'film'
+  const cls   = mode === 'wiki' ? 'g-face' : mode === 'series' ? 'g-serie' : 'g-film'
+  const hints = mode === 'wiki'
+    ? 'année de naissance, nationalité, domaine…'
+    : mode === 'series'
+      ? 'année, créateur, acteur principal…'
+      : 'année, réalisateur, acteur principal…'
+  return [
+    {
+      glyph, cls,
+      title: `Devine ${noun} chaque jour`,
+      body: 'Un nouveau défi à minuit (heure de Paris), le même pour tout le monde. Tape ton hypothèse dans la barre de recherche.',
+    },
+    {
+      glyph, cls,
+      title: '5 essais, des indices',
+      body: `À chaque mauvaise réponse, un indice se dévoile (${hints}). Trouve avant d'épuiser tes 5 essais.`,
+    },
+    {
+      glyph, cls,
+      title: 'Garde ta série 🔥',
+      body: 'Réussis le défi pour allonger ta série, grimper au classement et partager ton score avec tes amis.',
+    },
+  ]
+}
 
 export function RulesModal({ mode }: { mode?: RulesMode }) {
   const [slide, setSlide] = useState(0)
@@ -58,6 +65,7 @@ export function RulesModal({ mode }: { mode?: RulesMode }) {
   const wikiOpenModal  = useWikiStore((s) => s.openModal)
 
   const resolvedMode: RulesMode = mode ?? (gameType === 'series' ? 'series' : 'film')
+  const slides = slidesFor(resolvedMode)
   const isWiki    = resolvedMode === 'wiki'
   const isOpen    = isWiki
     ? (wikiUi.isModalOpen && wikiUi.modalType === 'rules')
@@ -79,71 +87,63 @@ export function RulesModal({ mode }: { mode?: RulesMode }) {
   }
 
   function handleNext() {
-    if (slide < SLIDES.length - 1) setSlide(slide + 1)
+    if (slide < slides.length - 1) setSlide(slide + 1)
     else handleClose()
   }
 
   if (!isOpen) return null
 
-  const s = SLIDES[slide]
+  const s = slides[slide]
+
+  const content = (
+    <div className="cdym-onb">
+      {/* Skip */}
+      <button className="cdym-onb-skip" type="button" onClick={handleClose}>Passer</button>
+
+      {/* Illustration */}
+      <div className="cdym-onb-art">
+        <div className="cdym-onb-card" style={{ transform: 'rotate(-4deg)' }}>
+          <GlyphC game={s.glyph} size={84} />
+        </div>
+      </div>
+
+      {/* Text */}
+      <h2 className="cdym-onb-h">{s.title}</h2>
+      <p className="cdym-onb-b">{s.body}</p>
+
+      {/* Dots */}
+      <div className="cdym-onb-dots">
+        {slides.map((_, i) => <i key={i} className={i === slide ? 'on' : ''} />)}
+      </div>
+
+      {/* CTA */}
+      <button
+        type="button"
+        className="cdym-btn cdym-btn-primary cdym-btn-block"
+        style={{ padding: '16px' }}
+        onClick={handleNext}
+      >
+        {slide === slides.length - 1 ? 'Commencer à jouer' : 'Suivant'}
+      </button>
+    </div>
+  )
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(60,48,80,0.55)', backdropFilter: 'blur(4px)' }}
-      onClick={handleClose}>
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={slide}
-          className={`${s.cls}`}
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            background: 'var(--bg)',
-            borderRadius: 28,
-            border: '2.5px solid var(--line)',
-            boxShadow: '0 12px 0 var(--line-2), 0 24px 60px rgba(60,48,80,0.18)',
-            width: '100%',
-            maxWidth: 360,
-            minHeight: 480,
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-          initial={{ opacity: 0, y: 20, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -12, scale: 0.97 }}
-          transition={{ duration: 0.22 }}
-        >
-          <div className="cdym-onb">
-            {/* Skip */}
-            <button className="cdym-onb-skip" type="button" onClick={handleClose}>Passer</button>
-
-            {/* Illustration */}
-            <div className="cdym-onb-art">
-              <div className="cdym-onb-card">
-                <GlyphC game={s.glyph} size={84} />
-              </div>
-            </div>
-
-            {/* Text */}
-            <h2 className="cdym-onb-h">{s.title}</h2>
-            <p className="cdym-onb-b">{s.body}</p>
-
-            {/* Dots */}
-            <div className="cdym-onb-dots">
-              {SLIDES.map((_, i) => <i key={i} className={i === slide ? 'on' : ''} />)}
-            </div>
-
-            {/* CTA */}
-            <button
-              type="button"
-              className="cdy-btn cdy-btn-primary"
-              style={{ width: '100%', padding: '16px' }}
-              onClick={handleNext}
-            >
-              {slide === SLIDES.length - 1 ? 'Commencer à jouer' : 'Suivant'}
-            </button>
-          </div>
-        </motion.div>
-      </AnimatePresence>
-    </div>
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={slide}
+        className={`onb-overlay ${s.cls}`}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.18 }}
+        onClick={handleClose}
+      >
+        {/* Inner card — full-screen on mobile, centered card on desktop */}
+        <div className="onb-inner" onClick={(e) => e.stopPropagation()}>
+          {content}
+        </div>
+      </motion.div>
+    </AnimatePresence>
   )
 }

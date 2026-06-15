@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { Share2, BarChart2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { useAuthStore } from '@/store/authStore'
@@ -122,9 +123,9 @@ export function LoseModal({ isOpen, onClose, mode, result, onShare, onShareAll, 
               Stats du jour
             </button>
           )}
-          <a href="/" className="cdy-btn cdy-btn-soft" style={{ flex: 1, textDecoration: 'none' }}>
+          <Link to="/" className="cdy-btn cdy-btn-soft" style={{ flex: 1, textDecoration: 'none' }}>
             Accueil
-          </a>
+          </Link>
         </div>
 
         {/* 9. Défis non joués */}
@@ -135,10 +136,10 @@ export function LoseModal({ isOpen, onClose, mode, result, onShare, onShareAll, 
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               {unplayedModes.map(({ type, path }) => (
-                <a key={type} href={path} className="cdy-btn cdy-btn-soft" style={{ flex: 1, textDecoration: 'none', padding: '10px 12px' }}>
+                <Link key={type} to={path} className="cdy-btn cdy-btn-soft" style={{ flex: 1, textDecoration: 'none', padding: '10px 12px' }}>
                   <GlyphC game={modeGlyph(type)} size={16} />
                   {type === 'wiki' ? 'FaceGuess' : type === 'series' ? 'SerieGuess' : 'FilmGuess'}
-                </a>
+                </Link>
               ))}
             </div>
           </div>

@@ -11,6 +11,7 @@ import {
   getSeries,
   getWikiPersons,
   scheduleChallenge,
+  autoScheduleChallenges,
   updateChallenge,
   deleteChallenge,
   rescheduleChallenge,
@@ -199,47 +200,29 @@ export function CalendarPage() {
     setAutoLoading(true)
     setError(null)
     setAutoSuccess(null)
-    let scheduled = 0
     try {
       const emptyDates = futureDates.filter((d) => !byDate[d])
       if (emptyDates.length === 0) {
         setAutoSuccess('Tous les jours sont déjà planifiés !')
         return
       }
-
-      // Pool is restricted to the active media type
-      const usedIds = new Set(challenges.map((c) =>
-        mediaType === 'series' ? c.series?.id : mediaType === 'wiki' ? c.wiki?.id : c.film?.id
-      ).filter(Boolean) as number[])
-      const pool: MediaRef[] = mediaType === 'series'
-        ? seriesList.filter((s) => !usedIds.has(s.id)).map((s) => ({ seriesId: s.id }) as MediaRef)
-        : mediaType === 'wiki'
-          ? wikiPersons.filter((p) => !usedIds.has(p.id)).map((p) => ({ wikiPersonId: p.id }) as MediaRef)
-          : films.filter((f) => !usedIds.has(f.id)).map((f) => ({ filmId: f.id }) as MediaRef)
-      pool.sort(() => Math.random() - 0.5)
-
-      if (pool.length === 0) {
-        setError('Aucun contenu disponible non encore planifié.')
-        return
-      }
-
-      const toSchedule = emptyDates.slice(0, pool.length)
-      const results = await Promise.allSettled(
-        toSchedule.map((date, i) => scheduleChallenge(date, pool[i]))
-      )
-      scheduled = results.filter((r) => r.status === 'fulfilled').length
-      const failed = results.filter((r) => r.status === 'rejected').length
-      if (failed > 0) {
-        setError(`${failed} défi${failed > 1 ? 's' : ''} n'ont pas pu être planifiés (conflit de date ?).`)
+      // Le serveur recalcule les jours vides et pioche les fiches inutilisées
+      // triées par qualité (wiki) / notoriété (film, série) — un seul appel transactionnel.
+      const startDate = emptyDates[0]
+      const lastDate = emptyDates[emptyDates.length - 1]
+      const days =
+        Math.round((new Date(`${lastDate}T00:00:00Z`).getTime() - new Date(`${startDate}T00:00:00Z`).getTime()) / 86_400_000) + 1
+      const r = await autoScheduleChallenges({ mediaType, startDate, days })
+      if (r.scheduled > 0) {
+        setAutoSuccess(`${r.scheduled} défi${r.scheduled > 1 ? 's' : ''} planifié${r.scheduled > 1 ? 's' : ''} automatiquement.`)
+        setTimeout(() => setAutoSuccess(null), 4000)
+      } else {
+        setError(r.note ?? 'Aucun contenu disponible non encore planifié.')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur auto-planification')
     } finally {
       load(from, to, mediaType)
-      if (scheduled > 0) {
-        setAutoSuccess(`${scheduled} défi${scheduled > 1 ? 's' : ''} planifié${scheduled > 1 ? 's' : ''} automatiquement.`)
-        setTimeout(() => setAutoSuccess(null), 4000)
-      }
       setAutoLoading(false)
     }
   }

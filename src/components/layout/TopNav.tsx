@@ -1,4 +1,4 @@
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Flame } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useAuthModal } from '@/components/modals/AuthModal'
@@ -31,17 +31,17 @@ export function TopNav() {
   return (
     <header className="cdy-nav" style={{ position: 'sticky', top: 0, zIndex: 40 }}>
       {/* Logo */}
-      <a href="/" className="cdy-logo" style={{ textDecoration: 'none', color: 'var(--ink)' }}>
+      <Link to="/" className="cdy-logo" style={{ textDecoration: 'none', color: 'var(--ink)' }}>
         <span className="cdy-die">?</span>
         <span>Guess<span style={{ color: 'var(--coral)' }}>Today</span></span>
-      </a>
+      </Link>
 
       {/* Nav links (desktop only) */}
       <nav className="cdy-navlinks hidden lg:flex">
         {navLinks.map(({ href, label, active }, i) => (
-          <a key={i} href={href} className={`cdy-navlink${active ? ' on' : ''}`} style={{ textDecoration: 'none' }}>
+          <Link key={i} to={href} className={`cdy-navlink${active ? ' on' : ''}`} style={{ textDecoration: 'none' }}>
             {label}
-          </a>
+          </Link>
         ))}
       </nav>
 
@@ -57,8 +57,8 @@ export function TopNav() {
               <Flame size={14} aria-hidden /> {maxStreak}j
             </span>
           )}
-          <a
-            href="/profile"
+          <Link
+            to="/profile"
             className="cdy-avatar"
             aria-label={`Profil de ${user.displayName}`}
             style={{ background: avatarBg(user.avatarUrl), boxShadow: avatarShadow(user.avatarUrl), textDecoration: 'none', fontSize: 14 }}
@@ -68,7 +68,7 @@ export function TopNav() {
             ) : (
               initial
             )}
-          </a>
+          </Link>
         </div>
       ) : (
         <>

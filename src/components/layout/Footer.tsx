@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Modal } from '@/components/ui/Modal'
 import { BRAND_NAME, FEATURES } from '@/config/features'
 
@@ -209,10 +209,10 @@ export function Footer() {
       <div className="cdy-foot-main">
         {/* Colonne brand */}
         <div className="cdy-foot-brand">
-          <a href="/" className="cdy-foot-logo" style={{ textDecoration: 'none' }}>
+          <Link to="/" className="cdy-foot-logo" style={{ textDecoration: 'none' }}>
             <span className="d">🎬</span>
             <span style={{ color: 'var(--ink)' }}>Guess<span style={{ color: 'var(--coral)' }}>Today</span></span>
-          </a>
+          </Link>
           <p className="cdy-foot-tag">
             Trois devinettes par jour, le même défi pour tout le monde. Garde ta série en vie et défie tes amis.
           </p>
@@ -233,16 +233,16 @@ export function Footer() {
         <div className="cdy-foot-cols">
           <div className="cdy-foot-col">
             <h5>Les jeux</h5>
-            <a href="/films">FilmGuess</a>
-            {FEATURES.enableSeries && <a href="/series">SerieGuess</a>}
-            {FEATURES.enableWiki && <a href="/wiki">FaceGuess</a>}
-            <a href="/">Défi du jour</a>
+            <Link to="/films">FilmGuess</Link>
+            {FEATURES.enableSeries && <Link to="/series">SerieGuess</Link>}
+            {FEATURES.enableWiki && <Link to="/wiki">FaceGuess</Link>}
+            <Link to="/">Défi du jour</Link>
           </div>
           <div className="cdy-foot-col">
             <h5>Découvrir</h5>
             <button type="button" onClick={() => setModal('faq')}>FAQ</button>
-            <a href="/friends">Classement</a>
-            <a href="/friends">Amis</a>
+            <Link to="/friends">Classement</Link>
+            <Link to="/friends">Amis</Link>
           </div>
           <div className="cdy-foot-col">
             <h5>GuessToday</h5>
@@ -264,11 +264,6 @@ export function Footer() {
 
       <div className="cdy-foot-bottom">
         <span>© {new Date().getFullYear()} {BRAND_NAME} · Fait avec 🧡 à Paris</span>
-        <span className="langs">
-          <span className="on">FR</span>
-          <span>EN</span>
-          <span>ES</span>
-        </span>
       </div>
 
       {modal === 'faq'       && <FaqModal       onClose={() => setModal(null)} />}

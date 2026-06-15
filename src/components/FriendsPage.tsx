@@ -27,6 +27,7 @@ import {
 import { FEATURES } from '@/config/features'
 import { useUiPrefsStore } from '@/store/uiPrefsStore'
 import { Footer } from '@/components/layout/Footer'
+import { MobileTabBar } from '@/components/layout/MobileTabBar'
 import { TopNav } from '@/components/layout/TopNav'
 import { loadStats } from '@/lib/storage'
 import { isMockEnabled } from '@/mock/mockFlags'
@@ -455,7 +456,9 @@ export function FriendsPage() {
   const tableRows: TableRow[] = (() => {
     if (period === 'today') {
       if (!friendsData) return []
-      return sortRows(friendsData.friends.map((f) => friendToRow(f, modeFilter)))
+      const rows = sortRows(friendsData.friends.map((f) => friendToRow(f, modeFilter)))
+      const hasOtherPlayers = rows.some((r) => !r.isMe)
+      return hasOtherPlayers ? rows : rows.filter((r) => !r.isMe)
     }
     if (!leaderboard) return []
     const rows = leaderboard.map((e) => leaderboardToRow(e, modeFilter))
@@ -468,6 +471,7 @@ export function FriendsPage() {
   const pending = friendsData?.pending ?? []
   const incoming = pending.filter((p) => p.direction === 'incoming')
   const myCode = friendsData?.myCode ?? null
+  const actualFriends = friendsData?.friends.filter((f) => !f.isMe) ?? []
 
   return (
     <div className="min-h-dvh flex flex-col" style={{ background: 'var(--bg)' }}>
@@ -646,17 +650,17 @@ export function FriendsPage() {
                   {/* Left: friends grid */}
                   <div>
                     <div className="cdy-sec-head" style={{ marginTop: 0 }}>
-                      <h3>Mes amis ({friendsData?.friends.length ?? 0})</h3>
+                      <h3>Mes amis ({actualFriends.length})</h3>
                     </div>
                     {loadingFriends ? (
                       <div className="cdy-card h-32 animate-pulse" style={{ background: 'var(--line)' }} />
-                    ) : friendsData?.friends.length === 0 ? (
+                    ) : actualFriends.length === 0 ? (
                       <div className="cdy-card" style={{ padding: 24, color: 'var(--ink-2)', fontSize: 14 }}>
                         Aucun ami pour l'instant. Invite des joueurs !
                       </div>
                     ) : (
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                        {friendsData?.friends.map((f) => (
+                        {actualFriends.map((f) => (
                           <div key={f.id} className="cdy-card cdy-friend">
                             <Avatar displayName={f.displayName} avatarUrl={f.avatarUrl} size={42} />
                             <div style={{ flex: 1, minWidth: 0 }}>
@@ -751,6 +755,9 @@ export function FriendsPage() {
           />
         )}
       </AnimatePresence>
+
+      <div className="lg:hidden" style={{ height: 80 }} />
+      <MobileTabBar activeTab="friends" />
     </div>
   )
 }

@@ -1,7 +1,6 @@
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import './index.css'
 import { BRAND_NAME, FEATURES } from './config/features'
@@ -51,6 +50,41 @@ if (hostname === 'cineguessr.fr' || hostname === 'www.cineguessr.fr') {
   }
 }
 
+function setMetaForPath(path: string) {
+  if (path.startsWith('/series') && FEATURES.enableSeries) {
+    setMeta(
+      `${BRAND_NAME} — Devine la série du jour`,
+      'Devine la série mystère du jour à partir d\'indices. Un nouveau défi chaque jour.'
+    )
+    return
+  }
+  if (path.startsWith('/wiki') && FEATURES.enableWiki) {
+    setMeta(
+      `${BRAND_NAME} — Devine la personnalité du jour`,
+      'Devine la personnalité mystère du jour à partir de sa biographie. Un nouveau défi Personnalités chaque jour.'
+    )
+    return
+  }
+  if (path === '/' || path === '') {
+    const title = FEATURES.enableSeries
+      ? (FEATURES.enableWiki
+        ? `${BRAND_NAME} — Devine le film, la série ou la personnalité du jour`
+        : `${BRAND_NAME} — Devine le film ou la série du jour`)
+      : (FEATURES.enableWiki
+        ? `${BRAND_NAME} — Devine le film ou la personnalité du jour`
+        : `${BRAND_NAME} — Devine le film du jour`)
+    const desc = FEATURES.enableSeries
+      ? 'Trois jeux quotidiens : devine le film, la série ou la personnalité mystère du jour.'
+      : 'Devine le film mystère du jour à partir d\'indices progressifs. Un nouveau défi chaque jour.'
+    setMeta(title, desc)
+    return
+  }
+  setMeta(
+    `${BRAND_NAME} — Devine le film du jour`,
+    'Devine le film mystère du jour à partir d\'indices. Un nouveau défi cinéma chaque jour.'
+  )
+}
+
 const root = document.getElementById('root')!
 const path = window.location.pathname
 
@@ -59,64 +93,8 @@ if (path.startsWith('/admin')) {
   import('./admin/AdminApp').then(({ AdminApp }) => {
     createRoot(root).render(wrap(<AdminApp />))
   })
-} else if (path.startsWith('/series')) {
-  if (!FEATURES.enableSeries) {
-    window.history.replaceState({}, '', '/films')
-    setMeta(
-      `${BRAND_NAME} — Devine le film du jour`,
-      'Devine le film mystère du jour à partir d\'indices. Un nouveau défi cinéma chaque jour.'
-    )
-  } else {
-    setMeta(
-      `${BRAND_NAME} — Devine la série du jour`,
-      'Devine la série mystère du jour à partir d\'indices. Un nouveau défi chaque jour.'
-    )
-  }
-  import('./App').then(({ default: App }) => {
-    createRoot(root).render(wrap(<App />))
-  })
-} else if (path.startsWith('/wiki')) {
-  if (!FEATURES.enableWiki) {
-    window.history.replaceState({}, '', '/films')
-    setMeta(
-      `${BRAND_NAME} — Devine le film du jour`,
-      'Devine le film mystère du jour à partir d\'indices. Un nouveau défi cinéma chaque jour.'
-    )
-  } else {
-    setMeta(
-      `${BRAND_NAME} — Devine la personnalité du jour`,
-      'Devine la personnalité mystère du jour à partir de sa biographie. Un nouveau défi Personnalités chaque jour.'
-    )
-  }
-  import('./App').then(({ default: App }) => {
-    createRoot(root).render(wrap(<App />))
-  })
-} else if (path === '/' || path === '') {
-  const title = FEATURES.enableSeries
-    ? (FEATURES.enableWiki
-      ? `${BRAND_NAME} — Devine le film, la série ou la personnalité du jour`
-      : `${BRAND_NAME} — Devine le film ou la série du jour`)
-    : (FEATURES.enableWiki
-      ? `${BRAND_NAME} — Devine le film ou la personnalité du jour`
-      : `${BRAND_NAME} — Devine le film du jour`)
-  const desc = FEATURES.enableSeries
-    ? 'Trois jeux quotidiens : devine le film, la série ou la personnalité mystère du jour.'
-    : 'Devine le film mystère du jour à partir d\'indices progressifs. Un nouveau défi chaque jour.'
-  setMeta(title, desc)
-  import('./components/HomePage').then(({ HomePage }) => {
-    createRoot(root).render(
-      wrap(
-        <BrowserRouter>
-          <HomePage />
-        </BrowserRouter>
-      )
-    )
-  })
 } else {
-  setMeta(
-    `${BRAND_NAME} — Devine le film du jour`,
-    'Devine le film mystère du jour à partir d\'indices. Un nouveau défi cinéma chaque jour.'
-  )
+  setMetaForPath(path)
   import('./App').then(({ default: App }) => {
     createRoot(root).render(wrap(<App />))
   })

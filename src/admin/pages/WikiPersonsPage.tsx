@@ -43,6 +43,23 @@ function personTypeLabel(personType: PersonType): string {
   }
 }
 
+// Badge couleur du score de parsing (vert ≥70 / orange 40-69 / rouge <40).
+function QualityBadge({ score, warnings }: { score: number | null; warnings?: string[] }) {
+  if (score == null) return null
+  const cls =
+    score >= 70 ? 'bg-emerald-100 text-emerald-800'
+    : score >= 40 ? 'bg-amber-100 text-amber-900'
+    : 'bg-red-100 text-red-800'
+  const title = warnings && warnings.length > 0
+    ? `Qualité parsing ${score} % — ${warnings.join(' · ')}`
+    : `Qualité parsing ${score} %`
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold tabular-nums ${cls}`} title={title}>
+      {score} %{warnings && warnings.length > 0 ? ` ⚠${warnings.length}` : ''}
+    </span>
+  )
+}
+
 type ModalState =
   | { type: 'create'; autoRandom?: boolean }
   | { type: 'edit'; person: AdminWikiPerson }
@@ -1447,6 +1464,7 @@ export function WikiPersonsPage() {
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${person.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}`}>
                                   {person.is_active ? 'Actif' : 'Inactif'}
                                 </span>
+                                <QualityBadge score={person.parse_quality_score} warnings={person.parse_warnings} />
                               </div>
                               <div className="text-xs text-gray-500 flex items-center gap-1 min-w-0 mt-1">
                                 <span className="truncate font-mono">{person.wikipedia_slug}</span>
@@ -1495,11 +1513,14 @@ export function WikiPersonsPage() {
                           </div>
                         </td>
                         <td className="px-3 py-3 text-sm text-gray-600 hidden sm:table-cell">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                            person.person_type === 'politician' ? 'bg-indigo-100 text-indigo-700'
-                            : person.person_type === 'sportsperson' ? 'bg-violet-100 text-violet-700'
-                            : 'bg-slate-100 text-slate-700'
-                          }`}>{personTypeLabel(person.person_type)}</span>
+                          <div className="flex flex-col items-start gap-1">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              person.person_type === 'politician' ? 'bg-indigo-100 text-indigo-700'
+                              : person.person_type === 'sportsperson' ? 'bg-violet-100 text-violet-700'
+                              : 'bg-slate-100 text-slate-700'
+                            }`}>{personTypeLabel(person.person_type)}</span>
+                            <QualityBadge score={person.parse_quality_score} warnings={person.parse_warnings} />
+                          </div>
                         </td>
                         <td className="px-3 py-3 text-sm hidden md:table-cell">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${person.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>

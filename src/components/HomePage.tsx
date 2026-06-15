@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Smartphone } from 'lucide-react'
 import { Footer } from '@/components/layout/Footer'
-import { AuthModal, useAuthModal } from '@/components/modals/AuthModal'
+import { useAuthModal } from '@/components/modals/AuthModal'
 import { FEATURES, IOS_APP_STORE_URL } from '@/config/features'
 import { useAuthStore } from '@/store/authStore'
 import { loadStats, loadHistory, loadGameState, setHistoryEntry } from '@/lib/storage'
 import { buildAllShareText, type AllShareGame, avatarBg, avatarShadow, parseAvatarHue } from '@/lib/utils'
-import { fetchChallenge, fetchGlobalStats } from '@/api/client'
+import type { GuessEntry } from '@/types'
+import { fetchChallenge, fetchLandingStats, type LandingStatsPayload } from '@/api/client'
 import { fetchWikiChallenge } from '@/api/wikiClient'
 import {
   NewModesAnnouncementModal,
@@ -60,18 +62,18 @@ function HomeNav() {
   return (
     <header className="cdy-nav">
       {/* Logo */}
-      <a href="/" className="cdy-logo" style={{ textDecoration: 'none', color: 'var(--ink)' }}>
+      <Link to="/" className="cdy-logo" style={{ textDecoration: 'none', color: 'var(--ink)' }}>
         <span className="cdy-die">?</span>
         <span>Guess<span style={{ color: 'var(--coral)' }}>Today</span></span>
-      </a>
+      </Link>
 
       {/* Navlinks (connecté, desktop only) */}
       {!isLoading && user && (
         <nav className="cdy-navlinks hidden lg:flex">
-          <a href="/"         className="cdy-navlink on">Jeux du jour</a>
-          <a href="/profile"  className="cdy-navlink">Stats</a>
-          <a href="/friends"  className="cdy-navlink">Classement</a>
-          <a href="/friends"  className="cdy-navlink">Amis</a>
+          <Link to="/"         className="cdy-navlink on">Jeux du jour</Link>
+          <Link to="/profile"  className="cdy-navlink">Stats</Link>
+          <Link to="/friends"  className="cdy-navlink">Classement</Link>
+          <Link to="/friends"  className="cdy-navlink">Amis</Link>
         </nav>
       )}
 
@@ -85,12 +87,12 @@ function HomeNav() {
           {maxStreak > 0 && (
             <span className="cdy-streak">🔥 {maxStreak} jour{maxStreak > 1 ? 's' : ''}</span>
           )}
-          <a href="/profile" className="cdy-avatar"
+          <Link to="/profile" className="cdy-avatar"
             style={{ background: avatarBg(user.avatarUrl), boxShadow: avatarShadow(user.avatarUrl), textDecoration: 'none', fontSize: 14 }}>
             {user.avatarUrl && !parseAvatarHue(user.avatarUrl)
               ? <img src={user.avatarUrl} alt={user.displayName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
               : user.displayName.charAt(0).toUpperCase()}
-          </a>
+          </Link>
         </>
       ) : (
         <>
@@ -132,7 +134,7 @@ const HOW_STEPS = [
   { cls: 'g-face',  n: '3', h: 'Compare & partage', p: 'Garde ta série en vie et défie tes amis sur le score du jour.' },
 ]
 
-function CandyLanding({ communityCount, onRegister }: { communityCount: number | null; onRegister: () => void }) {
+function CandyLanding({ landing, onRegister }: { landing: LandingStatsPayload | null; onRegister: () => void }) {
   return (
     <>
       {/* Hero — 2 colonnes */}
@@ -153,17 +155,17 @@ function CandyLanding({ communityCount, onRegister }: { communityCount: number |
             <button type="button" onClick={onRegister} className="cdy-btn cdy-btn-lg cdy-btn-primary g-film">
               Créer un compte gratuit
             </button>
-            <a href="/films" className="cdy-btn cdy-btn-lg cdy-btn-soft" style={{ textDecoration: 'none' }}>
+            <Link to="/films" className="cdy-btn cdy-btn-lg cdy-btn-soft" style={{ textDecoration: 'none' }}>
               Voir le défi du jour
-            </a>
+            </Link>
           </div>
           <div className="cdy-stats">
             <div className="cdy-stat">
-              <b style={{ color: 'var(--coral)' }}>142</b>
+              <b style={{ color: 'var(--coral)' }}>{landing ? landing.challengeDays : '—'}</b>
               <span>jours de défis</span>
             </div>
             <div className="cdy-stat">
-              <b style={{ color: 'var(--grape)' }}>{communityCount && communityCount > 1000 ? `${Math.round(communityCount / 1000)}k` : '28k'}</b>
+              <b style={{ color: 'var(--grape)' }}>{landing ? (landing.playersPerDay > 1000 ? `${Math.round(landing.playersPerDay / 1000)}k` : landing.playersPerDay) : '—'}</b>
               <span>joueurs / jour</span>
             </div>
             <div className="cdy-stat">
@@ -223,13 +225,11 @@ interface HubGameCardProps {
 }
 
 function HubGameCard({ href, game, name, label, todayStatus, attemptsUsed, maxAttempts = 5, disabled }: HubGameCardProps) {
+  const navigate = useNavigate()
   const cls = game === 'film' ? 'g-film' : game === 'serie' ? 'g-serie' : 'g-face'
   const isWon  = todayStatus === 'won'
   const isLost = todayStatus === 'lost'
   const done   = isWon || isLost
-
-  const Tag = disabled ? 'div' : 'a'
-  const tagProps = disabled ? {} : { href }
 
   const mobileDots = done && isWon && attemptsUsed
     ? Array.from({ length: maxAttempts }, (_, i) => (
@@ -237,76 +237,93 @@ function HubGameCard({ href, game, name, label, todayStatus, attemptsUsed, maxAt
       ))
     : null
 
+  const desktopBody = (
+    <>
+      <div className="cdy-gc-top">
+        <div className="cdy-gc-glyph"><GlyphC game={game} size={26} /></div>
+        <div className="cdy-gc-name">{name}</div>
+        <div className="cdy-gc-label">{label}</div>
+        <span className="cdy-gc-chip">
+          {done ? '✓ Terminé' : disabled ? 'Bientôt disponible' : '5 essais · 3 indices'}
+        </span>
+      </div>
+      <div className="cdy-gc-body">
+        {done ? (
+          <>
+            <div className={`cdy-gc-status ${isWon ? 'done' : 'todo'}`}>
+              <span className="tk">{isWon ? '✓' : '✕'}</span>
+              {isWon ? `Trouvé en ${attemptsUsed ?? '?'}/${maxAttempts}` : `Perdu (${maxAttempts}/${maxAttempts})`}
+              {mobileDots && <span className="cdy-dots" style={{ marginLeft: 'auto' }}>{mobileDots}</span>}
+            </div>
+            <button type="button" className="cdy-btn cdy-btn-soft" style={{ width: '100%' }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(href) }}>
+              Voir le résultat
+            </button>
+          </>
+        ) : disabled ? (
+          <>
+            <div className="cdy-gc-status todo"><span className="tk">·</span> Bientôt disponible</div>
+            <button type="button" className="cdy-btn cdy-btn-soft" style={{ width: '100%', opacity: .5 }} disabled>Non disponible</button>
+          </>
+        ) : (
+          <>
+            <div className="cdy-gc-status todo"><span className="tk">·</span> Pas encore joué aujourd'hui</div>
+            <button type="button" className="cdy-btn cdy-btn-primary" style={{ width: '100%' }}>Jouer maintenant →</button>
+          </>
+        )}
+      </div>
+    </>
+  )
+
+  const mobileBody = (
+    <>
+      <div className="cdym-gc-top">
+        <span className="cdym-gc-glyph"><GlyphC game={game} size={24} /></span>
+        <div>
+          <div className="cdym-gc-name">{name}</div>
+          <div className="cdym-gc-label">{label}</div>
+        </div>
+        <span className="cdym-gc-state">
+          {done ? (isWon ? '✓ Fini' : '✕ Perdu') : disabled ? 'Bientôt' : 'À jouer'}
+        </span>
+      </div>
+      <div className="cdym-gc-body">
+        {done ? (
+          <>
+            {mobileDots && <span className="dots">{mobileDots}</span>}
+            <span className={`res${isWon ? ' done' : ''}`}>
+              {isWon ? `Trouvé en ${attemptsUsed}/${maxAttempts}` : `Perdu · ${maxAttempts}/${maxAttempts}`}
+            </span>
+            <button type="button" className="cdym-btn cdym-btn-soft" style={{ marginLeft: 'auto', padding: '10px 14px' }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(href) }}>
+              Résultat
+            </button>
+          </>
+        ) : disabled ? (
+          <button type="button" className="cdym-btn cdym-btn-soft cdym-btn-block" style={{ opacity: .5 }} disabled>Non disponible</button>
+        ) : (
+          <button type="button" className="cdym-btn cdym-btn-primary cdym-btn-block">Jouer maintenant →</button>
+        )}
+      </div>
+    </>
+  )
+
+  const desktopClass = `hub-desktop cdy-gamecard ${cls}`
+  const mobileClass = `hub-mobile cdym-gc ${cls}`
+  const linkStyle = { textDecoration: 'none', display: 'flex', flexDirection: 'column' as const }
+
   return (
     <>
-      {/* ── Desktop card ── */}
-      <Tag {...tagProps} className={`hub-desktop cdy-gamecard ${cls}`} style={{ textDecoration: 'none', display: 'flex', flexDirection: 'column' }}>
-        <div className="cdy-gc-top">
-          <div className="cdy-gc-glyph"><GlyphC game={game} size={26} /></div>
-          <div className="cdy-gc-name">{name}</div>
-          <div className="cdy-gc-label">{label}</div>
-          <span className="cdy-gc-chip">
-            {done ? '✓ Terminé' : disabled ? 'Bientôt disponible' : '5 essais · 3 indices'}
-          </span>
-        </div>
-        <div className="cdy-gc-body">
-          {done ? (
-            <>
-              <div className={`cdy-gc-status ${isWon ? 'done' : 'todo'}`}>
-                <span className="tk">{isWon ? '✓' : '✕'}</span>
-                {isWon ? `Trouvé en ${attemptsUsed ?? '?'}/${maxAttempts}` : `Perdu (${maxAttempts}/${maxAttempts})`}
-                {mobileDots && <span className="cdy-dots" style={{ marginLeft: 'auto' }}>{mobileDots}</span>}
-              </div>
-              <button type="button" className="cdy-btn cdy-btn-soft" style={{ width: '100%' }}
-                onClick={(e) => { e.preventDefault(); window.location.href = href }}>
-                Voir le résultat
-              </button>
-            </>
-          ) : disabled ? (
-            <>
-              <div className="cdy-gc-status todo"><span className="tk">·</span> Bientôt disponible</div>
-              <button type="button" className="cdy-btn cdy-btn-soft" style={{ width: '100%', opacity: .5 }} disabled>Non disponible</button>
-            </>
-          ) : (
-            <>
-              <div className="cdy-gc-status todo"><span className="tk">·</span> Pas encore joué aujourd'hui</div>
-              <button type="button" className="cdy-btn cdy-btn-primary" style={{ width: '100%' }}>Jouer maintenant →</button>
-            </>
-          )}
-        </div>
-      </Tag>
-
-      {/* ── Mobile card (cdym-gc layout) ── */}
-      <Tag {...tagProps} className={`hub-mobile cdym-gc ${cls}`} style={{ textDecoration: 'none' }}>
-        <div className="cdym-gc-top">
-          <span className="cdym-gc-glyph"><GlyphC game={game} size={24} /></span>
-          <div>
-            <div className="cdym-gc-name">{name}</div>
-            <div className="cdym-gc-label">{label}</div>
-          </div>
-          <span className="cdym-gc-state">
-            {done ? (isWon ? '✓ Fini' : '✕ Perdu') : disabled ? 'Bientôt' : 'À jouer'}
-          </span>
-        </div>
-        <div className="cdym-gc-body">
-          {done ? (
-            <>
-              {mobileDots && <span className="dots">{mobileDots}</span>}
-              <span className={`res${isWon ? ' done' : ''}`}>
-                {isWon ? `Trouvé en ${attemptsUsed}/${maxAttempts}` : `Perdu · ${maxAttempts}/${maxAttempts}`}
-              </span>
-              <button type="button" className="cdym-btn cdym-btn-soft" style={{ marginLeft: 'auto', padding: '10px 14px' }}
-                onClick={(e) => { e.preventDefault(); window.location.href = href }}>
-                Résultat
-              </button>
-            </>
-          ) : disabled ? (
-            <button type="button" className="cdym-btn cdym-btn-soft cdym-btn-block" style={{ opacity: .5 }} disabled>Non disponible</button>
-          ) : (
-            <button type="button" className="cdym-btn cdym-btn-primary cdym-btn-block">Jouer maintenant →</button>
-          )}
-        </div>
-      </Tag>
+      {disabled ? (
+        <div className={desktopClass} style={linkStyle}>{desktopBody}</div>
+      ) : (
+        <Link to={href} className={desktopClass} style={linkStyle}>{desktopBody}</Link>
+      )}
+      {disabled ? (
+        <div className={mobileClass} style={{ textDecoration: 'none' }}>{mobileBody}</div>
+      ) : (
+        <Link to={href} className={mobileClass} style={{ textDecoration: 'none' }}>{mobileBody}</Link>
+      )}
     </>
   )
 }
@@ -439,6 +456,31 @@ function CandyHub({ user, today, filmStatus, seriesStatus, wikiStatus, attemptsU
   )
 }
 
+// ─── Hub skeleton (auth en cours de résolution) ───────────────────────────────
+
+function CandyHubSkeleton() {
+  const block = 'animate-pulse'
+  const bg = { background: 'var(--line)', borderRadius: 12 }
+  return (
+    <div className="cdy-hub" aria-busy="true" aria-label="Chargement">
+      <div className="cdy-hubhead">
+        <div>
+          <div className={block} style={{ ...bg, width: 180, height: 28, marginBottom: 10 }} />
+          <div className={block} style={{ ...bg, width: 220, height: 18 }} />
+        </div>
+      </div>
+      <div className="cdy-daybar">
+        <div className={block} style={{ ...bg, width: '60%', height: 48 }} />
+      </div>
+      <div className="cdy-games">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className={block} style={{ ...bg, minHeight: 220, borderRadius: 20 }} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── iOS banner ───────────────────────────────────────────────────────────────
 
 function IosBanner() {
@@ -467,10 +509,10 @@ export function HomePage() {
   const [shareCopied, setShareCopied] = useState(false)
   const [serverToday, setServerToday] = useState<{ film: TodayStatus; series: TodayStatus; wiki: TodayStatus } | null>(null)
   const [attemptsUsed, setAttemptsUsed] = useState<{ film?: number; series?: number; wiki?: number }>({})
-  const [communityCount, setCommunityCount] = useState<number | null>(null)
+  const [landingStats, setLandingStats] = useState<LandingStatsPayload | null>(null)
 
-  const fetchMe = useAuthStore((s) => s.fetchMe)
   const user    = useAuthStore((s) => s.user)
+  const isLoading = useAuthStore((s) => s.isLoading)
   const { open: openAuth } = useAuthModal()
 
   const today       = getTodayParis()
@@ -482,9 +524,6 @@ export function HomePage() {
   const seriesStatus: TodayStatus = serverToday?.series ?? localSeries
   const wikiStatus:   TodayStatus = serverToday?.wiki   ?? localWiki
 
-  useEffect(() => { void fetchMe() }, [fetchMe])
-
-  // Sync today's statuses from server (connecté)
   useEffect(() => {
     if (!user) { setServerToday(null); return }
     let cancelled = false
@@ -514,9 +553,9 @@ export function HomePage() {
   }, [user, today])
 
   useEffect(() => {
-    if (user) return
-    fetchGlobalStats().then((s) => setCommunityCount(s.totalGames)).catch(() => {})
-  }, [user])
+    if (isLoading || user) return
+    fetchLandingStats().then(setLandingStats).catch(() => {})
+  }, [user, isLoading])
 
   useEffect(() => {
     try {
@@ -528,25 +567,36 @@ export function HomePage() {
   }, [])
 
   function handleShareDay() {
-    const allModes = [
-      { type: 'film' as const,   enabled: true },
-      { type: 'series' as const, enabled: FEATURES.enableSeries },
-      { type: 'wiki' as const,   enabled: FEATURES.enableWiki },
+    const order = [
+      { type: 'film' as const,   enabled: true,                 status: filmStatus,   attempts: attemptsUsed.film },
+      { type: 'series' as const, enabled: FEATURES.enableSeries, status: seriesStatus, attempts: attemptsUsed.series },
+      { type: 'wiki' as const,   enabled: FEATURES.enableWiki,   status: wikiStatus,   attempts: attemptsUsed.wiki },
     ]
-    const games: AllShareGame[] = allModes.filter(m => m.enabled).flatMap((m) => {
-      const state = loadGameState(m.type)
-      if (!state || (state.status !== 'won' && state.status !== 'lost')) return []
-      return [{ mode: m.type, guesses: state.guesses, won: state.status === 'won', maxAttempts: 5 }]
+    const games: AllShareGame[] = order.filter((m) => m.enabled).flatMap((m) => {
+      const local = loadGameState(m.type)
+      if (local && (local.status === 'won' || local.status === 'lost')) {
+        return [{ mode: m.type, guesses: local.guesses, won: local.status === 'won', maxAttempts: 5 }]
+      }
+      // Connecté sans état local (joué ailleurs) : reconstruit une grille depuis le statut serveur.
+      if (m.status === 'won' || m.status === 'lost') {
+        const won = m.status === 'won'
+        const n = won ? Math.min(5, Math.max(1, m.attempts ?? 1)) : 5
+        const guesses: GuessEntry[] = Array.from({ length: n }, (_, i) => ({
+          value: '',
+          status: won && i === n - 1 ? 'correct' : 'wrong',
+          timestamp: 0,
+        }))
+        return [{ mode: m.type, guesses, won, maxAttempts: 5 }]
+      }
+      return []
     })
     if (games.length === 0) return
     const text = buildAllShareText(today, games)
+    const flash = () => { setShareCopied(true); setTimeout(() => setShareCopied(false), 2000) }
     if (navigator.share) {
-      void navigator.share({ text }).catch(() => {})
+      void navigator.share({ text }).then(flash).catch(() => {})
     } else {
-      navigator.clipboard?.writeText(text).then(() => {
-        setShareCopied(true)
-        setTimeout(() => setShareCopied(false), 2000)
-      }).catch(() => {})
+      navigator.clipboard?.writeText(text).then(flash).catch(() => {})
     }
   }
 
@@ -554,7 +604,9 @@ export function HomePage() {
     <div className="cdy" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
       <HomeNav />
 
-      {user ? (
+      {isLoading ? (
+        <CandyHubSkeleton />
+      ) : user ? (
         /* ── Hub connecté (CandyHub) ── */
         <CandyHub
           user={user}
@@ -569,14 +621,13 @@ export function HomePage() {
       ) : (
         /* ── Landing non-connecté (CandyLanding) ── */
         <CandyLanding
-          communityCount={communityCount}
+          landing={landingStats}
           onRegister={() => openAuth('register')}
         />
       )}
 
       <IosBanner />
       <Footer />
-      <AuthModal />
 
       {announcementVariant && (
         <NewModesAnnouncementModal isOpen onClose={() => setAnnouncementVariant(null)} variant={announcementVariant} />

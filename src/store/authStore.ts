@@ -130,7 +130,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
       set({ user: MOCK_USER, serverStats: MOCK_SERVER_STATS, isLoading: false })
       return
     }
-    set({ isLoading: true })
+    const hadUser = useAuthStore.getState().user
+    if (!hadUser) set({ isLoading: true })
     try {
       const { user } = await authGetMe()
       set({ user, isLoading: false })

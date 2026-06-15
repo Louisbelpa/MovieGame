@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { useAuthModal } from '@/components/modals/AuthModal'
 import { loadStats } from '@/lib/storage'
@@ -22,17 +23,17 @@ export function Header({ mode: _mode }: HeaderProps) {
   return (
     <header className="cdy-nav">
       {/* Logo */}
-      <a href="/" className="cdy-logo" style={{ textDecoration: 'none', color: 'var(--ink)' }}>
+      <Link to="/" className="cdy-logo" style={{ textDecoration: 'none', color: 'var(--ink)' }}>
         <span className="cdy-die">?</span>
         <span>Guess<span style={{ color: 'var(--coral)' }}>Today</span></span>
-      </a>
+      </Link>
 
       {/* Navlinks (desktop only) */}
       <nav className="cdy-navlinks hidden lg:flex">
-        <a href="/"        className="cdy-navlink on">Jeux du jour</a>
-        <a href="/profile" className="cdy-navlink">Stats</a>
-        <a href="/classement" className="cdy-navlink">Classement</a>
-        <a href="/friends"    className="cdy-navlink">Amis</a>
+        <Link to="/"        className="cdy-navlink on">Jeux du jour</Link>
+        <Link to="/stats" className="cdy-navlink">Stats</Link>
+        <Link to="/classement" className="cdy-navlink">Classement</Link>
+        <Link to="/friends"    className="cdy-navlink">Amis</Link>
       </nav>
 
       <span className="cdy-spacer" />
@@ -45,8 +46,8 @@ export function Header({ mode: _mode }: HeaderProps) {
           {maxStreak > 0 && (
             <span className="cdy-streak">🔥 {maxStreak}j</span>
           )}
-          <a
-            href="/profile"
+          <Link
+            to="/profile"
             className="cdy-avatar"
             style={{ background: avatarBg(user.avatarUrl), boxShadow: avatarShadow(user.avatarUrl), textDecoration: 'none', fontSize: 14 }}
           >
@@ -55,7 +56,7 @@ export function Header({ mode: _mode }: HeaderProps) {
             ) : (
               user.displayName.charAt(0).toUpperCase()
             )}
-          </a>
+          </Link>
         </>
       ) : (
         <>

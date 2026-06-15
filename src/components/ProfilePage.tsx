@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Pencil,
   Check,
@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { AuthModal, useAuthModal } from '@/components/modals/AuthModal'
-import { authDeleteAccount, authChangePassword, authUploadAvatar, authGetHistory } from '@/api/client'
+import { authDeleteAccount, authChangePassword, authUploadAvatar, authGetHistory, authGetPreferences, authUpdatePreferences, type PreferencesPayload } from '@/api/client'
 import { loadStats, loadHistory } from '@/lib/storage'
 import { parseAvatarHue, avatarBg, avatarShadow } from '@/lib/utils'
 import { FEATURES } from '@/config/features'
@@ -19,6 +19,7 @@ import { useUiPrefsStore } from '@/store/uiPrefsStore'
 import type { GameStats } from '@/types'
 import { Modal } from '@/components/ui/Modal'
 import { Footer } from '@/components/layout/Footer'
+import { MobileTabBar } from '@/components/layout/MobileTabBar'
 type TabMode = 'film' | 'series' | 'wiki' | 'total'
 
 interface SettingsModalProps {
@@ -46,6 +47,27 @@ function SettingsModal({ onClose, user, onSaveName, onSaveHue, onChangePassword,
   const [notifOn, setNotifOn] = useState(false)
   const [leaderOn, setLeaderOn] = useState(true)
   const [publicOn, setPublicOn] = useState(true)
+
+  // Charge les préférences réelles du compte au montage.
+  useEffect(() => {
+    let cancelled = false
+    authGetPreferences()
+      .then((p) => {
+        if (cancelled) return
+        setNotifOn(p.notifDaily)
+        setLeaderOn(p.leaderboardPublic)
+        setPublicOn(p.profilePublic)
+      })
+      .catch(() => { /* garde les valeurs par défaut */ })
+    return () => { cancelled = true }
+  }, [])
+
+  // Toggle optimiste + persistance ; revert si l'API échoue.
+  function togglePref(key: keyof PreferencesPayload, current: boolean, setter: (v: boolean) => void) {
+    const next = !current
+    setter(next)
+    authUpdatePreferences({ [key]: next }).catch(() => setter(current))
+  }
 
   const [pwOpen, setPwOpen] = useState(false)
   const [pwCurrent, setPwCurrent] = useState('')
@@ -177,21 +199,21 @@ function SettingsModal({ onClose, user, onSaveName, onSaveHue, onChangePassword,
               <div className="tt">Rappel quotidien</div>
               <div className="ts">Notif à minuit pour le nouveau défi</div>
             </div>
-            <div className={`cdy-toggle${notifOn ? ' on' : ''}`} onClick={() => setNotifOn((v) => !v)} />
+            <div className={`cdy-toggle${notifOn ? ' on' : ''}`} onClick={() => togglePref('notifDaily', notifOn, setNotifOn)} />
           </div>
           <div className="cdy-toggle-row">
             <div style={{ flex: 1 }}>
               <div className="tt">Classement public</div>
               <div className="ts">Ton score apparaît dans le classement global</div>
             </div>
-            <div className={`cdy-toggle${leaderOn ? ' on' : ''}`} onClick={() => setLeaderOn((v) => !v)} />
+            <div className={`cdy-toggle${leaderOn ? ' on' : ''}`} onClick={() => togglePref('leaderboardPublic', leaderOn, setLeaderOn)} />
           </div>
           <div className="cdy-toggle-row">
             <div style={{ flex: 1 }}>
               <div className="tt">Profil public</div>
               <div className="ts">Les amis peuvent voir ton historique</div>
             </div>
-            <div className={`cdy-toggle${publicOn ? ' on' : ''}`} onClick={() => setPublicOn((v) => !v)} />
+            <div className={`cdy-toggle${publicOn ? ' on' : ''}`} onClick={() => togglePref('profilePublic', publicOn, setPublicOn)} />
           </div>
         </div>
 
@@ -268,18 +290,18 @@ function SettingsModal({ onClose, user, onSaveName, onSaveHue, onChangePassword,
         )}
 
         {/* Danger zone */}
-        <div className="cdy-edit-card" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div className="cdy-edit-danger" style={{ flex: 1 }}>
+        <div className="cdy-edit-card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="cdy-edit-danger">
             <div>
               <div className="dt">Zone de danger</div>
               <div className="ds">Ces actions sont irréversibles.</div>
             </div>
           </div>
-          <div className="cdy-edit-actions">
-            <button type="button" onClick={() => void onLogout()} className="cdy-btn cdy-btn-soft" style={{ gap: 8 }}>
+          <div className="cdy-edit-actions" style={{ flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => void onLogout()} className="cdy-btn cdy-btn-soft" style={{ flex: '1 1 130px', justifyContent: 'center', gap: 8 }}>
               <LogOut size={15} /> Déconnexion
             </button>
-            <button type="button" onClick={() => void onDeleteAccount()} className="cdy-btn cdy-btn-danger" style={{ fontSize: 13 }}>
+            <button type="button" onClick={() => void onDeleteAccount()} className="cdy-btn cdy-btn-danger" style={{ flex: '1 1 130px', justifyContent: 'center', fontSize: 13 }}>
               Supprimer le compte
             </button>
           </div>
@@ -584,15 +606,15 @@ export function ProfilePage() {
     <div style={{ background: 'var(--bg)' }}>
       {/* ── Header Candy ── */}
       <header className="cdy-nav">
-        <a href="/" className="cdy-logo" style={{ textDecoration: 'none', color: 'var(--ink)' }}>
+        <Link to="/" className="cdy-logo" style={{ textDecoration: 'none', color: 'var(--ink)' }}>
           <span className="cdy-die">?</span>
           <span>Guess<span style={{ color: 'var(--coral)' }}>Today</span></span>
-        </a>
+        </Link>
         <nav className="cdy-navlinks hidden lg:flex">
-          <a href="/"        className="cdy-navlink">Jeux du jour</a>
-          <a href="/profile" className="cdy-navlink on">Stats</a>
-          <a href="/friends" className="cdy-navlink">Classement</a>
-          <a href="/friends" className="cdy-navlink">Amis</a>
+          <Link to="/"        className="cdy-navlink">Jeux du jour</Link>
+          <Link to="/profile" className="cdy-navlink on">Stats</Link>
+          <Link to="/friends" className="cdy-navlink">Classement</Link>
+          <Link to="/friends" className="cdy-navlink">Amis</Link>
         </nav>
         <span className="cdy-spacer" />
         {globalCurrentStreak > 0 && (
@@ -780,6 +802,9 @@ export function ProfilePage() {
           </button>
         </div>
       </Modal>
+
+      <div className="lg:hidden" style={{ height: 80 }} />
+      <MobileTabBar activeTab="profile" />
     </div>
   )
 }

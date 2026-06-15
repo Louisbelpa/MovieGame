@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom'
 import { MotionConfig } from 'framer-motion'
 import { Header } from './components/layout/Header'
 import { Footer } from './components/layout/Footer'
@@ -18,11 +18,12 @@ import { loadStats } from './lib/storage'
 import { useAuthStore } from './store/authStore'
 import { AuthModal } from './components/modals/AuthModal'
 import { ResetPasswordPage } from './components/ResetPasswordPage'
-import { PalettePicker } from './components/PalettePicker'
+
 import { FriendsPage } from './components/FriendsPage'
 import { ProfilePage } from './components/ProfilePage'
 import { StatsPage } from './components/StatsPage'
 import { EmailVerificationBanner } from './components/EmailVerificationBanner'
+import { HomePage } from './components/HomePage'
 
 const EMPTY_GLOBAL_STATS: GlobalStatsPayload = {
   totalGames: 0,
@@ -155,15 +156,23 @@ export default function App() {
       <BrowserRouter>
         <AuthShell>
           <Routes>
+            <Route path="/" element={<HomePage />} />
             <Route path="/films/*" element={<GameLayout mode="film" />} />
-            {FEATURES.enableSeries && <Route path="/series/*" element={<GameLayout mode="series" />} />}
-            {FEATURES.enableWiki && <Route path="/wiki/*" element={<GameLayout mode="wiki" />} />}
+            {FEATURES.enableSeries ? (
+              <Route path="/series/*" element={<GameLayout mode="series" />} />
+            ) : (
+              <Route path="/series/*" element={<Navigate to="/films" replace />} />
+            )}
+            {FEATURES.enableWiki ? (
+              <Route path="/wiki/*" element={<GameLayout mode="wiki" />} />
+            ) : (
+              <Route path="/wiki/*" element={<Navigate to="/films" replace />} />
+            )}
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/stats" element={<StatsPage />} />
             <Route path="/friends" element={<FriendsPage />} />
             <Route path="/classement" element={<FriendsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/" element={<Navigate to="/films" replace />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthShell>
@@ -182,7 +191,6 @@ function AuthShell({ children }: { children: React.ReactNode }) {
       <EmailVerificationBanner />
       {children}
       <AuthModal />
-      <PalettePicker />
     </>
   )
 }
@@ -192,7 +200,7 @@ function NotFound() {
     <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-film-black text-film-text px-4 text-center">
       <p className="text-6xl font-title font-bold text-film-gold">404</p>
       <p className="text-film-text-dim">Cette page n'existe pas.</p>
-      <a href="/films" className="text-sm text-film-gold hover:underline">Retour au jeu</a>
+      <Link to="/films" className="text-sm text-film-gold hover:underline">Retour au jeu</Link>
     </div>
   )
 }

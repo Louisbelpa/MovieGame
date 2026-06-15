@@ -24,6 +24,19 @@ export async function scheduleChallenge(date: string, ref: MediaRef): Promise<Ad
   })
 }
 
+// Remplit automatiquement les jours vides avec des fiches inutilisées (triées par qualité/notoriété).
+export async function autoScheduleChallenges(body: {
+  mediaType: 'film' | 'series' | 'wiki'
+  startDate: string
+  days: number
+  minScore?: number | null
+}): Promise<{ ok: boolean; scheduled: number; emptyDays: number; remainingPool: number; scheduledDates?: string[]; note?: string }> {
+  return request('/api/admin/challenges/auto-schedule', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
 export async function updateChallenge(id: number, ref: MediaRef): Promise<AdminChallenge> {
   const body =
     'filmId' in ref && ref.filmId !== undefined

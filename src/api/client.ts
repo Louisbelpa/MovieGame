@@ -175,6 +175,16 @@ export function fetchGlobalStats(): Promise<GlobalStatsPayload> {
   return request<GlobalStatsPayload>('/api/stats')
 }
 
+export interface LandingStatsPayload {
+  challengeDays: number
+  playersPerDay: number
+}
+
+/** GET /api/stats/landing — chiffres réels pour la homepage (jours de défis, joueurs/jour) */
+export function fetchLandingStats(): Promise<LandingStatsPayload> {
+  return request<LandingStatsPayload>('/api/stats/landing')
+}
+
 /** GET /api/stats/challenge?challengeId= — stats communautaires pour ce défi (jour + type) */
 export function fetchChallengeCommunityStats(challengeId: number): Promise<GlobalStatsPayload> {
   const params = new URLSearchParams({ challengeId: String(challengeId) })
@@ -227,6 +237,25 @@ export function authUpdateProfile(data: { displayName?: string; avatarUrl?: stri
   return request<{ user: UserPayload }>('/api/auth/profile', {
     method: 'PUT',
     body: JSON.stringify(data),
+  })
+}
+
+export interface PreferencesPayload {
+  notifDaily: boolean
+  leaderboardPublic: boolean
+  profilePublic: boolean
+}
+
+/** GET /api/auth/preferences — toggles de l'écran profil */
+export function authGetPreferences(): Promise<PreferencesPayload> {
+  return request<PreferencesPayload>('/api/auth/preferences')
+}
+
+/** PATCH /api/auth/preferences — sauvegarde partielle d'un ou plusieurs toggles */
+export function authUpdatePreferences(prefs: Partial<PreferencesPayload>): Promise<PreferencesPayload> {
+  return request<PreferencesPayload>('/api/auth/preferences', {
+    method: 'PATCH',
+    body: JSON.stringify(prefs),
   })
 }
 

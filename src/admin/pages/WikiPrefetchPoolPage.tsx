@@ -1,14 +1,18 @@
 import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronDown, ChevronRight, ExternalLink, Eye, HelpCircle, Loader2, Plus, RefreshCw, UserPlus } from 'lucide-react'
+import { ChevronDown, ChevronRight, DownloadCloud, ExternalLink, Eye, HelpCircle, Loader2, Plus, RefreshCw, Sparkles, Trash2, UserPlus } from 'lucide-react'
 import { AdminLayout } from '../components/AdminLayout'
 import { WikiGamePreviewModal } from '../components/WikiGamePreviewModal'
 import {
   addWikiPrefetchPoolEntry,
+  clearWikiPrefetchPool,
+  generateWikiPrefetchBatch,
   getWikiPrefetchPool,
   getWikiPrefetchSettings,
   importWikiPersonFromPrefetchPool,
+  importWikiPrefetchBatch,
   refetchWikiPrefetchPoolEntry,
+  type WikiCategory,
   type WikipediaFetchPayload,
   type WikiPrefetchPoolEntry,
   type WikiPrefetchPoolHasWikiFilter,
@@ -19,6 +23,25 @@ function statusBadge(status: WikiPrefetchPoolEntry['status']): string {
   if (status === 'processing') return 'bg-amber-100 text-amber-700'
   return 'bg-red-100 text-red-700'
 }
+
+// Badge couleur selon le score de parsing (vert ≥70 / orange 40-69 / rouge <40).
+function scoreBadgeClass(score: number | null | undefined): string {
+  const base = 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums'
+  if (score == null) return `${base} bg-slate-100 text-slate-500`
+  if (score >= 70) return `${base} bg-emerald-100 text-emerald-800`
+  if (score >= 40) return `${base} bg-amber-100 text-amber-900`
+  return `${base} bg-red-100 text-red-800`
+}
+
+const WIKI_CATEGORIES: { value: WikiCategory; label: string }[] = [
+  { value: 'politician', label: 'Politiciens' },
+  { value: 'sportsperson', label: 'Sportifs' },
+  { value: 'actor', label: 'Acteurs' },
+  { value: 'artist', label: 'Artistes' },
+  { value: 'scientist', label: 'Scientifiques' },
+  { value: 'writer', label: 'Écrivains' },
+  { value: 'entrepreneur', label: 'Entrepreneurs' },
+]
 
 const PARIS_TZ = 'Europe/Paris'
 
@@ -386,10 +409,17 @@ export function WikiPrefetchPoolPage() {
   const [wikiPreviewPoolEntryId, setWikiPreviewPoolEntryId] = useState<number | null>(null)
   const [refetchingId, setRefetchingId] = useState<number | null>(null)
   const [importingPoolId, setImportingPoolId] = useState<number | null>(null)
+  const [minScore, setMinScore] = useState<number | null>(null)
+  const [genCategories, setGenCategories] = useState<WikiCategory[]>(['politician', 'sportsperson', 'actor'])
+  const [genCount, setGenCount] = useState(15)
+  const [generating, setGenerating] = useState(false)
+  const [importMinScore, setImportMinScore] = useState(50)
+  const [importingBatch, setImportingBatch] = useState(false)
+  const [clearing, setClearing] = useState(false)
 
   useEffect(() => {
     setPage(1)
-  }, [lang, minFame])
+  }, [lang, minFame, minScore])
 
   const pullPoolPage = useCallback(
     async (targetPage: number) => {
@@ -399,6 +429,7 @@ export function WikiPrefetchPoolPage() {
         page: targetPage,
         pageSize,
         hasWikiPerson: hasWikiPersonFilter,
+        minScore,
       })
       setEntries(data.entries)
       setStats(data.stats)
@@ -407,7 +438,7 @@ export function WikiPrefetchPoolPage() {
       setPage(data.page)
       return data
     },
-    [lang, minFame, pageSize, hasWikiPersonFilter],
+    [lang, minFame, pageSize, hasWikiPersonFilter, minScore],
   )
 
   const load = useCallback((): Promise<void> => {
@@ -513,8 +544,54 @@ export function WikiPrefetchPoolPage() {
               <option value={100}>100</option>
             </select>
           </div>
+          <div className="flex flex-col gap-0.5 flex-1 basis-[calc(50%-0.2rem)] min-w-0 sm:min-w-[8rem] sm:basis-auto sm:flex-none">
+            <label htmlFor="pool-minscore" className="text-[10px] sm:text-xs text-gray-500 leading-tight">Qualité min.</label>
+            <select
+              id="pool-minscore"
+              value={minScore ?? ''}
+              onChange={(e) => {
+                const v = e.target.value
+                setMinScore(v === '' ? null : parseInt(v, 10))
+                setPage(1)
+              }}
+              className="rounded-md sm:rounded-lg border border-gray-300 px-1.5 py-1 sm:px-3 sm:py-2 text-[11px] sm:text-sm bg-white w-full max-sm:min-h-0"
+            >
+              <option value="">Toutes</option>
+              <option value="40">≥ 40</option>
+              <option value="60">≥ 60</option>
+              <option value="70">≥ 70</option>
+              <option value="80">≥ 80</option>
+            </select>
+          </div>
         </div>
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-1.5 sm:gap-2">
+          <button
+            onClick={async () => {
+              if (!window.confirm(
+                'Vider tout le pool de préchargement (et le cache SPARQL) ?\n\n'
+                + 'Cela n’affecte PAS les fiches Personnalités déjà créées. '
+                + 'Le pool se régénérera ensuite avec le parser à jour.'
+              )) return
+              setClearing(true)
+              setError(null)
+              setSuccess(null)
+              try {
+                const r = await clearWikiPrefetchPool()
+                setSuccess(`Pool vidé : ${r.poolDeleted} entrée(s) supprimée(s)${r.cacheDeleted ? `, cache SPARQL réinitialisé (${r.cacheDeleted})` : ''}.`)
+                await pullPoolPage(1)
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'Échec du vidage du pool')
+              } finally {
+                setClearing(false)
+              }
+            }}
+            disabled={clearing || loading}
+            className="inline-flex justify-center items-center gap-1 px-2 py-1 sm:px-3 sm:py-2 text-[11px] sm:text-sm font-medium text-red-700 bg-red-50 rounded-md sm:rounded-lg hover:bg-red-100 disabled:opacity-50 max-sm:min-h-0"
+            title="Supprimer toutes les entrées du pool (sans toucher aux Personnalités)"
+          >
+            {clearing ? <Loader2 size={12} className="animate-spin sm:w-3.5 sm:h-3.5 shrink-0" /> : <Trash2 size={12} className="sm:w-3.5 sm:h-3.5 shrink-0" />}
+            Vider le pool
+          </button>
           <button
             onClick={load}
             disabled={loading}
@@ -592,6 +669,121 @@ export function WikiPrefetchPoolPage() {
         </div>
       </div>
 
+      <div className="mb-2 sm:mb-4 bg-white rounded-lg sm:rounded-xl border border-gray-200 p-2 sm:p-5 space-y-3">
+        <div>
+          <h3 className="text-[11px] sm:text-sm font-semibold text-gray-900 mb-0.5 sm:mb-2 inline-flex items-center gap-1.5">
+            <Sparkles size={14} className="text-indigo-600" aria-hidden /> Génération de masse (ciblée par métier)
+          </h3>
+          <p className="hidden sm:block text-xs text-gray-500 mb-2 leading-relaxed">
+            Remplit le pool avec des profils Wikidata garantis du bon type. Le fetch tourne en arrière-plan — clique <strong>Rafraîchir</strong> pour suivre l’avancement.
+          </p>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {WIKI_CATEGORIES.map((c) => {
+              const active = genCategories.includes(c.value)
+              return (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() =>
+                    setGenCategories((prev) =>
+                      prev.includes(c.value) ? prev.filter((x) => x !== c.value) : [...prev, c.value],
+                    )
+                  }
+                  className={`rounded-full px-2.5 py-1 text-[11px] sm:text-xs font-medium border transition-colors ${
+                    active
+                      ? 'bg-indigo-600 border-indigo-600 text-white'
+                      : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {c.label}
+                </button>
+              )
+            })}
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-col gap-0.5">
+              <label htmlFor="gen-count" className="text-[10px] sm:text-xs text-gray-500">Profils / catégorie</label>
+              <input
+                id="gen-count"
+                type="number"
+                min={1}
+                max={100}
+                value={genCount}
+                onChange={(e) => setGenCount(Math.max(1, Math.min(100, parseInt(e.target.value || '15', 10))))}
+                className="rounded-md border border-gray-300 px-2 py-1 text-[11px] sm:text-sm w-24"
+              />
+            </div>
+            <button
+              type="button"
+              disabled={generating || !enabled || genCategories.length === 0}
+              onClick={async () => {
+                setGenerating(true)
+                setError(null)
+                setSuccess(null)
+                try {
+                  const r = await generateWikiPrefetchBatch({ categories: genCategories, countPerCategory: genCount, minFame, lang })
+                  setSuccess(`${r.queued} profil(s) en cours de récupération (arrière-plan). Rafraîchis pour suivre.`)
+                  await pullPoolPage(1)
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : 'Génération impossible')
+                } finally {
+                  setGenerating(false)
+                }
+              }}
+              className="inline-flex justify-center items-center gap-1 px-3 py-1.5 text-[11px] sm:text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {generating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} aria-hidden />}
+              Générer
+            </button>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-100 pt-3">
+          <h3 className="text-[11px] sm:text-sm font-semibold text-gray-900 mb-0.5 sm:mb-2 inline-flex items-center gap-1.5">
+            <DownloadCloud size={14} className="text-emerald-600" aria-hidden /> Import en masse (fiches prêtes)
+          </h3>
+          <p className="hidden sm:block text-xs text-gray-500 mb-2 leading-relaxed">
+            Crée des fiches Personnalités pour toutes les entrées <strong>prêtes</strong> au-dessus du seuil de qualité (doublons ignorés).
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-col gap-0.5">
+              <label htmlFor="import-minscore" className="text-[10px] sm:text-xs text-gray-500">Qualité min.</label>
+              <input
+                id="import-minscore"
+                type="number"
+                min={0}
+                max={100}
+                value={importMinScore}
+                onChange={(e) => setImportMinScore(Math.max(0, Math.min(100, parseInt(e.target.value || '50', 10))))}
+                className="rounded-md border border-gray-300 px-2 py-1 text-[11px] sm:text-sm w-24"
+              />
+            </div>
+            <button
+              type="button"
+              disabled={importingBatch}
+              onClick={async () => {
+                setImportingBatch(true)
+                setError(null)
+                setSuccess(null)
+                try {
+                  const r = await importWikiPrefetchBatch({ lang, minFame, minScore: importMinScore })
+                  setSuccess(`Import en masse : ${r.created} créée(s), ${r.skipped} ignorée(s), ${r.failed} échec(s).`)
+                  await pullPoolPage(page)
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : 'Import en masse impossible')
+                } finally {
+                  setImportingBatch(false)
+                }
+              }}
+              className="inline-flex justify-center items-center gap-1 px-3 py-1.5 text-[11px] sm:text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {importingBatch ? <Loader2 size={14} className="animate-spin" /> : <DownloadCloud size={14} aria-hidden />}
+              Importer tout (qualité ≥ {importMinScore})
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-4">
         <div className="bg-white border border-gray-200 rounded-lg sm:rounded-xl px-2 py-2 sm:px-4 sm:py-3"><div className="text-[10px] sm:text-xs text-gray-500">Total</div><div className="text-base sm:text-xl font-semibold tabular-nums">{stats.total}</div></div>
         <div className="bg-white border border-gray-200 rounded-lg sm:rounded-xl px-2 py-2 sm:px-4 sm:py-3"><div className="text-[10px] sm:text-xs text-gray-500">Ready</div><div className="text-base sm:text-xl font-semibold text-emerald-700 tabular-nums">{stats.ready}</div></div>
@@ -629,11 +821,8 @@ export function WikiPrefetchPoolPage() {
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusBadge(entry.status)}`}>
                           {entry.status}
                         </span>
-                        <span className="text-xs text-gray-500 tabular-nums text-right">
-                          Parse{' '}
-                          {entry.payload && typeof entry.payload.parse_quality_score === 'number'
-                            ? `${Math.round(entry.payload.parse_quality_score)} %`
-                            : '—'}
+                        <span className={scoreBadgeClass(entry.parse_quality_score)} title="Score de qualité du parsing">
+                          {entry.parse_quality_score != null ? `${entry.parse_quality_score} %` : '—'}
                         </span>
                       </>
                     }
@@ -743,10 +932,15 @@ export function WikiPrefetchPoolPage() {
                       <td className="px-3 py-2 align-top">
                         <PoolEntryTableIdentityCell entry={entry} />
                       </td>
-                      <td className="px-3 py-2 align-top text-xs text-gray-700 tabular-nums">
-                        {entry.payload && typeof entry.payload.parse_quality_score === 'number'
-                          ? `${Math.round(entry.payload.parse_quality_score)} %`
-                          : '—'}
+                      <td className="px-3 py-2 align-top">
+                        <span className={scoreBadgeClass(entry.parse_quality_score)} title="Score de qualité du parsing">
+                          {entry.parse_quality_score != null ? `${entry.parse_quality_score} %` : '—'}
+                        </span>
+                        {entry.parse_warnings.length > 0 ? (
+                          <span className="ml-1 text-[10px] text-amber-700" title={entry.parse_warnings.join(' · ')}>
+                            ⚠{entry.parse_warnings.length}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-3 py-2 font-mono text-xs">{entry.source_slug}</td>
                       <td className="px-3 py-2 font-mono text-xs">{entry.resolved_slug ?? '-'}</td>

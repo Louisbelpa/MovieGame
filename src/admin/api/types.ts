@@ -70,6 +70,8 @@ export interface AdminWikiPerson {
   difficulty: number
   is_active: boolean
   used_dates: string[]
+  parse_quality_score: number | null
+  parse_warnings: string[]
 }
 
 export interface WikiPersonPayload {
@@ -95,9 +97,15 @@ export interface WikiPrefetchPoolEntry {
   expires_at: number
   updated_at: string
   payload: WikipediaFetchPayload | null
+  parse_quality_score: number | null
+  parse_warnings: string[]
+  person_type: string | null
   has_wiki_person: boolean
   wiki_person_id: number | null
 }
+
+export type WikiCategory =
+  | 'politician' | 'sportsperson' | 'actor' | 'artist' | 'scientist' | 'writer' | 'entrepreneur'
 
 export type WikiPrefetchPoolHasWikiFilter = 'all' | 'yes' | 'no'
 
