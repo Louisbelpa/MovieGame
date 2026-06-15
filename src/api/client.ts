@@ -439,3 +439,8 @@ export interface LeaderboardEntry {
 export function friendsGetLeaderboard(): Promise<{ leaderboard: LeaderboardEntry[] }> {
   return request('/api/friends/leaderboard')
 }
+
+/** Classement mondial — top joueurs publics, tous comptes confondus */
+export function friendsGetGlobalLeaderboard(): Promise<{ leaderboard: LeaderboardEntry[] }> {
+  return request('/api/friends/leaderboard/global')
+}

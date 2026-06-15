@@ -7,7 +7,6 @@ import {
   Check,
   Plus,
   X,
-  ChevronLeft,
   UserPlus,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
@@ -18,6 +17,7 @@ import {
   friendsAccept,
   friendsRemove,
   friendsGetLeaderboard,
+  friendsGetGlobalLeaderboard,
   type FriendEntry,
   type FriendScore,
   type PendingEntry,
@@ -398,6 +398,9 @@ export function FriendsPage() {
 
   const [friendsData, setFriendsData] = useState<FriendsResponse | null>(null)
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null)
+  const [scope, setScope] = useState<'friends' | 'global'>('friends')
+  const [globalLeaderboard, setGlobalLeaderboard] = useState<LeaderboardEntry[] | null>(null)
+  const [loadingGlobal, setLoadingGlobal] = useState(false)
   const [loadingFriends, setLoadingFriends] = useState(true)
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true)
 
@@ -433,11 +436,24 @@ export function FriendsPage() {
       .finally(() => setLoadingLeaderboard(false))
   }, [])
 
+  const loadGlobalLeaderboard = useCallback(() => {
+    setLoadingGlobal(true)
+    friendsGetGlobalLeaderboard()
+      .then((r) => setGlobalLeaderboard(r.leaderboard))
+      .catch(() => setGlobalLeaderboard([]))
+      .finally(() => setLoadingGlobal(false))
+  }, [])
+
   useEffect(() => {
     if (!user) { setLoadingFriends(false); setLoadingLeaderboard(false); return }
     loadFriends()
     loadLeaderboard()
   }, [user, loadFriends, loadLeaderboard])
+
+  // Charge le classement mondial à la première bascule sur l'onglet « Mondial ».
+  useEffect(() => {
+    if (scope === 'global' && globalLeaderboard === null) loadGlobalLeaderboard()
+  }, [scope, globalLeaderboard, loadGlobalLeaderboard])
 
   const handleAccept = async (userId: number) => {
     await friendsAccept(userId).catch(() => null)
@@ -452,8 +468,13 @@ export function FriendsPage() {
     void friendsRemove(userId).catch(() => null).then(() => loadFriends())
   }
 
-  // Build table rows based on period + mode
+  // Build table rows based on scope (amis / mondial) + period + mode
   const tableRows: TableRow[] = (() => {
+    if (scope === 'global') {
+      if (!globalLeaderboard) return []
+      // Mondial : on garde tout le monde (y compris soi), classé par victoires.
+      return sortRows(globalLeaderboard.map((e) => leaderboardToRow(e, modeFilter)))
+    }
     if (period === 'today') {
       if (!friendsData) return []
       const rows = sortRows(friendsData.friends.map((f) => friendToRow(f, modeFilter)))
@@ -467,7 +488,7 @@ export function FriendsPage() {
     return sortRows(hasOtherPlayers ? rows : rows.filter((r) => !r.isMe))
   })()
 
-  const loading = period === 'today' ? loadingFriends : loadingLeaderboard
+  const loading = scope === 'global' ? loadingGlobal : (period === 'today' ? loadingFriends : loadingLeaderboard)
   const pending = friendsData?.pending ?? []
   const incoming = pending.filter((p) => p.direction === 'incoming')
   const myCode = friendsData?.myCode ?? null
@@ -478,46 +499,40 @@ export function FriendsPage() {
       {/* Desktop nav */}
       <TopNav />
 
-      {/* Mobile header */}
-      <header
-        className="lg:hidden flex items-center justify-between px-4 py-3 sticky top-0 z-10"
-        style={{ background: 'var(--panel)', borderBottom: '2.5px solid var(--line)' }}
-      >
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            aria-label="Retour"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-2)', padding: 4 }}
-          >
-            <ChevronLeft size={22} />
-          </button>
-          <h1 style={{ fontWeight: 700, fontSize: 17, color: 'var(--ink)' }}>Amis</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {maxStreak > 0 && (
-            <span className="text-xs font-semibold text-amber-400">🔥 {maxStreak}</span>
-          )}
-          {user && (
-            <button
-              type="button"
-              onClick={() => setShowAddModal(true)}
-              aria-label="Ajouter un ami"
-              className="w-7 h-7 rounded-full border border-film-border/60 bg-film-dark/70 flex items-center justify-center text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
-            >
-              <UserPlus size={14} />
-            </button>
-          )}
-          {user ? (
-            <a href="/profile" className="w-7 h-7 rounded-full bg-film-gold/20 border border-film-gold/40 flex items-center justify-center text-xs font-bold text-film-gold overflow-hidden">
-              {user.avatarUrl
-                ? <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />
-                : user.displayName.charAt(0).toUpperCase()
-              }
-            </a>
-          ) : null}
-        </div>
-      </header>
+      {/* Mobile header — masqué sur la vue Classement (titre + toggles déjà dans la section) */}
+      {activeSection !== 'classement' && (
+        <header
+          className="lg:hidden flex items-center justify-between px-4 py-3 sticky top-0 z-10"
+          style={{ background: 'var(--panel)', borderBottom: '2.5px solid var(--line)' }}
+        >
+          <div className="flex items-center gap-2">
+            <h1 style={{ fontWeight: 700, fontSize: 17, color: 'var(--ink)' }}>Amis</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            {maxStreak > 0 && (
+              <span className="text-xs font-semibold text-amber-400">🔥 {maxStreak}</span>
+            )}
+            {user && (
+              <button
+                type="button"
+                onClick={() => setShowAddModal(true)}
+                aria-label="Ajouter un ami"
+                className="w-7 h-7 rounded-full border border-film-border/60 bg-film-dark/70 flex items-center justify-center text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
+              >
+                <UserPlus size={14} />
+              </button>
+            )}
+            {user ? (
+              <a href="/profile" className="w-7 h-7 rounded-full bg-film-gold/20 border border-film-gold/40 flex items-center justify-center text-xs font-bold text-film-gold overflow-hidden">
+                {user.avatarUrl
+                  ? <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />
+                  : user.displayName.charAt(0).toUpperCase()
+                }
+              </a>
+            ) : null}
+          </div>
+        </header>
+      )}
 
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6 lg:py-8">
         {/* Auth gate */}
@@ -560,16 +575,26 @@ export function FriendsPage() {
             {activeSection === 'classement' && (
               <div>
                 {/* Header */}
-                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
                   <div>
-                    <h1 className="cdy-h1b">Classement amis 🏆</h1>
-                    <p className="cdy-lead">Victoires et score moyen — moins d'essais = mieux.</p>
+                    <h1 className="cdy-h1b">{scope === 'global' ? 'Classement mondial 🌍' : 'Classement amis 🏆'}</h1>
+                    <p className="cdy-lead">{scope === 'global' ? 'Les meilleurs joueurs, tous comptes confondus.' : 'Victoires et score moyen — moins d\'essais = mieux.'}</p>
                   </div>
-                  <div className="cdy-seg">
-                    <span className={period === '7d' ? 'on' : ''} style={{ cursor: 'pointer' }}
-                      onClick={() => setPeriod('7d')}>Hebdo</span>
-                    <span className={period === '30d' ? 'on' : ''} style={{ cursor: 'pointer' }}
-                      onClick={() => setPeriod('30d')}>Mensuel</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+                    <div className="cdy-seg">
+                      <span className={scope === 'friends' ? 'on' : ''} style={{ cursor: 'pointer' }}
+                        onClick={() => setScope('friends')}>Amis</span>
+                      <span className={scope === 'global' ? 'on' : ''} style={{ cursor: 'pointer' }}
+                        onClick={() => setScope('global')}>Mondial</span>
+                    </div>
+                    {scope === 'friends' && (
+                      <div className="cdy-seg">
+                        <span className={period === '7d' ? 'on' : ''} style={{ cursor: 'pointer' }}
+                          onClick={() => setPeriod('7d')}>Hebdo</span>
+                        <span className={period === '30d' ? 'on' : ''} style={{ cursor: 'pointer' }}
+                          onClick={() => setPeriod('30d')}>Mensuel</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -613,11 +638,17 @@ export function FriendsPage() {
                   <div className="cdy-card h-40 animate-pulse" style={{ background: 'var(--line)' }} />
                 ) : tableRows.length === 0 ? (
                   <div className="cdy-card" style={{ padding: 40, textAlign: 'center' }}>
-                    <p style={{ color: 'var(--ink-2)', fontSize: 15 }}>Aucun ami pour l'instant.</p>
-                    <button type="button" onClick={() => { setActiveSection('amis'); setShowAddModal(true) }}
-                      className="cdy-btn cdy-btn-primary g-film" style={{ marginTop: 16, padding: '12px 20px' }}>
-                      <Plus size={13} /> Ajouter un ami
-                    </button>
+                    {scope === 'global' ? (
+                      <p style={{ color: 'var(--ink-2)', fontSize: 15 }}>Pas encore de classement — reviens après quelques parties.</p>
+                    ) : (
+                      <>
+                        <p style={{ color: 'var(--ink-2)', fontSize: 15 }}>Aucun ami pour l'instant.</p>
+                        <button type="button" onClick={() => { setActiveSection('amis'); setShowAddModal(true) }}
+                          className="cdy-btn cdy-btn-primary g-film" style={{ marginTop: 16, padding: '12px 20px' }}>
+                          <Plus size={13} /> Ajouter un ami
+                        </button>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="cdy-card" style={{ padding: 0, overflow: 'hidden' }}>

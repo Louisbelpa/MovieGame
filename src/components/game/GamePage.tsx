@@ -342,6 +342,7 @@ export function GamePage({ mode }: GamePageProps) {
                 </div>
                 {isToday ? <span className="tag">Auj.</span> : <span className="tag old" onClick={() => void loadDate(todayParis)} style={{ cursor: 'pointer' }}>Aujourd'hui</span>}
                 <button type="button" onClick={() => void navigateDate('next')} disabled={isLoading || !showNextNav} className={`arrow${!showNextNav ? ' disabled' : ''}`}>›</button>
+                <button type="button" onClick={() => openModal('rules')} className="arrow" aria-label="Comment jouer" title="Comment jouer"><HelpCircle size={18} /></button>
               </div>
               <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
                 <p className="text-4xl">🗓️</p>
@@ -426,25 +427,9 @@ export function GamePage({ mode }: GamePageProps) {
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
-              type="button"
-              onClick={() => openModal('rules')}
-              aria-label="Comment jouer"
-              title="Comment jouer"
-              style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-                border: '1px solid var(--line)', background: 'var(--panel)',
-                color: 'var(--ink-2)', cursor: 'pointer', padding: 0,
-              }}
-            >
-              <HelpCircle size={17} />
-            </button>
-            <span className="cdym-ar-badge">
-              {mode === 'wiki' ? 'Personnalités' : mode === 'series' ? 'Séries' : 'Films'}
-            </span>
-          </div>
+          <span className="cdym-ar-badge">
+            {mode === 'wiki' ? 'Personnalités' : mode === 'series' ? 'Séries' : 'Films'}
+          </span>
         </div>
 
         {/* 1. Date navigator — before slots (Candy spec: ar-top → datenav → slots → media) */}
@@ -476,6 +461,15 @@ export function GamePage({ mode }: GamePageProps) {
             className={`arrow${(!showNextNav || isLoading) ? ' disabled' : ''}`}
             aria-label="Jour suivant"
           >›</button>
+          <button
+            type="button"
+            onClick={() => openModal('rules')}
+            className="arrow"
+            aria-label="Comment jouer"
+            title="Comment jouer"
+          >
+            <HelpCircle size={18} />
+          </button>
         </div>
 
         {/* 2. Attempt slots */}
