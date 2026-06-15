@@ -42,11 +42,11 @@ struct HintCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, minHeight: 64, maxHeight: .infinity, alignment: .leading)
-        .background(Theme.surface)
+        .background(accentColor.opacity(0.12))
         .cornerRadius(Theme.radiusM)
         .overlay(
             RoundedRectangle(cornerRadius: Theme.radiusM)
-                .stroke(isNew ? accentColor.opacity(0.5) : Theme.border, lineWidth: 1)
+                .stroke(accentColor.opacity(isNew ? 0.55 : 0.30), lineWidth: 1.5)
         )
         .scaleEffect(appeared ? 1 : 0.92)
         .opacity(appeared ? 1 : 0)

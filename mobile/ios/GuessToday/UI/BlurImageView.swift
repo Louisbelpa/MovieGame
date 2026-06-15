@@ -37,6 +37,23 @@ struct BlurImageView: View {
         .aspectRatio(isWiki ? nil : 16.0 / 9.0, contentMode: .fill)
         .clipped()
         .cornerRadius(Theme.radiusL)
+        // Wiki : indicateur « photo floue » centré tant que la photo est masquée
+        .overlay {
+            if isWiki && blurRadius > 0 {
+                VStack(spacing: 8) {
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 34, weight: .bold))
+                        .foregroundColor(.white)
+                    Text("Photo floue")
+                        .font(Theme.inter(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(Capsule().fill(.ultraThinMaterial))
+                }
+                .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
+                .allowsHitTesting(false)
+            }
+        }
         // Bottom gradient overlay — mirrors web GamePage image gradient
         .overlay(alignment: .bottom) {
             LinearGradient(

@@ -332,6 +332,11 @@ extension APIClient {
         try await requestVoid("/api/auth/forgot-password", method: "POST", body: Body(email: email))
     }
 
+    func resetPassword(token: String, newPassword: String) async throws {
+        struct Body: Encodable { let token: String; let password: String }
+        try await requestVoid("/api/auth/reset-password", method: "POST", body: Body(token: token, password: newPassword))
+    }
+
     func appleSignIn(identityToken: String, displayName: String?) async throws -> AuthResponse {
         struct Body: Encodable { let identityToken: String; let displayName: String? }
         let r: AuthResponse = try await request("/api/auth/apple", method: "POST", body: Body(identityToken: identityToken, displayName: displayName))
@@ -367,6 +372,15 @@ extension APIClient {
 extension APIClient {
     func serverStats(type: String) async throws -> ServerStats {
         try await request("/api/auth/stats?type=\(type)", requiresAuth: true)
+    }
+
+    func communityStats(challengeId: Int) async throws -> CommunityStats {
+        try await request("/api/stats/challenge?challengeId=\(challengeId)")
+    }
+
+    /// Cumul global communauté, tous défis confondus (table global_stats).
+    func globalStats() async throws -> CommunityStats {
+        try await request("/api/stats")
     }
 
     func importStats(_ stats: LocalStats, for mode: GameMode) async throws {

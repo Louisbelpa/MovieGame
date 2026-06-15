@@ -26,6 +26,9 @@ final class StatsManager {
     private init() { reload() }
 
     func stats(for mode: GameMode) -> LocalStats {
+        #if DEBUG || NRT
+        if FeatureFlags.shared.useMockData { return MockData.localStats(for: mode) }
+        #endif
         switch mode {
         case .film:   return filmStats
         case .series: return seriesStats

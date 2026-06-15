@@ -285,6 +285,33 @@ struct ServerStats: Codable {
     }
 }
 
+// MARK: - Community stats (stats du jour, par défi)
+
+struct CommunityStats: Codable {
+    let totalGames: Int
+    let totalWins: Int
+    let totalLosses: Int
+    let winRate: Int                  // pourcentage entier 0–100 (backend: round(wins/games*100))
+    let winsByAttempt: [String: Int]  // clés "1".."maxAttempts", déjà 0-remplies côté serveur
+
+    /// Victoires par nombre d'essais, ordonné essai 1 → max.
+    var winValues: [Int] {
+        winsByAttempt.keys
+            .compactMap(Int.init)
+            .sorted()
+            .map { winsByAttempt[String($0)] ?? 0 }
+    }
+
+    /// Moyenne d'essais parmi les victoires.
+    var avgAttempts: Double {
+        guard totalWins > 0 else { return 0 }
+        let weighted = winsByAttempt.reduce(0) { acc, kv in
+            acc + (Int(kv.key) ?? 0) * kv.value
+        }
+        return Double(weighted) / Double(totalWins)
+    }
+}
+
 // MARK: - Stats (local tracking)
 
 struct LocalStats: Codable {

@@ -35,6 +35,14 @@ struct RootView: View {
                     .zIndex(2)
             }
         }
+        .sheet(isPresented: Binding(
+            get: { router.pendingResetToken != nil },
+            set: { if !$0 { router.consumeReset() } }
+        )) {
+            if let token = router.pendingResetToken {
+                ResetPasswordView(token: token)
+            }
+        }
         .animation(.easeInOut(duration: 0.42), value: showSplash)
         .animation(.easeInOut(duration: 0.35), value: hasSeenOnboarding)
         .onChange(of: auth.isCheckingSession) { _, isChecking in
@@ -64,17 +72,20 @@ struct RootView: View {
 
             TabView(selection: $selectedTab) {
                 HomeView()
-                    .tabItem { Label("Jouer", systemImage: "gamecontroller") }
+                    .tabItem { Label("Jeux", systemImage: "gamecontroller.fill") }
                     .tag(AppTab.home)
-                NavigationStack { FriendsView() }
-                    .tabItem { Label("Amis", systemImage: "person.2") }
-                    .tag(AppTab.friends)
+                StatsView()
+                    .tabItem { Label("Stats", systemImage: "chart.bar.fill") }
+                    .tag(AppTab.stats)
+                LeaderboardView()
+                    .tabItem { Label("Classement", systemImage: "trophy.fill") }
+                    .tag(AppTab.leaderboard)
                 ProfileView()
-                    .tabItem { Label("Profil", systemImage: "person.circle") }
+                    .tabItem { Label("Profil", systemImage: "person.circle.fill") }
                     .tag(AppTab.profile)
             }
-            .tint(Theme.gold)
-            .background(Theme.background)
+            .tint(Theme.coral)
+            .background(Theme.bg)
         }
         .animation(.easeInOut(duration: 0.25), value: network.isConnected)
         .onChange(of: selectedTab) { _, _ in tabHaptic.selectionChanged() }
@@ -84,14 +95,19 @@ struct RootView: View {
         .onAppear {
             let a = UITabBarAppearance()
             a.configureWithOpaqueBackground()
-            a.backgroundColor = UIColor(Theme.surface)
+            a.backgroundColor = UIColor(Theme.panel)
+            a.shadowColor = UIColor(Theme.line)
+            // État non sélectionné = ink-3 ; sélectionné = accent (via .tint).
+            let unselected = UIColor(Theme.ink3)
+            a.stackedLayoutAppearance.normal.iconColor = unselected
+            a.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: unselected]
             UITabBar.appearance().standardAppearance = a
             UITabBar.appearance().scrollEdgeAppearance = a
         }
     }
 }
 
-enum AppTab: Hashable { case home, friends, profile }
+enum AppTab: Hashable { case home, stats, leaderboard, profile }
 
 // ─── Splash (Lottie) ──────────────────────────────────────────────────────────
 

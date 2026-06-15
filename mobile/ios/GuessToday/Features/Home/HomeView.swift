@@ -33,6 +33,13 @@ final class HomeViewModel {
     private let orderedModes: [GameMode] = [.film, .series, .wiki]
 
     func load(isRefresh: Bool = false) async {
+        #if DEBUG || NRT
+        if FeatureFlags.shared.useMockData {
+            loadMockStatuses()
+            isLoading = false
+            return
+        }
+        #endif
         if !isRefresh { isLoading = true }
         defer { isLoading = false }
         await withTaskGroup(of: Void.self) { group in
@@ -126,6 +133,22 @@ final class HomeViewModel {
         }
     }
 
+    #if DEBUG || NRT
+    private func loadMockStatuses() {
+        for mode in orderedModes {
+            let m = MockData.hubStatus(for: mode)
+            let s = MockData.localStats(for: mode)
+            statuses[mode] = DailyChallengeStatus(
+                mode: mode, challengeNumber: m.number, outcome: m.outcome,
+                attemptsUsed: m.attemptsUsed, maxAttempts: 5,
+                streak: s.currentStreak, wins: s.wins, gamesPlayed: s.gamesPlayed, maxStreak: s.maxStreak
+            )
+        }
+        failedModes.removeAll(); noChallengeModes.removeAll()
+        friendsPlayedCount = 3
+    }
+    #endif
+
     private func loadFriends() async {
         let today = todayParis()
         if let payload = try? await APIClient.shared.friends(date: today) {
@@ -187,49 +210,24 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background
-                Theme.background.ignoresSafeArea()
-
-                // Ambient glow — mirrors web radial-gradient
-                GeometryReader { geo in
-                    ZStack {
-                        RadialGradient(
-                            colors: [Theme.modeFilm.opacity(0.10), .clear],
-                            center: UnitPoint(x: 0.1, y: 0.04),
-                            startRadius: 0,
-                            endRadius: geo.size.width * 0.7
-                        )
-                        RadialGradient(
-                            colors: [Theme.modeSeries.opacity(0.07), .clear],
-                            center: UnitPoint(x: 0.92, y: 0.88),
-                            startRadius: 0,
-                            endRadius: geo.size.width * 0.65
-                        )
-                    }
-                }
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
+                Theme.bg.ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 0) {
-                        // ── Header ──────────────────────────────
+                    VStack(spacing: Theme.spacing16) {
+                        // ── Header compact ──────────────────────
                         HomeHeaderBar(vm: vm)
-                            .padding(.horizontal, Theme.spacing16)
-                            .padding(.top, Theme.spacing8)
-                            .padding(.bottom, Theme.spacing16)
+                            .padding(.top, Theme.spacing4)
 
-                        // ── Hero ────────────────────────────────
-                        HeroSection(vm: vm)
-                            .padding(.horizontal, Theme.spacing16)
-                            .padding(.bottom, Theme.spacing24)
+                        // ── Page header ─────────────────────────
+                        HubPageHeader(vm: vm)
 
-                        // ── Défis section ───────────────────────
-                        VStack(spacing: Theme.spacing8) {
-                            ChallengesSectionHeader(vm: vm)
-                                .padding(.horizontal, Theme.spacing16)
+                        // ── Progression du jour ─────────────────
+                        DayProgressChip(vm: vm)
 
+                        // ── 3 cartes de jeu (sans spoiler) ──────
+                        VStack(spacing: Theme.spacing12) {
                             ForEach([GameMode.film, .series, .wiki], id: \.title) { mode in
-                                DayChallengeCard(
+                                CandyGameCard(
                                     mode: mode,
                                     status: vm.statuses[mode],
                                     isLoading: vm.isLoading,
@@ -238,32 +236,24 @@ struct HomeView: View {
                                     isNextToPlay: !vm.isLoading && vm.nextToPlayMode == mode,
                                     onRetry: { Task { await vm.reload(mode: mode) } }
                                 ) { selectedMode = mode }
-                                .padding(.horizontal, Theme.spacing16)
                             }
                         }
                         .opacity(cardsAppeared ? 1 : 0)
                         .offset(y: cardsAppeared ? 0 : 18)
-                        .padding(.bottom, Theme.spacing20)
 
-                        // ── Stats + Countdown ────────────────────
-                        StatsCountdownBar(vm: vm)
-                            .padding(.horizontal, Theme.spacing16)
-                            .padding(.bottom, Theme.spacing16)
+                        // ── Récap score du jour ─────────────────
+                        ScoreRecapCard(vm: vm)
 
-                        // ── Friends snippet ──────────────────────
+                        // ── Amis ────────────────────────────────
                         if let count = vm.friendsPlayedCount {
                             FriendsSnippet(count: count)
-                                .padding(.horizontal, Theme.spacing16)
-                                .padding(.bottom, Theme.spacing24)
                         }
 
-                        // ── Notification promo ──────────────────────────────────────
                         NotificationPromoCard()
-                            .padding(.horizontal, Theme.spacing16)
-                            .padding(.bottom, Theme.spacing16)
 
-                        Spacer(minLength: Theme.spacing24)
+                        Spacer(minLength: Theme.spacing16)
                     }
+                    .padding(.horizontal, Theme.spacing16)
                     .animation(.easeInOut(duration: 0.3), value: vm.isLoading)
                 }
                 .refreshable { await vm.load(isRefresh: true) }
@@ -311,132 +301,124 @@ private struct HomeHeaderBar: View {
 
     var body: some View {
         HStack(spacing: Theme.spacing8) {
-            // Logo lockup — mirrors web Header
-            ApertureLockup(iconSize: 22, fontSize: 22)
+            // Logo glyphe Candy
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(Theme.coral)
+                    .frame(width: 30, height: 30)
+                    .overlay(Image(systemName: "sparkles").font(.system(size: 15, weight: .bold)).foregroundColor(.white))
+                    .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.coralDark).offset(y: 3))
+                Text("GuessToday")
+                    .font(Theme.fraunces(size: 19))
+                    .foregroundColor(Theme.ink)
+            }
 
             Spacer()
 
-            // Streak pill — mirrors web Header desktop pill
+            // Pastille série
             if !vm.isLoading && vm.currentStreak > 0 {
                 HStack(spacing: 4) {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 10))
-                    Text("\(vm.currentStreak)j")
-                        .font(Theme.inter(size: 11, weight: .semibold))
+                    Text("🔥").font(.system(size: 12))
+                    Text("\(vm.currentStreak)")
+                        .font(Theme.mono(size: 13, weight: .bold))
                 }
-                .foregroundColor(Theme.amber)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
-                .background(Theme.amber.opacity(0.12))
-                .cornerRadius(20)
-                .overlay(Capsule().stroke(Theme.amber.opacity(0.25), lineWidth: 1))
+                .foregroundColor(Theme.flame)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule().fill(Theme.flameSoft)
+                        .background(Capsule().fill(Color(hex: "#ffe2bd")).offset(y: 3))
+                )
             }
 
-            // Avatar or login icon
-            if auth.isLoggedIn, let user = auth.user {
-                NavigationLink(destination: ProfileView()) {
-                    Group {
-                        if let url = user.avatarUrl, let imageURL = URL(string: url.hasPrefix("/") ? APIClient.baseURL + url : url) {
-                            AsyncImage(url: imageURL) { img in
-                                img.resizable().scaledToFill()
-                            } placeholder: {
-                                Text(user.displayName.prefix(1).uppercased())
-                                    .font(Theme.inter(size: 13, weight: .bold))
-                                    .foregroundColor(Theme.gold)
-                            }
-                        } else {
+            // Avatar
+            NavigationLink(destination: ProfileView()) {
+                Group {
+                    if let user = auth.user, let url = user.avatarUrl,
+                       let imageURL = URL(string: url.hasPrefix("/") ? APIClient.baseURL + url : url) {
+                        AsyncImage(url: imageURL) { img in img.resizable().scaledToFill() } placeholder: {
                             Text(user.displayName.prefix(1).uppercased())
-                                .font(Theme.inter(size: 13, weight: .bold))
-                                .foregroundColor(Theme.gold)
+                                .font(Theme.inter(size: 14, weight: .bold)).foregroundColor(.white)
                         }
+                    } else if let user = auth.user {
+                        Text(user.displayName.prefix(1).uppercased())
+                            .font(Theme.inter(size: 14, weight: .bold)).foregroundColor(.white)
+                    } else {
+                        Image(systemName: "person.fill").font(.system(size: 15, weight: .bold)).foregroundColor(.white)
                     }
-                    .frame(width: 32, height: 32)
-                    .background(Theme.gold.opacity(0.18))
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Theme.gold.opacity(0.38), lineWidth: 1))
                 }
-                .buttonStyle(.plain)
-            } else {
-                NavigationLink(destination: ProfileView()) {
-                    Image(systemName: "person.circle")
-                        .font(.system(size: 22))
-                        .foregroundColor(Theme.textDim)
-                        .frame(width: 36, height: 36)
-                }
-                .buttonStyle(.plain)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(Theme.grape))
+                .background(Circle().fill(Theme.grapeDark).offset(y: 3))
+                .clipShape(Circle())
             }
+            .buttonStyle(.plain)
         }
     }
 }
 
-// MARK: - Hero section
+// MARK: - Page header
 
-private struct HeroSection: View {
+private struct HubPageHeader: View {
+    @Environment(AuthViewModel.self) var auth
     let vm: HomeViewModel
 
+    private var firstName: String {
+        guard let name = auth.user?.displayName, !name.isEmpty else { return "toi" }
+        return name.split(separator: " ").first.map(String.init) ?? name
+    }
     private var todayLabel: String {
-        Date().formatted(
-            .dateTime
-                .weekday(.wide)
-                .day()
-                .month(.wide)
-                .locale(Locale(identifier: "fr_FR"))
-        ).capitalized
+        Date().formatted(.dateTime.weekday(.wide).day().month(.wide).locale(Locale(identifier: "fr_FR"))).capitalized
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(todayLabel.uppercased())
-                .font(Theme.inter(size: 10, weight: .semibold))
-                .tracking(1.4)
-                .foregroundColor(Theme.muted)
-
-            Text("À toi de trouver.")
-                .font(Theme.fraunces(size: 26))
-                .foregroundColor(Theme.text)
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Salut \(firstName) 👋")
+                .font(Theme.fraunces(size: 27))
+                .foregroundColor(Theme.ink)
+            Text(todayLabel)
+                .font(Theme.mono(size: 12, weight: .medium))
+                .foregroundColor(Theme.ink2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-// MARK: - Challenges section header
+// MARK: - Day progress chip
 
-private struct ChallengesSectionHeader: View {
+private struct DayProgressChip: View {
     let vm: HomeViewModel
+    private let modes: [GameMode] = [.film, .series, .wiki]
 
     var body: some View {
         HStack {
-            Text("DÉFIS DU JOUR")
-                .font(Theme.inter(size: 11, weight: .semibold))
-                .tracking(1.4)
-                .foregroundColor(Theme.muted)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Défis du jour")
+                    .font(Theme.inter(size: 15, weight: .semibold))
+                    .foregroundColor(Theme.ink)
+                Text("\(vm.completedToday)/\(modes.count) terminé\(vm.completedToday > 1 ? "s" : "")")
+                    .font(Theme.mono(size: 11, weight: .medium))
+                    .foregroundColor(Theme.ink2)
+            }
             Spacer()
-            if vm.isLoading {
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Theme.surfaceAlt)
-                    .frame(width: 36, height: 12)
-                    .shimmer()
-            } else {
-                let c = vm.completedToday
-                let total = vm.statuses.count
-                HStack(spacing: 4) {
-                    Text("\(c)/\(total)")
-                        .font(Theme.inter(size: 12, weight: .semibold))
-                        .foregroundColor(total > 0 && c == total ? Theme.green : Theme.textDim)
-                    if c > 0 {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(total > 0 && c == total ? Theme.green : Theme.textDim)
-                    }
+            HStack(spacing: 8) {
+                ForEach(modes, id: \.title) { mode in
+                    let done = vm.statuses[mode]?.isPlayed ?? false
+                    Circle()
+                        .fill(done ? Theme.correct : Theme.line)
+                        .frame(width: 12, height: 12)
+                        .background(done ? Circle().fill(Theme.correctDark).offset(y: 2) : nil)
                 }
             }
         }
+        .padding(Theme.spacing16)
+        .candyCard(radius: Theme.radiusM)
     }
 }
 
-// MARK: - Challenge card (immersive, aligned with web homepage cards)
+// MARK: - Candy game card (en-tête coloré + corps, SANS image — anti-spoiler)
 
-private struct DayChallengeCard: View {
+private struct CandyGameCard: View {
     let mode: GameMode
     let status: DailyChallengeStatus?
     let isLoading: Bool
@@ -446,314 +428,156 @@ private struct DayChallengeCard: View {
     let onRetry: () -> Void
     let onTap: () -> Void
 
-    private var modeColor: Color { mode.color }
+    private var isDone: Bool { status?.isWon == true || status?.isLost == true }
 
     var body: some View {
         Button(action: {
             if noChallenge { return }
             if loadFailed { onRetry() } else { onTap() }
         }) {
-            ZStack(alignment: .topLeading) {
-                // Atmospheric background — radial glow at top like web `atmosphere-film`
-                GeometryReader { geo in
-                    ZStack {
-                        Theme.surface
-                        RadialGradient(
-                            colors: [modeColor.opacity(0.13), .clear],
-                            center: UnitPoint(x: 0.5, y: -0.1),
-                            startRadius: 0,
-                            endRadius: geo.size.width * 0.85
-                        )
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 0) {
-                    // Top row: icon + challenge number
-                    HStack(alignment: .top) {
-                        ZStack {
-                            Circle()
-                                .fill(modeColor.opacity(0.15))
-                                .frame(width: 48, height: 48)
-                            Circle()
-                                .stroke(modeColor.opacity(0.22), lineWidth: 1)
-                                .frame(width: 48, height: 48)
-                            Image(systemName: modeIcon)
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundColor(modeColor)
-                        }
-
-                        Spacer()
-
+            VStack(spacing: 0) {
+                // En-tête coloré
+                HStack(spacing: Theme.spacing12) {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .fill(Color.white.opacity(0.22))
+                        .frame(width: 44, height: 44)
+                        .overlay(Image(systemName: mode.iconFilled).font(.system(size: 20, weight: .bold)).foregroundColor(.white))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(mode.title)
+                            .font(Theme.fraunces(size: 18))
+                            .foregroundColor(.white)
                         if let n = status?.challengeNumber {
-                            Text("#\(n)")
-                                .font(Theme.inter(size: 11, weight: .medium))
-                                .foregroundColor(Theme.textDim)
-                                .padding(.top, 4)
+                            Text("Défi #\(n)")
+                                .font(Theme.mono(size: 11, weight: .semibold))
+                                .foregroundColor(.white.opacity(0.85))
                         }
                     }
-                    .padding(.bottom, Theme.spacing12)
-
-                    // Mode name
-                    Text(modeLabel)
-                        .font(Theme.fraunces(size: 22))
-                        .foregroundColor(Theme.text)
-                        .padding(.bottom, 4)
-
-                    // Status / description line
-                    statusLine
-                        .padding(.bottom, Theme.spacing16)
-
-                    // CTA
-                    ctaRow
+                    Spacer()
+                    statusBadge
                 }
-                .padding(Theme.spacing16)
+                .padding(Theme.spacing14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(mode.color)
+
+                // Corps
+                bodyContent
+                    .padding(Theme.spacing14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Theme.panel)
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 168)
-            .cornerRadius(18)
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(borderColor, lineWidth: isNextToPlay ? 1.5 : 1)
-            )
+            .clipShape(RoundedRectangle(cornerRadius: Theme.radiusL, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.radiusL, style: .continuous).strokeBorder(Theme.line, lineWidth: 2.5))
+            .background(RoundedRectangle(cornerRadius: Theme.radiusL, style: .continuous).fill(Theme.line2).offset(y: 6))
         }
         .buttonStyle(CardPressStyle())
         .disabled(noChallenge)
     }
 
-    // MARK: - Status line
+    @ViewBuilder private var statusBadge: some View {
+        if isDone {
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark").font(.system(size: 10, weight: .bold))
+                Text("Fini").font(Theme.inter(size: 12, weight: .semibold))
+            }
+            .foregroundColor(mode.color)
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .background(Capsule().fill(.white))
+        } else if status?.isInProgress == true {
+            Text("En cours").font(Theme.inter(size: 12, weight: .semibold))
+                .foregroundColor(.white).padding(.horizontal, 10).padding(.vertical, 5)
+                .background(Capsule().fill(Color.white.opacity(0.22)))
+        } else if !noChallenge {
+            Text("À jouer").font(Theme.inter(size: 12, weight: .semibold))
+                .foregroundColor(.white).padding(.horizontal, 10).padding(.vertical, 5)
+                .background(Capsule().fill(Color.white.opacity(0.22)))
+        }
+    }
 
-    @ViewBuilder
-    private var statusLine: some View {
+    @ViewBuilder private var bodyContent: some View {
         if isLoading && status == nil && !loadFailed && !noChallenge {
-            RoundedRectangle(cornerRadius: 3)
-                .fill(Theme.surfaceAlt)
-                .frame(width: 120, height: 12)
-                .shimmer()
+            RoundedRectangle(cornerRadius: 6).fill(Theme.surfaceAlt).frame(height: 28).shimmer()
         } else if noChallenge {
-            Text("Pas de défi aujourd'hui")
-                .font(Theme.inter(size: 13))
-                .foregroundColor(Theme.muted)
+            Text("Pas de défi aujourd'hui").font(Theme.inter(size: 13)).foregroundColor(Theme.ink2)
         } else if loadFailed {
-            Text("Impossible de charger — Réessayer")
-                .font(Theme.inter(size: 13))
-                .foregroundColor(Theme.red)
-        } else if let s = status, s.isWon {
-            HStack(spacing: 5) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 13))
-                    .foregroundColor(Theme.green)
-                Text("Gagné en \(s.attemptsUsed)/\(s.maxAttempts)")
-                    .font(Theme.inter(size: 13))
-                    .foregroundColor(Theme.green)
-            }
-        } else if let s = status, s.isLost {
-            HStack(spacing: 5) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 13))
-                    .foregroundColor(Theme.red.opacity(0.8))
-                Text("Non trouvé")
-                    .font(Theme.inter(size: 13))
-                    .foregroundColor(Theme.red.opacity(0.8))
-            }
-        } else if let s = status, s.isInProgress {
-            Text("En cours — \(s.maxAttempts - s.attemptsUsed) essai\(s.maxAttempts - s.attemptsUsed > 1 ? "s" : "") restant\(s.maxAttempts - s.attemptsUsed > 1 ? "s" : "")")
-                .font(Theme.inter(size: 13))
-                .foregroundColor(modeColor)
-        } else {
-            Text(modeDescription)
-                .font(Theme.inter(size: 13))
-                .foregroundColor(Theme.textDim)
-        }
-    }
-
-    // MARK: - CTA row
-
-    @ViewBuilder
-    private var ctaRow: some View {
-        HStack {
-            if !noChallenge {
-                ctaButton
-            }
-            Spacer()
-            // Streak pill if exists
-            if let s = status, s.streak > 1 {
-                HStack(spacing: 3) {
-                    Text("🔥")
-                        .font(.system(size: 11))
-                    Text("\(s.streak)")
-                        .font(Theme.inter(size: 11, weight: .semibold))
-                        .foregroundColor(Theme.amber)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Theme.amber.opacity(0.10))
-                .cornerRadius(20)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var ctaButton: some View {
-        if isLoading && status == nil {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Theme.surfaceAlt)
-                .frame(width: 80, height: 30)
-                .shimmer()
-        } else if loadFailed {
-            EmptyView()
-        } else if let s = status {
-            if s.isWon || s.isLost {
-                // Replay / see result
+            Text("Impossible de charger — Toucher pour réessayer").font(Theme.inter(size: 13)).foregroundColor(Theme.wrong)
+        } else if let s = status, isDone {
+            HStack {
+                AttemptPips(used: s.attemptsUsed, won: s.isWon, max: s.maxAttempts, mode: mode)
+                Spacer()
                 HStack(spacing: 4) {
-                    Text("Voir")
-                        .font(Theme.inter(size: 12, weight: .semibold))
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 11, weight: .semibold))
+                    Text(s.isWon ? "Gagné" : "Perdu")
+                        .font(Theme.inter(size: 13, weight: .semibold))
+                        .foregroundColor(s.isWon ? Theme.correctDark : Theme.wrongDark)
+                    Image(systemName: "arrow.right").font(.system(size: 11, weight: .bold)).foregroundColor(Theme.ink3)
                 }
-                .foregroundColor(Theme.textDim)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(Theme.surfaceAlt)
-                .cornerRadius(8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border, lineWidth: 1))
-            } else {
-                // In progress
-                HStack(spacing: 4) {
-                    Text("Continuer")
-                        .font(Theme.inter(size: 12, weight: .semibold))
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 11, weight: .semibold))
-                }
-                .foregroundColor(Theme.primaryButtonFg)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(modeColor)
-                .cornerRadius(8)
             }
-        } else if isNextToPlay {
-            HStack(spacing: 4) {
-                Text("Jouer")
-                    .font(Theme.inter(size: 13, weight: .bold))
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 12, weight: .bold))
-            }
-            .foregroundColor(Theme.primaryButtonFg)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 9)
-            .background(modeColor)
-            .cornerRadius(10)
         } else {
-            HStack(spacing: 4) {
-                Text("Jouer")
-                    .font(Theme.inter(size: 12, weight: .semibold))
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 11, weight: .semibold))
+            HStack {
+                Text(status?.isInProgress == true ? "Continue ta partie" : "Devine le défi du jour")
+                    .font(Theme.inter(size: 13)).foregroundColor(Theme.ink2)
+                Spacer()
+                HStack(spacing: 5) {
+                    Text(status?.isInProgress == true ? "Continuer" : "Jouer")
+                        .font(Theme.inter(size: 14, weight: .bold))
+                    Image(systemName: "arrow.right").font(.system(size: 12, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 14).padding(.vertical, 9)
+                .background(
+                    Capsule().fill(mode.color)
+                        .background(Capsule().fill(mode.accentDark).offset(y: 3))
+                )
             }
-            .foregroundColor(modeColor)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(modeColor.opacity(0.10))
-            .cornerRadius(8)
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(modeColor.opacity(0.25), lineWidth: 1))
-        }
-    }
-
-    // MARK: - Colors & labels
-
-    private var borderColor: Color {
-        if loadFailed  { return Theme.red.opacity(0.30) }
-        if let s = status {
-            if s.isWon  { return Theme.green.opacity(0.30) }
-            if s.isLost { return Theme.red.opacity(0.22) }
-        }
-        return Theme.border  // neutre comme sur le web (rgba(255,255,255,0.06))
-    }
-
-    private var modeIcon: String { mode.icon }
-
-    private var modeLabel: String {
-        switch mode {
-        case .film:   return "Films"
-        case .series: return "Séries"
-        case .wiki:   return "Personnalités"
-        }
-    }
-
-    private var modeDescription: String {
-        switch mode {
-        case .film:   return "Identifie le film depuis une scène"
-        case .series: return "Identifie la série depuis une scène"
-        case .wiki:   return "Devine la personnalité du jour"
         }
     }
 }
 
-// MARK: - Stats + countdown bar
+private struct AttemptPips: View {
+    let used: Int
+    let won: Bool
+    let max: Int
+    let mode: GameMode
 
-private struct StatsCountdownBar: View {
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<max, id: \.self) { i in
+                Circle()
+                    .fill(color(for: i))
+                    .frame(width: 11, height: 11)
+            }
+        }
+    }
+
+    private func color(for i: Int) -> Color {
+        guard i < used else { return Theme.line2 }
+        // dernière tentative = correcte si gagné, sinon ratée
+        if won && i == used - 1 { return Theme.correct }
+        return won ? mode.color : Theme.wrong
+    }
+}
+
+// MARK: - Récap score du jour
+
+private struct ScoreRecapCard: View {
     let vm: HomeViewModel
 
     var body: some View {
-        HStack(spacing: 0) {
-            StatCell(
-                value: vm.isLoading ? "—" : "\(vm.totalPlayed)",
-                label: "JOUÉS",
-                isLoading: vm.isLoading
-            )
-
-            Divider()
-                .frame(width: 1, height: 36)
-                .background(Theme.border)
-
-            let wins = vm.isLoading ? 0 : vm.totalWins
-            let played = vm.isLoading ? 1 : max(1, vm.totalPlayed)
-            StatCell(
-                value: vm.isLoading ? "—" : "\(Int(round(Double(wins) / Double(played) * 100)))%",
-                label: "VICTOIRES",
-                isLoading: vm.isLoading
-            )
-
-            Divider()
-                .frame(width: 1, height: 36)
-                .background(Theme.border)
-
-            CountdownCell()
-        }
-        .padding(.vertical, Theme.spacing12)
-        .background(Theme.surface)
-        .cornerRadius(Theme.radiusL)
-        .overlay(RoundedRectangle(cornerRadius: Theme.radiusL).stroke(Theme.border, lineWidth: 1))
-    }
-}
-
-private struct StatCell: View {
-    let value: String
-    let label: String
-    var isLoading: Bool = false
-
-    var body: some View {
-        VStack(spacing: 3) {
-            if isLoading {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Theme.surfaceAlt)
-                    .frame(width: 36, height: 22)
-                    .shimmer()
-            } else {
-                Text(value)
-                    .font(Theme.fraunces(size: 22))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Theme.goldLight, Theme.gold],
-                            startPoint: .top, endPoint: .bottom
-                        )
-                    )
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("TON SCORE DU JOUR")
+                    .font(Theme.mono(size: 11, weight: .bold))
+                    .tracking(1.1)
+                    .foregroundColor(Theme.ink2)
+                Text("\(vm.completedToday)/3 jeux")
+                    .font(Theme.fraunces(size: 24))
+                    .foregroundColor(Theme.ink)
             }
-            Text(label)
-                .font(Theme.inter(size: 9, weight: .semibold))
-                .tracking(1.1)
-                .foregroundColor(Theme.muted)
+            Spacer()
+            CountdownCell()
+                .frame(width: 130)
         }
-        .frame(maxWidth: .infinity)
+        .padding(Theme.spacing16)
+        .candyCard(radius: Theme.radiusM, fill: Theme.coralSoft, border: Theme.coralSoft, shadow: Color(hex: "#f7cbb8"))
     }
 }
 

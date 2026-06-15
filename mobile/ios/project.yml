@@ -78,8 +78,8 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        UIStatusBarStyle: UIStatusBarStyleLightContent
-        UIUserInterfaceStyle: Dark
+        UIStatusBarStyle: UIStatusBarStyleDarkContent
+        UIUserInterfaceStyle: Light
         NSAppTransportSecurity:
           NSExceptionDomains:
             localhost:

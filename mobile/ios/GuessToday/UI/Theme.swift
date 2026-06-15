@@ -1,48 +1,75 @@
 import SwiftUI
 
 enum Theme {
-    // MARK: - Base colours (Minuit Studio — dark cinema theme)
-    static let background   = Color(hex: "#0b0b1a")  // --color-film-black (fond global)
-    static let surface      = Color(hex: "#13132b")  // --color-film-surface (cartes, inputs, modales)
-    static let surfaceAlt   = Color(hex: "#1a1a38")  // --color-film-gray (surface tertiaire)
-    static let border       = Color(red: 1, green: 1, blue: 1, opacity: 0.09)   // rgba(255,255,255,0.09)
-    static let muted        = Color(red: 1, green: 1, blue: 1, opacity: 0.18)   // rgba(255,255,255,0.18)
-    static let text         = Color(hex: "#ece9e2")  // --color-film-text (blanc chaud)
-    static let textDim      = Color(red: 236/255, green: 233/255, blue: 226/255, opacity: 0.48)
-    static let gold         = Color(hex: "#f5c842")  // --color-film-gold
-    static let goldLight    = Color(hex: "#ffe07a")  // --color-film-gold-light
-    static let green        = Color(hex: "#2fc87a")  // --color-film-green
-    static let red          = Color(hex: "#ff5252")  // --color-film-red
-    static let amber        = Color(hex: "#f0a820")  // --color-film-amber
+    // MARK: - Candy surfaces & ink
+    static let bg           = Color(hex: "#fff4ea")  // --bg (crème)
+    static let bg2          = Color(hex: "#ffefe1")  // --bg-2
+    static let panel        = Color(hex: "#ffffff")  // --panel (cartes)
+    static let ink          = Color(hex: "#3c3050")  // --ink (texte principal, prune)
+    static let ink2         = Color(hex: "#9a8ca5")  // --ink-2
+    static let ink3         = Color(hex: "#bcaec3")  // --ink-3 (placeholder)
+    static let line         = Color(hex: "#f0e3d6")  // --line (bordures)
+    static let line2        = Color(hex: "#ecd9c7")  // --line-2 (ombres dures neutres)
 
-    // MARK: - Mode colours
-    static let modeFilm     = Color(hex: "#f5c842")  // --sg-films (gold chaud)
-    static let modeSeries   = Color(hex: "#4ecdc4")  // --sg-series (teal menthe)
-    static let modeWiki     = Color(hex: "#ff6b9d")  // --sg-wiki (rose)
+    // MARK: - Semantic
+    static let correct      = Color(hex: "#27c08a")
+    static let correctDark  = Color(hex: "#159468")
+    static let correctSoft  = Color(hex: "#d6f6ea")
+    static let wrong        = Color(hex: "#ff6b81")
+    static let wrongDark    = Color(hex: "#e0445d")
+    static let wrongSoft    = Color(hex: "#ffe3e7")
+    static let flame        = Color(hex: "#ff9436")
+    static let flameSoft    = Color(hex: "#fff5e6")
+    static let sun          = Color(hex: "#ffce4a")
+    static let sunDark      = Color(hex: "#e0a91f")
 
-    // MARK: - Dedicated text colour for primary (gold) buttons
-    static let primaryButtonFg = Color(hex: "#0b0b1a")  // dark bg — lisible sur fond gold vif
+    // MARK: - Per-game accents
+    static let coral        = Color(hex: "#ff7a4d")
+    static let coralDark    = Color(hex: "#d6582e")
+    static let coralSoft    = Color(hex: "#ffe7dd")
+    static let grape        = Color(hex: "#9b6cff")
+    static let grapeDark    = Color(hex: "#7a4ae0")
+    static let grapeSoft    = Color(hex: "#ece1ff")
+    static let sky          = Color(hex: "#3bb6f5")
+    static let skyDark      = Color(hex: "#1f93d6")
+    static let skySoft      = Color(hex: "#dcf1ff")
 
-    // MARK: - Gold gradient (gold vif pour fond sombre)
+    // MARK: - Backward-compatible aliases (anciens noms → tokens Candy)
+    static let background   = bg
+    static let surface      = panel
+    static let surfaceAlt   = Color(hex: "#fffaf4")
+    static let border       = line
+    static let muted        = line2
+    static let text         = ink
+    static let textDim      = ink2
+    static let gold         = coral         // film accent
+    static let goldLight    = Color(hex: "#ffa07a")
+    static let green        = correct
+    static let red          = wrong
+    static let amber        = flame
+    static let modeFilm     = coral
+    static let modeSeries   = grape
+    static let modeWiki     = sky
+    static let primaryButtonFg = Color.white  // texte blanc sur accent
+
     static let goldGradient = LinearGradient(
-        colors: [Color(hex: "#f5c842"), Color(hex: "#d4a030")],
+        colors: [Color(hex: "#ff8a5d"), Color(hex: "#ff6a3a")],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
 
-    // MARK: - Typography (Fraunces = display/serif titles, Inter = body/UI)
+    // MARK: - Typography (Fredoka → SF Rounded, JetBrains Mono → monospaced système)
+    /// Titres / display (arrondi, gras).
     static func fraunces(size: CGFloat, italic: Bool = false) -> Font {
-        italic
-            ? .custom("Fraunces-MediumItalic", size: size)
-            : .custom("Fraunces-Medium", size: size)
+        .system(size: size, weight: .semibold, design: .rounded)
     }
+    /// Corps / UI (arrondi).
     static func inter(size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        switch weight {
-        case .medium:    return .custom("Inter-Medium",   size: size)
-        case .semibold:  return .custom("Inter-SemiBold", size: size)
-        case .bold:      return .custom("Inter-Bold",     size: size)
-        default:         return .custom("Inter-Regular",  size: size)
-        }
+        .system(size: size, weight: weight, design: .rounded)
+    }
+    /// Chiffres / dates / labels mono (tabular).
+    static func mono(size: CGFloat, weight: Font.Weight = .semibold) -> Font {
+        .system(size: size, weight: weight, design: .monospaced)
     }
 
     // MARK: - Spacing
@@ -55,10 +82,10 @@ enum Theme {
     static let spacing24: CGFloat = 24
     static let spacing28: CGFloat = 28
 
-    // MARK: - Corner radius
-    static let radiusS: CGFloat   = 6
-    static let radiusM: CGFloat   = 10
-    static let radiusL: CGFloat   = 16
+    // MARK: - Corner radius (Candy : plus généreux)
+    static let radiusS: CGFloat   = 12
+    static let radiusM: CGFloat   = 16
+    static let radiusL: CGFloat   = 22
 }
 
 extension Color {
@@ -76,14 +103,132 @@ extension Color {
     }
 }
 
-// MARK: - ViewModifiers
+// MARK: - Profondeur 3D Candy (ombres dures décalées, blur 0)
+
+/// Carte Candy : fond panel, bordure 2.5px, ombre dure décalée vers le bas.
+struct CandyCard: ViewModifier {
+    var radius: CGFloat = Theme.radiusL
+    var fill: Color = Theme.panel
+    var border: Color = Theme.line
+    var shadow: Color = Theme.line2
+    var depth: CGFloat = 6
+    var borderWidth: CGFloat = 2.5
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .fill(fill)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: radius, style: .continuous)
+                            .strokeBorder(border, lineWidth: borderWidth)
+                    )
+                    .background(
+                        RoundedRectangle(cornerRadius: radius, style: .continuous)
+                            .fill(shadow)
+                            .offset(y: depth)
+                    )
+            )
+    }
+}
+
+extension View {
+    func candyCard(
+        radius: CGFloat = Theme.radiusL,
+        fill: Color = Theme.panel,
+        border: Color = Theme.line,
+        shadow: Color = Theme.line2,
+        depth: CGFloat = 6
+    ) -> some View {
+        modifier(CandyCard(radius: radius, fill: fill, border: border, shadow: shadow, depth: depth))
+    }
+}
+
+/// Bouton plein avec enfoncement physique (ombre dure → réduite à l'appui).
+struct CandyButtonStyle: ButtonStyle {
+    var accent: Color = Theme.coral
+    var accentDark: Color = Theme.coralDark
+    var radius: CGFloat = 15
+    var depth: CGFloat = 6
+    var fontSize: CGFloat = 16
+
+    func makeBody(configuration: Configuration) -> some View {
+        let pressed = configuration.isPressed
+        let off: CGFloat = pressed ? depth - 2 : 0
+        return configuration.label
+            .font(.system(size: fontSize, weight: .semibold, design: .rounded))
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .fill(accent)
+                    .background(
+                        RoundedRectangle(cornerRadius: radius, style: .continuous)
+                            .fill(accentDark)
+                            .offset(y: pressed ? 2 : depth)
+                    )
+            )
+            .offset(y: off)
+            .animation(.easeOut(duration: 0.08), value: pressed)
+    }
+}
+
+/// Bouton « soft » (fond blanc, bordure, ombre neutre).
+struct CandySoftButtonStyle: ButtonStyle {
+    var radius: CGFloat = 15
+    var depth: CGFloat = 5
+    var fontSize: CGFloat = 15
+
+    func makeBody(configuration: Configuration) -> some View {
+        let pressed = configuration.isPressed
+        return configuration.label
+            .font(.system(size: fontSize, weight: .semibold, design: .rounded))
+            .foregroundColor(Theme.ink)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 13)
+            .background(
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .fill(Theme.panel)
+                    .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Theme.line, lineWidth: 2.5))
+                    .background(
+                        RoundedRectangle(cornerRadius: radius, style: .continuous)
+                            .fill(Theme.line2)
+                            .offset(y: pressed ? 2 : depth)
+                    )
+            )
+            .offset(y: pressed ? depth - 2 : 0)
+            .animation(.easeOut(duration: 0.08), value: pressed)
+    }
+}
+
+// MARK: - Glyphe de jeu (pastille accent + icône)
+
+struct GameGlyph: View {
+    let mode: GameMode
+    var size: CGFloat = 40
+    var body: some View {
+        RoundedRectangle(cornerRadius: size * 0.3, style: .continuous)
+            .fill(mode.color)
+            .frame(width: size, height: size)
+            .overlay(
+                Image(systemName: mode.iconFilled)
+                    .font(.system(size: size * 0.5, weight: .bold))
+                    .foregroundColor(.white)
+            )
+            .background(
+                RoundedRectangle(cornerRadius: size * 0.3, style: .continuous)
+                    .fill(mode.accentDark)
+                    .offset(y: 3)
+            )
+    }
+}
+
+// MARK: - ViewModifiers (rétro-compat, restylés Candy)
 
 struct CardStyle: ViewModifier {
     func body(content: Content) -> some View {
-        content
-            .background(Theme.surface)
-            .cornerRadius(Theme.radiusM)
-            .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(Theme.border, lineWidth: 1))
+        content.candyCard(radius: Theme.radiusM)
     }
 }
 
@@ -91,36 +236,49 @@ struct PrimaryButtonStyle: ButtonStyle {
     var isLoading: Bool = false
 
     func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 8) {
-            if isLoading {
-                ProgressView().tint(Theme.background)
-            }
+        let pressed = configuration.isPressed
+        return HStack(spacing: 8) {
+            if isLoading { ProgressView().tint(.white) }
             configuration.label
         }
-        .font(Theme.inter(size: 15, weight: .semibold))
-        .foregroundColor(Theme.primaryButtonFg)
+        .font(.system(size: 16, weight: .semibold, design: .rounded))
+        .foregroundColor(.white)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
         .background(
-            Theme.goldGradient
-                .opacity(configuration.isPressed ? 0.85 : 1)
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .fill(Theme.coral)
+                .background(
+                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                        .fill(Theme.coralDark)
+                        .offset(y: pressed ? 2 : 6)
+                )
         )
-        .cornerRadius(Theme.radiusM)
-        .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+        .offset(y: pressed ? 4 : 0)
+        .animation(.easeOut(duration: 0.08), value: pressed)
     }
 }
 
 struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(Theme.inter(size: 15, weight: .medium))
-            .foregroundColor(Theme.text)
+        let pressed = configuration.isPressed
+        return configuration.label
+            .font(.system(size: 15, weight: .semibold, design: .rounded))
+            .foregroundColor(Theme.ink)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(configuration.isPressed ? Theme.surfaceAlt : Theme.surface)
-            .cornerRadius(Theme.radiusM)
-            .overlay(RoundedRectangle(cornerRadius: Theme.radiusM).stroke(Theme.border, lineWidth: 1))
-            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+            .padding(.vertical, 13)
+            .background(
+                RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    .fill(Theme.panel)
+                    .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).strokeBorder(Theme.line, lineWidth: 2.5))
+                    .background(
+                        RoundedRectangle(cornerRadius: 15, style: .continuous)
+                            .fill(Theme.line2)
+                            .offset(y: pressed ? 2 : 5)
+                    )
+            )
+            .offset(y: pressed ? 3 : 0)
+            .animation(.easeOut(duration: 0.08), value: pressed)
     }
 }
 
@@ -128,7 +286,7 @@ struct CardPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .opacity(configuration.isPressed ? 0.88 : 1.0)
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
             .animation(.spring(response: 0.22, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
@@ -143,7 +301,7 @@ struct ShimmerModifier: ViewModifier {
                     LinearGradient(
                         stops: [
                             .init(color: .clear, location: phase - 0.3),
-                            .init(color: .white.opacity(0.07), location: phase),
+                            .init(color: .black.opacity(0.05), location: phase),
                             .init(color: .clear, location: phase + 0.3),
                         ],
                         startPoint: .leading,
@@ -166,64 +324,9 @@ extension View {
     func shimmer() -> some View { modifier(ShimmerModifier()) }
 }
 
-// MARK: - Mode Atmosphere
+// MARK: - Mode Atmosphere (neutralisée sur fond crème Candy)
 
 struct ModeAtmosphere: View {
     let mode: GameMode
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                // Top radial halo (mode-coloured glow at 20% from top)
-                RadialGradient(
-                    gradient: Gradient(colors: [haloColor.opacity(0.13), .clear]),
-                    center: UnitPoint(x: 0.5, y: 0.2),
-                    startRadius: 0,
-                    endRadius: geo.size.width * 0.65
-                )
-
-                // Texture overlay (Canvas drawn, no UIKit dependency)
-                Canvas { ctx, size in
-                    switch mode {
-                    case .film:
-                        // Horizontal scan lines — argentique film grain
-                        var y: CGFloat = 0
-                        while y < size.height {
-                            var path = Path()
-                            path.move(to: CGPoint(x: 0, y: y + 2))
-                            path.addLine(to: CGPoint(x: size.width, y: y + 2))
-                            ctx.stroke(path, with: .color(.black.opacity(0.025)), lineWidth: 1)
-                            y += 3
-                        }
-                    case .series:
-                        // CRT scanlines — slightly wider spacing
-                        var y: CGFloat = 0
-                        while y < size.height {
-                            var path = Path()
-                            path.move(to: CGPoint(x: 0, y: y + 3))
-                            path.addLine(to: CGPoint(x: size.width, y: y + 3))
-                            ctx.stroke(path, with: .color(.black.opacity(0.018)), lineWidth: 1)
-                            y += 4
-                        }
-                    case .wiki:
-                        // Halftone dot grid — press/newspaper feel
-                        let spacing: CGFloat = 6
-                        var x: CGFloat = 0
-                        while x < size.width {
-                            var y: CGFloat = 0
-                            while y < size.height {
-                                let dot = Path(ellipseIn: CGRect(x: x, y: y, width: 1, height: 1))
-                                ctx.fill(dot, with: .color(haloColor.opacity(0.055)))
-                                y += spacing
-                            }
-                            x += spacing
-                        }
-                    }
-                }
-            }
-        }
-        .allowsHitTesting(false)
-    }
-
-    private var haloColor: Color { mode.color }
+    var body: some View { Color.clear.allowsHitTesting(false) }
 }

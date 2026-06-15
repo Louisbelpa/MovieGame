@@ -58,7 +58,7 @@ struct DebugMenuView: View {
         .navigationTitle("Debug")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.background, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
         .confirmationDialog(
             "Changer l'environnement ?",
             isPresented: $showConfirm,

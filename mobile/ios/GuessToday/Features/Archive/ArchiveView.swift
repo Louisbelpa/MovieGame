@@ -166,7 +166,7 @@ struct ArchiveView: View {
             .navigationTitle("Archive")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Theme.background, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
             .task { await vm.load() }
             .navigationDestination(isPresented: $showGame) {
                 GameView(mode: vm.selectedMode, initialDate: selectedDate ?? "")

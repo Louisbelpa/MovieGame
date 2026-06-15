@@ -4,31 +4,42 @@ struct GameView: View {
     let mode: GameMode
     let initialDate: String?
     @State private var vm: GameViewModel
+    @State private var activeMode: GameMode
     @State private var showRules = false
     @State private var showArchive = false
     @FocusState private var inputFocused: Bool
 
     private var rulesSeen: Bool {
-        UserDefaults.standard.bool(forKey: "rules_seen_\(mode.statsKey)")
+        UserDefaults.standard.bool(forKey: "rules_seen_\(activeMode.statsKey)")
     }
 
     init(mode: GameMode, initialDate: String? = nil) {
         self.mode = mode
         self.initialDate = initialDate
         _vm = State(wrappedValue: GameViewModel(mode: mode))
+        _activeMode = State(initialValue: mode)
+    }
+
+    /// Change de jeu sans quitter l'arène : recrée le ViewModel et recharge le défi du jour.
+    private func switchTo(_ newMode: GameMode) {
+        guard newMode != activeMode else { return }
+        inputFocused = false
+        activeMode = newMode
+        vm = GameViewModel(mode: newMode)
+        Task { await vm.loadToday() }
     }
 
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
-            ModeAtmosphere(mode: mode).ignoresSafeArea()
+            ModeAtmosphere(mode: activeMode).ignoresSafeArea()
 
             if vm.isLoading && vm.challenge == nil {
                 ProgressView()
                     .tint(Theme.gold)
             } else if vm.notFound {
                 NotFoundView(
-                    mode: mode,
+                    mode: activeMode,
                     viewingDate: vm.viewingDate,
                     onPrev: { Task { await vm.navigatePrev() } },
                     onNext: { Task { await vm.navigateNext() } },
@@ -42,6 +53,10 @@ struct GameView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(spacing: 0) {
+                            // Sélecteur de jeux (3 onglets, change de défi sans quitter)
+                            GameSwitcher(active: activeMode, current: challenge, onSelect: switchTo)
+                                .padding(.top, Theme.spacing8)
+
                             // Date navigation bar
                             DateNavBar(
                                 challenge: challenge,
@@ -81,7 +96,7 @@ struct GameView: View {
                                         hintsAvailable: challenge.hintsAvailable,
                                         hintsRevealed: challenge.hintsRevealed,
                                         previousRevealCount: vm.previousHintsRevealed,
-                                        accentColor: mode.color
+                                        accentColor: activeMode.color
                                     )
                                     .id("\(challenge.challengeId)-\(challenge.hintsRevealed)")
                                 }
@@ -108,7 +123,7 @@ struct GameView: View {
                             }
 
                             // Input area
-                            GuessInputSection(vm: vm, inputFocused: $inputFocused, accentColor: mode.color)
+                            GuessInputSection(vm: vm, inputFocused: $inputFocused, accentColor: activeMode.color)
                                 .id("guessInput")
                                 .padding(.top, Theme.spacing16)
 
@@ -148,10 +163,10 @@ struct GameView: View {
                 }
             }
         }
-        .navigationTitle(mode.title)
+        .navigationTitle(activeMode.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.background, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showArchive = true } label: {
@@ -186,15 +201,62 @@ struct GameView: View {
             LoseSheet(vm: vm)
         }
         .sheet(isPresented: $showRules) {
-            RulesSheet(mode: mode)
+            RulesSheet(mode: activeMode)
         }
         .sheet(isPresented: $showArchive) {
-            ArchiveView(initialMode: mode)
+            ArchiveView(initialMode: activeMode)
         }
     }
 }
 
 // MARK: - Sub-components
+
+/// Sélecteur de jeux (3 onglets) — change de défi sans quitter l'arène.
+private struct GameSwitcher: View {
+    let active: GameMode
+    let current: ChallengePayload
+    let onSelect: (GameMode) -> Void
+    private let modes: [GameMode] = [.film, .series, .wiki]
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(modes, id: \.title) { mode in
+                let isActive = mode == active
+                Button { onSelect(mode) } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: mode.iconFilled)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(isActive ? mode.color : Theme.ink3)
+                        Text(mode.shortName)
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundColor(isActive ? Theme.ink : Theme.ink2)
+                        Text(statusText(for: mode, isActive: isActive))
+                            .font(Theme.mono(size: 9, weight: .bold))
+                            .foregroundColor(isActive ? mode.accentDark : Theme.ink3)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(isActive ? mode.accentSoft : Theme.panel)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .strokeBorder(isActive ? mode.color.opacity(0.55) : Theme.line, lineWidth: 2)
+                            )
+                    )
+                }
+                .buttonStyle(CardPressStyle())
+            }
+        }
+    }
+
+    private func statusText(for mode: GameMode, isActive: Bool) -> String {
+        guard isActive else { return "•" }
+        if current.isGameOver { return current.won ? "✓ \(current.attemptsUsed)/\(current.maxAttempts)" : "✕ raté" }
+        if current.attemptsUsed > 0 { return "en cours" }
+        return "à jouer"
+    }
+}
 
 private struct DateNavBar: View {
     let challenge: ChallengePayload

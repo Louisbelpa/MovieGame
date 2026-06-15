@@ -17,6 +17,23 @@ enum MobileAuthHandoff {
         return token
     }
 
+    /// Token de réinitialisation depuis :
+    /// - le schéma custom `guesstoday://reset?token=…`
+    /// - le Universal Link `https://guesstoday.fr/reset-password?token=…`
+    static func parseResetToken(from url: URL) -> String? {
+        let scheme = url.scheme?.lowercased()
+        let isCustom = scheme == "guesstoday" && url.host?.lowercased() == "reset"
+        let isUniversal = scheme == "https"
+            && (url.host?.lowercased().hasSuffix("guesstoday.fr") ?? false)
+            && url.path == "/reset-password"
+        guard isCustom || isUniversal else { return nil }
+
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let token = components.queryItems?.first(where: { $0.name == "token" })?.value,
+              !token.isEmpty else { return nil }
+        return token
+    }
+
     static var webRegisterURL: URL {
         URL(string: "\(BuildConfig.baseURL)?auth=register&platform=ios")!
     }

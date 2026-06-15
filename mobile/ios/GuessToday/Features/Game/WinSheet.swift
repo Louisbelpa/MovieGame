@@ -236,26 +236,22 @@ private struct WinHeaderView: View {
     @State private var appeared = false
 
     var body: some View {
-        VStack(spacing: Theme.spacing8) {
-            Image(systemName: "trophy.fill")
+        VStack(spacing: 6) {
+            Text("🎉")
                 .font(.system(size: 48))
-                .foregroundStyle(Theme.gold)
-                .symbolRenderingMode(.hierarchical)
-                .symbolEffect(.bounce.up.byLayer, value: appeared)
                 .scaleEffect(appeared ? 1 : 0.5)
                 .opacity(appeared ? 1 : 0)
 
-            Text("Bravo !")
+            Text("Bien joué !")
                 .font(Theme.fraunces(size: 26))
-                .fontWeight(.bold)
-                .foregroundColor(Theme.gold)
+                .foregroundColor(Theme.ink)
                 .opacity(appeared ? 1 : 0)
                 .offset(y: appeared ? 0 : 6)
 
             if let c = challenge {
-                Text("En \(c.attemptsUsed) tentative\(c.attemptsUsed > 1 ? "s" : "")")
+                Text("Trouvé en \(c.attemptsUsed) essai\(c.attemptsUsed > 1 ? "s" : "")")
                     .font(Theme.inter(size: 15))
-                    .foregroundColor(Theme.textDim)
+                    .foregroundColor(Theme.ink2)
                     .opacity(appeared ? 1 : 0)
             }
         }
@@ -275,31 +271,22 @@ private struct LoseHeaderView: View {
     @State private var shake = false
 
     var body: some View {
-        VStack(spacing: Theme.spacing8) {
-            ZStack {
-                Circle()
-                    .fill(Theme.red.opacity(0.12))
-                    .frame(width: 80, height: 80)
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 44))
-                    .foregroundStyle(Theme.red)
-                    .symbolRenderingMode(.hierarchical)
-                    .symbolEffect(.bounce.down.byLayer, value: appeared)
-            }
-            .scaleEffect(appeared ? 1 : 0.4)
-            .opacity(appeared ? 1 : 0)
-            .rotationEffect(.degrees(shake ? -4 : 0))
+        VStack(spacing: 6) {
+            Text("😣")
+                .font(.system(size: 48))
+                .scaleEffect(appeared ? 1 : 0.4)
+                .opacity(appeared ? 1 : 0)
+                .rotationEffect(.degrees(shake ? -4 : 0))
 
-            Text("Pas cette fois")
-                .font(Theme.fraunces(size: 26))
-                .fontWeight(.bold)
-                .foregroundColor(Theme.red)
+            Text("Perdu pour aujourd'hui")
+                .font(Theme.fraunces(size: 24))
+                .foregroundColor(Theme.ink)
                 .opacity(appeared ? 1 : 0)
                 .offset(y: appeared ? 0 : 8)
 
             Text("La bonne réponse était…")
                 .font(Theme.inter(size: 15))
-                .foregroundColor(Theme.textDim)
+                .foregroundColor(Theme.ink2)
                 .opacity(appeared ? 1 : 0)
         }
         .onAppear {
@@ -491,22 +478,20 @@ struct ShareResultButtons: View {
 
     var body: some View {
         VStack(spacing: Theme.spacing8) {
+            // CTA principal : carte « Ma journée » (agrège les 3 jeux, sans spoiler)
+            DailyShareButton()
+
+            // Partage de ce jeu uniquement
             Button {
                 shareImage = makeShareImage()
             } label: {
-                Label("Partager", systemImage: "square.and.arrow.up")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(PrimaryButtonStyle())
-            .sheet(item: $shareImage) { img in
-                ShareSheet(image: img.image)
-            }
-
-            ShareLink(item: vm.shareText) {
-                Label("Partager en texte", systemImage: "doc.text")
+                Label("Partager ce jeu", systemImage: "square.and.arrow.up")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(SecondaryButtonStyle())
+            .sheet(item: $shareImage) { img in
+                ShareSheet(image: img.image)
+            }
         }
     }
 

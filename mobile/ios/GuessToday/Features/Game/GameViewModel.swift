@@ -30,9 +30,36 @@ enum GameMode {
 
     var color: Color {
         switch self {
-        case .film:   return Theme.gold
-        case .series: return Theme.modeSeries
-        case .wiki:   return Theme.modeWiki
+        case .film:   return Theme.coral
+        case .series: return Theme.grape
+        case .wiki:   return Theme.sky
+        }
+    }
+
+    /// Variante foncée de l'accent (ombres dures 3D Candy).
+    var accentDark: Color {
+        switch self {
+        case .film:   return Theme.coralDark
+        case .series: return Theme.grapeDark
+        case .wiki:   return Theme.skyDark
+        }
+    }
+
+    /// Variante claire de l'accent (fonds doux, états actifs).
+    var accentSoft: Color {
+        switch self {
+        case .film:   return Theme.coralSoft
+        case .series: return Theme.grapeSoft
+        case .wiki:   return Theme.skySoft
+        }
+    }
+
+    /// Nom court pour le sélecteur de jeux.
+    var shortName: String {
+        switch self {
+        case .film:   return "Film"
+        case .series: return "Série"
+        case .wiki:   return "Visage"
         }
     }
 

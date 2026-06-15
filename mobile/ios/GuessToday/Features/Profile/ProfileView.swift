@@ -28,7 +28,7 @@ struct ProfileView: View {
             .navigationTitle("Profil")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Theme.background, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
             .toolbar {
                 if auth.isLoggedIn {
                     ToolbarItem(placement: .topBarTrailing) {
@@ -73,7 +73,7 @@ struct SettingsView: View {
         .navigationTitle("Réglages")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.background, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
     }
 }
 
@@ -200,49 +200,8 @@ private struct LoggedInProfileView: View {
                 }
                 .padding(.top, Theme.spacing16)
 
-                // Mode tabs — pill style
-                HStack(spacing: 4) {
-                    // "Tous" tab
-                    let isTotalActive = selectedMode == nil
-                    Button("Tous") {
-                        withAnimation(.easeInOut(duration: 0.18)) { selectedMode = nil }
-                    }
-                    .font(.system(size: 13, weight: isTotalActive ? .semibold : .regular))
-                    .foregroundColor(isTotalActive ? Theme.text : Theme.textDim)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(isTotalActive ? Theme.text.opacity(0.10) : Color.clear)
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(isTotalActive ? Theme.border : Color.clear, lineWidth: 1)
-                    )
-
-                    ForEach([GameMode.film, .series, .wiki], id: \.title) { mode in
-                        let isActive = selectedMode == mode
-                        let activeColor = mode.color
-                        Button(mode.title) {
-                            withAnimation(.easeInOut(duration: 0.18)) { selectedMode = mode }
-                        }
-                        .font(.system(size: 13, weight: isActive ? .semibold : .regular))
-                        .foregroundColor(isActive ? activeColor : Theme.textDim)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(isActive ? activeColor.opacity(0.14) : Color.clear)
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(isActive ? Theme.border : Color.clear, lineWidth: 1)
-                        )
-                    }
-                }
-                .padding(3)
-                .background(Theme.surfaceAlt)
-                .cornerRadius(Theme.radiusM)
-                .padding(.horizontal, Theme.spacing16)
-
-                // Stats for selected mode (nil = aggregate)
-                StatsPanel(mode: selectedMode)
+                // Tuiles globales + stats par jeu (format maquette Candy)
+                ProfileStatsSection()
                     .padding(.horizontal, Theme.spacing16)
 
                 // Achievements
@@ -255,6 +214,11 @@ private struct LoggedInProfileView: View {
 
                 // Navigation links
                 VStack(spacing: Theme.spacing8) {
+                    NavigationLink(destination: FriendsView()) {
+                        ProfileNavRow(icon: "person.2.fill", label: "Mes amis", color: Theme.grape)
+                    }
+                    .buttonStyle(.plain)
+
                     NavigationLink(destination: ArchiveView()) {
                         ProfileNavRow(icon: "calendar", label: "Historique", color: Theme.gold)
                     }
@@ -349,6 +313,82 @@ private struct LoggedInProfileView: View {
         } catch {
             avatarError = "Erreur lors de l'envoi de la photo."
         }
+    }
+}
+
+// MARK: - Profile stats (tuiles globales + stats par jeu, format maquette Candy)
+
+private struct ProfileStatsSection: View {
+    private var sm: StatsManager { StatsManager.shared }
+    private let modes: [GameMode] = [.film, .series, .wiki]
+    private var played: Int { modes.map { sm.stats(for: $0).gamesPlayed }.reduce(0, +) }
+    private var wins: Int { modes.map { sm.stats(for: $0).wins }.reduce(0, +) }
+    private var pct: Int { played > 0 ? Int(round(Double(wins) / Double(played) * 100)) : 0 }
+    private var streak: Int { modes.map { sm.stats(for: $0).currentStreak }.max() ?? 0 }
+    private var maxStreak: Int { modes.map { sm.stats(for: $0).maxStreak }.max() ?? 0 }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.spacing16) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+                ProfileTile(value: "\(played)", label: "Parties", accent: Theme.ink)
+                ProfileTile(value: "\(pct)%", label: "Victoires", accent: Theme.correctDark)
+                ProfileTile(value: "\(streak)", label: "Série actuelle", accent: Theme.flame)
+                ProfileTile(value: "\(maxStreak)", label: "Meilleure série", accent: Theme.grapeDark)
+            }
+            Text("STATS PAR JEU")
+                .font(Theme.mono(size: 11, weight: .bold)).tracking(1.1).foregroundColor(Theme.ink2)
+            VStack(spacing: Theme.spacing12) {
+                ForEach(modes, id: \.title) { mode in
+                    ProfileGameRow(mode: mode, stats: sm.stats(for: mode))
+                }
+            }
+        }
+    }
+}
+
+private struct ProfileTile: View {
+    let value: String
+    let label: String
+    var accent: Color = Theme.ink
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(value).font(Theme.mono(size: 24, weight: .bold)).foregroundColor(accent)
+            Text(label).font(Theme.inter(size: 12, weight: .medium)).foregroundColor(Theme.ink2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Theme.spacing16)
+        .candyCard(radius: Theme.radiusM)
+    }
+}
+
+private struct ProfileGameRow: View {
+    let mode: GameMode
+    let stats: LocalStats
+    private var pct: Int { stats.gamesPlayed > 0 ? Int(round(Double(stats.wins) / Double(stats.gamesPlayed) * 100)) : 0 }
+    var body: some View {
+        HStack(spacing: Theme.spacing12) {
+            GameGlyph(mode: mode, size: 40)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(mode.title).font(Theme.inter(size: 15, weight: .semibold)).foregroundColor(Theme.ink)
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Theme.line)
+                        Capsule().fill(mode.color).frame(width: geo.size.width * CGFloat(pct) / 100)
+                    }
+                }
+                .frame(height: 6)
+            }
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("\(pct)%").font(Theme.mono(size: 15, weight: .bold)).foregroundColor(mode.accentDark)
+                HStack(spacing: 2) {
+                    Text("🔥").font(.system(size: 10))
+                    Text("\(stats.currentStreak)").font(Theme.mono(size: 11, weight: .semibold)).foregroundColor(Theme.ink2)
+                }
+            }
+            .frame(width: 52)
+        }
+        .padding(Theme.spacing14)
+        .candyCard(radius: Theme.radiusM)
     }
 }
 
@@ -977,7 +1017,7 @@ struct EditNameView: View {
             .navigationTitle("Modifier le pseudo")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Theme.background, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Annuler") { dismiss() }.foregroundColor(Theme.textDim)
@@ -1105,7 +1145,7 @@ struct AboutView: View {
         .navigationTitle("À propos")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.background, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
     }
 }
 
@@ -1288,7 +1328,7 @@ struct PrivacyView: View {
         .navigationTitle("Confidentialité")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.background, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
     }
 }
 
@@ -1390,7 +1430,7 @@ struct ChangePasswordView: View {
             .navigationTitle("Mot de passe")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Theme.background, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Annuler") { dismiss() }.foregroundColor(Theme.textDim)

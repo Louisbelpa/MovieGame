@@ -45,39 +45,46 @@ struct GuessRow: View {
         )
     }
 
+    // Pastille circulaire (icône blanche sur fond couleur) — signature Candy.
     @ViewBuilder
     private var statusIcon: some View {
-        if isCorrect {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(Theme.green)
-        } else if isSkipped {
-            Image(systemName: "forward.fill")
-                .foregroundColor(Theme.muted)
-                .font(.system(size: 12))
-        } else {
-            Image(systemName: "xmark.circle.fill")
-                .foregroundColor(Theme.red)
+        ZStack {
+            Circle().fill(pastilleColor).frame(width: 20, height: 20)
+            Image(systemName: pastilleGlyph)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.white)
         }
     }
 
+    private var pastilleColor: Color {
+        if isCorrect { return Theme.correct }
+        if isSkipped { return Theme.ink3 }
+        return Theme.wrong
+    }
+    private var pastilleGlyph: String {
+        if isCorrect { return "checkmark" }
+        if isSkipped { return "arrow.right" }
+        return "xmark"
+    }
+
     private var statusColor: Color {
-        if isCorrect { return Theme.green }
-        if isSkipped { return Theme.muted }
-        return Theme.red
+        if isCorrect { return Theme.correctDark }
+        if isSkipped { return Theme.ink2 }
+        return Theme.wrongDark
     }
 
     private var rowBackground: Color {
-        guard isUsed else { return Theme.surfaceAlt.opacity(0.3) }
-        if isCorrect { return Theme.green.opacity(0.1) }
-        if isSkipped { return Theme.surfaceAlt.opacity(0.5) }
-        return Theme.red.opacity(0.08)
+        guard isUsed else { return Theme.surfaceAlt }
+        if isCorrect { return Theme.correctSoft }
+        if isSkipped { return Color(hex: "#f1ece6") }
+        return Theme.wrongSoft
     }
 
     private var rowBorderColor: Color {
-        guard isUsed else { return Theme.border.opacity(0.3) }
-        if isCorrect { return Theme.green.opacity(0.4) }
-        if isSkipped { return Theme.border.opacity(0.3) }
-        return Theme.red.opacity(0.3)
+        guard isUsed else { return Theme.line }
+        if isCorrect { return Theme.correct.opacity(0.4) }
+        if isSkipped { return Theme.line }
+        return Theme.wrong.opacity(0.4)
     }
 }
 

@@ -39,7 +39,58 @@ struct LoginView: View {
                         }
                         .padding(.top, Theme.spacing24)
 
-                        // Form
+                        // ── Boutons sociaux d'abord (maquette) ──
+                        // Apple Sign In
+                        SignInWithAppleButton(.signIn) { request in
+                            request.requestedScopes = [.fullName, .email]
+                        } onCompletion: { result in
+                            guard case .success(let authorization) = result,
+                                  let cred = authorization.credential as? ASAuthorizationAppleIDCredential,
+                                  let tokenData = cred.identityToken,
+                                  let token = String(data: tokenData, encoding: .utf8) else { return }
+                            let name = [cred.fullName?.givenName, cred.fullName?.familyName]
+                                .compactMap { $0 }.joined(separator: " ")
+                            Task { await loginWithApple(token: token, name: name.isEmpty ? nil : name) }
+                        }
+                        .signInWithAppleButtonStyle(.black)
+                        .frame(height: 50)
+                        .cornerRadius(Theme.radiusM)
+                        .padding(.horizontal, Theme.spacing16)
+
+                        // Google Sign In
+                        Button {
+                            Task { await loginWithGoogle() }
+                        } label: {
+                            HStack(spacing: 10) {
+                                GoogleLogoMark()
+                                Text("Continuer avec Google")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(Color(hex: "#1f1f1f"))
+                                    .tracking(0.25)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                            .background(Color.white)
+                            .cornerRadius(Theme.radiusM)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Theme.radiusM)
+                                    .stroke(Color(hex: "#747775"), lineWidth: 1)
+                            )
+                        }
+                        .padding(.horizontal, Theme.spacing16)
+
+                        // ── Séparateur ──
+                        HStack {
+                            VStack { Divider().background(Theme.border) }
+                            Text("ou avec un e-mail")
+                                .font(.system(size: 12, design: .rounded))
+                                .foregroundColor(Theme.ink3)
+                                .fixedSize()
+                            VStack { Divider().background(Theme.border) }
+                        }
+                        .padding(.horizontal, Theme.spacing16)
+
+                        // ── Formulaire e-mail ──
                         VStack(spacing: Theme.spacing12) {
                             AuthTextField(placeholder: "Email", text: $email, contentType: .emailAddress, keyboardType: .emailAddress)
                             AuthTextField(placeholder: "Mot de passe", text: $password, contentType: .password, isSecure: true)
@@ -69,55 +120,6 @@ struct LoginView: View {
                             .foregroundColor(Theme.textDim)
                         }
 
-                        // Google Sign In
-                        Button {
-                            Task { await loginWithGoogle() }
-                        } label: {
-                            HStack(spacing: 10) {
-                                GoogleLogoMark()
-                                Text("Continuer avec Google")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(Color(hex: "#1f1f1f"))
-                                    .tracking(0.25)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 40)
-                            .background(Color.white)
-                            .cornerRadius(4)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .stroke(Color(hex: "#747775"), lineWidth: 1)
-                            )
-                        }
-                        .padding(.horizontal, Theme.spacing16)
-
-                        // Apple Sign In
-                        SignInWithAppleButton(.signIn) { request in
-                            request.requestedScopes = [.fullName, .email]
-                        } onCompletion: { result in
-                            guard case .success(let authorization) = result,
-                                  let cred = authorization.credential as? ASAuthorizationAppleIDCredential,
-                                  let tokenData = cred.identityToken,
-                                  let token = String(data: tokenData, encoding: .utf8) else { return }
-                            let name = [cred.fullName?.givenName, cred.fullName?.familyName]
-                                .compactMap { $0 }.joined(separator: " ")
-                            Task { await loginWithApple(token: token, name: name.isEmpty ? nil : name) }
-                        }
-                        .signInWithAppleButtonStyle(.white)
-                        .frame(height: 50)
-                        .cornerRadius(Theme.radiusM)
-                        .padding(.horizontal, Theme.spacing16)
-
-                        HStack {
-                            VStack { Divider().background(Theme.border) }
-                            Text("ou")
-                                .font(.system(size: 12))
-                                .foregroundColor(Theme.muted)
-                                .fixedSize()
-                            VStack { Divider().background(Theme.border) }
-                        }
-                        .padding(.horizontal, Theme.spacing16)
-
                         Button("Créer un compte") {
                             showRegister = true
                         }
@@ -131,7 +133,7 @@ struct LoginView: View {
             .navigationTitle("Connexion")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Theme.background, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Annuler") { dismiss() }
@@ -252,7 +254,7 @@ struct RegisterView: View {
         .navigationTitle("Inscription")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.background, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
     }
 
     private func register() async {
@@ -331,7 +333,7 @@ struct ForgotPasswordView: View {
             .navigationTitle("Mot de passe oublié")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Theme.background, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Annuler") { dismiss() }.foregroundColor(Theme.textDim)
@@ -347,6 +349,104 @@ struct ForgotPasswordView: View {
         do {
             try await APIClient.shared.forgotPassword(email: email.lowercased())
             sent = true
+        } catch let e as APIError {
+            error = e.localizedDescription
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - Reset password (deep link guesstoday://reset?token=…)
+
+struct ResetPasswordView: View {
+    let token: String
+
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var password = ""
+    @State private var confirm = ""
+    @State private var isLoading = false
+    @State private var done = false
+    @State private var error: String?
+
+    private var isValid: Bool { password.count >= 8 && password == confirm }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Theme.background.ignoresSafeArea()
+
+                VStack(spacing: Theme.spacing20) {
+                    if done {
+                        VStack(spacing: Theme.spacing12) {
+                            Image(systemName: "lock.open.fill")
+                                .font(.system(size: 48))
+                                .foregroundColor(Theme.green)
+                            Text("Mot de passe réinitialisé !")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(Theme.text)
+                            Text("Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.")
+                                .font(.system(size: 14))
+                                .foregroundColor(Theme.textDim)
+                                .multilineTextAlignment(.center)
+                            Button("Se connecter") { dismiss() }
+                                .buttonStyle(PrimaryButtonStyle())
+                                .padding(.horizontal, Theme.spacing16)
+                        }
+                        .padding()
+                    } else {
+                        VStack(spacing: Theme.spacing16) {
+                            Text("Choisissez un nouveau mot de passe (8 caractères minimum).")
+                                .font(.system(size: 14))
+                                .foregroundColor(Theme.textDim)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, Theme.spacing16)
+
+                            AuthTextField(placeholder: "Nouveau mot de passe", text: $password, contentType: .newPassword, isSecure: true)
+                                .padding(.horizontal, Theme.spacing16)
+                            AuthTextField(placeholder: "Confirmer le mot de passe", text: $confirm, contentType: .newPassword, isSecure: true)
+                                .padding(.horizontal, Theme.spacing16)
+
+                            if let error {
+                                Text(error).font(.system(size: 13)).foregroundColor(Theme.red)
+                            } else if !confirm.isEmpty && password != confirm {
+                                Text("Les mots de passe ne correspondent pas.")
+                                    .font(.system(size: 13)).foregroundColor(Theme.red)
+                            }
+
+                            Button("Réinitialiser") {
+                                Task { await submit() }
+                            }
+                            .buttonStyle(PrimaryButtonStyle(isLoading: isLoading))
+                            .disabled(isLoading || !isValid)
+                            .padding(.horizontal, Theme.spacing16)
+                        }
+                        .padding(.top, Theme.spacing24)
+                    }
+                    Spacer()
+                }
+            }
+            .navigationTitle("Réinitialiser")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Theme.background, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Annuler") { dismiss() }.foregroundColor(Theme.textDim)
+                }
+            }
+        }
+    }
+
+    private func submit() async {
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+        do {
+            try await APIClient.shared.resetPassword(token: token, newPassword: password)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            done = true
         } catch let e as APIError {
             error = e.localizedDescription
         } catch {
@@ -422,15 +522,16 @@ struct AuthTextField: View {
                     .textInputAutocapitalization(.never)
             }
         }
-        .padding(Theme.spacing12)
-        .font(.system(size: 15))
-        .foregroundColor(Theme.text)
-        .tint(Theme.gold)
-        .background(Theme.surface)
-        .cornerRadius(Theme.radiusM)
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.radiusM)
-                .stroke(Theme.border, lineWidth: 1)
+        .padding(.horizontal, Theme.spacing14)
+        .padding(.vertical, 13)
+        .font(.system(size: 15, design: .rounded))
+        .foregroundColor(Theme.ink)
+        .tint(Theme.coral)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous)
+                .fill(Theme.panel)
+                .overlay(RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous).strokeBorder(Theme.line, lineWidth: 2.5))
+                .background(RoundedRectangle(cornerRadius: Theme.radiusM, style: .continuous).fill(Theme.line2).offset(y: 4))
         )
     }
 }

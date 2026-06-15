@@ -157,6 +157,32 @@ struct OnboardingView: View {
     }
 }
 
+// MARK: - Carte-glyphe 3D Candy (hero des slides)
+
+private struct OnbHeroCard: View {
+    let systemIcon: String
+    let accent: Color
+    let accentDark: Color
+    var size: CGFloat = 150
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 34, style: .continuous)
+            .fill(accent)
+            .frame(width: size, height: size)
+            .overlay(
+                Image(systemName: systemIcon)
+                    .font(.system(size: size * 0.42, weight: .bold))
+                    .foregroundColor(.white)
+            )
+            .background(
+                RoundedRectangle(cornerRadius: 34, style: .continuous)
+                    .fill(accentDark)
+                    .offset(y: 8)
+            )
+            .rotationEffect(.degrees(-4))
+    }
+}
+
 // MARK: - Page 0 — Welcome
 
 private struct WelcomePage: View {
@@ -165,20 +191,11 @@ private struct WelcomePage: View {
             Spacer()
 
             VStack(spacing: Theme.spacing20) {
-                ApertureIconView(size: 96, showBackground: true, cornerRadius: 24)
-                    .shadow(color: Theme.gold.opacity(0.25), radius: 20, y: 6)
+                OnbHeroCard(systemIcon: "sparkles", accent: Theme.coral, accentDark: Theme.coralDark)
 
-                (
-                    Text("Guess")
-                        .font(Theme.fraunces(size: 32))
-                        .foregroundColor(Theme.text)
-                    + Text("today")
-                        .font(Theme.fraunces(size: 32, italic: true))
-                        .foregroundStyle(LinearGradient(
-                            colors: [Theme.goldLight, Theme.gold],
-                            startPoint: .top, endPoint: .bottom
-                        ))
-                )
+                Text("GuessToday")
+                    .font(Theme.fraunces(size: 32))
+                    .foregroundColor(Theme.ink)
             }
 
             Spacer().frame(height: 44)
@@ -206,10 +223,10 @@ private struct WelcomePage: View {
 // MARK: - Page 1 — Three modes
 
 private struct ModesPage: View {
-    private let modes: [(icon: String, title: String, desc: String, color: Color)] = [
-        ("film",             "Films",         "Trouvez le film\nà partir de scènes",         Theme.modeFilm),
-        ("tv",               "Séries",        "Retrouvez la série\nà partir d'extraits",     Theme.modeSeries),
-        ("person.fill", "Personnalités", "Identifiez la célébrité\nà partir d'indices", Theme.modeWiki),
+    private let modes: [(icon: String, title: String, desc: String, color: Color, colorDark: Color)] = [
+        ("film",        "Films",         "Trouvez le film\nà partir de scènes",        Theme.coral, Theme.coralDark),
+        ("tv",          "Séries",        "Retrouvez la série\nà partir d'extraits",    Theme.grape, Theme.grapeDark),
+        ("person.fill", "Personnalités", "Identifiez la célébrité\nà partir d'indices", Theme.sky,  Theme.skyDark),
     ]
 
     var body: some View {
@@ -233,36 +250,26 @@ private struct ModesPage: View {
                 HStack(spacing: 12) {
                     ForEach(modes, id: \.title) { mode in
                         VStack(spacing: 10) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(mode.color.opacity(0.13))
-                                    .frame(width: 60, height: 60)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .stroke(mode.color.opacity(0.25), lineWidth: 1)
-                                    )
-                                Image(systemName: mode.icon)
-                                    .font(.system(size: 24))
-                                    .foregroundColor(mode.color)
-                                    .symbolRenderingMode(.hierarchical)
-                            }
+                            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                .fill(mode.color)
+                                .frame(width: 54, height: 54)
+                                .overlay(Image(systemName: mode.icon).font(.system(size: 23, weight: .bold)).foregroundColor(.white))
+                                .background(RoundedRectangle(cornerRadius: 15, style: .continuous).fill(mode.colorDark).offset(y: 4))
 
                             Text(mode.title)
                                 .font(Theme.inter(size: 12, weight: .semibold))
-                                .foregroundColor(Theme.text)
+                                .foregroundColor(Theme.ink)
 
                             Text(mode.desc)
                                 .font(Theme.inter(size: 11))
-                                .foregroundColor(Theme.textDim)
+                                .foregroundColor(Theme.ink2)
                                 .multilineTextAlignment(.center)
                                 .lineSpacing(2)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .padding(.horizontal, 8)
-                        .background(Theme.surface)
-                        .cornerRadius(Theme.radiusL)
-                        .overlay(RoundedRectangle(cornerRadius: Theme.radiusL).stroke(Theme.border, lineWidth: 1))
+                        .candyCard(radius: Theme.radiusL)
                     }
                 }
                 .padding(.horizontal, Theme.spacing16)
@@ -286,30 +293,10 @@ private struct StreakPage: View {
             Spacer()
 
             VStack(spacing: Theme.spacing28) {
-                ZStack {
-                    Circle()
-                        .fill(Theme.amber.opacity(0.1))
-                        .frame(width: 110, height: 110)
-                        .overlay(Circle().stroke(Theme.amber.opacity(0.15), lineWidth: 1))
-                    VStack(spacing: 2) {
-                        Image(systemName: "flame.fill")
-                            .font(.system(size: 36))
-                            .foregroundStyle(
-                                LinearGradient(colors: [Color(hex: "#fcd982"), Theme.amber],
-                                               startPoint: .top, endPoint: .bottom)
-                            )
-                            .scaleEffect(animate ? 1.1 : 1.0)
-                            .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: animate)
-
-                        Text("5")
-                            .font(Theme.fraunces(size: 28))
-                            .foregroundStyle(
-                                LinearGradient(colors: [Color(hex: "#fcd982"), Theme.amber],
-                                               startPoint: .top, endPoint: .bottom)
-                            )
-                    }
-                }
-                .onAppear { animate = true }
+                OnbHeroCard(systemIcon: "flame.fill", accent: Theme.flame, accentDark: Theme.sunDark)
+                    .scaleEffect(animate ? 1.0 : 0.92)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: animate)
+                    .onAppear { animate = true }
 
                 VStack(spacing: 10) {
                     Text("Construisez votre série")
@@ -366,15 +353,7 @@ private struct WebTransferPage: View {
             Spacer()
 
             VStack(spacing: Theme.spacing24) {
-                ZStack {
-                    Circle()
-                        .fill(Theme.gold.opacity(0.1))
-                        .frame(width: 100, height: 100)
-                        .overlay(Circle().stroke(Theme.gold.opacity(0.2), lineWidth: 1))
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 40))
-                        .foregroundStyle(Theme.gold)
-                }
+                OnbHeroCard(systemIcon: "arrow.triangle.2.circlepath", accent: Theme.coral, accentDark: Theme.coralDark)
 
                 VStack(spacing: 12) {
                     Text("Vous jouiez\nsur le site ?")
@@ -414,19 +393,10 @@ private struct NotificationsPage: View {
             Spacer()
 
             VStack(spacing: Theme.spacing24) {
-                ZStack {
-                    Circle()
-                        .fill(Theme.green.opacity(0.1))
-                        .frame(width: 100, height: 100)
-                        .overlay(Circle().stroke(Theme.green.opacity(0.2), lineWidth: 1))
-                    Image(systemName: "bell.badge.fill")
-                        .font(.system(size: 40))
-                        .foregroundStyle(Theme.green)
-                        .symbolRenderingMode(.hierarchical)
-                        .offset(x: animate ? 2 : -2)
-                        .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: animate)
-                }
-                .onAppear { animate = true }
+                OnbHeroCard(systemIcon: "bell.badge.fill", accent: Theme.correct, accentDark: Theme.correctDark)
+                    .scaleEffect(animate ? 1.0 : 0.92)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: animate)
+                    .onAppear { animate = true }
 
                 VStack(spacing: 12) {
                     Text("Ne ratez aucun défi")

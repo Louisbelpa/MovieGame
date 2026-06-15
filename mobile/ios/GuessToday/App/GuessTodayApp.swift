@@ -10,6 +10,8 @@ final class DeepLinkRouter {
     private(set) var trigger: Int = 0
     private(set) var pendingMode: GameMode? = nil
     private(set) var pendingDate: String? = nil
+    /// Token de réinitialisation reçu via `guesstoday://reset?token=…` — déclenche la feuille ResetPasswordView.
+    var pendingResetToken: String? = nil
 
     /// Handles `guesstoday://game/{film|series|wiki}[/YYYY-MM-DD]`.
     /// Returns true if the URL was consumed.
@@ -34,6 +36,9 @@ final class DeepLinkRouter {
         pendingMode = nil
         pendingDate = nil
     }
+
+    func presentReset(token: String) { pendingResetToken = token }
+    func consumeReset() { pendingResetToken = nil }
 }
 
 // ─── App ──────────────────────────────────────────────────────────────────────
@@ -55,11 +60,22 @@ struct GuessTodayApp: App {
             RootView()
                 .environment(authViewModel)
                 .environment(router)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(.light)
                 .onOpenURL { url in
                     if router.handle(url) { return }
+                    if let resetToken = MobileAuthHandoff.parseResetToken(from: url) {
+                        router.presentReset(token: resetToken)
+                        return
+                    }
                     guard let token = MobileAuthHandoff.parseSessionToken(from: url) else { return }
                     Task { await authViewModel.completeWebHandoff(sessionToken: token) }
+                }
+                .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                    // Universal Links (https) — onOpenURL ne se déclenche pas pour eux.
+                    guard let url = activity.webpageURL else { return }
+                    if let resetToken = MobileAuthHandoff.parseResetToken(from: url) {
+                        router.presentReset(token: resetToken)
+                    }
                 }
         }
     }

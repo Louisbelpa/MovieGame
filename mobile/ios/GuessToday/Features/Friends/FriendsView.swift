@@ -154,7 +154,7 @@ struct FriendsView: View {
         .navigationTitle("Amis")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.background, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
         .task {
             guard auth.isLoggedIn else { return }
             await vm.load()
@@ -466,7 +466,7 @@ private struct FriendCodeSheet: View {
             .navigationTitle("Mon code ami")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Theme.background, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { dismiss() } label: {
@@ -542,7 +542,7 @@ private struct FriendCodeInfoSheet: View {
             .navigationTitle("Qu'est-ce qu'un code ami ?")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Theme.background, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarColorScheme(.light, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { dismiss() } label: {
@@ -815,7 +815,7 @@ private struct FriendLeaderboardRow: View {
 
 // MARK: - Global Leaderboard
 
-private struct GlobalLeaderboardView: View {
+struct GlobalLeaderboardView: View {
     @Environment(AuthViewModel.self) var auth
     @State private var entries: [LeaderboardEntry] = []
     @State private var isLoading = false
@@ -1055,7 +1055,7 @@ private let mockLeaderboard: [LeaderboardEntry] = [
         .navigationTitle("Classement")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.background, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
     }
 }
 
