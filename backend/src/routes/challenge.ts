@@ -51,13 +51,13 @@ challengeRouter.get(
       const { date } = req.params;
 
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-        res.status(400).json({ error: 'Date must be in YYYY-MM-DD format.' });
+        res.status(400).json({ error: 'Date invalide.' });
         return;
       }
 
       const todayParis = getTodayParis();
       if (date > todayParis) {
-        res.status(400).json({ error: 'Cannot access future challenges.' });
+        res.status(400).json({ error: 'Ce défi n\'est pas encore disponible.' });
         return;
       }
 
@@ -88,11 +88,11 @@ challengeRouter.post(
       const { guess, challengeId: bodyChallId } = req.body as { guess?: string; challengeId?: number };
 
       if (typeof guess !== 'string') {
-        res.status(422).json({ error: 'Field "guess" must be a string (use empty string to skip).' });
+        res.status(422).json({ error: 'Réponse invalide.' });
         return;
       }
       if (guess.length > 300) {
-        res.status(422).json({ error: 'Field "guess" must be 300 characters or fewer.' });
+        res.status(422).json({ error: 'Réponse trop longue (300 caractères max).' });
         return;
       }
 
@@ -152,7 +152,7 @@ challengeRouter.get(
       if (req.query.challengeId) {
         challengeId = parseInt(req.query.challengeId as string, 10);
         if (isNaN(challengeId)) {
-          res.status(400).json({ error: 'Invalid challengeId.' });
+          res.status(400).json({ error: 'Défi introuvable.' });
           return;
         }
       } else {
@@ -215,11 +215,11 @@ challengeRouter.get(
       const { date, direction } = req.query as { date?: string; direction?: string };
 
       if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-        res.status(400).json({ error: 'date must be YYYY-MM-DD' });
+        res.status(400).json({ error: 'Date invalide.' });
         return;
       }
       if (direction !== 'prev' && direction !== 'next') {
-        res.status(400).json({ error: 'direction must be "prev" or "next"' });
+        res.status(400).json({ error: 'Navigation invalide.' });
         return;
       }
 
@@ -242,7 +242,7 @@ challengeRouter.get(
           ).get(date, todayParis, type);
 
       if (!row) {
-        res.status(404).json({ error: 'No adjacent challenge found.' });
+        res.status(404).json({ error: 'Aucun défi adjacent trouvé.' });
         return;
       }
 

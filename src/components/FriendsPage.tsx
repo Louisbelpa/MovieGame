@@ -403,6 +403,7 @@ export function FriendsPage() {
   const [loadingGlobal, setLoadingGlobal] = useState(false)
   const [loadingFriends, setLoadingFriends] = useState(true)
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true)
+  const [friendQuery, setFriendQuery] = useState('')
 
   const maxStreak = Math.max(
     loadStats('film').currentStreak,
@@ -493,6 +494,9 @@ export function FriendsPage() {
   const incoming = pending.filter((p) => p.direction === 'incoming')
   const myCode = friendsData?.myCode ?? null
   const actualFriends = friendsData?.friends.filter((f) => !f.isMe) ?? []
+  const filteredFriends = friendQuery.trim()
+    ? actualFriends.filter((f) => f.displayName.toLowerCase().includes(friendQuery.trim().toLowerCase()))
+    : actualFriends
 
   return (
     <div className="min-h-dvh flex flex-col" style={{ background: 'var(--bg)' }}>
@@ -669,7 +673,14 @@ export function FriendsPage() {
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="2.4" strokeLinecap="round">
                     <circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" />
                   </svg>
-                  <span className="ph">Rechercher un pseudo…</span>
+                  <input
+                    type="search"
+                    value={friendQuery}
+                    onChange={(e) => setFriendQuery(e.target.value)}
+                    placeholder="Rechercher un pseudo…"
+                    className="cdy-search-input"
+                    style={{ flex: 1, border: 'none', background: 'transparent', fontFamily: 'inherit', fontSize: 15, fontWeight: 500, color: 'var(--ink)', outline: 'none' }}
+                  />
                   <button type="button" onClick={() => setShowAddModal(true)}
                     className="cdy-btn cdy-btn-primary g-film" style={{ padding: '10px 18px' }}>
                     Inviter
@@ -681,17 +692,17 @@ export function FriendsPage() {
                   {/* Left: friends grid */}
                   <div>
                     <div className="cdy-sec-head" style={{ marginTop: 0 }}>
-                      <h3>Mes amis ({actualFriends.length})</h3>
+                      <h3>Mes amis ({filteredFriends.length})</h3>
                     </div>
                     {loadingFriends ? (
                       <div className="cdy-card h-32 animate-pulse" style={{ background: 'var(--line)' }} />
-                    ) : actualFriends.length === 0 ? (
+                    ) : filteredFriends.length === 0 ? (
                       <div className="cdy-card" style={{ padding: 24, color: 'var(--ink-2)', fontSize: 14 }}>
-                        Aucun ami pour l'instant. Invite des joueurs !
+                        {friendQuery.trim() ? 'Aucun ami ne correspond à ta recherche.' : 'Aucun ami pour l\'instant. Invite des joueurs !'}
                       </div>
                     ) : (
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                        {actualFriends.map((f) => (
+                        {filteredFriends.map((f) => (
                           <div key={f.id} className="cdy-card cdy-friend">
                             <Avatar displayName={f.displayName} avatarUrl={f.avatarUrl} size={42} />
                             <div style={{ flex: 1, minWidth: 0 }}>

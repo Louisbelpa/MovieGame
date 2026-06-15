@@ -325,50 +325,26 @@ export function AuthGateNewDesign({ context }: { context: 'profile' | 'friends' 
   }
 
   return (
-    <>
-      {/* Mobile */}
-      <div className="cdym-locked lg:hidden">
+    <div className="auth-gate">
+      <div className="auth-gate-card">
         <div className="lk">{cfg.icon}</div>
         <h2>{cfg.title}</h2>
         <p>{cfg.body}</p>
-        <div className="cdym-locked-perks">
+        <div className="auth-gate-perks">
           {cfg.perks.map((p) => (
-            <span key={p} className="cdym-locked-perk">{p}</span>
+            <span key={p} className="auth-gate-perk">{p}</span>
           ))}
         </div>
-        <button type="button" onClick={() => openAuth('register')} className="cdy-btn cdy-btn-primary" style={{ width: '100%' }}>
-          Créer un compte gratuit
-        </button>
-        <button type="button" onClick={() => openAuth('login')} className="cdym-locked-ghost">
-          Se connecter
-        </button>
-      </div>
-
-      {/* Desktop */}
-      <div className="cdy-locked hidden lg:block">
-        <div className="cdy-locked-bg" aria-hidden />
-        <div className="cdy-locked-scrim">
-          <div className="cdy-locked-card">
-            <div className="lk">{cfg.icon}</div>
-            <h2>{cfg.title}</h2>
-            <p>{cfg.body}</p>
-            <div className="cdy-locked-perks">
-              {cfg.perks.map((p) => (
-                <span key={p} className="cdy-locked-perk">{p}</span>
-              ))}
-            </div>
-            <div className="cdy-locked-cta">
-              <button type="button" onClick={() => openAuth('register')} className="cdy-btn cdy-btn-primary" style={{ width: '100%' }}>
-                Créer un compte gratuit
-              </button>
-              <button type="button" onClick={() => openAuth('login')} className="cdy-locked-ghost">
-                Se connecter
-              </button>
-            </div>
-          </div>
+        <div className="auth-gate-cta">
+          <button type="button" onClick={() => openAuth('register')} className="cdy-btn cdy-btn-primary" style={{ width: '100%' }}>
+            Créer un compte gratuit
+          </button>
+          <button type="button" onClick={() => openAuth('login')} className="auth-gate-ghost">
+            Se connecter
+          </button>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 

@@ -14,8 +14,10 @@ import { fetchWikiChallengeDates } from '@/api/wikiClient'
 import { useWikiStore } from '@/store/wikiStore'
 import { useAuthStore } from '@/store/authStore'
 import { loadHistory, loadStats } from '@/lib/storage'
+import { FEATURES } from '@/config/features'
 
 type DayStatus = 'won' | 'lost' | 'available' | 'none'
+type ModeKey = 'film' | 'series' | 'wiki'
 
 function weekdayOffset(iso: string): number {
   const dow = new Date(iso + 'T12:00:00Z').getUTCDay()
@@ -82,7 +84,9 @@ export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps
   const viewingDate = isWiki ? wikiViewingDate : gameViewingDate
 
   const [challengeDates, setChallengeDates] = useState<Set<string>>(new Set())
-  const [history, setHistory]               = useState<Record<string, 'won' | 'lost'>>({})
+  const [historyByMode, setHistoryByMode] = useState<Record<ModeKey, Record<string, 'won' | 'lost'>>>({
+    film: {}, series: {}, wiki: {},
+  })
   const [loading, setLoading]               = useState(false)
   const [isDesktop, setIsDesktop]           = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : false
@@ -120,23 +124,30 @@ export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps
     const datesPromise = challenges
       ? Promise.resolve({ dates: challenges })
       : (isWiki ? fetchWikiChallengeDates(365) : fetchChallengeDates(365, gameType === 'series' ? 'series' : 'film'))
-    const histType: 'film' | 'series' | 'wiki' = isWiki ? 'wiki' : (gameType === 'series' ? 'series' : 'film')
-    const serverHistPromise = user ? authGetHistory(histType).catch(() => null) : Promise.resolve(null)
 
-    Promise.all([datesPromise, serverHistPromise])
-      .then(([{ dates }, serverHistResp]) => {
-        setChallengeDates(new Set(dates))
-        let hist = loadHistory(isWiki ? 'wiki' : undefined)
-        const stats = loadStats(isWiki ? 'wiki' : undefined)
-        if (stats.lastPlayedDate === today) {
-          hist[today] = (stats.lastWonDate === today) ? 'won' : 'lost'
+    const serverHistFilm = user ? authGetHistory('film').catch(() => null) : Promise.resolve(null)
+    const serverHistSeries = user && FEATURES.enableSeries ? authGetHistory('series').catch(() => null) : Promise.resolve(null)
+    const serverHistWiki = user && FEATURES.enableWiki ? authGetHistory('wiki').catch(() => null) : Promise.resolve(null)
+
+    Promise.all([datesPromise, serverHistFilm, serverHistSeries, serverHistWiki])
+      .then(([{ dates: modeDates }, serverFilm, serverSeries, serverWiki]) => {
+        setChallengeDates(new Set(modeDates))
+
+        function mergeHist(mode: ModeKey, serverHist: { history?: Record<string, 'won' | 'lost'> } | null) {
+          let hist = loadHistory(mode)
+          const stats = loadStats(mode)
+          if (stats.lastPlayedDate === today) {
+            hist[today] = (stats.lastWonDate === today) ? 'won' : 'lost'
+          }
+          if (serverHist?.history) hist = { ...hist, ...serverHist.history }
+          return hist
         }
-        if ((Object.keys(hist).length === 0 || hist[stats.lastPlayedDate ?? ''] === undefined) && stats.lastPlayedDate) {
-          const d = stats.lastPlayedDate
-          hist[d] = (stats.lastWonDate === d) ? 'won' : 'lost'
-        }
-        if (serverHistResp?.history) hist = { ...hist, ...serverHistResp.history }
-        setHistory(hist)
+
+        setHistoryByMode({
+          film: mergeHist('film', serverFilm),
+          series: FEATURES.enableSeries ? mergeHist('series', serverSeries) : {},
+          wiki: FEATURES.enableWiki ? mergeHist('wiki', serverWiki) : {},
+        })
       })
       .catch((err) => {
         console.error('[ArchiveModal] Failed to load challenge dates:', err)
@@ -156,7 +167,27 @@ export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps
 
   function dayStatus(date: string): DayStatus {
     if (!challengeDates.has(date)) return 'none'
-    return history[date] ?? 'available'
+    const hist = historyByMode[histTypeForCurrent()][date]
+    return hist ?? 'available'
+  }
+
+  function histTypeForCurrent(): ModeKey {
+    return isWiki ? 'wiki' : (gameType === 'series' ? 'series' : 'film')
+  }
+
+  /** Pastilles film / série / wiki pour un jour donné. */
+  function dayModeDots(date: string): Array<'win' | 'lose' | 'none'> {
+    const modes: ModeKey[] = [
+      'film',
+      ...(FEATURES.enableSeries ? (['series'] as const) : []),
+      ...(FEATURES.enableWiki ? (['wiki'] as const) : []),
+    ]
+    return modes.map((m) => {
+      const h = historyByMode[m][date]
+      if (h === 'won') return 'win'
+      if (h === 'lost') return 'lose'
+      return 'none'
+    })
   }
 
   const pastDays = days.filter((d) => d <= today)
@@ -198,7 +229,7 @@ export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps
           const day    = parseInt(date.slice(8), 10)
           const isActive = date === activeDate
           const isFuture = date > today
-          const hasChallenge = s !== 'none'
+          const hasChallenge = challengeDates.has(date)
           const cls = [
             'cdym-cal-day',
             isFuture                  ? 'future' : '',
@@ -224,7 +255,9 @@ export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps
               <span className="dn">{day}</span>
               {!isFuture && hasChallenge && (
                 <span className="dots">
-                  <i className={s === 'won' ? 'win' : s === 'lost' ? 'lose' : 'none'} />
+                  {dayModeDots(date).map((dot, j) => (
+                    <i key={j} className={dot} />
+                  ))}
                 </span>
               )}
             </button>
@@ -244,6 +277,7 @@ export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps
         <span><i className="win" /> Trouvé</span>
         <span><i className="lose" /> Manqué</span>
         <span><i className="none" /> Non joué</span>
+        <span style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>· {FEATURES.enableSeries && FEATURES.enableWiki ? '3' : '1'} pastille{(FEATURES.enableSeries && FEATURES.enableWiki) ? 's' : ''} = jeux du jour</span>
         {displayYM !== todayYM && (
           <button
             type="button"

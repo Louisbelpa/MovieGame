@@ -144,7 +144,7 @@ function GameLayout({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
       <main style={{ flex: 1 }}>
         <GamePage mode={mode} />
       </main>
-      <div className="hidden lg:block"><Footer /></div>
+      <div className="page-footer-desktop"><Footer /></div>
       <GameModals mode={mode} />
     </div>
   )

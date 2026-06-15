@@ -8,6 +8,7 @@ import { WikiChallengeImage } from '@/components/wiki/WikiChallengeImage'
 import { WikiHintPanel } from '@/components/wiki/WikiHintPanel'
 import { WikiGuessInput } from '@/components/wiki/WikiGuessInput'
 import { MobileTabBar } from '@/components/layout/MobileTabBar'
+import { GuestBar } from '@/components/layout/GuestBar'
 import { Spinner } from '@/components/ui/Spinner'
 import { WinModal } from '@/components/modals/WinModal'
 import { LoseModal } from '@/components/modals/LoseModal'
@@ -18,9 +19,11 @@ import type { WikiChallengePayload, WikiHintPayload, WikiVisibleProfile } from '
 import type { GuessEntry } from '@/types'
 import { useGameStore, getTodayParis } from '@/store/gameStore'
 import { useWikiStore } from '@/store/wikiStore'
-import { loadHistory, loadGameState } from '@/lib/storage'
+import { loadHistory } from '@/lib/storage'
+import { getTodayGameSnapshot, switcherLabel } from '@/lib/dayStatus'
 
 import { buildShareText, buildAllShareText, collectDayShareGames, type AllShareGame } from '@/lib/utils'
+import { guessAttemptMeta } from '@/lib/guessMeta'
 import { nativeShare } from '@/lib/share'
 import { FEATURES } from '@/config/features'
 
@@ -102,8 +105,15 @@ function modeGlyph(m: string) {
   return 'film'
 }
 
-function GameSwitcher({ currentMode }: { currentMode: 'film' | 'series' | 'wiki' }) {
-  const today = getTodayParis()
+function GameSwitcher({
+  currentMode,
+  today,
+  liveToday,
+}: {
+  currentMode: 'film' | 'series' | 'wiki'
+  today: string
+  liveToday?: { status: 'playing' | 'won' | 'lost'; attempts: number }
+}) {
   const activeTabRef = useRef<HTMLElement | null>(null)
   const modes = [
     { key: 'film' as const,   path: '/films',  name: 'FilmGuess',  enabled: true },
@@ -120,21 +130,34 @@ function GameSwitcher({ currentMode }: { currentMode: 'film' | 'series' | 'wiki'
     <div className="cdy-switch">
       {/* Header label (desktop) */}
       <div className="cdy-switch-head hidden sm:block">
-        Un nouveau défi chaque jour · choisis ton jeu
+        Les défis du jour · change de jeu quand tu veux
       </div>
 
       {/* Tabs */}
       <div className="cdy-switch-tabs">
         {modes.map(({ key, path, name }) => {
-          const isCur    = key === currentMode
-          const history  = loadHistory(key)[today]
-          const isDone   = !!history
-          const st       = isCur ? 'st-current' : isDone ? 'st-done' : 'st-todo'
-          const stBadge  = isCur ? '●' : isDone ? '✓' : '→'
-          const stLabel  = isCur ? 'En cours'
-            : history === 'won'  ? 'Réussi'
-            : history === 'lost' ? 'Perdu'
-            : 'À jouer'
+          const isCur = key === currentMode
+          const snapshot = getTodayGameSnapshot(key, today)
+          const { label: stLabel, st } = switcherLabel(
+            snapshot,
+            isCur,
+            isCur ? liveToday : undefined,
+          )
+          const effectiveOutcome = (() => {
+            if (isCur && liveToday) {
+              if (liveToday.status === 'won' || liveToday.status === 'lost') return liveToday.status
+              if (liveToday.status === 'playing') return null
+            }
+            return snapshot.outcome
+          })()
+          const stBadge = effectiveOutcome === 'won'
+            ? '✓'
+            : effectiveOutcome === 'lost'
+              ? '✕'
+              : isCur && (!effectiveOutcome || liveToday?.status === 'playing')
+                ? '●'
+                : '→'
+          const stResolved = isCur && liveToday?.status === 'playing' ? 'st-current' : st
           const cls      = accentClass(key)
 
           const Tag  = isCur ? 'div' : 'a'
@@ -145,7 +168,7 @@ function GameSwitcher({ currentMode }: { currentMode: 'film' | 'series' | 'wiki'
               key={key}
               ref={isCur ? (el: HTMLElement | null) => { activeTabRef.current = el } : undefined}
               {...(href ? { href } : {})}
-              className={`cdy-switch-tab ${cls} ${st}${isCur ? ' active' : ''}`}
+              className={`cdy-switch-tab ${cls} ${stResolved}${isCur ? ' active' : ''}`}
               style={{ textDecoration: 'none' }}
             >
               <span className="sg"><GlyphC game={modeGlyph(key)} size={20} /></span>
@@ -315,6 +338,13 @@ export function GamePage({ mode }: GamePageProps) {
   const showPrevNav = hasPrev
   const showNextNav = hasNext && !isToday
 
+  const switcherLive = isToday
+    ? {
+        status: (status === 'won' || status === 'lost' ? status : 'playing') as 'playing' | 'won' | 'lost',
+        attempts: guesses.length,
+      }
+    : undefined
+
   // ── Loading / error states ────────────────────────────────────────────────
   if (isLoading || (status === 'idle' && !error)) {
     return (
@@ -328,9 +358,9 @@ export function GamePage({ mode }: GamePageProps) {
   if (!challenge || status === 'not_found' || error) {
     return (
       <div className={accentClass(mode)} style={{ background: 'var(--bg)' }}>
-        <div className="lg:cdy-gamepage">
-          <GameSwitcher currentMode={mode} />
-          <div className="lg:cdy-gamestage">
+        <div className="cdy-gamepage">
+          <GameSwitcher currentMode={mode} today={todayParis} liveToday={switcherLive} />
+          <div className="cdy-gamestage">
             <div className="cdym-arena">
               <div className="cdym-datenav">
                 <button type="button" onClick={() => void navigateDate('prev')} disabled={isLoading || !showPrevNav} className={`arrow${!showPrevNav ? ' disabled' : ''}`}>‹</button>
@@ -402,11 +432,12 @@ export function GamePage({ mode }: GamePageProps) {
     <div className={gCls} data-mode={dataModeAttr} style={{ background: 'var(--bg)', minHeight: '100dvh' }}>
 
       {/* ── Game switcher + arena wrapper (desktop: cdy-gamepage) ── */}
-      <div className="lg:cdy-gamepage">
-      <GameSwitcher currentMode={mode} />
+      <div className="cdy-gamepage">
+      <GameSwitcher currentMode={mode} today={todayParis} liveToday={switcherLive} />
 
       {/* ── Arena ── */}
-      <div className="lg:cdy-gamestage">
+      <div className="cdy-gamestage">
+      <GuestBar />
       <div className="cdym-arena">
 
         {/* 0. Arena header: icon + name + badge */}
@@ -449,8 +480,8 @@ export function GamePage({ mode }: GamePageProps) {
             </div>
           </div>
           {isToday
-            ? <span className="tag">Auj.</span>
-            : <span className="tag old" onClick={() => void loadDate(todayParis)} style={{ cursor: 'pointer' }}>Aujourd'hui</span>
+            ? <span className="tag">Aujourd&apos;hui</span>
+            : <span className="tag old">Ancien défi</span>
           }
           <button
             type="button"
@@ -495,6 +526,12 @@ export function GamePage({ mode }: GamePageProps) {
             />
           ) : (
             <WikiChallengeImage imageUrl={challenge.photoUrl ?? null} isRevealed={isGameOver} />
+          )}
+          {isWiki && !isGameOver && (
+            <div className="cdym-ar-blurnote" aria-hidden>
+              <div className="em">🫥</div>
+              <div className="tx">photo floue · reste floue</div>
+            </div>
           )}
 
           {/* Reveal overlay */}
@@ -594,10 +631,16 @@ export function GamePage({ mode }: GamePageProps) {
               )
             }
             const rowCls = g.correct ? 'correct' : g.guess === '' ? 'skip' : 'wrong'
+            const meta = guessAttemptMeta(
+              i,
+              g,
+              (isWiki ? (challenge.hints as WikiHintPayload[]) : (challenge.hints as HintPayload[])) ?? [],
+            )
             return (
               <div key={i} className={`cdym-ar-row ${rowCls}`}>
                 <i>{g.correct ? '✓' : g.guess === '' ? '→' : '✕'}</i>
                 <span>{g.guess || 'Essai passé'}</span>
+                {meta && <em>{meta}</em>}
               </div>
             )
           })}
@@ -667,8 +710,8 @@ export function GamePage({ mode }: GamePageProps) {
         </div>
 
       </div>{/* /cdym-arena */}
-      </div>{/* /lg:cdy-gamestage */}
-      </div>{/* /lg:cdy-gamepage */}
+      </div>{/* /cdy-gamestage */}
+      </div>{/* /cdy-gamepage */}
 
       {/* ── Bottom tab bar (mobile) ── */}
       <MobileTabBar activeTab="games" />
@@ -695,6 +738,7 @@ export function GamePage({ mode }: GamePageProps) {
           enabledShareModes={enabledShareModes}
           onOpenStats={() => openModal('stats')}
           unplayedModes={unplayedModes}
+          guesses={guesses}
         />
       )}
       {status === 'lost' && (
@@ -716,6 +760,7 @@ export function GamePage({ mode }: GamePageProps) {
           onShareAll={handleShareAll}
           onOpenStats={() => openModal('stats')}
           unplayedModes={unplayedModes}
+          guesses={guesses}
         />
       )}
     </div>

@@ -4,6 +4,8 @@
  * All requests include credentials (cookie-based session).
  */
 
+import { userErrorFromResponse } from '@/lib/userErrors'
+
 const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
 // ─── Generic fetch wrapper ────────────────────────────────────────────────────
@@ -20,7 +22,7 @@ async function request<T>(
 
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string }
-    const err = new Error(body.message ?? body.error ?? `HTTP ${res.status}`)
+    const err = new Error(userErrorFromResponse(res.status, body))
     ;(err as Error & { status: number }).status = res.status
     throw err
   }
@@ -99,6 +101,7 @@ export interface GlobalStatsPayload {
   totalLosses: number
   winRate: number
   winsByAttempt: Record<string, number>
+  winsByHints?: Record<string, number>
   lastUpdated: string
 }
 
@@ -283,7 +286,7 @@ export async function authUploadAvatar(file: File): Promise<{ user: UserPayload 
   })
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string }
-    throw new Error(body.message ?? body.error ?? `HTTP ${res.status}`)
+    throw new Error(userErrorFromResponse(res.status, body, 'Impossible d\'envoyer la photo.'))
   }
   return res.json() as Promise<{ user: UserPayload }>
 }

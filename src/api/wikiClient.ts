@@ -5,6 +5,8 @@
 
 import type { GlobalStatsPayload } from '@/api/client'
 
+import { userErrorFromResponse } from '@/lib/userErrors'
+
 const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -14,8 +16,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...options,
   })
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    const err = new Error((body as { message?: string }).message ?? `HTTP ${res.status}`)
+    const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string }
+    const err = new Error(userErrorFromResponse(res.status, body, undefined, 'game'))
     ;(err as Error & { status: number }).status = res.status
     throw err
   }

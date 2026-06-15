@@ -74,7 +74,7 @@ friendsRouter.get('/code', apiLimiter, userAuth, requireUser, (req: Request, res
   }
 
   if (!code) {
-    res.status(500).json({ error: 'Could not generate unique friend code' });
+    res.status(500).json({ error: 'Impossible de générer un code ami. Réessaie.' });
     return;
   }
 
@@ -87,7 +87,7 @@ friendsRouter.post('/add', AUTH, userAuth, requireUser, (req: Request, res: Resp
   const { code } = req.body as { code?: unknown };
 
   if (typeof code !== 'string' || code.trim().length === 0) {
-    res.status(400).json({ error: 'code is required' });
+    res.status(400).json({ error: 'Code ami requis.' });
     return;
   }
 
@@ -99,12 +99,12 @@ friendsRouter.post('/add', AUTH, userAuth, requireUser, (req: Request, res: Resp
     .get(upper);
 
   if (!target) {
-    res.status(404).json({ error: 'User not found' });
+    res.status(404).json({ error: 'Joueur introuvable.' });
     return;
   }
 
   if (target.id === me) {
-    res.status(400).json({ error: 'Cannot add yourself' });
+    res.status(400).json({ error: 'Tu ne peux pas t\'ajouter toi-même.' });
     return;
   }
 
@@ -116,7 +116,7 @@ friendsRouter.post('/add', AUTH, userAuth, requireUser, (req: Request, res: Resp
     .get(me, target.id, target.id, me);
 
   if (existing) {
-    res.status(409).json({ error: 'Friendship already exists or pending' });
+    res.status(409).json({ error: 'Cette amitié existe déjà ou est en attente.' });
     return;
   }
 
@@ -132,7 +132,7 @@ friendsRouter.post('/accept', AUTH, userAuth, requireUser, (req: Request, res: R
   const { userId } = req.body as { userId?: unknown };
 
   if (typeof userId !== 'number' || !Number.isInteger(userId) || userId <= 0) {
-    res.status(400).json({ error: 'userId must be a positive integer' });
+    res.status(400).json({ error: 'Identifiant invalide.' });
     return;
   }
 
@@ -146,7 +146,7 @@ friendsRouter.post('/accept', AUTH, userAuth, requireUser, (req: Request, res: R
     .get(userId, me);
 
   if (!friendship) {
-    res.status(404).json({ error: 'Pending friendship not found' });
+    res.status(404).json({ error: 'Demande d\'amitié introuvable.' });
     return;
   }
 
@@ -159,7 +159,7 @@ friendsRouter.delete('/:userId', AUTH, userAuth, requireUser, (req: Request, res
   const targetId = parseInt(req.params.userId, 10);
 
   if (!Number.isInteger(targetId) || targetId <= 0) {
-    res.status(400).json({ error: 'Invalid userId' });
+    res.status(400).json({ error: 'Identifiant invalide.' });
     return;
   }
 

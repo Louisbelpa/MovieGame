@@ -111,15 +111,15 @@ authRouter.post('/register', AUTH, async (req: Request, res: Response): Promise<
   };
 
   if (typeof email !== 'string' || !isValidEmail(email)) {
-    res.status(400).json({ error: 'Invalid email address' });
+    res.status(400).json({ error: 'Adresse e-mail invalide.' });
     return;
   }
   if (typeof password !== 'string' || password.length < 8) {
-    res.status(400).json({ error: 'Password must be at least 8 characters' });
+    res.status(400).json({ error: 'Le mot de passe doit contenir au moins 8 caractères.' });
     return;
   }
   if (typeof displayName !== 'string' || displayName.trim().length === 0 || displayName.trim().length > 50) {
-    res.status(400).json({ error: 'Display name must be between 1 and 50 characters' });
+    res.status(400).json({ error: 'Le pseudo doit contenir entre 1 et 50 caractères.' });
     return;
   }
 
@@ -128,7 +128,7 @@ authRouter.post('/register', AUTH, async (req: Request, res: Response): Promise<
     .get(email.toLowerCase());
 
   if (existing) {
-    res.status(409).json({ error: 'Email already registered' });
+    res.status(409).json({ error: 'Cette adresse e-mail est déjà utilisée.' });
     return;
   }
 
@@ -157,7 +157,7 @@ authRouter.post('/login', AUTH, async (req: Request, res: Response): Promise<voi
   const { email, password } = req.body as { email?: unknown; password?: unknown };
 
   if (typeof email !== 'string' || typeof password !== 'string') {
-    res.status(400).json({ error: 'Email and password are required' });
+    res.status(400).json({ error: "L'e-mail et le mot de passe sont requis." });
     return;
   }
 
@@ -173,7 +173,7 @@ authRouter.post('/login', AUTH, async (req: Request, res: Response): Promise<voi
   const valid = await bcrypt.compare(password, hashToCompare);
 
   if (!user || !valid || user.is_banned) {
-    res.status(401).json({ error: 'Invalid credentials' });
+    res.status(401).json({ error: 'E-mail ou mot de passe incorrect.' });
     return;
   }
 
@@ -203,7 +203,7 @@ authRouter.post('/logout', userAuth, (req: Request, res: Response): void => {
 /** GET /api/auth/me */
 authRouter.get('/me', userAuth, (req: Request, res: Response): void => {
   if (!req.user) {
-    res.status(401).json({ error: 'Not authenticated' });
+    res.status(401).json({ error: 'Session expirée. Reconnecte-toi.' });
     return;
   }
   res.json({ user: req.user });
@@ -222,11 +222,11 @@ authRouter.put('/profile', userAuth, requireUser, (req: Request, res: Response):
   };
 
   if (displayName !== undefined && (typeof displayName !== 'string' || displayName.trim().length === 0 || displayName.trim().length > 50)) {
-    res.status(400).json({ error: 'Display name must be between 1 and 50 characters' });
+    res.status(400).json({ error: 'Le pseudo doit contenir entre 1 et 50 caractères.' });
     return;
   }
   if (avatarUrl !== undefined && avatarUrl !== null && (typeof avatarUrl !== 'string' || avatarUrl.length > 500)) {
-    res.status(400).json({ error: 'Invalid avatarUrl' });
+    res.status(400).json({ error: "URL d'avatar invalide." });
     return;
   }
 
@@ -302,13 +302,13 @@ const avatarUpload = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) cb(null, true);
-    else cb(new Error('Only JPEG, PNG and WebP images are allowed'));
+    else cb(new Error('Formats acceptés : JPEG, PNG ou WebP.'));
   },
 });
 
 authRouter.post('/avatar', userAuth, requireUser, avatarUpload.single('avatar'), (req: Request, res: Response): void => {
   if (!req.file) {
-    res.status(400).json({ error: 'No file uploaded' });
+    res.status(400).json({ error: 'Aucune image envoyée.' });
     return;
   }
 
@@ -382,7 +382,7 @@ authRouter.post('/oauth/callback', AUTH, (req: Request, res: Response): void => 
     typeof providerId !== 'string' ||
     providerId.trim().length === 0
   ) {
-    res.status(400).json({ error: 'Invalid provider or providerId' });
+    res.status(400).json({ error: 'Connexion externe invalide.' });
     return;
   }
 
@@ -430,7 +430,7 @@ authRouter.post('/oauth/callback', AUTH, (req: Request, res: Response): void => 
     .get(userId)!;
 
   if (user.is_banned) {
-    res.status(403).json({ error: 'Account suspended' });
+    res.status(403).json({ error: 'Compte suspendu.' });
     return;
   }
 
@@ -878,7 +878,7 @@ authRouter.post('/apple', AUTH, async (req: Request, res: Response): Promise<voi
   };
 
   if (typeof identityToken !== 'string' || identityToken.trim().length === 0) {
-    res.status(400).json({ error: 'identityToken is required' });
+    res.status(400).json({ error: 'Connexion Apple incomplète. Réessaie.' });
     return;
   }
 
@@ -886,7 +886,7 @@ authRouter.post('/apple', AUTH, async (req: Request, res: Response): Promise<voi
   try {
     decoded = (await appleSignin.verifyIdToken(identityToken, { audience: ['fr.guesstoday.app', process.env.APPLE_WEB_CLIENT_ID ?? 'fr.guesstoday.web'] })) as unknown as typeof decoded;
   } catch {
-    res.status(401).json({ error: 'Invalid Apple identity token' });
+    res.status(401).json({ error: 'Connexion Apple invalide. Réessaie.' });
     return;
   }
 
@@ -908,7 +908,7 @@ authRouter.post('/apple', AUTH, async (req: Request, res: Response): Promise<voi
       .get(existing.user_id)!;
 
     if (user.is_banned) {
-      res.status(403).json({ error: 'Account suspended' });
+      res.status(403).json({ error: 'Compte suspendu.' });
       return;
     }
 
@@ -948,7 +948,7 @@ authRouter.post('/apple', AUTH, async (req: Request, res: Response): Promise<voi
         .get(userId)!;
 
       if (user.is_banned) {
-        res.status(403).json({ error: 'Account suspended' });
+        res.status(403).json({ error: 'Compte suspendu.' });
         return;
       }
 

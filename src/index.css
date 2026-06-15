@@ -511,6 +511,7 @@
 }
 .cdy-switch-tab.active { background: var(--acc-soft); border-color: var(--acc); box-shadow: 0 5px 0 color-mix(in oklab, var(--acc) 28%, #fff); }
 .cdy-switch-tab.st-done    .stk { background: var(--correct); }
+.cdy-switch-tab.st-lost    .stk { background: var(--wrong); }
 .cdy-switch-tab.st-current .stk { background: var(--acc); }
 .cdy-switch-tab.st-todo    .stk { background: var(--line-2); color: var(--ink-2); }
 
@@ -530,8 +531,10 @@
 @media (min-width: 640px) { .cdym-arena { gap: 18px; padding: 14px 24px 70px; } }
 @media (min-width: 1024px) { .cdym-arena { width: 760px; max-width: 760px; padding: 34px 34px 38px; gap: 18px; } }
 /* Desktop gamepage wrappers */
-.cdy-gamepage { padding: 26px 40px 0; }
-.cdy-gamestage { width: 760px; margin: 0 auto; }
+@media (min-width: 1024px) {
+  .cdy-gamepage { padding: 26px 40px 0; }
+  .cdy-gamestage { width: 760px; margin: 0 auto; }
+}
 
 /* Attempt slots */
 .cdym-ar-slots { display: flex; gap: 6px; }
@@ -758,17 +761,19 @@
    Candy Nav, Hub, Footer — composants de layout
    ========================================================================= */
 
-/* ── Top navigation ─────────────────────────────────────────────── */
+/* ── Top navigation (maquette candy.css) ───────────────────────── */
 .cdy-nav {
   display: flex; align-items: center; gap: 18px;
-  padding: 16px 40px; background: var(--panel);
+  padding: 16px 40px; background: #fff;
   border-bottom: 3px solid var(--line);
 }
+.cdy-nav-sticky { position: sticky; top: 0; z-index: 40; }
 .cdy-logo {
   display: inline-flex; align-items: center; gap: 11px;
   font-weight: 700; font-size: 23px; letter-spacing: -.01em;
-  text-decoration: none;
+  text-decoration: none; color: var(--ink);
 }
+.cdy-logo-accent { color: var(--coral); }
 .cdy-die {
   width: 38px; height: 38px; border-radius: 12px;
   background: var(--coral); color: #fff;
@@ -777,23 +782,36 @@
 }
 .cdy-navlinks { display: flex; align-items: center; gap: 6px; margin-left: 18px; }
 .cdy-navlink {
-  font-weight: 600; font-size: 14.5px; padding: 8px 14px;
-  border-radius: 11px; color: var(--ink-2); text-decoration: none;
+  font-weight: 600; font-size: 15px; padding: 9px 16px;
+  border-radius: 12px; color: var(--ink-2); text-decoration: none;
   transition: background .12s, color .12s;
 }
 .cdy-navlink:hover { background: var(--bg-2); color: var(--ink); }
 .cdy-navlink.on { background: var(--coral-soft); color: var(--coral-d); }
+.cdy-navlink-btn {
+  background: none; border: none; cursor: pointer; font-family: inherit;
+}
 .cdy-spacer { margin-left: auto; }
 .cdy-avatar {
-  width: 38px; height: 38px; border-radius: 50%;
+  width: 40px; height: 40px; border-radius: 50%;
   display: grid; place-items: center; font-weight: 700;
   color: #fff; font-size: 14px; flex-shrink: 0; overflow: hidden;
+  background: var(--grape); box-shadow: 0 4px 0 var(--grape-d);
+  text-decoration: none;
 }
+.cdy-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .cdy-streak {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-weight: 700; font-size: 14px; padding: 8px 14px;
+  display: inline-flex; align-items: center; gap: 8px;
+  font-weight: 700; font-size: 15px; padding: 9px 15px;
   border-radius: 999px; background: #fff5e6; color: var(--flame);
-  box-shadow: 0 3px 0 #ffe2bd; white-space: nowrap;
+  box-shadow: 0 4px 0 #ffe2bd; white-space: nowrap;
+}
+.cdy-nav-skel { width: 40px; height: 40px; border-radius: 50%; background: var(--line); flex-shrink: 0; }
+.cdy-nav-cta-mobile { padding: 9px 14px; font-size: 13.5px; }
+.cdy-nav-auth-desktop { display: none; }
+@media (min-width: 1024px) {
+  .cdy-nav-cta-mobile { display: none !important; }
+  .cdy-nav-auth-desktop { display: inline-flex !important; align-items: center; gap: 8px; }
 }
 
 /* ── Game cards hub (cdy-gamecard) ──────────────────────────────── */
@@ -1243,6 +1261,7 @@
 .cdy-switch-tab .stk { margin-left:auto; width:24px; height:24px; border-radius:50%; display:grid; place-items:center; font-size:12px; font-weight:800; color:#fff; flex:0 0 auto; }
 .cdy-switch-tab.active { background:var(--acc-soft); border-color:var(--acc); }
 .cdy-switch-tab.st-done .stk { background:var(--correct); }
+.cdy-switch-tab.st-lost .stk { background:var(--wrong); }
 .cdy-switch-tab.st-current .stk { background:var(--acc); }
 .cdy-switch-tab.st-todo .stk { background:var(--line-2); color:var(--ink-2); }
 
@@ -1477,17 +1496,20 @@
    RESPONSIVE OVERRIDES — mobile adaptations pour les composants desktop
    ========================================================================= */
 
-/* Hub-card dual-render visibility */
-.hub-mobile { display: none; }
+/* Hub game cards — structure unique, mise en page responsive */
+.cdy-gc-meta { flex: 1; min-width: 0; }
+.cdy-gc-status-text { flex: 1; min-width: 0; }
+.cdy-gc-status-wide { flex: 1; min-width: 0; }
+.cdy-gc-action { flex-shrink: 0; }
+.cdy-gc-play { display: inline-flex; align-items: center; justify-content: center; text-align: center; }
+.cdy-hub-streak { font-size: 17px; padding: 11px 18px; }
 
 /* Hub : game cards en colonne sur mobile */
 @media (max-width: 1023px) {
-  .hub-desktop { display: none !important; }
-  .hub-mobile { display: block; }
-
   .cdy-hub { padding: 20px 0 32px; }
   .cdy-hubhead { margin: 0 16px 6px; }
-  .cdy-hubhead .cdy-streak { display: none; } /* streak already in nav header */
+  .cdy-hubhead .cdy-streak,
+  .cdy-hubhead .cdy-hub-streak { display: none; }
   .cdy-hello { font-size: 26px; }
   .cdy-daybar { flex-direction: row; align-items: center; gap: 12px; padding: 15px 17px; margin: 12px 16px 0; border-radius: 18px; }
   .cdy-daybar .dd-title { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1496,6 +1518,25 @@
   .cdy-prog .dd-sub { display: block; font-size: 12px; white-space: nowrap; }
   /* cdy-games behaves like cdym-games on mobile */
   .cdy-games { display: flex !important; flex-direction: column; padding: 16px; gap: 15px; margin-top: 0; }
+  .cdy-gamecard .cdy-gc-top {
+    display: flex; align-items: center; gap: 13px;
+    padding: 16px 17px !important;
+  }
+  .cdy-gamecard .cdy-gc-glyph { margin-bottom: 0 !important; width: 44px; height: 44px; flex-shrink: 0; }
+  .cdy-gamecard .cdy-gc-name { font-size: 19px; }
+  .cdy-gamecard .cdy-gc-label { font-size: 13px; margin-top: 0; }
+  .cdy-gamecard .cdy-gc-chip { margin-top: 0; margin-left: auto; flex-shrink: 0; font-size: 12.5px; padding: 6px 11px; }
+  .cdy-gamecard .cdy-gc-body {
+    flex-direction: row; align-items: center;
+    padding: 15px 17px !important; gap: 13px;
+  }
+  .cdy-gamecard .cdy-gc-body--solo { flex-direction: column; align-items: stretch; }
+  .cdy-gamecard .cdy-gc-body--solo .cdy-gc-play { width: 100%; }
+  .cdy-gamecard .cdy-gc-status-wide { display: none; }
+  .cdy-gamecard .cdy-gc-status .tk { display: none; }
+  .cdy-gamecard .cdy-gc-status .cdy-dots { margin-left: 0; }
+  .cdy-gamecard .cdy-gc-action { width: auto !important; margin-left: auto; padding: 10px 14px; font-size: 13px; }
+  .cdy-gamecard .cdy-gc-action::after { content: none; }
   .cdy-summary { flex-direction: column; align-items: stretch; gap: 16px; padding: 20px; margin: 4px 16px 16px; text-align: center; }
   .cdy-summary-actions { margin-left: 0; flex-direction: column; align-items: stretch; width: 100%; gap: 10px; }
   .cdy-summary-hint { text-align: center; line-height: 1.35; }
@@ -1556,9 +1597,6 @@
    FINAL MOBILE FIXES — must be last in file to override all above
    ========================================================================= */
 @media (max-width: 1023px) {
-  /* Hub layout — dual-render cards */
-  .hub-desktop { display: none !important; }
-  .hub-mobile { display: block; }
   .cdy-hub { padding: 20px 0 32px; }
   .cdy-hubhead { margin: 0 16px 6px; }
   .cdy-hubhead .cdy-streak { display: none; }
@@ -1624,8 +1662,6 @@
    ========================================================================= */
 
 /* ── Desktop Arena ───────────────────────────────────────────── */
-.cdy-gamepage { padding:26px 40px 0; }
-.cdy-gamestage { width:760px; margin:0 auto; }
 .cdy-arena { width:760px; min-height:100%; background:var(--bg); padding:34px 34px 38px; display:flex; flex-direction:column; gap:18px; }
 .cdy-ar-top { display:flex; align-items:center; justify-content:space-between; }
 .cdy-ar-game { display:flex; align-items:center; gap:13px; }
@@ -1737,12 +1773,26 @@
 .cdy-end .e-streak { background:#fff; border-radius:18px; padding:16px 22px; box-shadow:0 5px 0 var(--line-2); font-family:'JetBrains Mono',monospace; font-size:12.5px; font-weight:600; color:var(--ink-2); }
 .cdy-end .e-streak b { color:var(--flame); }
 
-/* ── Guest ───────────────────────────────────────────────────── */
-.cdy-guestbar { display:flex; align-items:center; gap:14px; margin:18px 18px 0; padding:14px 18px; border-radius:18px; background:#fff; border:2.5px solid var(--line); box-shadow:0 5px 0 var(--line-2); }
-.cdy-guestbar .gb-emoji { font-size:24px; }
-.cdy-guestbar .gb-title { font-weight:700; font-size:16px; }
-.cdy-guestbar .gb-sub { font-size:13.5px; color:var(--ink-2); font-weight:500; }
-.cdy-guestbar .gb-btn { margin-left:auto; }
+/* ── Guest bar ─────────────────────────────────────────────────── */
+.guestbar {
+  display: flex; align-items: center; gap: 11px;
+  margin: 0 0 12px; padding: 11px 14px;
+  border-radius: 14px; background: #fff;
+  border: 2px solid var(--line); box-shadow: 0 4px 0 var(--line-2);
+}
+.guestbar .gb-emoji, .guestbar .e { font-size: 20px; flex-shrink: 0; line-height: 1; }
+.guestbar .gb-text { flex: 1; min-width: 0; }
+.guestbar .gb-title, .guestbar .t { font-weight: 700; font-size: 13.5px; line-height: 1.25; color: var(--ink); }
+.guestbar .gb-sub, .guestbar .s { font-size: 12px; line-height: 1.3; color: var(--ink-2); font-weight: 500; margin-top: 1px; }
+.guestbar .gb-btn { margin-left: auto; flex-shrink: 0; padding: 8px 14px; font-size: 13px; }
+@media (min-width: 1024px) {
+  .guestbar { padding: 10px 14px; gap: 12px; }
+  .guestbar .gb-title, .guestbar .t { font-size: 14px; }
+}
+
+/* Legacy aliases (autres écrans) */
+.cdy-guestbar { display: none; }
+.cdym-guestbar { display: none; }
 .cdy-guest-strip { display:flex; align-items:center; gap:14px; padding:15px 20px; border-radius:18px; background:#fff; border:2.5px solid var(--line); box-shadow:0 5px 0 var(--line-2); margin-bottom:22px; }
 .cdy-guest-strip .e { font-size:24px; }
 .cdy-guest-strip .t { font-weight:700; font-size:15.5px; }
@@ -1866,9 +1916,11 @@
 .cdym-guest-strip .t { font-weight:700; font-size:13.5px; }
 .cdym-guest-strip .s { font-size:11.5px; color:var(--ink-2); font-weight:500; }
 .cdym-guestbar { display:flex; align-items:center; gap:11px; margin:0 16px 12px; padding:11px 14px; border-radius:14px; background:#fff; border:2.5px solid var(--line); box-shadow:0 4px 0 var(--line-2); }
+@media (min-width: 1024px) { .cdym-guestbar { display: none !important; } }
 .cdym-guestbar .e { font-size:20px; }
 .cdym-guestbar .t { font-weight:700; font-size:13.5px; }
 .cdym-guestbar .s { font-size:11.5px; color:var(--ink-2); font-weight:500; }
+.cdym-guestbar .gb-text { flex: 1; min-width: 0; }
 .cdym-teaser { margin:16px 16px 0; }
 .cdym-teaser-h { font-weight:700; font-size:15px; margin-bottom:11px; color:var(--ink); }
 .cdym-teaser-cards { display:flex; flex-direction:column; gap:10px; }
@@ -1980,4 +2032,174 @@
       aligns with slots/image, and let margin-top provide the gap from the switch. */
 @media (max-width: 1023px) {
   .cdym-arena > .cdym-datenav { margin-left: 0; margin-right: 0; }
+}
+
+/* Burger mobile + note photo floue + tutoriel */
+.cdym-burger { margin-left: auto; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--bg); border: 2.5px solid var(--line); box-shadow: 0 3px 0 var(--line-2); cursor: pointer; padding: 0; }
+.cdym-burger span { display: block; width: 18px; height: 2.5px; border-radius: 2px; background: var(--ink); margin: 2.5px 0; }
+.cdym-ar-media { position: relative; }
+.cdym-ar-blurnote { position: absolute; inset: 0; z-index: 2; display: grid; place-content: center; text-align: center; pointer-events: none; }
+.cdym-ar-blurnote .em { font-size: 36px; opacity: .55; }
+.cdym-ar-blurnote .tx { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-2); margin-top: 6px; }
+.cdym-tuto { display: flex; flex-direction: column; max-height: min(78dvh, 640px); }
+.cdym-tuto-head { position: relative; display: flex; align-items: center; gap: 12px; padding: 4px 4px 16px; margin: -4px -4px 0; border-radius: 18px 18px 0 0; background: var(--acc); color: #fff; }
+.cdym-tuto-head .ic { width: 46px; height: 46px; border-radius: 14px; flex: 0 0 auto; display: grid; place-items: center; background: rgba(255,255,255,.22); }
+.cdym-tuto-head h3 { margin: 0; font-weight: 700; font-size: 21px; color: #fff; }
+.cdym-tuto-head p { margin: 2px 0 0; font-size: 12.5px; opacity: .95; font-weight: 500; color: #fff; }
+.cdym-tuto-x { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,.22); border: none; display: grid; place-items: center; font-size: 15px; font-weight: 800; color: #fff; cursor: pointer; }
+.cdym-tuto-body { flex: 1; overflow-y: auto; padding: 18px 2px 6px; }
+.cdym-tuto-demo { margin-bottom: 20px; }
+.cdym-tuto-lbl { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; }
+.cdym-tuto-lbl .n { width: 24px; height: 24px; flex: 0 0 auto; border-radius: 8px; display: grid; place-items: center; font-weight: 800; font-size: 13px; color: #fff; background: var(--acc); box-shadow: 0 2px 0 var(--acc-d); }
+.cdym-tuto-lbl .tx { font-weight: 700; font-size: 15.5px; }
+.cdym-tuto-note { font-size: 12.5px; line-height: 1.45; color: var(--ink-2); font-weight: 400; margin: 8px 0 0; padding-left: 33px; }
+.cdym-tuto-demo .demo-input { margin: 10px 0 0 33px; display: flex; align-items: center; padding: 11px 14px; border-radius: 12px; background: #fff; border: 2.5px solid var(--line); box-shadow: 0 3px 0 var(--line-2); color: var(--ink-3); font-size: 14px; }
+.cdym-tuto-demo .demo-board { padding-left: 33px; display: flex; flex-direction: column; gap: 7px; }
+.cdym-tuto-demo .cdym-ar-hints { padding-left: 33px; }
+.cdym-tuto-foot { padding: 10px 2px 4px; }
+
+/* =========================================================================
+   UNIFIED RESPONSIVE — landing, guest strip, auth gate, stats, footer
+   (must stay last)
+   ========================================================================= */
+
+/* Landing invité */
+.cdy-landing-deck-list { display: none; }
+.cdy-landing-stats {
+  display: flex; gap: 28px; flex-wrap: wrap;
+  margin-top: 28px; padding-top: 24px;
+  border-top: 2px solid var(--line);
+}
+.cdy-landing-stats > div { display: flex; flex-direction: column; gap: 2px; }
+.cdy-landing-stats b { font-size: 22px; font-weight: 800; line-height: 1; }
+.cdy-landing-stats span { font-size: 13px; color: var(--ink-2); font-weight: 500; }
+
+@media (max-width: 1023px) {
+  .cdy-hero .cdy-deck { display: none !important; }
+  .cdy-landing-deck-list {
+    display: flex; flex-direction: column; gap: 10px;
+    padding: 0 16px 8px;
+  }
+  .cdy-landing-deck-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 16px; border-radius: 16px;
+    background: #fff; border: 2.5px solid var(--line);
+    box-shadow: 0 4px 0 var(--line-2);
+  }
+  .cdy-landing-deck-item .g {
+    width: 44px; height: 44px; border-radius: 13px;
+    display: grid; place-items: center; flex-shrink: 0;
+    color: #fff;
+  }
+  .cdy-landing-deck-item.g-film .g { background: var(--coral); box-shadow: 0 4px 0 var(--coral-d); }
+  .cdy-landing-deck-item.g-serie .g { background: var(--grape); box-shadow: 0 4px 0 var(--grape-d); }
+  .cdy-landing-deck-item.g-face .g { background: var(--sky); box-shadow: 0 4px 0 var(--sky-d); }
+  .cdy-landing-deck-item .n { font-weight: 700; font-size: 16px; }
+  .cdy-landing-deck-item .s { font-size: 13px; color: var(--ink-2); font-weight: 500; margin-top: 1px; }
+  .cdy-landing-stats { gap: 20px; margin-top: 22px; padding-top: 20px; }
+  .cdy-landing-stats b { font-size: 20px; }
+}
+
+/* Bandeau invité stats */
+.guest-strip {
+  display: flex; align-items: center; gap: 14px;
+  padding: 15px 20px; margin-bottom: 22px;
+  border-radius: 18px; background: #fff;
+  border: 2.5px solid var(--line); box-shadow: 0 5px 0 var(--line-2);
+}
+.guest-strip .e { font-size: 24px; flex-shrink: 0; }
+.guest-strip-text { flex: 1; min-width: 0; }
+.guest-strip .t { font-weight: 700; font-size: 15.5px; line-height: 1.25; }
+.guest-strip .s { font-size: 13px; color: var(--ink-2); font-weight: 500; margin-top: 2px; }
+.guest-strip-btn { margin-left: auto; flex-shrink: 0; }
+.guest-strip-btn-short { display: none; }
+
+@media (max-width: 1023px) {
+  .guest-strip {
+    gap: 11px; padding: 12px 14px; margin-bottom: 18px;
+    border-radius: 14px; box-shadow: 0 4px 0 var(--line-2);
+  }
+  .guest-strip .e { font-size: 20px; }
+  .guest-strip .t { font-size: 13.5px; }
+  .guest-strip .s { font-size: 11.5px; }
+  .guest-strip-btn { padding: 8px 12px; font-size: 13px; }
+  .guest-strip-btn-long { display: none; }
+  .guest-strip-btn-short { display: inline; }
+}
+
+/* Auth gate (profil / amis invité) */
+.auth-gate {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  min-height: min(100dvh, 720px); padding: 24px 20px;
+}
+.auth-gate-card {
+  width: 480px; max-width: 100%;
+  background: #fff; border-radius: 26px;
+  border: 3px solid var(--coral);
+  box-shadow: 0 12px 0 var(--coral-soft), 0 24px 60px rgba(60, 48, 80, .18);
+  padding: 40px 36px 36px; text-align: center;
+}
+.auth-gate-card .lk {
+  width: 64px; height: 64px; border-radius: 20px;
+  margin: 0 auto 16px; display: grid; place-items: center;
+  background: var(--coral-soft); font-size: 30px;
+}
+.auth-gate-card h2 { margin: 0 0 8px; font-weight: 700; font-size: 27px; }
+.auth-gate-card p {
+  margin: 0 auto 22px; font-size: 15.5px; line-height: 1.5;
+  color: var(--ink-2); font-weight: 400; max-width: 34ch;
+}
+.auth-gate-perks {
+  display: flex; gap: 10px; justify-content: center;
+  flex-wrap: wrap; margin-bottom: 24px;
+}
+.auth-gate-perk {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-weight: 600; font-size: 13.5px;
+  padding: 8px 16px; border-radius: 999px;
+  background: var(--bg); border: 2px solid var(--line);
+}
+.auth-gate-cta { display: flex; flex-direction: column; gap: 11px; align-items: center; }
+.auth-gate-ghost {
+  font-weight: 600; font-size: 14px; color: var(--ink-2);
+  cursor: pointer; background: none; border: none;
+  font-family: 'Fredoka', sans-serif;
+}
+
+@media (max-width: 1023px) {
+  .auth-gate { min-height: 0; padding: 24px 20px 100px; align-items: flex-start; }
+  .auth-gate-card {
+    width: 100%; border-radius: 22px; padding: 32px 24px 28px;
+    box-shadow: 0 8px 0 var(--coral-soft), 0 16px 40px rgba(60, 48, 80, .12);
+  }
+  .auth-gate-card .lk { width: 60px; height: 60px; font-size: 28px; margin-bottom: 14px; }
+  .auth-gate-card h2 { font-size: 24px; margin-bottom: 6px; }
+  .auth-gate-card p { font-size: 14.5px; margin-bottom: 18px; max-width: 30ch; }
+  .auth-gate-perks { gap: 8px; margin-bottom: 20px; }
+  .auth-gate-perk { font-size: 12px; padding: 7px 12px; box-shadow: 0 3px 0 var(--line-2); background: #fff; border: none; }
+}
+
+/* Footer desktop — masqué sur mobile (tab bar) */
+.page-footer-desktop { display: none; }
+@media (min-width: 1024px) {
+  .page-footer-desktop { display: block; }
+}
+
+/* Stats page */
+.stats-page-head { margin-bottom: 8px; }
+.stats-page-title { margin: 0 0 6px; }
+.stats-page-lead { margin: 0; }
+.stats-mode-seg { margin: 16px 0 20px; }
+.stats-tiles { margin-bottom: 20px; }
+.stats-charts {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+}
+.stats-chart-card h3 {
+  margin: 0 0 16px; font-weight: 700; font-size: 16px;
+}
+
+@media (max-width: 1023px) {
+  .stats-charts { grid-template-columns: 1fr; gap: 14px; }
+  .stats-page-head { margin-bottom: 4px; }
+  .stats-mode-seg { margin: 12px 0 16px; }
 }

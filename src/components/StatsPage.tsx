@@ -3,8 +3,8 @@ import { useLocation } from 'react-router-dom'
 import { MobileTabBar } from '@/components/layout/MobileTabBar'
 import { TopNav } from '@/components/layout/TopNav'
 import { Footer } from '@/components/layout/Footer'
+import { GuestStrip } from '@/components/layout/GuestStrip'
 import { useAuthStore } from '@/store/authStore'
-import { useAuthModal } from '@/components/modals/AuthModal'
 import { fetchGlobalStats } from '@/api/client'
 import type { GlobalStatsPayload } from '@/api/client'
 import { loadStats } from '@/lib/storage'
@@ -18,23 +18,18 @@ const EMPTY_STATS: GlobalStatsPayload = {
 }
 
 function ModeSelector({ mode, setMode }: { mode: StatsMode; setMode: (m: StatsMode) => void }) {
-  const allModes: Array<{ key: StatsMode; label: string; enabled: boolean }> = [
-    { key: 'film',   label: 'FilmGuess',  enabled: true },
-    { key: 'series', label: 'SerieGuess', enabled: FEATURES.enableSeries },
-    { key: 'wiki',   label: 'FaceGuess',  enabled: FEATURES.enableWiki },
-  ]
-  const modes = allModes.filter((m) => m.enabled)
+  const modes = [
+    { key: 'film' as const, label: 'FilmGuess', enabled: true },
+    { key: 'series' as const, label: 'SerieGuess', enabled: FEATURES.enableSeries },
+    { key: 'wiki' as const, label: 'FaceGuess', enabled: FEATURES.enableWiki },
+  ].filter((m) => m.enabled)
 
   if (modes.length <= 1) return null
 
   return (
-    <div className="cdy-seg" style={{ alignSelf: 'flex-start' }}>
+    <div className="cdy-seg stats-mode-seg">
       {modes.map(({ key, label }) => (
-        <span
-          key={key}
-          className={mode === key ? 'on' : ''}
-          onClick={() => setMode(key)}
-        >
+        <span key={key} className={mode === key ? 'on' : ''} onClick={() => setMode(key)}>
           {label}
         </span>
       ))}
@@ -67,13 +62,10 @@ function BarChart({ data, maxVal, color }: { data: [string, number][]; maxVal: n
 
 export function StatsPage() {
   const user = useAuthStore((s) => s.user)
-  const { open: openAuth } = useAuthModal()
   const location = useLocation()
-
   const [mode, setMode] = useState<StatsMode>('film')
   const [globalStats, setGlobalStats] = useState<GlobalStatsPayload>(EMPTY_STATS)
 
-  // Derive mode from URL path
   useEffect(() => {
     if (location.pathname.includes('wiki')) setMode('wiki')
     else if (location.pathname.includes('series')) setMode('series')
@@ -113,30 +105,18 @@ export function StatsPage() {
     <div className={gCls} style={{ background: 'var(--bg)', minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
       <TopNav />
 
-      {/* Desktop layout */}
-      <main className="cdy-page hidden lg:block" style={{ flex: 1 }}>
+      <main className="cdy-page stats-page">
         <div className="cdy-page-narrow">
-          {!user && (
-            <div className="cdy-guest-strip">
-              <span className="e">👤</span>
-              <div>
-                <div className="t">Connecte-toi pour sauvegarder tes stats</div>
-                <div className="s">Tes stats actuelles sont locales à ce navigateur.</div>
-              </div>
-              <button type="button" onClick={() => openAuth('register')} className="cdy-btn cdy-btn-primary b" style={{ padding: '10px 18px', fontSize: 14 }}>
-                Créer un compte
-              </button>
-            </div>
-          )}
+          {!user && <GuestStrip />}
 
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginTop: 26, marginBottom: 8 }}>
-            <h1 className="cdy-h1b">Les stats du jour 📊</h1>
-          </div>
-          <p className="cdy-lead">Comment tu as joué aujourd'hui.</p>
+          <header className="stats-page-head">
+            <h1 className="cdy-h1b stats-page-title">Les stats du jour 📊</h1>
+            <p className="cdy-lead stats-page-lead">Comment tu as joué aujourd&apos;hui.</p>
+          </header>
 
           <ModeSelector mode={mode} setMode={setMode} />
 
-          <div className="cdy-stat-grid" style={{ margin: '28px 0' }}>
+          <div className="cdy-stat-grid stats-tiles">
             {tiles.map(({ v, l }) => (
               <div key={l} className="cdy-stat-tile">
                 <div className="v" style={{ color: accentColor }}>{v}</div>
@@ -145,64 +125,20 @@ export function StatsPage() {
             ))}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22 }}>
-            <div className="cdy-card" style={{ padding: 26 }}>
-              <h3 style={{ margin: '0 0 16px', fontWeight: 700, fontSize: 18 }}>Mes tentatives</h3>
+          <div className="stats-charts">
+            <div className="cdy-card stats-chart-card">
+              <h3>Mes tentatives</h3>
               <BarChart data={distData} maxVal={maxDist} color={accentColor} />
             </div>
-            <div className="cdy-card" style={{ padding: 26 }}>
-              <h3 style={{ margin: '0 0 16px', fontWeight: 700, fontSize: 18 }}>Communauté ({globalStats.totalGames} parties)</h3>
+            <div className="cdy-card stats-chart-card">
+              <h3>Communauté ({globalStats.totalGames} parties)</h3>
               <BarChart data={communityDist} maxVal={maxCommunity} color={accentColor} />
             </div>
           </div>
         </div>
       </main>
 
-      {/* Mobile layout */}
-      <div className="lg:hidden" style={{ flex: 1, paddingBottom: 80 }}>
-        {!user && (
-          <div className="cdym-guest-strip">
-            <span className="e">👤</span>
-            <div style={{ flex: 1 }}>
-              <div className="t">Connecte-toi pour sauvegarder</div>
-              <div className="s">Stats locales à ce navigateur</div>
-            </div>
-            <button type="button" onClick={() => openAuth('register')} className="cdy-btn cdy-btn-primary" style={{ padding: '9px 14px', fontSize: 13 }}>
-              Compte
-            </button>
-          </div>
-        )}
-
-        <div style={{ padding: '16px 16px 0' }}>
-          <h1 style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 24 }}>Stats 📊</h1>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-2)' }}>Tes résultats aujourd'hui</p>
-        </div>
-
-        <div style={{ padding: '14px 16px 0' }}>
-          <ModeSelector mode={mode} setMode={setMode} />
-        </div>
-
-        <div className="cdym-stat-grid" style={{ padding: '14px 16px 0' }}>
-          {tiles.map(({ v, l }) => (
-            <div key={l} className="cdym-stat-t">
-              <div className="v" style={{ color: accentColor }}>{v}</div>
-              <div className="l">{l}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="cdym-card-m">
-          <h3>Mes tentatives</h3>
-          <BarChart data={distData} maxVal={maxDist} color={accentColor} />
-        </div>
-
-        <div className="cdym-card-m">
-          <h3>Communauté ({globalStats.totalGames} parties)</h3>
-          <BarChart data={communityDist} maxVal={maxCommunity} color={accentColor} />
-        </div>
-      </div>
-
-      <div className="hidden lg:block"><Footer /></div>
+      <div className="page-footer-desktop"><Footer /></div>
       <MobileTabBar activeTab="stats" />
     </div>
   )

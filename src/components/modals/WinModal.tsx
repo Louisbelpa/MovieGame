@@ -10,6 +10,7 @@ import { NextGameCountdown } from '@/components/modals/NextGameCountdown'
 import { getTodayParis } from '@/store/gameStore'
 import { copyText, nativeShare, canNativeShare } from '@/lib/share'
 import { buildAllShareText, collectDayShareGames, type AllShareGame, type ShareGameMode } from '@/lib/utils'
+import { maxAttemptsForMode } from '@/lib/gameRules'
 
 /** "2026-06-14" → "14 juin 2026" (format français). */
 function formatDateFr(dateStr: string): string {
@@ -19,7 +20,6 @@ function formatDateFr(dateStr: string): string {
 
 // ── Carte de partage "Ma journée" ────────────────────────────────────────────
 
-type ShareGameMode = 'film' | 'series' | 'wiki'
 const GAME_C: Record<ShareGameMode, { cls: string; name: string; glyph: ShareGameMode }> = {
   film:  { cls: 'g-film',  name: 'FilmGuess',  glyph: 'film'  },
   series: { cls: 'g-serie', name: 'SerieGuess', glyph: 'series' },
@@ -76,7 +76,7 @@ function SingleGameShareCard({ mode, won, attempts, maxAttempts }: {
         <div className={`cdy-share-grow ${g.cls}`} style={{ justifyContent: 'center', padding: '6px 0' }}>
           <ShareSquares won={won} attempts={attempts} total={maxAttempts} />
           <span className="cdy-share-score" style={{ fontSize: 22, color: won ? 'var(--acc)' : 'var(--wrong-d)' }}>
-            {won ? `${attempts}/${maxAttempts}` : 'X/5'}
+            {won ? `${attempts}/${maxAttempts}` : `X/${maxAttempts}`}
           </span>
         </div>
         <div className="cdy-share-foot">
@@ -134,9 +134,13 @@ function DailyShareCard({ currentMode, currentWon, currentAttempts }: {
           {list.map((r) => (
             <div key={r.mode} className={`cdy-share-grow ${GAME_C[r.mode].cls}`}>
               <span className="sg"><GlyphShare game={r.mode} size={17} /></span>
-              <ShareSquares won={r.won} attempts={r.attempts} />
+              <ShareSquares won={r.won} attempts={r.attempts} total={maxAttemptsForMode(r.mode)} />
               <span className="cdy-share-score" style={{ color: r.won === true ? 'var(--acc)' : r.won === false ? 'var(--wrong-d)' : 'var(--ink-3)' }}>
-                {r.won === true ? `${r.attempts}/5` : r.won === false ? 'X/5' : '–'}
+                {r.won === true
+                  ? `${r.attempts}/${maxAttemptsForMode(r.mode)}`
+                  : r.won === false
+                    ? `X/${maxAttemptsForMode(r.mode)}`
+                    : '–'}
               </span>
             </div>
           ))}
@@ -214,9 +218,10 @@ interface WinModalProps {
   enabledShareModes?: ShareGameMode[]
   onOpenStats?: () => void
   unplayedModes?: Array<{ type: GameMode; path: string }>
+  guesses?: Array<{ guess: string; correct: boolean }>
 }
 
-export function WinModal({ isOpen, onClose, mode, result, stats, singleShareText, currentShareGame, enabledShareModes, onOpenStats, unplayedModes }: WinModalProps) {
+export function WinModal({ isOpen, onClose, mode, result, stats, singleShareText, currentShareGame, enabledShareModes, onOpenStats, unplayedModes, guesses }: WinModalProps) {
   const user      = useAuthStore((s) => s.user)
   const { open: openAuth } = useAuthModal()
   const statsKey  = mode === 'wiki' ? 'wiki' : mode === 'series' ? 'series' : 'film'
@@ -258,7 +263,8 @@ export function WinModal({ isOpen, onClose, mode, result, stats, singleShareText
       <div className="hidden lg:grid" style={{ gridTemplateColumns: '1fr 380px', gap: 32, alignItems: 'start' }}>
 
         {/* ── Left col: résultat ── */}
-        <div>
+        <div style={{ position: 'relative' }}>
+          {stats.attemptsUsed <= 3 && <Confetti />}
           <span className="cdy-badge" style={{ background: 'var(--correct-soft)', color: 'var(--correct-d)', marginBottom: 14 }}>
             ✓ Résolu en {stats.attemptsUsed}/{stats.maxAttempts}
           </span>
@@ -280,6 +286,37 @@ export function WinModal({ isOpen, onClose, mode, result, stats, singleShareText
               </div>
             </div>
           </div>
+
+          {guesses && guesses.length > 0 && (
+            <div className="cdy-card" style={{ padding: 18, marginTop: 18 }}>
+              <div className="cdy-mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-2)', marginBottom: 10 }}>TES TENTATIVES</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {guesses.map((g, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}>
+                    <span style={{ width: 22, textAlign: 'center', color: g.correct ? 'var(--correct-d)' : 'var(--wrong-d)', fontWeight: 800 }}>
+                      {g.correct ? '✓' : g.guess === '' ? '→' : '✕'}
+                    </span>
+                    <span style={{ fontWeight: g.correct ? 700 : 500, color: 'var(--ink)' }}>{g.guess || 'Essai passé'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!user && (
+            <div style={{ marginTop: 22, borderRadius: 16, padding: '18px', background: 'var(--acc-soft,var(--coral-soft))', border: '2.5px solid var(--acc,var(--coral))' }}>
+              <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>Ne perds pas ce score 🔥</div>
+              <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--ink-2)' }}>Crée un compte gratuit pour sauvegarder ta série et tes stats.</p>
+              {unplayedModes && unplayedModes.length > 0 && (
+                <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--ink-2)' }}>
+                  +{unplayedModes.length} autre{unplayedModes.length > 1 ? 's' : ''} défi{unplayedModes.length > 1 ? 's' : ''} t&apos;attendent aujourd&apos;hui
+                </p>
+              )}
+              <button type="button" onClick={() => { onClose(); openAuth('register') }} className="cdy-btn cdy-btn-primary" style={{ width: '100%' }}>
+                Créer un compte gratuit
+              </button>
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 12, marginTop: 22 }}>
             {onOpenStats && (
@@ -381,6 +418,15 @@ export function WinModal({ isOpen, onClose, mode, result, stats, singleShareText
               <span style={{ fontSize: 12.5, fontWeight: 600, background: '#fff', borderRadius: 999, padding: '5px 12px', color: 'var(--ink-2)' }}>📊 Stats</span>
               <span style={{ fontSize: 12.5, fontWeight: 600, background: '#fff', borderRadius: 999, padding: '5px 12px', color: 'var(--ink-2)' }}>👥 Amis</span>
             </div>
+            {unplayedModes && unplayedModes.length > 0 && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                {unplayedModes.map(({ type }) => (
+                  <span key={type} style={{ fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,.7)', borderRadius: 10, padding: '6px 10px', color: 'var(--ink-2)' }}>
+                    🔒 {type === 'wiki' ? 'FaceGuess' : type === 'series' ? 'SerieGuess' : 'FilmGuess'}
+                  </span>
+                ))}
+              </div>
+            )}
             <button
               type="button"
               onClick={() => { onClose(); openAuth('register') }}

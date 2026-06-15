@@ -38,7 +38,7 @@ export function createRateLimiter(
     max,
     standardHeaders: true,  // Return `RateLimit-*` headers
     legacyHeaders: false,
-    message: { error: 'Too many requests, please slow down.' },
+    message: { error: 'Trop de requêtes. Patiente un instant.' },
     ...rest,
   });
 }

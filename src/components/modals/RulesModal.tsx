@@ -1,6 +1,6 @@
 /**
  * modals/RulesModal.tsx
- * Tutoriel « Comment jouer » — règles du jeu courant, dans une modale centrée standard.
+ * Tutoriel interactif « Comment jouer » (maquette Candy cdym-tuto).
  */
 
 import { Modal } from '@/components/ui/Modal'
@@ -15,38 +15,55 @@ function GlyphC({ game, size = 24 }: { game: string; size?: number }) {
   if (game === 'film')  return <svg width={size} height={size} viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5" {...s} /><path d="M3 9h18M3 15h18M8 4v16M16 4v16" {...s} /></svg>
   if (game === 'serie') return <svg width={size} height={size} viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2.5" {...s} /><path d="M8 3l4 4 4-4" {...s} /></svg>
   if (game === 'face')  return <svg width={size} height={size} viewBox="0 0 24 24"><circle cx="12" cy="9" r="4" {...s} /><path d="M5 20c0-3.8 3.1-6.2 7-6.2s7 2.4 7 6.2" {...s} /></svg>
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" />
+  return null
 }
 
-type Rule = { glyph: string; cls: string; title: string; body: string }
-
-/** Règles « Comment jouer » spécifiques au jeu courant. */
-function rulesFor(mode: RulesMode): Rule[] {
-  const noun  = mode === 'wiki' ? 'une personnalité' : mode === 'series' ? 'une série' : 'un film'
-  const glyph = mode === 'wiki' ? 'face' : mode === 'series' ? 'serie' : 'film'
-  const cls   = mode === 'wiki' ? 'g-face' : mode === 'series' ? 'g-serie' : 'g-film'
-  const hints = mode === 'wiki'
-    ? 'année de naissance, nationalité, domaine…'
-    : mode === 'series'
-      ? 'année, créateur, acteur principal…'
-      : 'année, réalisateur, acteur principal…'
-  return [
-    {
-      glyph, cls,
-      title: `Devine ${noun} chaque jour`,
-      body: 'Un nouveau défi à minuit (heure de Paris), le même pour tout le monde. Tape ton hypothèse dans la barre de recherche.',
-    },
-    {
-      glyph, cls,
-      title: '5 essais, des indices',
-      body: `À chaque mauvaise réponse, un indice se dévoile (${hints}). Trouve avant d'épuiser tes 5 essais.`,
-    },
-    {
-      glyph, cls,
-      title: 'Garde ta série 🔥',
-      body: 'Réussis le défi pour allonger ta série, grimper au classement et partager ton score avec tes amis.',
-    },
-  ]
+const TUTO_CFG: Record<RulesMode, {
+  glyph: string
+  cls: string
+  name: string
+  intro: string
+  maxAttempts: number
+  placeholder: string
+  wrong: string
+  answer: string
+  firstMeta: string
+  hints: [{ l: string; v: string }, { l: string; v: string }]
+  mediaNote: string
+}> = {
+  film: {
+    glyph: 'film', cls: 'g-film', name: 'FilmGuess',
+    intro: 'Devine le film du jour.',
+    maxAttempts: 5,
+    placeholder: 'Interstellar…',
+    wrong: 'Inception',
+    answer: 'Interstellar',
+    firstMeta: 'Année · 2010',
+    hints: [{ l: 'Année', v: '2014' }, { l: 'Genre', v: 'Sci-Fi' }],
+    mediaNote: 'Reviens chaque jour pour un nouveau défi et garde ta série 🔥.',
+  },
+  series: {
+    glyph: 'serie', cls: 'g-serie', name: 'SerieGuess',
+    intro: 'Devine la série du jour.',
+    maxAttempts: 5,
+    placeholder: 'Breaking Bad…',
+    wrong: 'Better Call Saul',
+    answer: 'Breaking Bad',
+    firstMeta: 'Créateur · Gilligan',
+    hints: [{ l: 'Année', v: '2008' }, { l: 'Créateur', v: 'V. Gilligan' }],
+    mediaNote: 'Reviens chaque jour pour un nouveau défi et garde ta série 🔥.',
+  },
+  wiki: {
+    glyph: 'face', cls: 'g-face', name: 'FaceGuess',
+    intro: 'Devine la personnalité — photo floue.',
+    maxAttempts: 5,
+    placeholder: 'Cate Blanchett…',
+    wrong: 'Naomi Watts',
+    answer: 'Cate Blanchett',
+    firstMeta: 'Nationalité · Australie',
+    hints: [{ l: 'Domaine', v: 'Cinéma' }, { l: 'Nationalité', v: 'Australienne' }],
+    mediaNote: 'La photo reste floutée : appuie-toi sur la bio. Reviens chaque jour pour garder ta série 🔥.',
+  },
 }
 
 export function RulesModal({ mode }: { mode?: RulesMode }) {
@@ -62,7 +79,7 @@ export function RulesModal({ mode }: { mode?: RulesMode }) {
   const wikiOpenModal  = useWikiStore((s) => s.openModal)
 
   const resolvedMode: RulesMode = mode ?? (gameType === 'series' ? 'series' : 'film')
-  const rules     = rulesFor(resolvedMode)
+  const cfg = TUTO_CFG[resolvedMode]
   const isWiki    = resolvedMode === 'wiki'
   const isOpen    = isWiki
     ? (wikiUi.isModalOpen && wikiUi.modalType === 'rules')
@@ -78,35 +95,62 @@ export function RulesModal({ mode }: { mode?: RulesMode }) {
   function handleClose() {
     try { localStorage.setItem(rulesSeenKey, '1') } catch { /* private browsing */ }
     closeModal()
-    // Si la partie est déjà finie, on enchaîne sur la modale résultat.
     if (status === 'won') setTimeout(() => openModal('win'), 300)
     else if (status === 'lost') setTimeout(() => openModal('lose'), 300)
   }
 
   if (!isOpen) return null
 
+  const slots = Array.from({ length: cfg.maxAttempts }, (_, i) => i < 2)
+
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Comment jouer" className={rules[0].cls}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-        {rules.map((r, i) => (
-          <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-            <span style={{
-              flexShrink: 0, width: 46, height: 46, borderRadius: 13,
-              display: 'grid', placeItems: 'center',
-              background: 'var(--acc-soft, var(--bg))', color: 'var(--acc, var(--ink))',
-              border: '2px solid var(--line)',
-            }}>
-              <GlyphC game={r.glyph} size={24} />
-            </span>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--ink)' }}>{r.title}</div>
-              <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--ink-2)', fontWeight: 400, lineHeight: 1.5 }}>{r.body}</p>
+    <Modal isOpen={isOpen} onClose={handleClose} className={cfg.cls} ariaLabel="Comment jouer">
+      <div className={`cdym-tuto ${cfg.cls}`} style={{ margin: '-8px -4px 0' }}>
+        <div className="cdym-tuto-head">
+          <span className="ic"><GlyphC game={cfg.glyph} size={24} /></span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h3>Comment jouer</h3>
+            <p>{cfg.name} · {cfg.intro}</p>
+          </div>
+          <button type="button" className="cdym-tuto-x" onClick={handleClose} aria-label="Fermer">✕</button>
+        </div>
+
+        <div className="cdym-tuto-body">
+          <div className="cdym-tuto-demo">
+            <div className="cdym-tuto-lbl"><span className="n">1</span><span className="tx">Tu as {cfg.maxAttempts} essais</span></div>
+            <div className="cdym-ar-slots">
+              {slots.map((used, i) => <i key={i} className={used ? 'used' : ''} />)}
+            </div>
+            <div className="demo-input">{cfg.placeholder}</div>
+          </div>
+
+          <div className="cdym-tuto-demo">
+            <div className="cdym-tuto-lbl"><span className="n">2</span><span className="tx">Chaque erreur te rapproche</span></div>
+            <div className="demo-board">
+              <div className="cdym-ar-row wrong"><i>✕</i><span>{cfg.wrong}</span><em>{cfg.firstMeta}</em></div>
+              <div className="cdym-ar-row correct"><i>✓</i><span>{cfg.answer}</span></div>
             </div>
           </div>
-        ))}
-        <button type="button" onClick={handleClose} className="cdy-btn cdy-btn-primary" style={{ width: '100%', marginTop: 4 }}>
-          Compris, jouons !
-        </button>
+
+          <div className="cdym-tuto-demo">
+            <div className="cdym-tuto-lbl"><span className="n">3</span><span className="tx">Des indices se débloquent</span></div>
+            <div className="cdym-ar-hints">
+              <div className="cdym-ar-hint on"><span className="hl">{cfg.hints[0].l}</span><span className="hv">{cfg.hints[0].v}</span></div>
+              <div className="cdym-ar-hint on"><span className="hl">{cfg.hints[1].l}</span><span className="hv">{cfg.hints[1].v}</span></div>
+              <div className="cdym-ar-hint"><span className="hl">Ind. 3</span><span className="hv">🔒</span></div>
+            </div>
+            <p className="cdym-tuto-note">{cfg.mediaNote}</p>
+          </div>
+        </div>
+
+        <div className="cdym-tuto-foot">
+          <button type="button" onClick={handleClose} className="cdym-btn cdym-btn-primary cdym-btn-block" style={{ padding: '15px' }}>
+            C&apos;est parti !
+          </button>
+          <button type="button" onClick={handleClose} className="cdym-locked-ghost" style={{ marginTop: 8 }}>
+            Ne plus afficher
+          </button>
+        </div>
       </div>
     </Modal>
   )

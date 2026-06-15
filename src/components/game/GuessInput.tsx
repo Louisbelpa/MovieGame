@@ -1,6 +1,5 @@
 import { useId, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Search } from 'lucide-react'
 import { useGameStore } from '@/store/gameStore'
 
 interface GuessInputProps {
@@ -20,7 +19,10 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
   const hasError = shakeTrigger > 0
 
   const handleSubmit = () => {
-    if (inputValue.trim()) { setInputValue(''); onSubmit(inputValue.trim()) }
+    if (inputValue.trim()) {
+      setInputValue('')
+      onSubmit(inputValue.trim())
+    }
   }
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && inputValue.trim()) handleSubmit()
@@ -35,7 +37,6 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
         animate={shakeTrigger > 0 ? { x: [-8, 8, -5, 5, 0] } : {}}
         transition={{ duration: 0.35 }}
       >
-        <Search size={15} style={{ color: 'var(--ink-3)', flexShrink: 0 }} aria-hidden />
         <input
           ref={inputRef}
           type="text"
@@ -70,7 +71,7 @@ export function GuessInput({ onSubmit, onSkip, disabled, attemptsLeft }: GuessIn
           className="cdy-btn cdy-btn-primary"
           style={{ padding: '10px 16px', fontSize: 14, flexShrink: 0, opacity: !inputValue.trim() ? 0.4 : 1 }}
         >
-          Deviner
+          Valider ↵
         </button>
       </motion.div>
       <p id={errorId} className="sr-only" role={hasError ? 'alert' : undefined}>

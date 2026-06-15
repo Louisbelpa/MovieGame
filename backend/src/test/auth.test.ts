@@ -120,7 +120,7 @@ describe('POST /api/auth/register', () => {
       displayName: 'Test User',
     });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/email/i);
+    expect(res.body.error).toMatch(/e-mail|email/i);
   });
 
   it('returns 400 when password is too short', async () => {
@@ -130,7 +130,7 @@ describe('POST /api/auth/register', () => {
       displayName: 'Test User',
     });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/password/i);
+    expect(res.body.error).toMatch(/mot de passe|password/i);
   });
 
   it('returns 400 when displayName is empty', async () => {
@@ -140,7 +140,7 @@ describe('POST /api/auth/register', () => {
       displayName: '',
     });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/display name/i);
+    expect(res.body.error).toMatch(/pseudo|display name/i);
   });
 
   it('returns 400 when displayName is too long (>50 chars)', async () => {
@@ -165,7 +165,7 @@ describe('POST /api/auth/register', () => {
       displayName: 'Dupe User',
     });
     expect(res.status).toBe(409);
-    expect(res.body.error).toMatch(/already registered/i);
+    expect(res.body.error).toMatch(/déjà|already registered/i);
   });
 
   it('email is stored case-insensitively', async () => {

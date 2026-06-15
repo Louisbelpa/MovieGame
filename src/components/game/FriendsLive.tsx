@@ -1,3 +1,4 @@
+import { maxAttemptsForMode } from '@/lib/gameRules'
 import { useEffect, useState } from 'react'
 import { friendsGetAll } from '@/api/client'
 import type { FriendEntry } from '@/api/client'
@@ -38,6 +39,8 @@ export function FriendsLive({ mode }: FriendsLiveProps) {
 
   if (!user || friends.length === 0) return null
 
+  const maxAttempts = maxAttemptsForMode(mode)
+
   return (
     <div
       className="rounded-xl border border-film-border px-4 py-3 flex flex-col gap-3"
@@ -63,11 +66,11 @@ export function FriendsLive({ mode }: FriendsLiveProps) {
                 <span className="text-xs text-film-text-dim">·</span>
               ) : score.won ? (
                 <span className="text-xs font-mono text-film-green shrink-0">
-                  {score.attemptsUsed}/5 ✓
+                  {score.attemptsUsed}/{maxAttempts} ✓
                 </span>
               ) : (
                 <span className="text-xs font-mono text-film-red shrink-0">
-                  {score.attemptsUsed}/5 ✗
+                  {score.attemptsUsed}/{maxAttempts} ✗
                 </span>
               )}
             </li>

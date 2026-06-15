@@ -684,6 +684,26 @@ export function getCommunityStatsForChallengeId(challengeId: number) {
     }
   }
 
+  const hintRows = db
+    .prepare(
+      `SELECT hints_revealed AS n, COUNT(*) AS c
+       FROM game_sessions
+       WHERE challenge_id = ? AND outcome = 'won'
+       GROUP BY hints_revealed`
+    )
+    .all(challengeId) as { n: number; c: number }[];
+
+  const maxHints = ch.media_type === 'wiki' ? 3 : 3;
+  const winsByHints: Record<string, number> = {};
+  for (let i = 0; i <= maxHints; i += 1) {
+    winsByHints[String(i)] = 0;
+  }
+  for (const r of hintRows) {
+    if (Number.isFinite(r.n) && r.n >= 0 && r.n <= maxHints) {
+      winsByHints[String(r.n)] = r.c;
+    }
+  }
+
   const winRate =
     totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0;
 
@@ -693,6 +713,7 @@ export function getCommunityStatsForChallengeId(challengeId: number) {
     totalLosses,
     winRate,
     winsByAttempt,
+    winsByHints,
     lastUpdated: new Date().toISOString(),
   };
 }

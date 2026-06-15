@@ -2,6 +2,7 @@ import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import type { GameStats, GuessEntry } from '@/types'
 import { BRAND_NAME, PUBLIC_SITE_URL } from '@/config/features'
+import { maxAttemptsForMode } from '@/lib/gameRules'
 import { loadGameState } from '@/lib/storage'
 
 /** Merge Tailwind classes safely */
@@ -169,7 +170,7 @@ export function collectDayShareGames(
         mode: m,
         guesses: state.guesses,
         won: state.status === 'won',
-        maxAttempts: state.maxAttempts ?? 5,
+        maxAttempts: state.maxAttempts ?? maxAttemptsForMode(m),
       }]
     }
 
@@ -179,7 +180,7 @@ export function collectDayShareGames(
         mode: m,
         guesses: guessesFromServerResult(sv.won, sv.attempts.length),
         won: sv.won,
-        maxAttempts: 5,
+        maxAttempts: maxAttemptsForMode(m),
       }]
     }
 

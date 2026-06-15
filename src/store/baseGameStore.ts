@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { addToHistory, loadStats, saveStats, saveGameState } from '@/lib/storage'
 import { updateStats } from '@/lib/utils'
+import { toUserErrorMessage, userErrorFromResponse } from '@/lib/userErrors'
 import { authChallengeResult } from '@/api/client'
 import { useAuthStore } from '@/store/authStore'
 
@@ -107,8 +108,8 @@ export function createBaseGameStore<
     })
 
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}))
-      const err = new Error((body as { message?: string }).message ?? 'Request failed')
+      const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string }
+      const err = new Error(userErrorFromResponse(res.status, body, undefined, 'game'))
       ;(err as Error & { status?: number }).status = res.status
       throw err
     }
@@ -189,7 +190,7 @@ export function createBaseGameStore<
           const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
           const nav = await probeAdjacentNavigation(todayParis)
           set({
-            error: err instanceof Error ? err.message : 'Error',
+            error: toUserErrorMessage(err, 'Impossible de charger le défi.', { context: 'game' }),
             isLoading: false,
             isSubmitting: false,
             status: 'not_found',
@@ -198,7 +199,7 @@ export function createBaseGameStore<
           })
         } else {
           set({
-            error: err instanceof Error ? err.message : 'Error',
+            error: toUserErrorMessage(err, 'Impossible de charger le défi.', { context: 'game' }),
             isLoading: false,
             isSubmitting: false,
           })
@@ -227,7 +228,7 @@ export function createBaseGameStore<
         if (statusCode === 404) {
           const nav = await probeAdjacentNavigation(viewingDate)
           set({
-            error: err instanceof Error ? err.message : 'Error',
+            error: toUserErrorMessage(err, 'Impossible de charger le défi.', { context: 'game' }),
             isLoading: false,
             status: 'not_found',
             hasPrev: nav.hasPrev,
@@ -235,7 +236,7 @@ export function createBaseGameStore<
           })
         } else {
           set({
-            error: err instanceof Error ? err.message : 'Error',
+            error: toUserErrorMessage(err, 'Impossible de charger le défi.', { context: 'game' }),
             isLoading: false,
             status: get().status,
             hasPrev: false,
@@ -254,7 +255,7 @@ export function createBaseGameStore<
         await get().loadDate(date)
       } catch (err) {
         set({
-          error: err instanceof Error ? err.message : 'Error',
+          error: toUserErrorMessage(err, 'Impossible de changer de date.', { context: 'game' }),
           isLoading: false,
         })
       }
@@ -316,7 +317,7 @@ export function createBaseGameStore<
         }
       } catch (err) {
         set({
-          error: err instanceof Error ? err.message : 'Error',
+          error: toUserErrorMessage(err, 'Impossible d\'envoyer la réponse.', { context: 'game' }),
           isSubmitting: false,
         })
       }

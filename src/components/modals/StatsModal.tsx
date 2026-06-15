@@ -18,6 +18,7 @@ export interface StatsModalProps {
     totalWins: number
     winRate: number
     winsByAttempt: Record<string, number>
+    winsByHints?: Record<string, number>
   }
   personalStats: {
     currentStreak: number
@@ -26,6 +27,14 @@ export interface StatsModalProps {
     winRate: number
   }
   personalDistribution?: Record<1 | 2 | 3 | 4 | 5, number>
+}
+
+function avgHints(winsByHints: Record<string, number> | undefined): string {
+  if (!winsByHints) return '—'
+  const total = Object.values(winsByHints).reduce((s, v) => s + v, 0)
+  if (!total) return '—'
+  const weighted = Object.entries(winsByHints).reduce((s, [k, v]) => s + Number(k) * v, 0)
+  return (weighted / total).toFixed(1).replace('.', ',')
 }
 
 function avgAttempts(winsByAttempt: Record<string, number>): string {
@@ -51,11 +60,16 @@ export function StatsModal({ isOpen, onClose, mode, communityDateLabel, globalSt
   const distData = distKeys.map((k) => ({ k, v: globalStats.winsByAttempt[k] ?? 0 }))
   const maxBar   = Math.max(1, ...distData.map((d) => d.v))
 
+  const hintKeys = ['0', '1', '2', '3']
+  const hintData = hintKeys.map((k) => ({ k, v: globalStats.winsByHints?.[k] ?? 0 }))
+  const maxHintBar = Math.max(1, ...hintData.map((d) => d.v))
+  const hasHintStats = hintData.some((d) => d.v > 0)
+
   const communityTiles = [
     { v: `${globalStats.winRate}%`,                           l: 'taux de victoire',    c: 'var(--mint)' },
     { v: avgAttempts(globalStats.winsByAttempt),              l: 'essais en moyenne',   c: modeAcc },
     { v: globalStats.totalGames.toLocaleString('fr-FR'),      l: 'joueurs aujourd\'hui', c: 'var(--ink)' },
-    { v: personalStats.currentStreak > 0 ? `🔥 ${personalStats.currentStreak}` : '—', l: 'ta série', c: 'var(--flame)' },
+    { v: avgHints(globalStats.winsByHints),                   l: 'indices en moyenne',  c: 'var(--grape)' },
   ]
 
   const content = (
@@ -93,6 +107,28 @@ export function StatsModal({ isOpen, onClose, mode, communityDateLabel, globalSt
           </div>
         ))}
       </div>
+
+      {hasHintStats && (
+        <div className="cdym-card-m">
+          <h3>Victoires par indice révélé</h3>
+          {hintData.map(({ k, v }) => (
+            <div key={k} className="cdym-barrow">
+              <span className="k">{k === '0' ? '0' : k}</span>
+              <div className="tr">
+                <div
+                  className="fl"
+                  style={{ width: `${Math.max(v > 0 ? 8 : 0, Math.round((v / maxHintBar) * 100))}%`, background: 'var(--grape)' }}
+                >
+                  {v > 0 ? v : ''}
+                </div>
+              </div>
+            </div>
+          ))}
+          <div className="cdy-mono" style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8 }}>
+            Nombre d&apos;indices débloqués au moment de la victoire
+          </div>
+        </div>
+      )}
 
       {/* Mes stats personnelles */}
       {personalDistribution && (
