@@ -23,6 +23,20 @@ if (process.env.NODE_ENV === 'production') {
 const app = createApp();
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
 
+// ─── Cleanup expired sessions every hour ──────────────────────────────────────
+
+const cleanupInterval = setInterval(() => {
+  try {
+    db.prepare(`DELETE FROM user_sessions WHERE expires_at < datetime('now')`).run();
+    db.prepare(`DELETE FROM password_reset_tokens WHERE expires_at < datetime('now')`).run();
+    db.prepare(`DELETE FROM email_verification_tokens WHERE expires_at < datetime('now')`).run();
+    db.prepare(`DELETE FROM active_admin_tokens WHERE expires_at < datetime('now') OR revoked_at IS NOT NULL`).run();
+  } catch (err) {
+    logger.warn({ err }, 'Session cleanup failed');
+  }
+}, 60 * 60 * 1000);
+cleanupInterval.unref();
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 const server = app.listen(PORT, () => {

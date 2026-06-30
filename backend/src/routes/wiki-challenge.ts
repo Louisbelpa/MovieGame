@@ -4,7 +4,8 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express'
-import { guessLimiter } from '../middleware/rateLimiter.js'
+import { guessLimiter, searchLimiter } from '../middleware/rateLimiter.js'
+import { userAuth } from '../middleware/userAuth.js'
 import db from '../db/database.js'
 import {
   getTodayWikiChallenge,
@@ -17,6 +18,8 @@ import {
   searchWikiPersons,
   getWikiGlobalStats,
 } from '../services/wiki-challenge.service.js'
+import { attachUserToGameSession } from '../services/game-session.service.js'
+import { getTodayParis } from '../lib/dates.js'
 
 export const wikiChallengeRouter = Router()
 
@@ -26,7 +29,7 @@ wikiChallengeRouter.get('/today', async (req: Request, res: Response, next: Next
   try {
     const sessionToken = res.locals.sessionToken as string
     const challenge = getTodayWikiChallenge()
-    const session = getOrCreateWikiSession(sessionToken, challenge.id)
+    const session = getOrCreateWikiSession(sessionToken, challenge.id, req.user?.id)
     res.json(buildWikiChallengePayload(challenge, session))
   } catch (err) {
     next(err)
@@ -42,14 +45,14 @@ wikiChallengeRouter.get('/date/:date', async (req: Request, res: Response, next:
       res.status(400).json({ error: 'Date must be in YYYY-MM-DD format.' })
       return
     }
-    const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
+    const todayParis = getTodayParis()
     if (date > todayParis) {
       res.status(400).json({ error: 'Cannot access future challenges.' })
       return
     }
     const sessionToken = res.locals.sessionToken as string
     const challenge = getWikiChallengeByDate(date)
-    const session = getOrCreateWikiSession(sessionToken, challenge.id)
+    const session = getOrCreateWikiSession(sessionToken, challenge.id, req.user?.id)
     res.json(buildWikiChallengePayload(challenge, session))
   } catch (err) {
     next(err)
@@ -58,7 +61,7 @@ wikiChallengeRouter.get('/date/:date', async (req: Request, res: Response, next:
 
 // ─── POST /api/wiki/guess ─────────────────────────────────────────────────────
 
-wikiChallengeRouter.post('/guess', guessLimiter, async (req: Request, res: Response, next: NextFunction) => {
+wikiChallengeRouter.post('/guess', guessLimiter, userAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const sessionToken = res.locals.sessionToken as string
     const { guess, challengeId: bodyChallId } = req.body as { guess?: string; challengeId?: number }
@@ -76,9 +79,23 @@ wikiChallengeRouter.post('/guess', guessLimiter, async (req: Request, res: Respo
       ? getWikiChallengeById(bodyChallId)
       : getTodayWikiChallenge()
 
-    const result = processWikiGuess(sessionToken, challenge.id, guess.trim())
-    const session = getOrCreateWikiSession(sessionToken, challenge.id)
+    const userId = req.user?.id
+    const result = processWikiGuess(sessionToken, challenge.id, guess.trim(), userId)
+    const session = getOrCreateWikiSession(sessionToken, challenge.id, userId)
     const payload = buildWikiChallengePayload(challenge, session)
+
+    // Auto-record to user_challenge_results when game ends and user is logged in
+    if (req.user && result.outcome) {
+      db.prepare(`
+        INSERT INTO user_challenge_results (user_id, challenge_id, media_type, attempts_used, won)
+        VALUES (?, ?, 'wiki', ?, ?)
+        ON CONFLICT(user_id, challenge_id) DO UPDATE SET
+          attempts_used = excluded.attempts_used,
+          won           = excluded.won,
+          completed_at  = datetime('now')
+      `).run(req.user.id, challenge.id, payload.attemptsUsed, result.outcome === 'won' ? 1 : 0)
+      attachUserToGameSession(sessionToken, challenge.id, req.user.id)
+    }
 
     res.json({
       correct: result.correct,
@@ -104,7 +121,7 @@ wikiChallengeRouter.get('/result', async (req: Request, res: Response, next: Nex
     } else {
       challengeId = getTodayWikiChallenge().id
     }
-    res.json(getWikiResult(sessionToken, challengeId))
+    res.json(getWikiResult(sessionToken, challengeId, req.user?.id))
   } catch (err) {
     next(err)
   }
@@ -115,7 +132,7 @@ wikiChallengeRouter.get('/result', async (req: Request, res: Response, next: Nex
 wikiChallengeRouter.get('/dates', (req: Request, res: Response, next: NextFunction) => {
   try {
     const days = Math.min(Math.max(1, parseInt((req.query.days as string) ?? '90', 10)), 365)
-    const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
+    const todayParis = getTodayParis()
     const from = new Date(todayParis + 'T12:00:00Z')
     from.setUTCDate(from.getUTCDate() - days)
     const fromStr = from.toISOString().slice(0, 10)
@@ -146,7 +163,7 @@ wikiChallengeRouter.get('/adjacent', (req: Request, res: Response, next: NextFun
     if (direction !== 'prev' && direction !== 'next') {
       res.status(400).json({ error: 'direction must be "prev" or "next"' }); return
     }
-    const todayParis = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date())
+    const todayParis = getTodayParis()
     const row = direction === 'prev'
       ? db.prepare<[string, string], { challenge_date: string }>(
           `SELECT challenge_date FROM daily_challenges
@@ -170,7 +187,7 @@ wikiChallengeRouter.get('/adjacent', (req: Request, res: Response, next: NextFun
 
 // ─── GET /api/wiki/search ─────────────────────────────────────────────────────
 
-wikiChallengeRouter.get('/search', (req: Request, res: Response, next: NextFunction) => {
+wikiChallengeRouter.get('/search', searchLimiter, (req: Request, res: Response, next: NextFunction) => {
   try {
     const q = (req.query.q as string) ?? ''
     const limit = Math.min(20, parseInt((req.query.limit as string) ?? '8', 10))

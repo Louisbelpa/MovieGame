@@ -4,20 +4,24 @@
  */
 
 import { motion } from 'framer-motion'
+import { Clapperboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface MovieImageProps {
   imageUrl: string | null
   attempt: number
+  maxAttempts?: number
   className?: string
+  /** Fill the parent container instead of enforcing aspect-video */
+  fill?: boolean
 }
 
-export function MovieImage({ imageUrl, attempt, className }: MovieImageProps) {
+export function MovieImage({ imageUrl, attempt, maxAttempts, className, fill }: MovieImageProps) {
   return (
     <div
       className={cn(
-        'relative w-full overflow-hidden rounded-xl aspect-video bg-film-gray',
-        'max-h-[42vh] sm:max-h-none',
+        'relative w-full overflow-hidden rounded-xl bg-film-gray',
+        fill ? 'h-full' : 'aspect-video',
         className
       )}
       style={{
@@ -26,16 +30,28 @@ export function MovieImage({ imageUrl, attempt, className }: MovieImageProps) {
       }}
     >
       {imageUrl ? (
-        <motion.img
-          key={imageUrl}
-          src={imageUrl}
-          alt={`Extrait du film à deviner, tentative ${attempt}`}
-          className="w-full h-full object-cover"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          draggable={false}
-        />
+        <>
+          <motion.img
+            key={imageUrl}
+            src={imageUrl}
+            alt={`Extrait du film à deviner, tentative ${attempt}`}
+            className="w-full h-full object-cover"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            draggable={false}
+          />
+          {/* Scene badge top-left */}
+          <div
+            className="absolute top-2.5 left-2.5 flex items-center gap-1.5 rounded-md px-2 py-1"
+            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)' }}
+          >
+            <Clapperboard size={11} className="text-film-text-dim" aria-hidden />
+            <span className="text-[10px] font-medium text-film-text-dim leading-none">
+              {maxAttempts != null ? `SCÈNE ${attempt}/${maxAttempts}` : 'Scène'}
+            </span>
+          </div>
+        </>
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3" role="img" aria-label="Image du film masquée">
           <FilmStripIcon />

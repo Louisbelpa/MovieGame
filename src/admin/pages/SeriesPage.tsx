@@ -1,10 +1,5 @@
-/**
- * admin/pages/SeriesPage.tsx
- * Full CRUD for TV series: table + modal form.
- */
-
-import { useEffect, useState, useCallback } from 'react'
-import { Plus, Search, X, Shuffle } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Plus, Search, Shuffle, Trash2, ToggleLeft, ToggleRight } from 'lucide-react'
 import {
   getSeries,
   createSeries,
@@ -21,137 +16,60 @@ import { SeriesRow } from '../components/SeriesRow'
 import { FilmSeriesGamePreviewModal } from '../components/FilmSeriesGamePreviewModal'
 import { BackdropPicker } from '../components/BackdropPicker'
 import { Pagination } from '../components/Pagination'
+import { Modal, ConfirmDeleteModal } from '../components/Modal'
+import { useModal } from '../hooks/useModal'
+import { useList } from '../hooks/useList'
+import { useToast } from '../hooks/useToast'
 
-// ─── Simple modal wrapper ─────────────────────────────────────────────────────
-
-function Modal({
-  title,
-  onClose,
-  children,
-}: {
-  title: string
-  onClose: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl my-4 sm:my-8">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900 truncate pr-4">{title}</h2>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <div className="px-4 sm:px-6 py-4 sm:py-5">{children}</div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Confirm delete modal ─────────────────────────────────────────────────────
-
-function ConfirmDeleteModal({
-  series,
-  onConfirm,
-  onCancel,
-  loading,
-  error,
-}: {
-  series: AdminSeries
-  onConfirm: () => void
-  onCancel: () => void
-  loading: boolean
-  error?: string | null
-}) {
-  return (
-    <Modal title="Supprimer la série" onClose={onCancel}>
-      <p className="text-sm text-gray-600 mb-4">
-        Êtes-vous sûr de vouloir supprimer{' '}
-        <strong className="text-gray-900">« {series.title} »</strong> ? Cette
-        action est irréversible.
-      </p>
-      {error && (
-        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">{error}</p>
-      )}
-      <div className="flex justify-end gap-3">
-        <button
-          onClick={onCancel}
-          disabled={loading}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-        >
-          Annuler
-        </button>
-        <button
-          onClick={onConfirm}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-        >
-          {loading && (
-            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          )}
-          Supprimer
-        </button>
-      </div>
-    </Modal>
-  )
-}
-
-// ─── SeriesPage ───────────────────────────────────────────────────────────────
+type ActiveFilter = 'all' | 'active' | 'inactive'
 
 type ModalState =
   | { type: 'create'; initial?: SeriesPayload }
   | { type: 'edit'; series: AdminSeries }
   | { type: 'delete'; series: AdminSeries }
+  | { type: 'bulkDelete'; ids: number[] }
   | { type: 'backdrops'; series: AdminSeries }
-  | null
 
 export function SeriesPage() {
-  const [seriesList, setSeriesList] = useState<AdminSeries[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const toast = useToast()
+  const { modal, setModal, close } = useModal<ModalState>()
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('all')
   const [deleteError, setDeleteError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
-  const [modal, setModal] = useState<ModalState>(null)
-  const [deleteLoading, setDeleteLoading] = useState(false)
   const [randomLoading, setRandomLoading] = useState(false)
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
-  const [pages, setPages] = useState(1)
-  const [total, setTotal] = useState(0)
   const [previewSeriesId, setPreviewSeriesId] = useState<number | null>(null)
-  const LIMIT = 20
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
 
-  function showSuccess(msg: string) {
-    setSuccess(msg)
-    setTimeout(() => setSuccess(null), 3000)
+  const fetcher = useCallback(
+    (opts: { page: number; limit: number; q: string }) =>
+      getSeries({ ...opts, isActive: activeFilter === 'all' ? undefined : activeFilter === 'active' }),
+    [activeFilter],
+  )
+
+  const { items: seriesList, loading, error, page, pages, total, search, setSearch, setPage, reload, setItems } =
+    useList(fetcher)
+
+  useEffect(() => { setSelected(new Set()) }, [seriesList])
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal({ type: 'create' }) }
+      if (e.key === '/') { e.preventDefault(); searchRef.current?.focus() }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [setModal])
+
+  function toggleSelect(id: number, checked: boolean) {
+    setSelected((prev) => { const next = new Set(prev); checked ? next.add(id) : next.delete(id); return next })
   }
 
-  const load = useCallback((p: number, q: string) => {
-    setLoading(true)
-    getSeries({ page: p, limit: LIMIT, q: q.trim() || undefined })
-      .then((res) => {
-        setSeriesList(res.data)
-        setPages(res.pages)
-        setTotal(res.total)
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Erreur'))
-      .finally(() => setLoading(false))
-  }, [])
-
-  // Reset page when search changes, then load
-  useEffect(() => {
-    setPage(1)
-  }, [search])
-
-  useEffect(() => {
-    load(page, search)
-  }, [load, page, search])
+  function toggleSelectAll(checked: boolean) {
+    setSelected(checked ? new Set(seriesList.map((s) => s.id)) : new Set())
+  }
 
   async function handleRandomSeries() {
     setRandomLoading(true)
@@ -159,7 +77,7 @@ export function SeriesPage() {
       const payload = await getRandomTmdbSeries()
       setModal({ type: 'create', initial: payload })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur TMDB')
+      toast.error(err instanceof Error ? err.message : 'Erreur TMDB')
     } finally {
       setRandomLoading(false)
     }
@@ -167,68 +85,118 @@ export function SeriesPage() {
 
   async function handleCreate(payload: SeriesPayload) {
     await createSeries(payload)
-    setModal(null)
-    load(page, search)
+    close()
+    reload()
+    toast.success('Série créée')
   }
 
   async function handleEdit(payload: SeriesPayload) {
     if (modal?.type !== 'edit') return
     await updateSeries(modal.series.id, payload)
-    setModal(null)
-    load(page, search)
+    close()
+    reload()
+    toast.success('Série mise à jour')
   }
 
   async function handleBackdropSelect(imageUrl: string) {
     if (modal?.type !== 'backdrops') return
-    const seriesId = modal.series.id
     try {
-      await updateSeries(seriesId, { image_url: imageUrl })
-      setModal(null)
-      load(page, search)
-      showSuccess('Image mise à jour')
+      await updateSeries(modal.series.id, { image_url: imageUrl })
+      close()
+      reload()
+      toast.success('Image mise à jour')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de la mise à jour')
+      toast.error(err instanceof Error ? err.message : 'Erreur lors de la mise à jour')
     }
   }
 
   async function handleUpload(series: AdminSeries, file: File) {
     try {
       await uploadSeriesImage(series.id, file)
-      load(page, search)
-      showSuccess('Image uploadée')
+      reload()
+      toast.success('Image uploadée')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur upload')
+      toast.error(err instanceof Error ? err.message : 'Erreur upload')
     }
   }
 
-  async function handleDelete() {
+  function handleDelete() {
     if (modal?.type !== 'delete') return
-    setDeleteLoading(true)
-    setDeleteError(null)
+    const series = modal.series
+    close()
+    setItems((prev) => prev.filter((s) => s.id !== series.id))
+
+    let cancelled = false
+    const onUndo = () => { cancelled = true; reload() }
+    toast.success(`« ${series.title} » supprimée`, { undo: onUndo })
+
+    setTimeout(async () => {
+      if (cancelled) return
+      try { await deleteSeries(series.id) }
+      catch { toast.error('Échec de la suppression'); reload() }
+    }, 5000)
+  }
+
+  async function handleBulkToggle(activate: boolean) {
+    if (selected.size === 0) return
+    setBulkLoading(true)
     try {
-      await deleteSeries(modal.series.id)
-      setModal(null)
-      load(page, search)
-    } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Erreur')
+      await Promise.all([...selected].map((id) => updateSeries(id, { is_active: activate })))
+      toast.success(`${selected.size} série${selected.size > 1 ? 's' : ''} ${activate ? 'activée' : 'désactivée'}${selected.size > 1 ? 's' : ''}`)
+      setSelected(new Set())
+      reload()
+    } catch {
+      toast.error('Erreur lors de la mise à jour en lot')
     } finally {
-      setDeleteLoading(false)
+      setBulkLoading(false)
     }
   }
+
+  function handleBulkDeleteConfirm() {
+    if (modal?.type !== 'bulkDelete') return
+    const ids = modal.ids
+    close()
+    setItems((prev) => prev.filter((s) => !ids.includes(s.id)))
+
+    let cancelled = false
+    const onUndo = () => { cancelled = true; reload() }
+    toast.success(`${ids.length} série${ids.length > 1 ? 's' : ''} supprimée${ids.length > 1 ? 's' : ''}`, { undo: onUndo })
+
+    setTimeout(async () => {
+      if (cancelled) return
+      try { await Promise.all(ids.map((id) => deleteSeries(id))) }
+      catch { toast.error('Échec de la suppression en lot'); reload() }
+    }, 5000)
+  }
+
+  const allSelected = seriesList.length > 0 && selected.size === seriesList.length
+  const filterLabel: Record<ActiveFilter, string> = { all: 'Toutes', active: 'Actives', inactive: 'Inactives' }
 
   return (
     <AdminLayout>
-      {/* Top bar */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
         <div className="relative flex-1 sm:max-w-xs">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
+            ref={searchRef}
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher une série..."
+            placeholder="Rechercher une série… (/)"
             className="pl-9 pr-3 py-2 text-sm rounded-lg border border-gray-300 bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none w-full"
           />
+        </div>
+
+        <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm font-medium shrink-0">
+          {(['all', 'active', 'inactive'] as ActiveFilter[]).map((f) => (
+            <button
+              key={f}
+              onClick={() => setActiveFilter(f)}
+              className={['px-3 py-2 transition-colors', activeFilter === f ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'].join(' ')}
+            >
+              {filterLabel[f]}
+            </button>
+          ))}
         </div>
 
         <div className="flex items-center gap-2 sm:ml-auto">
@@ -246,6 +214,7 @@ export function SeriesPage() {
           <button
             onClick={() => setModal({ type: 'create' })}
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+            title="Nouvelle série (N)"
           >
             <Plus size={15} />
             Ajouter
@@ -254,18 +223,32 @@ export function SeriesPage() {
       </div>
 
       {error && (
-        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-          {error}
+        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">{error}</div>
+      )}
+
+      {selected.size > 0 && (
+        <div className="mb-3 flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2.5">
+          <span className="text-sm font-medium text-indigo-800 flex-1">
+            {selected.size} série{selected.size > 1 ? 's' : ''} sélectionnée{selected.size > 1 ? 's' : ''}
+          </span>
+          <button onClick={() => handleBulkToggle(true)} disabled={bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-white border border-emerald-300 rounded-lg hover:bg-emerald-50 transition-colors disabled:opacity-50">
+            <ToggleRight size={14} /> Activer
+          </button>
+          <button onClick={() => handleBulkToggle(false)} disabled={bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50">
+            <ToggleLeft size={14} /> Désactiver
+          </button>
+          <button onClick={() => setModal({ type: 'bulkDelete', ids: [...selected] })} disabled={bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-white border border-red-300 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50">
+            <Trash2 size={14} /> Supprimer
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-xs text-indigo-500 hover:text-indigo-700 underline ml-1">
+            Annuler
+          </button>
         </div>
       )}
 
-      {success && (
-        <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-4 py-3 text-sm">
-          {success}
-        </div>
-      )}
-
-      {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-40">
@@ -280,6 +263,14 @@ export function SeriesPage() {
             <table className="w-full min-w-[400px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100 text-left text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={(e) => toggleSelectAll(e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-300 text-indigo-600 accent-indigo-600"
+                    />
+                  </th>
                   <th className="px-3 py-3 w-20"></th>
                   <th className="px-3 py-3">Titre</th>
                   <th className="px-3 py-3 hidden sm:table-cell">Année</th>
@@ -293,6 +284,8 @@ export function SeriesPage() {
                   <SeriesRow
                     key={series.id}
                     series={series}
+                    selected={selected.has(series.id)}
+                    onSelect={toggleSelect}
                     onEdit={(s) => setModal({ type: 'edit', series: s })}
                     onDelete={(s) => { setDeleteError(null); setModal({ type: 'delete', series: s }) }}
                     onBackdrops={(s) => setModal({ type: 'backdrops', series: s })}
@@ -306,45 +299,43 @@ export function SeriesPage() {
         )}
       </div>
 
-      <Pagination page={page} pages={pages} total={total} limit={LIMIT} onPage={setPage} />
+      <Pagination page={page} pages={pages} total={total} limit={20} onPage={setPage} />
 
-      {/* Modals */}
       {modal?.type === 'create' && (
-        <Modal title="Ajouter une série" onClose={() => setModal(null)}>
-          <SeriesForm
-            initial={modal.initial}
-            onSubmit={handleCreate}
-            onCancel={() => setModal(null)}
-          />
+        <Modal title="Ajouter une série" onClose={close}>
+          <SeriesForm initial={modal.initial} onSubmit={handleCreate} onCancel={close} />
         </Modal>
       )}
 
       {modal?.type === 'edit' && (
-        <Modal title="Modifier la série" onClose={() => setModal(null)}>
-          <SeriesForm
-            initial={modal.series}
-            onSubmit={handleEdit}
-            onCancel={() => setModal(null)}
-          />
+        <Modal title="Modifier la série" onClose={close}>
+          <SeriesForm initial={modal.series} onSubmit={handleEdit} onCancel={close} />
         </Modal>
       )}
 
       {modal?.type === 'delete' && (
         <ConfirmDeleteModal
-          series={modal.series}
+          title="Supprimer la série"
+          name={modal.series.title}
           onConfirm={handleDelete}
-          onCancel={() => { setModal(null); setDeleteError(null) }}
-          loading={deleteLoading}
+          onCancel={() => { close(); setDeleteError(null) }}
+          loading={false}
           error={deleteError}
         />
       )}
 
-      {modal?.type === 'backdrops' && (
-        <BackdropPicker
-          seriesId={modal.series.id}
-          onSelect={handleBackdropSelect}
-          onClose={() => setModal(null)}
+      {modal?.type === 'bulkDelete' && (
+        <ConfirmDeleteModal
+          title={`Supprimer ${modal.ids.length} série${modal.ids.length > 1 ? 's' : ''}`}
+          name={`${modal.ids.length} série${modal.ids.length > 1 ? 's' : ''} sélectionnée${modal.ids.length > 1 ? 's' : ''}`}
+          onConfirm={handleBulkDeleteConfirm}
+          onCancel={close}
+          loading={false}
         />
+      )}
+
+      {modal?.type === 'backdrops' && (
+        <BackdropPicker seriesId={modal.series.id} onSelect={handleBackdropSelect} onClose={close} />
       )}
 
       <FilmSeriesGamePreviewModal

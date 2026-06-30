@@ -1,22 +1,40 @@
 /**
  * layout/Header.tsx
- * Top app bar with logo, challenge number, and icon buttons.
- * Detects /wiki route and uses wikiStore for modal actions.
+ * Responsive top bar:
+ *  - Mobile: compact (home + rules | logo+# | account + archive + stats)
+ *  - Desktop (lg+): logo left | mode tabs center | streak + controls right
  */
 
 import { useRef } from 'react'
-import { HelpCircle, BarChart2, Film, CalendarDays, Tv, Home, Landmark } from 'lucide-react'
+import { BarChart2, CalendarDays, LogIn, Flame, UserRound } from 'lucide-react'
+import { Film, Tv, User } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useLocation } from 'react-router-dom'
 import { useGameStore } from '@/store/gameStore'
 import { useWikiStore } from '@/store/wikiStore'
-import { BRAND_NAME } from '@/config/features'
+import { useAuthStore } from '@/store/authStore'
+import { useAuthModal } from '@/components/modals/AuthModal'
+import { ApertureIcon } from '@/components/ui/ApertureIcon'
+import { loadStats } from '@/lib/storage'
+import { FEATURES } from '@/config/features'
 
 interface HeaderProps {
   mode: 'film' | 'series' | 'wiki'
 }
 
+const MODE_TABS = [
+  { id: 'film',   label: 'Films',        to: '/films',  Icon: Film,     color: 'var(--sg-films)',  enabled: true },
+  { id: 'series', label: 'Séries',       to: '/series', Icon: Tv,       color: 'var(--sg-series)', enabled: FEATURES.enableSeries },
+  { id: 'wiki',   label: 'Personnalités', to: '/wiki',  Icon: User, color: 'var(--sg-wiki)',   enabled: FEATURES.enableWiki },
+].filter((t) => t.enabled)
+
 export function Header({ mode }: HeaderProps) {
   const isWiki = mode === 'wiki'
+  const { pathname } = useLocation()
+
+  const user = useAuthStore((s) => s.user)
+  const isLoading = useAuthStore((s) => s.isLoading)
+  const { open: openAuthModal } = useAuthModal()
 
   const gameOpenModal = useGameStore((s) => s.openModal)
   const wikiOpenModal = useWikiStore((s) => s.openModal)
@@ -24,7 +42,6 @@ export function Header({ mode }: HeaderProps) {
 
   const gameChallenge = useGameStore((s) => s.challenge)
   const wikiChallenge = useWikiStore((s) => s.challenge)
-  const gameType = useGameStore((s) => s.gameType)
 
   const lastNumberRef = useRef<number | null>(null)
   const prevModeRef = useRef(mode)
@@ -36,47 +53,35 @@ export function Header({ mode }: HeaderProps) {
   if (isWiki && wikiChallenge?.challengeNumber) lastNumberRef.current = wikiChallenge.challengeNumber
   const displayNumber = lastNumberRef.current
 
-  const icon = isWiki
-    ? <Landmark size={22} className="text-film-gold" aria-hidden />
-    : mode === 'series' || gameType === 'series'
-      ? <Tv size={22} className="text-film-gold" aria-hidden />
-      : <Film size={22} className="text-film-gold" aria-hidden />
+  const filmStreak = loadStats('film').currentStreak
+  const wikiStreak = FEATURES.enableWiki ? loadStats('wiki').currentStreak : 0
+  const seriesStreak = FEATURES.enableSeries ? loadStats('series').currentStreak : 0
+  const maxStreak = Math.max(filmStreak, wikiStreak, seriesStreak)
+
+  const activeTabId = pathname.startsWith('/series') ? 'series' : pathname.startsWith('/wiki') ? 'wiki' : 'film'
+
+  const iconBtn = 'inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold'
 
   return (
-    <header className="sticky top-0 z-30 w-full border-b border-film-border bg-film-black/90 backdrop-blur-md">
-      <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-        {/* Left: home + rules */}
-        <div className="flex items-center gap-1">
-          <a
-            href="/"
-            aria-label="Choisir le jeu"
-            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
-          >
-            <Home size={20} aria-hidden />
-          </a>
-          <button
-            onClick={() => openModal('rules')}
-            aria-label="Règles du jeu"
-            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
-          >
-            <HelpCircle size={20} aria-hidden />
-          </button>
-        </div>
+    <header className="w-full">
+      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
 
-        {/* Center: logo */}
-        <div className="flex items-center gap-2">
+        {/* ── Left: logo + help (mobile) ── */}
+        <div className="flex items-center gap-1">
+          {/* Logo: always visible */}
           <a
             href="/"
-            aria-label={`Accueil ${BRAND_NAME}`}
+            aria-label="Accueil GuessToday"
             className="inline-flex items-center gap-2 rounded-lg px-1 -mx-1 min-h-[44px] text-film-text hover:bg-film-gray/60 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
           >
-            {icon}
-            <span className="font-title text-xl font-bold text-gradient-gold tracking-tight">
-              {BRAND_NAME}
+            <ApertureIcon size={22} />
+            <span className="font-title text-xl leading-none tracking-tight">
+              <span className="font-[500] text-film-text">Guess</span>
+              <span className="italic font-[600] text-gradient-gold">today</span>
             </span>
           </a>
           {displayNumber && (
-            <div className="overflow-hidden h-5 flex items-center">
+            <div className="overflow-hidden h-5 flex items-center ml-1">
               <AnimatePresence mode="wait">
                 <motion.span
                   key={displayNumber}
@@ -93,20 +98,90 @@ export function Header({ mode }: HeaderProps) {
           )}
         </div>
 
-        {/* Right: archive + stats buttons */}
+        {/* ── Center: mode tabs (desktop only) ── */}
+        {MODE_TABS.length > 1 && (
+          <nav className="hidden lg:flex items-center gap-1" aria-label="Mode de jeu">
+            {MODE_TABS.map(({ id, label, to, Icon, color }) => {
+              const isActive = id === activeTabId
+              return (
+                <a
+                  key={id}
+                  href={to}
+                  aria-current={isActive ? 'page' : undefined}
+                  className="flex items-center gap-1.5 rounded-lg text-[13px] font-medium transition-all duration-150"
+                  style={isActive ? {
+                    color,
+                    background: `color-mix(in srgb, ${color} 14%, transparent)`,
+                    padding: '7px 14px',
+                  } : {
+                    color: 'var(--color-film-text-dim)',
+                    padding: '7px 14px',
+                  }}
+                >
+                  <Icon size={14} aria-hidden />
+                  {label}
+                </a>
+              )
+            })}
+          </nav>
+        )}
+
+        {/* ── Right: actions ── */}
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => openModal('archive')}
-            aria-label="Archives"
-            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
-          >
+          {/* Streak pill: desktop only */}
+          {maxStreak > 0 && (
+            <span className="hidden lg:flex items-center gap-1 text-xs font-semibold text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-full px-2.5 py-1 mr-1">
+              <Flame size={12} aria-hidden />
+              {maxStreak}j
+            </span>
+          )}
+
+          {/* Avatar / Login */}
+          {isLoading ? (
+            <div className="w-8 h-8 rounded-full bg-film-gold/10 animate-pulse" />
+          ) : user ? (
+            <a
+              href="/profile"
+              aria-label={`Profil de ${user.displayName}`}
+              title={user.displayName}
+              className="w-8 h-8 rounded-full overflow-hidden bg-film-gold/20 border border-film-gold/40 text-sm font-bold text-film-gold flex items-center justify-center hover:opacity-80 transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
+            >
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />
+              ) : (
+                user.displayName.charAt(0).toUpperCase()
+              )}
+            </a>
+          ) : (
+            <>
+              {/* Mobile: icon only */}
+              <button
+                type="button"
+                onClick={() => openAuthModal()}
+                aria-label="Connexion ou inscription"
+                className={`lg:hidden ${iconBtn}`}
+              >
+                <UserRound size={20} aria-hidden />
+              </button>
+              {/* Desktop: pill with label */}
+              <button
+                type="button"
+                onClick={() => openAuthModal()}
+                className="hidden lg:flex items-center gap-1.5 rounded-full border border-film-border bg-white/[0.03] hover:bg-white/[0.06] px-3 py-1.5 text-sm text-film-text-dim hover:text-film-text transition-colors cursor-pointer"
+              >
+                <LogIn size={14} aria-hidden />
+                Se connecter
+              </button>
+            </>
+          )}
+
+          {/* Archive: always */}
+          <button onClick={() => openModal('archive')} aria-label="Archives" className={iconBtn}>
             <CalendarDays size={20} aria-hidden />
           </button>
-          <button
-            onClick={() => openModal('stats')}
-            aria-label="Mes statistiques"
-            className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-film-text-dim hover:text-film-text hover:bg-film-gray transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-film-gold"
-          >
+
+          {/* Stats: always */}
+          <button onClick={() => openModal('stats')} aria-label="Mes statistiques" className={iconBtn}>
             <BarChart2 size={20} aria-hidden />
           </button>
         </div>

@@ -7,9 +7,10 @@ import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { useGameStore, getTodayParis } from '@/store/gameStore'
-import { fetchChallengeDates } from '@/api/client'
+import { fetchChallengeDates, authGetHistory } from '@/api/client'
 import { fetchWikiChallengeDates } from '@/api/wikiClient'
 import { useWikiStore } from '@/store/wikiStore'
+import { useAuthStore } from '@/store/authStore'
 import { loadHistory, loadStats } from '@/lib/storage'
 
 type DayStatus = 'won' | 'lost' | 'available' | 'none'
@@ -78,6 +79,8 @@ export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps
   const wikiLoadDate = useWikiStore((s) => s.loadDate)
   const wikiViewingDate = useWikiStore((s) => s.viewingDate)
 
+  const user = useAuthStore((s) => s.user)
+
   const isWiki = mode === 'wiki'
   const isOpen = isWiki ? (wikiUi.isModalOpen && wikiUi.modalType === 'archive') : (gameUi.isModalOpen && gameUi.modalType === 'archive')
   const closeModal = isWiki ? wikiCloseModal : gameCloseModal
@@ -99,26 +102,31 @@ export function ArchiveModal({ mode = 'classic', challenges }: ArchiveModalProps
     const datesPromise = challenges
       ? Promise.resolve({ dates: challenges })
       : (isWiki ? fetchWikiChallengeDates(365) : fetchChallengeDates(365, gameType === 'series' ? 'series' : 'film'))
-    datesPromise
-      .then(({ dates }) => {
+    const histType: 'film' | 'series' | 'wiki' = isWiki ? 'wiki' : (gameType === 'series' ? 'series' : 'film')
+    const serverHistPromise = user ? authGetHistory(histType).catch(() => null) : Promise.resolve(null)
+
+    Promise.all([datesPromise, serverHistPromise])
+      .then(([{ dates }, serverHistResp]) => {
         setChallengeDates(new Set(dates))
-        // Historique local
+        // Local history as baseline
         let hist = loadHistory(isWiki ? 'wiki' : undefined)
-        // Toujours compléter le jour courant si lastPlayedDate correspond à aujourd'hui
         const stats = loadStats(isWiki ? 'wiki' : undefined)
         if (stats.lastPlayedDate === today) {
           hist[today] = (stats.lastWonDate === today) ? 'won' : 'lost'
         }
-        // Si l'historique est vide ou partiel, on tente de compléter à partir des stats globaux (pour le dernier jour joué)
         if ((Object.keys(hist).length === 0 || hist[stats.lastPlayedDate ?? ''] === undefined) && stats.lastPlayedDate) {
           const d = stats.lastPlayedDate
           hist[d] = (stats.lastWonDate === d) ? 'won' : 'lost'
+        }
+        // Server history takes priority (covers all devices + web)
+        if (serverHistResp?.history) {
+          hist = { ...hist, ...serverHistResp.history }
         }
         setHistory(hist)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [challenges, gameType, isOpen, isWiki, today, todayYM])
+  }, [challenges, gameType, isOpen, isWiki, today, todayYM, user])
 
   const activeDate = viewingDate ?? today
   const days = daysForMonth(displayYM)

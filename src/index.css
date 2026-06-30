@@ -1,17 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  /* Mode films — bleu harmonisé (oklch L=0.66 C=0.14 h=245) */
-  --sg-films:       #4d8ee8;
-  --sg-films-hover: #5fa0f5;
-  --sg-films-soft:  rgba(77, 142, 232, 0.14);
-  --sg-films-ring:  rgba(77, 142, 232, 0.32);
+  /* Mode films — or (aligné sur la charte dorée globale) */
+  --sg-films:       #d4a64a;
+  --sg-films-hover: #e8b95c;
+  --sg-films-soft:  rgba(212, 166, 74, 0.16);
+  --sg-films-ring:  rgba(212, 166, 74, 0.32);
 
-  /* Mode séries — émeraude harmonisé (oklch L=0.66 C=0.14 h=165) */
-  --sg-series:       #1eb088;
-  --sg-series-hover: #2dc89b;
-  --sg-series-soft:  rgba(30, 176, 136, 0.14);
-  --sg-series-ring:  rgba(30, 176, 136, 0.32);
+  /* Mode séries — indigo */
+  --sg-series:       #6b7cff;
+  --sg-series-hover: #8a98ff;
+  --sg-series-soft:  rgba(107, 124, 255, 0.18);
+  --sg-series-ring:  rgba(107, 124, 255, 0.34);
+
+  /* Mode wiki / personnalités — rose */
+  --sg-wiki:       #e85788;
+  --sg-wiki-hover: #f06a9a;
+  --sg-wiki-soft:  rgba(232, 87, 136, 0.18);
+  --sg-wiki-ring:  rgba(232, 87, 136, 0.34);
 
   /* Couleur "à jouer" dans le calendrier — doré, indépendant du mode */
   --sg-todo:      #d4a64a;
@@ -30,21 +36,27 @@
   --mode-ring:  var(--sg-series-ring);
 }
 
+[data-mode="wiki"] {
+  --mode-color: var(--sg-wiki);
+  --mode-soft:  var(--sg-wiki-soft);
+  --mode-ring:  var(--sg-wiki-ring);
+}
+
 @theme {
-  --color-film-black: #16161f;
-  --color-film-dark: #20202e;
-  --color-film-gray: #28283a;
-  --color-film-border: #3a3a52;
-  --color-film-muted: #56566e;
-  --color-film-text: #f0ebe4;
-  --color-film-text-dim: #a09898;
-  --color-film-gold: #d4a842;
-  --color-film-gold-light: #f0c060;
-  --color-film-green: #4caf78;
-  --color-film-red: #e05050;
+  --color-film-black: #0a0d12;
+  --color-film-dark:  #0e1219;
+  --color-film-gray:  #161c25;
+  --color-film-border: #1e2738;
+  --color-film-muted: #5f6772;
+  --color-film-text: #e8eaed;
+  --color-film-text-dim: #9aa3ad;
+  --color-film-gold: #d4a64a;
+  --color-film-gold-light: #e8b95c;
+  --color-film-green: #4cb078;
+  --color-film-red: #d4604a;
   --color-film-amber: #e09040;
 
-  --font-title: "Playfair Display", Georgia, serif;
+  --font-title: "Fraunces", "Playfair Display", Georgia, serif;
   --font-body: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 
@@ -270,9 +282,57 @@
 @media (min-width: 1025px) {
   .game-page {
     padding: 2rem;
-    max-width: 800px;
+    max-width: 1024px;
     margin: 0 auto;
   }
+}
+
+/* ── Mode atmospheres ──────────────────────────────────────────────────────── */
+
+/* Films — grain argentique : lignes horizontales fines + halo doré */
+.atmosphere-film {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px 2px,
+      rgba(0, 0, 0, 0.28) 2px 3px
+    ),
+    radial-gradient(
+      ellipse 80% 50% at 50% 20%,
+      rgba(212, 166, 74, 0.07),
+      transparent 65%
+    );
+}
+
+/* Séries — scanlines CRT : lignes plus espacées + halo violet-bleu */
+.atmosphere-series {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px 3px,
+      rgba(0, 0, 0, 0.18) 3px 4px
+    ),
+    radial-gradient(
+      ellipse 80% 50% at 50% 20%,
+      rgba(107, 124, 255, 0.07),
+      transparent 65%
+    );
+}
+
+/* Personnalités — trame halftone façon presse + halo rose */
+.atmosphere-wiki {
+  background-image:
+    radial-gradient(
+      circle,
+      rgba(232, 87, 136, 0.055) 1px,
+      transparent 1.5px
+    ),
+    radial-gradient(
+      ellipse 80% 50% at 50% 20%,
+      rgba(232, 87, 136, 0.07),
+      transparent 65%
+    );
+  background-size: 6px 6px, 100% 100%;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -282,4 +342,97 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ─── Google Sign-In Material button (official) ──────────────────────────── */
+.gsi-material-button {
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-appearance: none;
+  background-color: #fff;
+  background-image: none;
+  border: 1px solid #747775;
+  border-radius: 4px;
+  box-sizing: border-box;
+  color: #1f1f1f;
+  cursor: pointer;
+  font-family: 'Roboto', arial, sans-serif;
+  font-size: 14px;
+  height: 40px;
+  letter-spacing: 0.25px;
+  outline: none;
+  overflow: hidden;
+  padding: 0 12px;
+  position: relative;
+  text-align: center;
+  transition: background-color .218s, border-color .218s, box-shadow .218s;
+  vertical-align: middle;
+  white-space: nowrap;
+  width: 100%;
+  max-width: 400px;
+  min-width: min-content;
+}
+.gsi-material-button .gsi-material-button-icon {
+  height: 20px;
+  margin-right: 10px;
+  min-width: 20px;
+  width: 20px;
+}
+.gsi-material-button .gsi-material-button-content-wrapper {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  height: 100%;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+}
+.gsi-material-button .gsi-material-button-contents {
+  flex-grow: 0;
+  font-family: 'Roboto', arial, sans-serif;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
+}
+.gsi-material-button .gsi-material-button-state {
+  transition: opacity .218s;
+  bottom: 0;
+  left: 0;
+  opacity: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+.gsi-material-button:disabled {
+  cursor: default;
+  background-color: #ffffff61;
+  border-color: #1f1f1f1f;
+}
+.gsi-material-button:disabled .gsi-material-button-contents,
+.gsi-material-button:disabled .gsi-material-button-icon {
+  opacity: 38%;
+}
+.gsi-material-button:not(:disabled):active .gsi-material-button-state,
+.gsi-material-button:not(:disabled):focus .gsi-material-button-state {
+  background-color: #303030;
+  opacity: 12%;
+}
+.gsi-material-button:not(:disabled):hover {
+  box-shadow: 0 1px 2px 0 rgba(60,64,67,.30), 0 1px 3px 1px rgba(60,64,67,.15);
+}
+.gsi-material-button:not(:disabled):hover .gsi-material-button-state {
+  background-color: #303030;
+  opacity: 8%;
+}
+
+/* ─── Scrollbar hide utility ─────────────────────────────────────────────── */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

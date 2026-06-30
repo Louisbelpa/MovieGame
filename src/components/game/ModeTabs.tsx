@@ -1,13 +1,13 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Film, Tv, Landmark } from 'lucide-react'
+import { Film, Tv, User } from 'lucide-react'
 import './ModeTabs.css'
 import { FEATURES } from '@/config/features'
 
 const ALL_TABS = [
   { id: 'films',  label: 'Films',  to: '/films',  Icon: Film,     color: 'var(--sg-films)',  enabled: true },
   { id: 'series', label: 'Séries', to: '/series', Icon: Tv,       color: 'var(--sg-series)', enabled: FEATURES.enableSeries },
-  { id: 'wiki',   label: 'Personnalités',   to: '/wiki',   Icon: Landmark, color: '#a78bfa',          enabled: FEATURES.enableWiki },
+  { id: 'wiki',   label: 'Personnalités',   to: '/wiki',   Icon: User, color: 'var(--sg-wiki)',    enabled: FEATURES.enableWiki },
 ];
 
 export function ModeTabs() {

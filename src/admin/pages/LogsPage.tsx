@@ -13,6 +13,8 @@ const ACTION_STYLES: Record<string, string> = {
   'challenge.create':  'bg-green-50 text-green-700 border-green-200',
   'challenge.update':  'bg-amber-50 text-amber-700 border-amber-200',
   'challenge.delete':  'bg-red-50 text-red-700 border-red-200',
+  'user.ban':          'bg-red-50 text-red-700 border-red-200',
+  'user.unban':        'bg-emerald-50 text-emerald-700 border-emerald-200',
 }
 
 function ActionBadge({ action }: { action: string }) {
@@ -45,6 +47,10 @@ function Details({ action, details }: { action: string; details: Record<string, 
     parts.push(`#${details.id} → film #${details.film_id ?? ''}`)
   } else if (action === 'challenge.delete') {
     parts.push(`#${details.id}`)
+  } else if (action === 'user.ban') {
+    parts.push(`utilisateur #${details.userId ?? details.id ?? '—'} banni`)
+  } else if (action === 'user.unban') {
+    parts.push(`utilisateur #${details.userId ?? details.id ?? '—'} réactivé`)
   } else {
     parts.push(JSON.stringify(details))
   }

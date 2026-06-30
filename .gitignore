@@ -38,3 +38,16 @@ backend/dist/
 *.sln
 *.sw?
 .claude/
+
+# Android build artifacts
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/local.properties
+mobile/android/*.hprof
+mobile/android/gradlew
+mobile/android/gradlew.bat
+mobile/android/gradle/
+
+# iOS build artifacts
+mobile/ios/GuessToday.xcodeproj/xcuserdata/
+mobile/ios/GuessToday.xcodeproj/project.xcworkspace/xcuserdata/

@@ -19,7 +19,7 @@ export function HintPanel({ hints, hintsAvailable, hintsRevealed }: HintPanelPro
 
   return (
     <section aria-label="Indices" className="w-full">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <AnimatePresence initial={false}>
           {hints.map((hint, i) => (
             <HintCard key={hint.type} hint={hint} index={i} />
@@ -28,7 +28,7 @@ export function HintPanel({ hints, hintsAvailable, hintsRevealed }: HintPanelPro
 
         {/* Locked slots */}
         {Array.from({ length: lockedCount }).map((_, i) => (
-          <LockedSlot key={`locked-${i}`} />
+          <LockedSlot key={`locked-${i}`} index={hintsRevealed + i + 1} />
         ))}
       </div>
     </section>
@@ -38,35 +38,52 @@ export function HintPanel({ hints, hintsAvailable, hintsRevealed }: HintPanelPro
 // ─── Hint card ────────────────────────────────────────────────────────────────
 
 function HintCard({ hint, index }: { hint: HintPayload; index: number }) {
-  const { icon: Icon, label, formatted } = resolveHint(hint)
+  const { label, formatted } = resolveHint(hint)
 
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.92, y: 8 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
-      className="flex items-start gap-2 sm:gap-2.5 px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-lg film-border"
+      className="flex flex-col gap-1 rounded-[10px] min-w-0"
+      style={{
+        padding: '10px 12px',
+        background: 'var(--color-film-gray, #1a1f2e)',
+        border: '1px solid var(--color-film-border)',
+      }}
     >
-      <span className="mt-0.5 text-film-gold shrink-0" aria-hidden>
-        <Icon size={14} />
-      </span>
-      <div className="min-w-0">
-        <p className="text-xs font-semibold text-film-text-dim uppercase tracking-wider">
-          {label}
-        </p>
-        <p className="text-sm text-film-text leading-snug mt-0.5 break-words">
-          {formatted}
-        </p>
-      </div>
+      <p
+        className="font-mono uppercase tracking-wider leading-none shrink-0 text-film-gold"
+        style={{ fontSize: '9px', fontWeight: 600 }}
+      >
+        {label}
+      </p>
+      <p className="text-sm text-film-text leading-snug break-words min-w-0">
+        {formatted}
+      </p>
     </motion.div>
   )
 }
 
-function LockedSlot() {
+function LockedSlot({ index }: { index: number }) {
   return (
-    <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-dashed border-film-border/40 opacity-40">
-      <Lock size={14} className="text-film-text-dim shrink-0" aria-hidden />
-      <span className="text-sm text-film-text-dim">Indice verrouillé</span>
+    <div
+      className="flex flex-col gap-1 rounded-[10px]"
+      style={{
+        padding: '10px 12px',
+        minHeight: '56px',
+        border: '1px dashed rgba(255,255,255,0.18)',
+      }}
+    >
+      <p
+        className="font-mono uppercase tracking-wider leading-none shrink-0"
+        style={{ fontSize: '9px', fontWeight: 600, color: 'rgba(255,255,255,0.25)' }}
+      >
+        Indice {index}
+      </p>
+      <div className="flex-1 flex items-center">
+        <Lock size={13} style={{ color: 'rgba(255,255,255,0.30)' }} aria-hidden />
+      </div>
     </div>
   )
 }

@@ -5,7 +5,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { RefreshCw, Trash2, Plus, Clapperboard, Tv, ChevronDown, AlertTriangle, History, Pencil, Landmark } from 'lucide-react'
+import { RefreshCw, Trash2, Plus, Clapperboard, Tv, ChevronDown, AlertTriangle, History, Pencil, User } from 'lucide-react'
 import type { AdminChallenge, AdminFilm, AdminSeries, AdminWikiPerson, MediaRef } from '../api'
 
 interface ChallengeRowProps {
@@ -128,7 +128,7 @@ function MediaPicker({ films, seriesList, wikiPersons, mediaType, onSelect, onCa
               tab === 'wiki' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700',
             ].join(' ')}
           >
-            <Landmark size={11} /> Personnalités
+            <User size={11} /> Personnalités
           </button>
         </div>
       )}
@@ -240,7 +240,7 @@ function MediaPicker({ films, seriesList, wikiPersons, mediaType, onSelect, onCa
                     <img src={p.photo_url} alt="" className="w-8 h-5 object-cover rounded border border-gray-100 flex-shrink-0" />
                   ) : (
                     <div className="w-8 h-5 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
-                      <Landmark size={10} className="text-gray-400" />
+                      <User size={10} className="text-gray-400" />
                     </div>
                   )}
                   <span className="truncate flex-1">{p.name}</span>
@@ -256,13 +256,15 @@ function MediaPicker({ films, seriesList, wikiPersons, mediaType, onSelect, onCa
                         ? 'Sport'
                         : p.person_type === 'artist'
                           ? 'Art'
-                          : p.person_type === 'scientist'
-                            ? 'Science'
-                            : p.person_type === 'entrepreneur'
-                              ? 'Business'
-                              : p.person_type === 'writer'
-                                ? 'Litterature'
-                                : 'Histoire'}
+                          : p.person_type === 'actor'
+                            ? 'Acteur'
+                            : p.person_type === 'scientist'
+                              ? 'Science'
+                              : p.person_type === 'entrepreneur'
+                                ? 'Business'
+                                : p.person_type === 'writer'
+                                  ? 'Littérature'
+                                  : 'Histoire'}
                   </span>
                 </button>
               )
@@ -371,7 +373,7 @@ export function ChallengeRow({
             ) : (
               <div className="w-10 h-7 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
                 {isWiki
-                  ? <Landmark size={12} className="text-gray-400" />
+                  ? <User size={12} className="text-gray-400" />
                   : isSeries
                   ? <Tv size={12} className="text-gray-400" />
                   : <Clapperboard size={12} className="text-gray-400" />
@@ -392,7 +394,7 @@ export function ChallengeRow({
               )}
               {isWiki && (
                 <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-violet-100 text-violet-700">
-                  <Landmark size={9} /> Personnalités
+                  <User size={9} /> Personnalités
                 </span>
               )}
             </span>

@@ -14,6 +14,8 @@ function getTodayStr(): string {
 
 interface SeriesRowProps {
   series: AdminSeries
+  selected?: boolean
+  onSelect?: (id: number, checked: boolean) => void
   onEdit: (series: AdminSeries) => void
   onDelete: (series: AdminSeries) => void
   onBackdrops: (series: AdminSeries) => void
@@ -21,7 +23,7 @@ interface SeriesRowProps {
   onPreview: (series: AdminSeries) => void
 }
 
-export function SeriesRow({ series, onEdit, onDelete, onBackdrops, onUpload, onPreview }: SeriesRowProps) {
+export function SeriesRow({ series, selected, onSelect, onEdit, onDelete, onBackdrops, onUpload, onPreview }: SeriesRowProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const today = getTodayStr()
   const pastDates = (series.used_dates ?? []).filter((d) => d <= today)
@@ -80,6 +82,14 @@ export function SeriesRow({ series, onEdit, onDelete, onBackdrops, onUpload, onP
       <tr className="sm:hidden border-b border-gray-100 last:border-0">
         <td className="px-3 py-3" colSpan={10}>
           <div className="flex items-center gap-3">
+            {onSelect && (
+              <input
+                type="checkbox"
+                checked={selected ?? false}
+                onChange={(e) => onSelect(series.id, e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-indigo-600 accent-indigo-600 shrink-0"
+              />
+            )}
             <div className="shrink-0">
               {series.image_url ? (
                 <img src={resolveThumb(series.image_url)} alt={series.title}
@@ -104,7 +114,17 @@ export function SeriesRow({ series, onEdit, onDelete, onBackdrops, onUpload, onP
       </tr>
 
       {/* Desktop row */}
-      <tr className="hidden sm:table-row hover:bg-gray-50 transition-colors group">
+      <tr className={`hidden sm:table-row hover:bg-gray-50 transition-colors group ${selected ? 'bg-indigo-50' : ''}`}>
+        {onSelect && (
+          <td className="px-3 py-3 w-8">
+            <input
+              type="checkbox"
+              checked={selected ?? false}
+              onChange={(e) => onSelect(series.id, e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-indigo-600 accent-indigo-600"
+            />
+          </td>
+        )}
         <td className="px-3 py-3 w-20">
           {series.image_url ? (
             <img src={resolveThumb(series.image_url)} alt={series.title}

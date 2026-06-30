@@ -55,6 +55,16 @@ export type WikiPersonType =
   | 'writer'
   | 'historical_figure'
   | 'generic'
+  | 'actor'
+
+export interface WikiActorData {
+  birth_year: number | null
+  nationality: string | null
+  /** Films notables extraits de l'infobox (ex. "Titanic · Inception · The Revenant") */
+  notable_films: string | null
+  /** Rôle principal : "Acteur", "Acteur · Réalisateur", etc. */
+  occupation: string | null
+}
 
 export interface WikiGenericData {
   domain: string | null
@@ -68,7 +78,7 @@ export interface WikiGenericData {
   highlights?: Array<{ label: string; value: string }>
 }
 
-export type WikiInfoboxData = WikiPoliticianData | WikiSportspersonData | WikiGenericData
+export type WikiInfoboxData = WikiPoliticianData | WikiSportspersonData | WikiActorData | WikiGenericData
 
 export interface WikiFetchResult {
   name: string
@@ -502,10 +512,17 @@ function detectPersonType(wikitext: string): WikiPersonType {
     'infobox premier ministre', 'infobox ministre', 'infobox chef d\'état',
   ]
   if (politicianKeywords.some(k => lower.includes(k))) return 'politician'
+  const actorKeywords = [
+    'infobox acteur', 'infobox actrice', 'infobox actor', 'infobox actress',
+    'infobox réalisateur', 'infobox director', 'infobox filmmaker',
+  ]
+  if (actorKeywords.some(k => lower.includes(k))) return 'actor'
+  // Infobox Biographie2 avec charte = Acteur/Actrice
+  if (lower.includes('infobox biographie2') && /\|\s*charte\s*=\s*actri?c?e?u?r?/i.test(wikitext)) return 'actor'
   const artistKeywords = [
-    'infobox artiste', 'infobox acteur', 'infobox musicien', 'infobox chanteur',
-    'infobox comedian', 'infobox actor', 'infobox singer', 'infobox musician',
-    'infobox entertainer', 'infobox artist', 'infobox réalisateur', 'infobox director',
+    'infobox artiste', 'infobox musicien', 'infobox chanteur',
+    'infobox comedian', 'infobox singer', 'infobox musician',
+    'infobox entertainer', 'infobox artist',
   ]
   if (artistKeywords.some(k => lower.includes(k))) return 'artist'
   const scientistKeywords = [
@@ -541,7 +558,8 @@ function detectPersonTypeFromSummary(description: string | undefined): WikiPerso
   if (!d) return null
   if (/(activiste|militant|militante|écologiste|ecologiste|climate activist|environmental activist|human rights activist)/.test(d)) return 'generic'
   if (/(footballeu[rs]e?|joueu[rs]e?|athlète|sportif|sportive|tennis|basket|rugby|cycliste|nageuse?|handballeu[rs]e?|volleyballer|boxeu[rs]e?)/.test(d)) return 'sportsperson'
-  if (/(chanteu[rs]e?|acteu[rs]|actrice|artiste|musicien|musicienne|rappeu[rs]e?|compositeu[rs]e?|réalisateu[rs]e?|comédien|comédienne)/.test(d)) return 'artist'
+  if (/(acteu[rs]|actrice|réalisateu[rs]e?|comédien|comédienne|filmmaker)/.test(d)) return 'actor'
+  if (/(chanteu[rs]e?|artiste|musicien|musicienne|rappeu[rs]e?|compositeu[rs]e?)/.test(d)) return 'artist'
   if (/(scientifique|physicien|chimiste|mathématicien|biologiste|astronome|informaticien|ingénieur)/.test(d)) return 'scientist'
   if (/(entrepreneur|homme d'affaires|femme d'affaires|businessman|businesswoman|investisseur|chef d'entreprise|dirigeant)/.test(d)) return 'entrepreneur'
   if (/(écrivain|écrivaine|romancier|romancière|poète|poétesse|auteur|auteure|dramaturge|journaliste)/.test(d)) return 'writer'
@@ -1066,6 +1084,79 @@ function parseSportspersonData(wikitext: string): WikiSportspersonData {
   }
 }
 
+function parseActorData(wikitext: string): WikiActorData {
+  const infoboxOnly = extractFirstInfoboxWikitext(wikitext)
+  const fields = parseInfoboxFields(infoboxOnly)
+
+  const birthYear = extractYear(readInfoboxField(fields, ['birth_date', 'date de naissance', 'naissance', 'born']))
+
+  // Nationalité : prefer birth_place lines 1 only if nationality absent
+  const natRaw = readInfoboxField(fields, ['nationality', 'nationalité', 'citoyenneté'])
+  const placeRaw = readInfoboxField(fields, ['birth_place', 'lieu de naissance', 'lieu_de_naissance'])
+  const nationality = (
+    stripLinks(natRaw).split('\n')[0]?.trim() ||
+    stripLinks(placeRaw).split(/[,\n]/)[0]?.trim() ||
+    null
+  ) || null
+
+  // Occupation
+  const occRaw = readInfoboxField(fields, ['occupation', 'occupations', 'profession', 'activité', 'activités'])
+  const occupation = occRaw
+    ? stripLinks(occRaw)
+        .replace(/\{\{[^}]*\}\}/g, '')
+        .split(/[,·\n]/)
+        .map(s => s.replace(/[*#]/g, '').trim())
+        .filter(Boolean)
+        .slice(0, 2)
+        .join(' · ') || null
+    : null
+
+  // Films notables — plusieurs champs possibles selon template
+  const filmsRaw = readInfoboxField(fields, [
+    'known_for', 'connu pour', 'célèbre pour',
+    'notable_works', 'œuvres principales', 'oeuvres principales',
+    'films notables', 'films_notables',
+    'films', 'filmographie',
+    'notable_role', 'roles notables',
+    'séries notables', 'series notables',
+  ])
+
+  function extractFilmList(raw: string, max = 6): string[] {
+    return stripLinks(raw)
+      .replace(/\{\{[^}]*\}\}/g, '')
+      .replace(/''/g, '')           // strip wiki italic markers
+      .split(/[,\n·;|]/)
+      .map(s => s.replace(/[*#\-–—]/g, '').trim())
+      .filter(s => s.length > 1 && !/^\d{4}$/.test(s) && !/^\d{4}[-–]\d{2,4}$/.test(s))
+      .slice(0, max)
+  }
+
+  let notable_films_list: string[] = filmsRaw ? extractFilmList(filmsRaw) : []
+
+  // Fallback 1 : section Filmographie sélective / partielle / notable
+  if (notable_films_list.length === 0) {
+    const filmSection = wikitext.match(
+      /==+\s*[Ff]ilmo(?:graphie)?(?:\s+(?:sélective|partielle|notable|choisie))?[^=]*==+\s*([\s\S]*?)(?:==|$)/
+    )?.[1] ?? ''
+    const filmTitles = [...filmSection.matchAll(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g)]
+      .map(m => m[1]!.replace(/ \(film\)| \(movie\)| \(série\)/i, '').trim())
+      .filter(t => t.length > 1 && t.length < 80)
+    notable_films_list = filmTitles.slice(0, 6)
+  }
+
+  // Fallback 2 : première table de filmographie (lignes en | avec une année)
+  if (notable_films_list.length === 0) {
+    const tableLinks = [...wikitext.matchAll(/\|\s*\[\[([^\]|]{2,60})(?:\|[^\]]+)?\]\]\s*\|\|/g)]
+      .map(m => m[1]!.replace(/ \(film\)| \(movie\)/i, '').trim())
+      .filter(t => t.length > 1)
+    notable_films_list = tableLinks.slice(0, 6)
+  }
+
+  const notable_films = notable_films_list.length > 0 ? notable_films_list.join(' · ') : null
+
+  return { birth_year: birthYear, nationality, notable_films, occupation }
+}
+
 function parseGenericData(wikitext: string, domain: string): WikiGenericData {
   const fields = parseInfoboxFields(extractFirstInfoboxWikitext(wikitext))
   const extractCompactField = (raw: string, maxLines = 2, maxLen = 180): string => {
@@ -1106,6 +1197,7 @@ function parseGenericData(wikitext: string, domain: string): WikiGenericData {
     'ouvrages principaux', 'principal_work', 'principal work', 'famous_works', 'works',
   ]), 3, 220)
   const mediaWorksRaw = extractCompactField(readInfoboxField(fields, [
+    'films', 'filmographie', 'films notables',
     'television', 'tv', 'programmes', 'programs', 'shows', 'émissions', 'emissions',
     'notable_role', 'notable role', 'roles notables',
   ]), 2, 180)
@@ -1388,7 +1480,8 @@ function inferTypeFromWikidataOccupations(occupations: string[]): WikiPersonType
   if (lower.some((o) => /(\bmonarch\b|\bmonarque\b|\bempereur\b|\bimp[ée]ratrice\b|\bemperor\b|\broi\b|\bking\b|\breine\b|\bqueen\b|\bnobility\b|\bdynasty\b|\bsultan\b|\bpope\b|\bpape\b|\bpharaoh\b|\bduke\b|\bduchess\b|\bsouverain\b)/.test(o))) return 'historical_figure'
   if (lower.some((o) => /(activist|activisme|militant|militante|environmentalist|écologiste|ecologiste|human rights)/.test(o))) return 'generic'
   if (lower.some((o) => /(football|athl|tennis|basket|sport|joueur|player|coureur|nageur|rugby|cyclist|swimmer|boxer|golfer)/.test(o))) return 'sportsperson'
-  if (lower.some((o) => /(singer|actor|actrice|acteur|artist|artiste|musician|musicien|rappeur|composer|filmmaker|comedian)/.test(o))) return 'artist'
+  if (lower.some((o) => /(actor|actrice|acteur|actress|filmmaker|réalisateur|director|comedian|comédien)/.test(o))) return 'actor'
+  if (lower.some((o) => /(singer|artist|artiste|musician|musicien|rappeur|composer)/.test(o))) return 'artist'
   if (lower.some((o) =>
     /(scientist|scientifique|physicien|chimiste|mathématicien|mathematician|biologiste|astronomer|researcher|ingénieur|ingenieur|engineer)/.test(o))) return 'scientist'
   if (lower.some((o) => /(entrepreneur|business|investor|industriel|chef d'entreprise)/.test(o))) return 'entrepreneur'
@@ -1450,9 +1543,34 @@ function applyWikidataFallback(
       },
     }
   }
+  if (resolvedType === 'actor') {
+    const a = infobox as Partial<WikiActorData>
+    let notable_films = normalizeValue(a.notable_films ?? null)
+    if (!notable_films && fallback.notable_work_labels.length > 0) {
+      notable_films = normalizeValue(fallback.notable_work_labels.slice(0, 4).join(' · '))
+    }
+    const occRaw = fallback.occupations
+      .filter(o => /(actor|acteur|actrice|actress|réalisateur|director|filmmaker|comedian|comédien)/.test(o.toLowerCase()))
+      .slice(0, 2)
+    const occupation = normalizeValue(
+      (a.occupation ?? (occRaw.length > 0 ? occRaw.join(' · ') : null)) ?? null
+    )
+    return {
+      personType: resolvedType,
+      infobox: {
+        birth_year: a.birth_year ?? fallback.birth_year,
+        nationality: normalizeValue(a.nationality ?? fallback.nationality),
+        notable_films,
+        occupation,
+      } satisfies WikiActorData,
+    }
+  }
   const g = infobox as Partial<WikiGenericData>
+  const isActorResolved = resolvedType === 'artist' && fallback.occupations.some((o) =>
+    /(actor|acteur|actrice|actress|réalisateur|director|filmmaker|comedian|comédien|comédienne)/.test(o.toLowerCase())
+  )
   const fallbackDomain = (() => {
-    if (resolvedType === 'artist') return 'Musique'
+    if (resolvedType === 'artist') return isActorResolved ? 'Cinéma' : 'Musique'
     if (resolvedType === 'scientist') return 'Science'
     if (resolvedType === 'entrepreneur') return 'Entrepreneuriat'
     if (resolvedType === 'writer') return 'Littérature'
@@ -1511,22 +1629,30 @@ function applyWikidataFallback(
 
   if (resolvedType === 'artist') {
     const rows: Array<{ label: string; value: string }> = [...existingHighlights]
-    if (fallback.member_of_labels.length > 0) {
-      rows.push({
-        label: 'Membre de',
-        value: fallback.member_of_labels.slice(0, 6).join(' · '),
-      })
-    }
-    if (fallback.record_label_labels.length > 0) {
-      rows.push({
-        label: 'Label(s)',
-        value: fallback.record_label_labels.slice(0, 6).join(' · '),
-      })
-    }
-    for (const value of fallback.notable_work_labels.slice(1, 9)) {
-      const v = normalizeValue(value)
-      if (!v) continue
-      rows.push({ label: 'Album / titre', value: v })
+    if (isActorResolved) {
+      for (const value of fallback.notable_work_labels.slice(0, 9)) {
+        const v = normalizeValue(value)
+        if (!v) continue
+        rows.push({ label: 'Film / série', value: v })
+      }
+    } else {
+      if (fallback.member_of_labels.length > 0) {
+        rows.push({
+          label: 'Membre de',
+          value: fallback.member_of_labels.slice(0, 6).join(' · '),
+        })
+      }
+      if (fallback.record_label_labels.length > 0) {
+        rows.push({
+          label: 'Label(s)',
+          value: fallback.record_label_labels.slice(0, 6).join(' · '),
+        })
+      }
+      for (const value of fallback.notable_work_labels.slice(1, 9)) {
+        const v = normalizeValue(value)
+        if (!v) continue
+        rows.push({ label: 'Album / titre', value: v })
+      }
     }
     highlightsOut = rows.slice(0, HIGHLIGHT_CAP)
     if (highlightsOut.length === 0) highlightsOut = undefined
@@ -1557,6 +1683,9 @@ function defaultHintSchedule(personType: WikiPersonType): string[] {
   }
   if (personType === 'entrepreneur') {
     return ['birth_year', 'nationality', 'company', 'name_initials', 'name_length']
+  }
+  if (personType === 'actor') {
+    return ['birth_year', 'nationality', 'notable_films', 'name_initials', 'name_length']
   }
   return ['birth_year', 'nationality', 'name_initials', 'name_length']
 }
@@ -1591,6 +1720,11 @@ function evaluateParseQuality(
     if (!isTennisProfile && !s.position) { score -= 15; warnings.push('Poste manquant') }
     if (!s.birth_year) { score -= 20; warnings.push('Année de naissance manquante') }
     if (!s.nationality) { score -= 15; warnings.push('Nationalité manquante') }
+  } else if (personType === 'actor') {
+    const a = infoboxData as WikiActorData
+    if (!a.notable_films) { score -= 35; warnings.push('Aucun film notable extrait') }
+    if (!a.birth_year) { score -= 20; warnings.push('Année de naissance manquante') }
+    if (!a.nationality) { score -= 15; warnings.push('Nationalité manquante') }
   } else if (personType === 'entrepreneur') {
     const g = infoboxData as WikiGenericData
     if (!g.domain) { score -= 20; warnings.push('Domaine manquant') }
@@ -1863,13 +1997,18 @@ export async function fetchWikipediaData(
 
   const wikidataType = wikidata ? inferTypeFromWikidataOccupations(wikidata.occupations) : null
   let personType = wikidataType ?? detectPersonTypeFromSummary(summaryDescription) ?? detectPersonType(wikitext)
+  const isActorOccupation = (wikidata?.occupations ?? []).some((o) =>
+    /(actor|acteur|actrice|actress|réalisateur|director|filmmaker|comedian|comédien|comédienne)/.test(o.toLowerCase())
+  )
   let infobox_data: WikiInfoboxData = personType === 'politician'
     ? parsePoliticianData(wikitext)
     : personType === 'sportsperson'
       ? parseSportspersonData(wikitext)
-      : personType === 'artist'
-        ? parseGenericData(wikitext, 'Musique')
-        : personType === 'scientist'
+      : personType === 'actor'
+        ? parseActorData(wikitext)
+        : personType === 'artist'
+          ? parseGenericData(wikitext, isActorOccupation ? 'Cinéma' : 'Musique')
+          : personType === 'scientist'
           ? parseGenericData(wikitext, 'Science')
           : personType === 'entrepreneur'
             ? parseGenericData(wikitext, 'Entrepreneuriat')

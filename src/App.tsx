@@ -15,6 +15,12 @@ import { useWikiStore } from './store/wikiStore'
 import { fetchChallengeCommunityStats } from './api/client'
 import type { GlobalStatsPayload } from './api/client'
 import { loadStats } from './lib/storage'
+import { useAuthStore } from './store/authStore'
+import { AuthModal } from './components/modals/AuthModal'
+import { ResetPasswordPage } from './components/ResetPasswordPage'
+import { FriendsPage } from './components/FriendsPage'
+import { ProfilePage } from './components/ProfilePage'
+import { EmailVerificationBanner } from './components/EmailVerificationBanner'
 
 const EMPTY_GLOBAL_STATS: GlobalStatsPayload = {
   totalGames: 0,
@@ -26,21 +32,51 @@ const EMPTY_GLOBAL_STATS: GlobalStatsPayload = {
 }
 
 function GameModals({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
-  const ui = useGameStore((s) => s.ui)
-  const closeModal = useGameStore((s) => s.closeModal)
-  const challenge = useGameStore((s) => s.challenge)
+  const gameUi = useGameStore((s) => s.ui)
+  const gameCloseModal = useGameStore((s) => s.closeModal)
+  const gameChallenge = useGameStore((s) => s.challenge)
+  const wikiUi = useWikiStore((s) => s.ui)
+  const wikiCloseModal = useWikiStore((s) => s.closeModal)
+  const wikiChallenge = useWikiStore((s) => s.challenge)
+
+  const isWiki = mode === 'wiki'
+  const ui = isWiki ? wikiUi : gameUi
+  const closeModal = isWiki ? wikiCloseModal : gameCloseModal
+  const challenge = isWiki ? wikiChallenge : gameChallenge
+
   const [globalStats, setGlobalStats] = useState<GlobalStatsPayload>(EMPTY_GLOBAL_STATS)
 
-  const statsType = mode === 'series' ? 'series' : 'film'
+  const statsType = isWiki ? 'wiki' : mode === 'series' ? 'series' : 'film'
+  const serverStatsForMode = useAuthStore((s) => s.serverStats[statsType])
   const personalStatsRaw = useMemo(() => loadStats(statsType), [statsType, ui.modalType, ui.isModalOpen])
-  const personalStats = useMemo(() => ({
-    currentStreak: personalStatsRaw.currentStreak,
-    maxStreak: personalStatsRaw.maxStreak,
-    gamesPlayed: personalStatsRaw.gamesPlayed,
-    winRate: personalStatsRaw.gamesPlayed > 0
-      ? Math.round((personalStatsRaw.gamesWon / personalStatsRaw.gamesPlayed) * 100)
-      : 0,
-  }), [personalStatsRaw])
+  const personalStats = useMemo(() => {
+    if (serverStatsForMode) {
+      return {
+        currentStreak: serverStatsForMode.currentStreak,
+        maxStreak: serverStatsForMode.maxStreak,
+        gamesPlayed: serverStatsForMode.gamesPlayed,
+        winRate: serverStatsForMode.gamesPlayed > 0
+          ? Math.round((serverStatsForMode.wins / serverStatsForMode.gamesPlayed) * 100)
+          : 0,
+      }
+    }
+    return {
+      currentStreak: personalStatsRaw.currentStreak,
+      maxStreak: personalStatsRaw.maxStreak,
+      gamesPlayed: personalStatsRaw.gamesPlayed,
+      winRate: personalStatsRaw.gamesPlayed > 0
+        ? Math.round((personalStatsRaw.gamesWon / personalStatsRaw.gamesPlayed) * 100)
+        : 0,
+    }
+  }, [serverStatsForMode, personalStatsRaw])
+  const personalDistribution = useMemo(() => {
+    if (serverStatsForMode) {
+      return Object.fromEntries(
+        ([1, 2, 3, 4, 5] as const).map((k) => [k, serverStatsForMode.distribution[String(k)] ?? 0])
+      ) as Record<1 | 2 | 3 | 4 | 5, number>
+    }
+    return personalStatsRaw.guessDistribution
+  }, [serverStatsForMode, personalStatsRaw])
 
   const communityDateLabel =
     challenge?.date != null
@@ -66,69 +102,16 @@ function GameModals({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
 
   return (
     <Suspense>
-      <RulesModal mode={mode === 'series' ? 'series' : 'film'} />
-      <ArchiveModal mode="classic" />
+      <RulesModal mode={isWiki ? 'wiki' : mode === 'series' ? 'series' : 'film'} />
+      <ArchiveModal mode={isWiki ? 'wiki' : 'classic'} />
       <StatsModal
         isOpen={ui.isModalOpen && ui.modalType === 'stats'}
         onClose={closeModal}
-        mode={mode === 'series' ? 'series' : 'film'}
+        mode={isWiki ? 'wiki' : mode === 'series' ? 'series' : 'film'}
         communityDateLabel={communityDateLabel}
         globalStats={globalStats}
         personalStats={personalStats}
-      />
-    </Suspense>
-  )
-}
-
-function WikiModals() {
-  const ui = useWikiStore((s) => s.ui)
-  const closeModal = useWikiStore((s) => s.closeModal)
-  const challenge = useWikiStore((s) => s.challenge)
-  const [globalStats, setGlobalStats] = useState<GlobalStatsPayload>(EMPTY_GLOBAL_STATS)
-
-  const personalStatsRaw = useMemo(() => loadStats('wiki'), [ui.modalType, ui.isModalOpen])
-  const personalStats = useMemo(() => ({
-    currentStreak: personalStatsRaw.currentStreak,
-    maxStreak: personalStatsRaw.maxStreak,
-    gamesPlayed: personalStatsRaw.gamesPlayed,
-    winRate: personalStatsRaw.gamesPlayed > 0
-      ? Math.round((personalStatsRaw.gamesWon / personalStatsRaw.gamesPlayed) * 100)
-      : 0,
-  }), [personalStatsRaw])
-
-  const communityDateLabel =
-    challenge?.date != null
-      ? `Pour le défi du ${new Date(challenge.date + 'T12:00:00').toLocaleDateString('fr-FR', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-        })} (tous les joueurs)`
-      : null
-
-  useEffect(() => {
-    if (!ui.isModalOpen || ui.modalType !== 'stats') return
-    const id = challenge && 'challengeId' in challenge ? challenge.challengeId : null
-    if (id == null) {
-      setGlobalStats(EMPTY_GLOBAL_STATS)
-      return
-    }
-    fetchChallengeCommunityStats(id)
-      .then(setGlobalStats)
-      .catch(() => setGlobalStats(EMPTY_GLOBAL_STATS))
-  }, [ui.isModalOpen, ui.modalType, challenge?.challengeId])
-
-  return (
-    <Suspense>
-      <RulesModal mode="wiki" />
-      <ArchiveModal mode="wiki" />
-      <StatsModal
-        isOpen={ui.isModalOpen && ui.modalType === 'stats'}
-        onClose={closeModal}
-        mode="wiki"
-        communityDateLabel={communityDateLabel}
-        globalStats={globalStats}
-        personalStats={personalStats}
+        personalDistribution={personalDistribution}
       />
     </Suspense>
   )
@@ -155,11 +138,11 @@ function GameLayout({ mode }: { mode: 'film' | 'series' | 'wiki' }) {
   return (
     <div className="app min-h-dvh flex flex-col bg-film-black text-film-text" data-mode={mode}>
       <Header mode={mode} />
-      <main id="main-content" className={`flex-1${mode === 'wiki' ? ' pb-10 sm:pb-14' : ''}`}>
+      <main id="main-content" className="flex-1">
         <GamePage mode={mode} />
       </main>
       <Footer />
-      {mode === 'wiki' ? <WikiModals /> : <GameModals mode={mode} />}
+      <GameModals mode={mode} />
     </div>
   )
 }
@@ -168,15 +151,34 @@ export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       <BrowserRouter>
-        <Routes>
-          <Route path="/films/*" element={<GameLayout mode="film" />} />
-          {FEATURES.enableSeries && <Route path="/series/*" element={<GameLayout mode="series" />} />}
-          {FEATURES.enableWiki && <Route path="/wiki/*" element={<GameLayout mode="wiki" />} />}
-          <Route path="/" element={<Navigate to="/films" replace />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthShell>
+          <Routes>
+            <Route path="/films/*" element={<GameLayout mode="film" />} />
+            {FEATURES.enableSeries && <Route path="/series/*" element={<GameLayout mode="series" />} />}
+            {FEATURES.enableWiki && <Route path="/wiki/*" element={<GameLayout mode="wiki" />} />}
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/friends" element={<FriendsPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/" element={<Navigate to="/films" replace />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthShell>
       </BrowserRouter>
     </MotionConfig>
+  )
+}
+
+function AuthShell({ children }: { children: React.ReactNode }) {
+  const fetchMe = useAuthStore((s) => s.fetchMe)
+  useEffect(() => {
+    void fetchMe()
+  }, [fetchMe])
+  return (
+    <>
+      <EmailVerificationBanner />
+      {children}
+      <AuthModal />
+    </>
   )
 }
 
